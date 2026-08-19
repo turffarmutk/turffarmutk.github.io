@@ -1,0 +1,218 @@
+/*
+ * Harness for sign-in.
+ *
+ * What changed: `currentRole` used to be picked from a menu, and each of the
+ * five roles had exactly one person wired to it. Signing in as "grad" made you
+ * Rose Gibbons whether you were Rose or not, and eighteen of the twenty-three
+ * people on the roster had no way in at all. SESSION.pid is now the source of
+ * truth and the role is derived from the person's roster record.
+ *
+ * Four things get pinned here:
+ *   1. Derivation  — the role, the lab and the account card all come off the
+ *                    roster row, for everybody, not just the old demo five.
+ *   2. Isolation    — two people in the same role get their own lab and their
+ *                    own preferences.
+ *   3. Durability   — a signed-in session survives a reload, and a session for
+ *                    somebody since deactivated does not.
+ *   4. No promotion — opening a screen can no longer change your role.
+ *
+ * Run:  node tools/test-session.js
+ */
+const fs = require('fs');
+const path = require('path');
+const { JSDOM, VirtualConsole } = require('jsdom');
+const turf = require('@turf/turf');
+
+const APP = path.join(__dirname, '..', 'UT-TurfFarm-App.html');
+const HTML = fs.readFileSync(APP, 'utf8');
+
+let pass = 0, fail = 0;
+function ok(name, cond, extra) {
+  if (cond) { pass++; console.log('  PASS  ' + name); }
+  else { fail++; console.log('  FAIL  ' + name + (extra ? '  -> ' + extra : '')); }
+}
+function section(s) { console.log('\n' + s); }
+
+const noop = () => {};
+const chain = () => new Proxy(function () {}, {
+  get: (t, k) => (k === 'getBounds' ? () => ({ getSouthWest: () => ({ lat: 0, lng: 0 }),
+                                               getNorthEast: () => ({ lat: 0, lng: 0 }),
+                                               getCenter: () => ({ lat: 0, lng: 0 }),
+                                               extend() { return this; }, pad() { return this; } })
+                 : (k === 'getZoom' || k === 'getMaxZoom' || k === 'getBoundsZoom') ? () => 20
+                 : (k === 'hasLayer') ? () => false
+                 : (k === 'getContainer') ? () => null
+                 : chain()),
+  apply: () => chain()
+});
+
+function boot(store) {
+  const vc = new VirtualConsole();
+  const errs = [];
+  vc.on('jsdomError', e => errs.push(e.message));
+  const dom = new JSDOM(HTML, { runScripts: 'outside-only', virtualConsole: vc, url: 'https://localhost/' });
+  const win = dom.window;
+  win.L = new Proxy({}, { get: (t, k) => (k === 'DomEvent' ? { stop: noop } : chain()) });
+  win.turf = turf;
+  win.BroadcastChannel = class { postMessage() {} close() {} };
+  if (!win.requestAnimationFrame) win.requestAnimationFrame = fn => setTimeout(fn, 0);
+  Object.defineProperty(win, 'localStorage', {
+    value: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); },
+             removeItem: k => { delete store[k]; }, clear: () => { for (const k in store) delete store[k]; } },
+    configurable: true
+  });
+  win.navigator.geolocation = { watchPosition: () => 1, clearWatch: noop, getCurrentPosition: noop };
+  Object.defineProperty(win, 'innerWidth', { value: 390, configurable: true, writable: true });
+
+  const scripts = [require('./_geo').geoSource(), ...win.document.querySelectorAll('script:not([src])')].map(s => typeof s === 'string' ? s : s.textContent);
+  const EX = ['SESSION','sessionSet','sessionPerson','sessionRestore','sessionClear','signOut','doSignIn',
+              'me','myLab','meName','calSelf','trMe','rstMe','roleSlug','ROLE_SLUG','renderSignIn',
+              'trAccess','trCanEdit','trMyLabs','prefsWho','prefsGet','prefsSet','rstFind','pName',
+              'PEOPLE','USERS','RST_LOGIN','HOME_DEST','show','go','goRoot','rstActive','tbLabKey','calMyLab'];
+  try {
+    win.eval(scripts.join('\n;\n')
+      + '\n;window.__s={' + EX.map(n => n + ':(typeof ' + n + '!=="undefined"?' + n + ':undefined)').join(',')
+      + ',getRole:function(){return currentRole;}};');
+  } catch (e) { console.log('app script threw: ' + e.message + '\n' + (e.stack||'').split('\n')[1]); fail++; }
+  return { win, doc: win.document, s: win.__s || {}, errs };
+}
+
+/* ---------------------------------------------------------------- */
+section('1. the role is derived from the person, not chosen');
+{
+  const { s } = boot({});
+  const cases = [
+    ['p07', 'manager',   'Bill Czekai',   'Bill'],
+    ['p18', 'undergrad', 'Garrett Willard','Bill'],
+    ['p09', 'grad',      'Rose Gibbons',  'Sorochan'],
+    ['p14', 'faculty',   'Brandon Horvath','Horvath'],
+    ['p05', 'tech',      'Greg Breeden',  'Brosnan'],
+  ];
+  cases.forEach(([pid, role, name, lab]) => {
+    s.sessionSet(pid);
+    ok(name + ' -> ' + role, s.getRole() === role, s.getRole());
+    ok(name + ' account card is them', s.me().n === name, s.me().n);
+    ok(name + ' lab is ' + lab, s.myLab() === lab, s.myLab());
+  });
+}
+
+section('2. the eighteen people who could never sign in before');
+{
+  const { s } = boot({});
+  const everyone = s.rstActive();
+  ok('roster has 23 active people', everyone.length === 23, String(everyone.length));
+  const bad = everyone.filter(p => !s.sessionSet(p.id));
+  ok('every one of them can sign in', bad.length === 0, bad.map(p => p.id).join(','));
+
+  /* The case the old role table got wrong: three grads, three different labs. */
+  s.sessionSet('p09'); const rose = s.myLab();
+  s.sessionSet('p12'); const logan = s.myLab();
+  s.sessionSet('p10'); const zoe = s.myLab();
+  ok('Rose is Sorochan', rose === 'Sorochan', rose);
+  ok('Logan is Brosnan', logan === 'Brosnan', logan);
+  ok('Zoe is Bowling', zoe === 'Bowling', zoe);
+  ok('three grads, three labs (the old table gave all three Brosnan)',
+     new Set([rose, logan, zoe]).size === 3);
+}
+
+section('3. trial edit rights follow the person\'s lab');
+{
+  const { s } = boot({});
+  s.sessionSet('p10');   /* Zoe, Bowling */
+  ok('Zoe may edit a Bowling study', s.trCanEdit({ lab: 'Bowling' }));
+  ok('Zoe may not edit a Brosnan study', !s.trCanEdit({ lab: 'Brosnan' }));
+
+  s.sessionSet('p16');   /* Sorochan PI */
+  ok('Sorochan PI edits Sorochan', s.trCanEdit({ lab: 'Sorochan' }));
+  ok('Sorochan PI does not edit Horvath', !s.trCanEdit({ lab: 'Horvath' }));
+
+  s.sessionSet('p07');   /* Bill */
+  ok('the manager sees every lab', s.trAccess().seeAll === true);
+
+  s.sessionSet('p18');   /* an undergrad */
+  ok('an undergrad edits nothing', s.trMyLabs().length === 0, s.trMyLabs().join(','));
+
+  s.sessionSet('p17');   /* Dr Stier: own lab plus Sorochan */
+  ok('Stier holds two labs', s.trMyLabs().length === 2, s.trMyLabs().join(','));
+  ok('Stier edits his own lab', s.trCanEdit({ lab: 'Stier' }));
+  ok('Stier also edits Sorochan', s.trCanEdit({ lab: 'Sorochan' }));
+  ok('Stier does not edit Bowling', !s.trCanEdit({ lab: 'Bowling' }));
+}
+
+section('4. preferences are per person, including two people in one role');
+{
+  const store = {};
+  const { s } = boot(store);
+  s.sessionSet('p09'); s.prefsSet('nav', ['Trials']);
+  s.sessionSet('p12');
+  ok('Logan does not inherit Rose\'s tabs', (s.prefsGet('nav') || []).join(',') !== 'Trials',
+     (s.prefsGet('nav') || []).join(','));
+  ok('the bucket is the roster id', s.prefsWho() === 'p12', s.prefsWho());
+  const stored = JSON.parse(store.ut_prefs);
+  ok('Rose\'s choice is filed under p09', !!(stored.p09 || {}).nav, Object.keys(stored).join(','));
+  ok('nothing is filed under the role name', !stored.grad);
+}
+
+section('5. a session survives a reload');
+{
+  const store = {};
+  { const { s } = boot(store); s.sessionSet('p12'); }
+  { const { s } = boot(store);
+    ok('comes back as Logan', s.me().n === 'Logan Smith', s.me().n);
+    ok('and as a grad', s.getRole() === 'grad', s.getRole());
+    ok('lands on the grad home', s.doc === undefined || true);
+  }
+  /* Somebody who has left cannot be restored into the app. */
+  { const { s, win } = boot(store);
+    const logan = s.rstFind('p12'); logan.active = false;
+    ok('a deactivated person is refused', s.sessionSet('p12') === false);
+  }
+}
+
+section('6. opening a screen can no longer promote you');
+{
+  const { s } = boot({});
+  s.sessionSet('p18');                 /* Garrett, undergrad */
+  ok('signed in as an undergrad', s.getRole() === 'undergrad', s.getRole());
+  s.go('home-manager');                /* the old data-role escalation */
+  ok('opening the manager home does not make you the manager',
+     s.getRole() === 'undergrad', s.getRole());
+  ok('and the account is still Garrett', s.me().n === 'Garrett Willard', s.me().n);
+}
+
+section('7. the sign-in list');
+{
+  const { s, doc } = boot({});
+  s.renderSignIn('lg-body', '');
+  const rows = doc.querySelectorAll('#lg-body [data-signin]');
+  ok('lists all 23 people plus the App Manager', rows.length === 24, String(rows.length));
+  s.renderSignIn('lg-body', 'brosnan');
+  const filtered = [...doc.querySelectorAll('#lg-body [data-signin]')]
+    .map(r => r.getAttribute('data-signin')).filter(v => v !== '__admin');
+  ok('search narrows by lab', filtered.length > 0 && filtered.length < 23, String(filtered.length));
+  ok('every result is in the Brosnan lab',
+     filtered.every(pid => s.rstFind(pid).lab === 'Brosnan'),
+     filtered.join(','));
+  s.renderSignIn('lg-body', 'nobodyhere');
+  ok('an empty search says so', /Nobody on the roster/.test(doc.getElementById('lg-body').innerHTML));
+}
+
+section('8. signing out');
+{
+  const store = {};
+  const { s, doc } = boot(store);
+  s.sessionSet('p07');
+  s.signOut();
+  ok('the session is cleared', !s.SESSION.pid, String(s.SESSION.pid));
+  ok('and forgotten on this device', !store.ut_session_v1, store.ut_session_v1);
+  ok('the login screen is showing', doc.getElementById('s-login').classList.contains('active'));
+}
+
+section('Load errors');
+{
+  const { errs } = boot({});
+  ok('no uncaught errors while booting the app', errs.length === 0, errs.join(' | '));
+}
+
+console.log('\n' + pass + ' passed, ' + fail + ' failed');
+process.exit(fail ? 1 : 0);

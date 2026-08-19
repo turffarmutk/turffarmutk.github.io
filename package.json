@@ -1,0 +1,31 @@
+{
+  "private": true,
+  "description": "Dev-only tooling for the UT Turf Farm app. The app is UT-TurfFarm-App.html plus farm-geo.js, which must sit beside it; neither needs any of this to run.",
+  "scripts": {
+    "test": "node tools/test-field-position.js && node tools/test-mowing-setup.js && node tools/test-back-nav.js && node tools/test-responsive.js && node tools/test-gps-power.js && node tools/test-prefs.js && node tools/test-session.js && node tools/test-phase0.js && node tools/test-store.js && node tools/test-spray.js && node tools/test-refdata.js && node tools/test-offline.js && node tools/test-pwa.js && node tools/test-bugreport.js",
+    "test:field": "node tools/test-field-position.js",
+    "test:mowing": "node tools/test-mowing-setup.js",
+    "test:back": "node tools/test-back-nav.js",
+    "test:responsive": "node tools/test-responsive.js",
+    "test:gps": "node tools/test-gps-power.js",
+    "test:prefs": "node tools/test-prefs.js",
+    "test:session": "node tools/test-session.js",
+    "test:phase0": "node tools/test-phase0.js",
+    "test:store": "node tools/test-store.js",
+    "zones": "python3 tools/make-alley-zones.py",
+    "test:spray": "node tools/test-spray.js",
+    "test:refdata": "node tools/test-refdata.js",
+    "test:offline": "node tools/test-offline.js",
+    "vendor": "node tools/build-vendor.js",
+    "test:pwa": "node tools/test-pwa.js",
+    "sw": "node tools/build-sw.js",
+    "test:bug": "node tools/test-bugreport.js"
+  },
+  "devDependencies": {
+    "@turf/turf": "^7.4.0",
+    "jsdom": "^30.0.1"
+  },
+  "dependencies": {
+    "playwright": "^1.62.1"
+  }
+}

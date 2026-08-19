@@ -1,0 +1,29 @@
+# Dependencies — reinstall with `npm install`
+node_modules/
+
+# Old manual version history, superseded by git. Kept on disk in archive/,
+# never committed. See DECISIONS.md 2026-08-15.
+archive/
+*.bak
+
+# Scratch this environment cannot delete itself — safe to remove by hand.
+_to_delete/
+
+# The crew addresses, kept off the public repo on purpose. The app ships with
+# blank emails; each person fills in their own under More -> Roster. This file
+# is a reference copy of what the seed used to hold.
+roster-emails.local.json
+
+# A clone of the published repo made INSIDE this folder. It has bitten twice: a
+# nested .git makes `git add -A` abort with "does not have a commit checked out"
+# and take the whole commit down with it. Ignored so it cannot do that again.
+/turffarmutk.github.io/
+
+# OS / editor / transient junk
+.DS_Store
+.fuse_hidden*
+*.tmp
+testperm.tmp
+
+# Local map edits export nothing here, but scratch files land as untitled blobs
+ziajuYl3

@@ -1,0 +1,13 @@
+# This file only does its job because the app is published as a USER site
+# (<account>.github.io), which owns the origin root. A project site
+# (<account>.github.io/<repo>/) does not own /robots.txt and cannot use this —
+# there, the noindex meta tag in each page is the only thing that works. Both
+# are in place, so moving the site later degrades rather than breaks.
+#
+# The point is not secrecy. A GitHub Pages site is reachable by anyone with the
+# URL and that cannot be changed on this plan. The point is that the farm's
+# crew roster, task history and trial records should not turn up in a search
+# for somebody's name.
+
+User-agent: *
+Disallow: /

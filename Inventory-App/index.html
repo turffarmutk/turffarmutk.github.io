@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#58595b">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Inventory entry for the UT Turf Farm chemical cage, barn and chem room.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-title" content="Inventory">
+<title>Turf Farm Inventory Entry</title>
+<style>
+:root{
+  --orange:#ff8200; --smokey:#58595b; --ink:#1a1a1a; --paper:#f5f5f4;
+  --card:#ffffff; --line:#dedddb; --muted:#77746f;
+  --down:#c0392b; --up:#2d7a46; --warn:#a86400; --warnbg:#fff6e3;
+  --pad: env(safe-area-inset-bottom, 0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--paper); color:var(--ink);
+  overscroll-behavior-y:contain;
+}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+
+/* ---------- header ---------- */
+header{
+  position:sticky; top:0; z-index:40; background:var(--smokey); color:#fff;
+  padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 8px;
+  box-shadow:0 2px 10px rgba(0,0,0,.18);
+}
+.hrow{display:flex;align-items:center;gap:10px}
+.htitle{font-size:15px;font-weight:700;letter-spacing:.02em;flex:1;min-width:0}
+.htitle small{display:block;font-weight:400;font-size:11px;opacity:.7;letter-spacing:.04em;text-transform:uppercase}
+.hbtn{background:rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:8px 11px;font-size:13px;font-weight:600;white-space:nowrap}
+.hbtn:active{background:rgba(255,255,255,.3)}
+.hbtn.pri{background:var(--orange);color:#231f20}
+
+.srow{display:flex;gap:6px;margin-top:8px}
+.searchwrap{position:relative;flex:1;min-width:0}
+#place{flex:0 0 116px;border:none;border-radius:10px;padding:12px 6px;background:#fff;font-size:16px;
+  -webkit-appearance:none;appearance:none;text-align:center;font-weight:600}
+#search{
+  width:100%;padding:12px 40px 12px 14px;border-radius:10px;border:none;
+  background:#fff;font-size:16px;
+}
+#clear{position:absolute;right:2px;top:0;bottom:0;width:38px;color:var(--muted);font-size:20px;line-height:1}
+
+.chips{display:flex;gap:6px;overflow-x:auto;margin-top:8px;padding-bottom:2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{
+  flex:0 0 auto;padding:7px 12px;border-radius:20px;font-size:13px;font-weight:600;
+  background:rgba(255,255,255,.13);color:#fff;white-space:nowrap;
+}
+.chip.on{background:var(--orange);color:#231f20}
+.chip .ct{opacity:.65;font-weight:400;margin-left:4px}
+
+.nostore{display:none;background:var(--warnbg);border-bottom:1px solid #e8cf9a;color:var(--warn);
+  padding:11px 14px;font-size:13px;line-height:1.5;font-weight:500}
+.nostore.on{display:block}
+
+.ty{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.06em;padding:2px 6px;
+  border-radius:4px;margin-right:6px;vertical-align:1px;text-transform:uppercase}
+.ty-Fungicide{background:#e5eefb;color:#1f4e8c}
+.ty-Herbicide{background:#e4f2e8;color:#1f6b3b}
+.ty-Insecticide{background:#efe7f7;color:#5a3585}
+.ty-PGR{background:#e0f1f1;color:#14625f}
+.ty-Fertilizer{background:#fdeedd;color:#8a4b12}
+.ty-Adjuvant{background:#ececea;color:#55524d}
+.ty-Other{background:#ececea;color:#55524d}
+
+/* ---------- list ---------- */
+main{padding:8px 10px calc(96px + var(--pad))}
+.card{
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  margin-bottom:8px;overflow:hidden;
+}
+.card.chg{border-color:var(--orange);box-shadow:0 0 0 1px var(--orange)}
+.chead{display:flex;align-items:center;gap:10px;padding:11px 12px;width:100%;text-align:left}
+.cmeta{flex:1;min-width:0}
+.cname{font-weight:650;font-size:15px;line-height:1.25;word-break:break-word}
+.csub{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.35;word-break:break-word}
+.tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.05em;padding:2px 5px;border-radius:4px;
+  background:var(--warnbg);color:var(--warn);border:1px solid #e8cf9a;margin-left:5px;vertical-align:1px}
+.tag.d{background:#fdeceb;color:var(--down);border-color:#f2c4c0}
+.camt{text-align:right;flex:0 0 auto;min-width:80px}
+.cq{font-size:22px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.cq.zero{color:var(--down)}
+.cu{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:3px}
+
+/* ---------- editor ---------- */
+.edit{display:none;padding:0 12px 12px;border-top:1px solid var(--line)}
+.card.open .edit{display:block}
+.card.open .chead{background:#fbfaf9}
+.stepper{display:flex;align-items:stretch;gap:8px;margin-top:12px}
+.sbtn{
+  flex:0 0 68px;border-radius:12px;font-size:30px;font-weight:400;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+  border:1.5px solid var(--line);background:#fff;
+}
+.sbtn.minus{color:var(--down);border-color:#eab7b1;background:#fdf5f4}
+.sbtn.plus{color:var(--up);border-color:#b4d4bf;background:#f4faf6}
+.sbtn:active{transform:scale(.94)}
+.qin{
+  flex:1;min-width:0;text-align:center;font-size:30px;font-weight:700;
+  border:1.5px solid var(--line);border-radius:12px;padding:14px 4px;background:#fff;
+  font-variant-numeric:tabular-nums;
+}
+.qin:focus{outline:none;border-color:var(--orange)}
+.quick{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.qb{
+  flex:1 1 0;min-width:64px;padding:11px 4px;border-radius:9px;font-size:14px;font-weight:650;
+  border:1px solid var(--line);background:#fff;text-align:center;
+}
+.qb.dn{color:var(--down);border-color:#eab7b1}
+.qb.zero{color:#fff;background:var(--down);border-color:var(--down)}
+.qb:active{opacity:.6}
+.erow{display:flex;gap:8px;margin-top:10px;align-items:center}
+.erow label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;flex:0 0 auto}
+select.unit{flex:1;padding:10px;border-radius:9px;border:1px solid var(--line);background:#fff}
+.orig{font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5}
+.orig b{color:var(--ink);font-weight:600}
+.undo{margin-left:auto;font-size:13px;font-weight:650;color:var(--orange);padding:8px 4px}
+
+/* ---------- footer ---------- */
+footer{
+  position:fixed;left:0;right:0;bottom:0;z-index:45;background:#fff;
+  border-top:1px solid var(--line);box-shadow:0 -3px 14px rgba(0,0,0,.08);
+  padding:9px 10px calc(9px + var(--pad));display:flex;gap:8px;align-items:center;
+}
+.fstat{flex:1;min-width:0;font-size:12px;color:var(--muted);line-height:1.35}
+.fstat b{display:block;color:var(--ink);font-size:14px;font-weight:700}
+.fbtn{padding:12px 14px;border-radius:10px;font-size:14px;font-weight:700;background:var(--smokey);color:#fff;white-space:nowrap}
+.fbtn.pri{background:var(--orange);color:#231f20}
+.fbtn:disabled{opacity:.4}
+
+/* ---------- sheets / modals ---------- */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:60;display:none}
+.scrim.on{display:block}
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:61;background:#fff;
+  border-radius:16px 16px 0 0;padding:16px 14px calc(20px + var(--pad));
+  max-height:88vh;overflow:auto;display:none;
+}
+.sheet.on{display:block}
+.sheet h2{margin:0 0 4px;font-size:18px}
+.sheet p.hint{margin:0 0 14px;font-size:13px;color:var(--muted);line-height:1.5}
+.field{margin-bottom:11px}
+.field label{display:block;font-size:12px;font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.field input,.field select{width:100%;padding:12px;border-radius:9px;border:1px solid var(--line);background:#fff}
+.two{display:flex;gap:8px}
+.two>*{flex:1;min-width:0}
+.sactions{display:flex;gap:8px;margin-top:16px}
+.sactions button{flex:1;padding:14px;border-radius:10px;font-weight:700;font-size:15px}
+.sactions .ok{background:var(--orange);color:#231f20}
+.sactions .no{background:#eee;color:var(--ink)}
+.exlist button{display:block;width:100%;text-align:left;padding:14px;border:1px solid var(--line);
+  border-radius:11px;margin-bottom:8px;background:#fff}
+.exlist b{display:block;font-size:15px}
+.exlist span{font-size:12px;color:var(--muted);line-height:1.4;display:block;margin-top:3px}
+
+.toast{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:calc(78px + var(--pad));z-index:80;
+  background:#231f20;color:#fff;padding:11px 16px;border-radius:22px;font-size:13.5px;font-weight:600;
+  opacity:0;pointer-events:none;transition:opacity .18s;max-width:90vw;text-align:center;
+}
+.toast.on{opacity:.96}
+.empty{text-align:center;padding:48px 20px;color:var(--muted);font-size:14px;line-height:1.6}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hrow">
+    <div class="htitle">Inventory Entry<small>UT Turf Farm</small></div>
+    <button class="hbtn" id="addBtn">+ Item</button>
+  </div>
+  <div class="srow">
+    <div class="searchwrap">
+      <input id="search" type="search" placeholder="Search product or ingredient" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <button id="clear" aria-label="Clear">&times;</button>
+    </div>
+    <select id="place" aria-label="Location"></select>
+  </div>
+  <div class="chips" id="chips"></div>
+</header>
+
+<div id="nostore" class="nostore">This phone is blocking saved data, so your edits only last until you close this page. Tap <b>Save file</b> before you leave. Open it from the home screen icon instead of a private browsing tab.</div>
+
+<main id="list"></main>
+
+<footer>
+  <div class="fstat"><b id="fcount">No changes</b><span id="fsub">Everything saved on this phone</span></div>
+  <button class="fbtn" id="revertBtn">Revert</button>
+  <button class="fbtn pri" id="saveBtn">Save file</button>
+</footer>
+
+<div class="scrim" id="scrim"></div>
+
+<!-- Add item sheet -->
+<div class="sheet" id="addSheet">
+  <h2>Add product</h2>
+  <p class="hint">Only Product and Amount are required.</p>
+  <div class="field"><label>Product</label><input id="a_name" placeholder="e.g. Primo Maxx PGR"></div>
+  <div class="field"><label>Active ingredient</label><input id="a_ai" placeholder="optional"></div>
+  <div class="field"><label>Type</label><select id="a_t"></select></div>
+  <div class="two">
+    <div class="field"><label>Amount</label><input id="a_q" type="number" inputmode="decimal" step="any" value="1"></div>
+    <div class="field"><label>Unit</label><select id="a_u"></select></div>
+  </div>
+  <div class="two">
+    <div class="field"><label>Container size</label><input id="a_cap" placeholder="e.g. 2.5 gal"></div>
+    <div class="field"><label>Formulation</label><select id="a_f">
+      <option value="">--</option><option>Liquid</option><option>Granular</option><option>WG</option>
+      <option>WDG</option><option>WP</option><option>WSG</option><option>DF</option><option>Flow</option><option>EG</option>
+    </select></div>
+  </div>
+  <div class="two">
+    <div class="field"><label>Location</label><select id="a_loc">
+      <option>Cage</option><option>Barn</option><option>Chem Room</option><option>Fertilizers</option><option value="">Other</option>
+    </select></div>
+    <div class="field"><label>Shelf / desc.</label><input id="a_ld" placeholder="e.g. 2"></div>
+  </div>
+  <div class="sactions"><button class="no" data-close>Cancel</button><button class="ok" id="a_save">Add</button></div>
+</div>
+
+<!-- Export sheet -->
+<div class="sheet" id="exSheet">
+  <h2>Save file</h2>
+  <p class="hint">Your edits are already saved on this phone. This writes them out to a file you can email, AirDrop, or drop back in the Turf Farm folder.</p>
+  <div class="exlist">
+    <button id="ex_xlsx"><b>Excel workbook (.xlsx)</b><span>Same 8 columns as the original sheet, plus the pre-conversion text in an "Original Entry" column. Replaces "Inventory of Cages_Bulk Materials.xlsx".</span></button>
+    <button id="ex_csv"><b>Spreadsheet (.csv)</b><span>Opens anywhere. Use if the .xlsx gives your phone trouble.</span></button>
+    <button id="ex_chg"><b>Changes only (.csv)</b><span>Just the items you edited, with before and after values.</span></button>
+  </div>
+  <p class="hint" style="margin:14px 0 0;text-align:center" id="verline"></p>
+  <div class="sactions"><button class="no" data-close>Close</button></div>
+</div>
+
+<!-- Confirm sheet -->
+<div class="sheet" id="cfSheet">
+  <h2 id="cf_t">Are you sure?</h2>
+  <p class="hint" id="cf_m"></p>
+  <div class="sactions"><button class="no" data-close>Cancel</button><button class="ok" id="cf_ok">Yes</button></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SEED=[{"r":2,"n":"0-0-22/ Mayo Fert","ai":"","f":"","y":"","cap":"50 lb","cq":50.0,"cu":"lb","o":"4 bags","q":4.0,"u":"bag","c":"ok","t":"Fertilizer","loc":"Barn","ld":""},{"r":3,"n":"17-17-17","ai":"","f":"","y":"","cap":"50 lb","cq":50.0,"cu":"lb","o":"6 Bags","q":6.0,"u":"bag","c":"ok","t":"Fertilizer","loc":"Barn","ld":""},{"r":4,"n":"26GT / Fungicide","ai":"Iprodione","f":"Liquid","y":"2018","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"Half","q":1.25,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":5,"n":"Accord XRT / Herbicide","ai":"glyphosate","f":"Liquid","y":"N/A","cap":"1 gal","cq":1.0,"cu":"gal","o":"2 Full","q":2.0,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":6,"n":"Acelepryn/Insecticide","ai":"Chloramtraniliprole","f":"Liquid","y":"2020","cap":"i gal","cq":1.0,"cu":"gal","o":"3 Full","q":3.0,"u":"gal","c":"ok","t":"Insecticide","loc":"Cage","ld":"3"},{"r":7,"n":"Advion/Insecticide","ai":"Indoxacarb","f":"Granular","y":"2019","cap":"1 lb","cq":1.0,"cu":"lb","o":"1 Full","q":1.0,"u":"lb","c":"ok","t":"Insecticide","loc":"Cage","ld":"3"},{"r":8,"n":"Akron","ai":"Purimisulfan","f":"Liquid","y":"","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"1 Full 1 partial","q":3.75,"u":"gal","c":"check","t":"Herbicide","loc":"Cage","ld":"3"},{"r":9,"n":"Aliette","ai":"Aluminum tris","f":"Liquid","y":"2026","cap":"5 lbs","cq":5.0,"cu":"lb","o":"2 Full","q":10.0,"u":"lb","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":10,"n":"Aloft LCSC","ai":"clothianidin + bifenthrin","f":"Liquid","y":"","cap":"64 fl oz","cq":64.0,"cu":"oz","o":"Full","q":64.0,"u":"oz","c":"ok","t":"Insecticide","loc":"Cage","ld":"3"},{"r":11,"n":"Anderson's Crab/Goose","ai":"Bensulide + Oxadiazon","f":"Granular","y":"N/A","cap":"28.7 lbs","cq":28.7,"cu":"lb","o":"8 Full","q":229.6,"u":"lb","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":12,"n":"Appear II/ Fungicide","ai":"Potassium Phosphite","f":"Liquid","y":"<2017","cap":"","cq":null,"cu":null,"o":"7 gal","q":7.0,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":13,"n":"Appear II/ Fungicide","ai":"Potassium Phosphite","f":"Liquid","y":"<2018","cap":"2 gal","cq":2.0,"cu":"gal","o":"8 Full","q":16.0,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":14,"n":"Armada/Fungicide","ai":"Trifloxistrobin","f":"WG","y":"<2017","cap":"","cq":null,"cu":null,"o":"8 lbs","q":8.0,"u":"lb","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":15,"n":"Avenue South","ai":"24D+Dicamba+Penoxsulam+Sulfentrazone","f":"Liquid","y":"2022","cap":"1 gal","cq":1.0,"cu":"gal","o":"2 Full","q":2.0,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":16,"n":"Barricade 4FL / Herbicide","ai":"Prodiamine","f":"Liquid","y":"<2017","cap":"1 gal","cq":1.0,"cu":"gal","o":"4 full","q":4.0,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":17,"n":"Basamid G","ai":"Dazomet","f":"Granular","y":"","cap":"50 lb","cq":50.0,"cu":"lb","o":"1 Half","q":25.0,"u":"lb","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":18,"n":"Bayleton / Fungicide","ai":"Triadimefon","f":"Liquid","y":"2018","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"4 Full","q":10.0,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":19,"n":"Bensumec 4","ai":"Bensulfide","f":"LF","y":"<2017","cap":"2.5 gallon","cq":2.5,"cu":"gal","o":"Half","q":1.25,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":20,"n":"Bulk Fert","ai":"","f":"","y":"","cap":"","cq":null,"cu":null,"o":"2 tons","q":2.0,"u":"ton","c":"ok","t":"Fertilizer","loc":"Barn","ld":""},{"r":21,"n":"Caravel","ai":"clomazone","f":"Liquid","y":"2022","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"2 Full","q":5.0,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":22,"n":"Celsilus","ai":"dicamba-sodium","f":"WG","y":"","cap":"10oz","cq":10.0,"cu":"oz","o":"2 full","q":20.0,"u":"oz","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":23,"n":"Chipco 26019","ai":"Iprodione","f":"Flow","y":"2024","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"2 Full","q":5.0,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":24,"n":"Coastal / Herbicide","ai":"Prodiamine, Imazaquin, Simazine","f":"Liquid","y":"2022","cap":"2.5 gals","cq":2.5,"cu":"gal","o":"1 Full 1 partial","q":3.75,"u":"gal","c":"check","t":"Herbicide","loc":"Cage","ld":""},{"r":25,"n":"Confront  / Herbicide","ai":"Triclopyr","f":"Liquid","y":"<2017","cap":"1 gal","cq":1.0,"cu":"gal","o":"1 full","q":1.0,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":26,"n":"Daconil Ultrex / Fungicide","ai":"Chlorothalonil","f":"WSG","y":"<2017","cap":"5 lbs","cq":5.0,"cu":"lb","o":"5 Full","q":25.0,"u":"lb","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":27,"n":"Daconil Weatherstik / Fungicide","ai":"Chlorothalonil","f":"Flow","y":"2018","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"Half","q":1.25,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":28,"n":"Daconil Weatherstik / Fungicide","ai":"Chlorothalonil","f":"Flow","y":"<2017","cap":"1 L","cq":1.0,"cu":"L","o":"Half","q":0.5,"u":"L","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":29,"n":"Daconil Action / Fungicide","ai":"Chlorothalonil","f":"Flow","y":"2023","cap":"2.5 gals","cq":2.5,"cu":"gal","o":"5 Full 1 Half","q":13.75,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":30,"n":"DI AQUA NIS","ai":"Nonionnic Surfactant","f":"Liquid","y":"","cap":"1gal","cq":1.0,"cu":"gal","o":"2 Full","q":2.0,"u":"gal","c":"ok","t":"Adjuvant","loc":"Cage","ld":""},{"r":31,"n":"DI AQUA   MSO","ai":"Methylated Seed Oil","f":"Liquid","y":"","cap":"1 gal","cq":1.0,"cu":"gal","o":"Half","q":0.5,"u":"gal","c":"ok","t":"Adjuvant","loc":"Cage","ld":""},{"r":32,"n":"Dimension / Herbicide","ai":"Dithiopyr","f":"Liquid","y":"2020","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"Low (Empty)","q":0.375,"u":"gal","c":"check","t":"Herbicide","loc":"Cage","ld":"3"},{"r":33,"n":"Drive XLR8","ai":"Dimethylamine","f":"Liquid","y":"","cap":"0.5 gal","cq":0.5,"cu":"gal","o":"3/4 gal","q":0.75,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":34,"n":"Drive 75","ai":"3, 7-dichloro-8-quinolinecarboxylicacid","f":"Granular","y":"","cap":"1 lbs","cq":1.0,"cu":"lb","o":"0","q":0.0,"u":"lb","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":35,"n":"Eagle / Fungicide","ai":"Myclobutanil","f":"Liquid","y":"<2017","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"1 Full","q":2.5,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":36,"n":"Echelon 4SC","ai":"sulfentrazone","f":"Liquid","y":"","cap":"1gal","cq":1.0,"cu":"gal","o":"2 Full","q":2.0,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":37,"n":"Emerald / Fungicide","ai":"BoscalidjasIk","f":"WDG","y":"N/A","cap":"0.49 lbs","cq":0.49,"cu":"lb","o":"6 Full","q":2.94,"u":"lb","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":38,"n":"Exteris Stressgard","ai":"","f":"Liquid","y":"2026","cap":"2.5","cq":2.5,"cu":"gal","o":"4 Full","q":10.0,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":39,"n":"Exteriss Stressguard / Fungicide","ai":"Fluopyram","f":"Liquid","y":"2019","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"3 Full","q":7.5,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":40,"n":"Ferromec AC","ai":"Liquid Iron","f":"Liquid","y":"2025","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"8 Full","q":20.0,"u":"gal","c":"ok","t":"Fertilizer","loc":"Fertilizers","ld":""},{"r":41,"n":"Finale XL","ai":"glufosinate-ammonium","f":"Liquid","y":"2022","cap":"2.5 Gallon","cq":2.5,"cu":"gal","o":"Half","q":1.25,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":42,"n":"Fleet/Wetting Agent","ai":"Polyoxyethylene Polymers","f":"Liquid","y":"2021","cap":"2.5 gallons","cq":2.5,"cu":"gal","o":"Half","q":1.25,"u":"gal","c":"ok","t":"Adjuvant","loc":"Cage","ld":""},{"r":43,"n":"Freehand / Herbicide","ai":"Dimethenamid","f":"Granular","y":"N/A","cap":"50 lbs","cq":50.0,"cu":"lb","o":"3.5 Full","q":175.0,"u":"lb","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":44,"n":"Fusilade 2","ai":"Fluazifop-P-butyl","f":"Liquid","y":"","cap":"1.5 gal","cq":1.5,"cu":"gal","o":"Full","q":1.5,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":45,"n":"Gallery","ai":"isoxaben","f":"Granular","y":"<2017","cap":"1lbs","cq":1.0,"cu":"lb","o":"1 Half","q":0.5,"u":"lb","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":46,"n":"Garlon 3A / Herbicide","ai":"Triclopyr","f":"Liquid","y":"<2017","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"1 full 1 half","q":3.75,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":47,"n":"Goosegrass Crabgrass Control","ai":"Bensulide","f":"Granular","y":"","cap":"28.87 lbs","cq":28.87,"cu":"lb","o":"Low","q":4.33,"u":"lb","c":"check","t":"Herbicide","loc":"Cage","ld":"1"},{"r":48,"n":"Gramoxone / Herbicide","ai":"Paraquat","f":"Liquid","y":"N/A","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"1 Full","q":2.5,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":49,"n":"Harells 21-0-0","ai":"","f":"","y":"","cap":"50 lb","cq":50.0,"cu":"lb","o":"14 bags","q":14.0,"u":"bag","c":"ok","t":"Fertilizer","loc":"Barn","ld":""},{"r":50,"n":"Harells Ronstar/Herbicide 1.5%","ai":"Oxadiazon","f":"","y":"","cap":"50 lb","cq":50.0,"cu":"lb","o":"1 Bag Partial 30lbs","q":1.0,"u":"bag","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":51,"n":"Harrell's Profertilizer","ai":"5% Nitrogen","f":"Granular","y":"2024","cap":"50 lbs","cq":50.0,"cu":"lb","o":"Full","q":50.0,"u":"lb","c":"ok","t":"Fertilizer","loc":"Barn","ld":""},{"r":52,"n":"Headway / Fungicide","ai":"Azoxystrobin","f":"Liquid","y":"<2017","cap":"1 gal","cq":1.0,"cu":"gal","o":"1 Full","q":1.0,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":53,"n":"Headway / Fungicide","ai":"Azoxystrobin","f":"Liquid","y":"2025","cap":"1 gal","cq":1.0,"cu":"gal","o":"2 Full","q":2.0,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":54,"n":"Heritage Action / Fungicide","ai":"Azoxystrobin","f":"WG","y":"<2017","cap":"1 lbs","cq":1.0,"cu":"lb","o":"1.5 lbs","q":1.5,"u":"lb","c":"ok","t":"Fungicide","loc":"Cage","ld":""},{"r":55,"n":"Heritage Action / Fungicide","ai":"Azoxystrobin","f":"WG","y":"<2017","cap":"500 g","cq":500.0,"cu":"g","o":"Half","q":250.0,"u":"g","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":56,"n":"Heritage TL","ai":"Azoxystrobin","f":"Liquid","y":"","cap":"1 gal","cq":1.0,"cu":"gal","o":"1","q":1.0,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":57,"n":"Insignia","ai":"Pyraclostrobin","f":"Granular","y":"","cap":"2.5 lbs","cq":2.5,"cu":"lb","o":".5 lb","q":0.5,"u":"lb","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":58,"n":"Insignia SC / Fungicide","ai":"Pyraclostrobin","f":"Liquid","y":"<2017","cap":"500 mL","cq":500.0,"cu":"mL","o":"Full","q":500.0,"u":"mL","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":59,"n":"Insignia SC / Fungicide","ai":"Pyraclostrobin","f":"Liquid","y":"N/A","cap":"30.5 oz","cq":30.5,"cu":"oz","o":"1 Half","q":15.25,"u":"oz","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":60,"n":"Insignia SC / Fungicide","ai":"Pyraclostrobin","f":"Liquid","y":"2018","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"1 Full 1 Partial","q":3.75,"u":"gal","c":"check","t":"Fungicide","loc":"Cage","ld":"2"},{"r":61,"n":"Instrata / Fungicide","ai":"Chlorothalonil, Propiconazole","f":"Liquid","y":"<2017","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"2 Full","q":5.0,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":62,"n":"Interface / Fungicide","ai":"Iprodione","f":"Liquid","y":"<2017","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"2/3 Full","q":1.667,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":63,"n":"Interface Stressguard","ai":"Iprodione","f":"Liquid","y":"<2017","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"2 Full","q":5.0,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":64,"n":"Junction / Fungicide","ai":"Mancozeb","f":"DF","y":"<2017","cap":"6 lbs","cq":6.0,"cu":"lb","o":"1 Full 1 partial","q":9.0,"u":"lb","c":"check","t":"Fungicide","loc":"Cage","ld":"2"},{"r":65,"n":"Kabuto / Fungicide","ai":"Isofetamid","f":"Liquid","y":"2019/2022","cap":"1 gallon","cq":1.0,"cu":"gal","o":"2 Full","q":2.0,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":66,"n":"Kabuto / Fungicide","ai":"Isofetamid","f":"Liquid","y":"2019","cap":"21.8 oz","cq":21.8,"cu":"oz","o":"Full","q":21.8,"u":"oz","c":"ok","t":"Fungicide","loc":"","ld":""},{"r":67,"n":"Kabuto / Fungicide","ai":"Isofetamid","f":"Liquid","y":"2025","cap":"1 gal","cq":1.0,"cu":"gal","o":"4 Full","q":4.0,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":68,"n":"Katana","ai":"flazasulfuron","f":"Granular","y":"","cap":"5oz","cq":5.0,"cu":"oz","o":"5","q":25.0,"u":"oz","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":69,"n":"Lexicon / Fungicide","ai":"Fluxapyroxad","f":"Liquid","y":"2018","cap":"21 oz","cq":21.0,"cu":"oz","o":"55 oz","q":55.0,"u":"oz","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":70,"n":"Liberty Ultra","ai":"Glufosinate","f":"Liquid","y":"","cap":"1 gal","cq":1.0,"cu":"gal","o":"Full","q":1.0,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":71,"n":"Matrix / Herbicide","ai":"Rimsulfuron","f":"WG","y":"<2017","cap":"1.25 lbs","cq":1.25,"cu":"lb","o":"1 Full","q":1.25,"u":"lb","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":72,"n":"Maxtima","ai":"Mefentrifluconazole","f":"Liquid","y":"2024","cap":"26 oz","cq":26.0,"cu":"oz","o":"4 Full","q":104.0,"u":"oz","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":73,"n":"Merit","ai":"Imidacloprid","f":"Granular","y":"2024","cap":"30 lbs","cq":30.0,"cu":"lb","o":"2 Full","q":60.0,"u":"lb","c":"ok","t":"Insecticide","loc":"Cage","ld":"3"},{"r":74,"n":"Millennium / Herbicide","ai":"Dimethylamine Salt","f":"Liquid","y":"N/A","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"Full","q":2.5,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":75,"n":"Nano Charge","ai":"Nitrogen","f":"Liquid","y":"","cap":"8.5 lbs","cq":8.5,"cu":"lb","o":"1 qt","q":1.0,"u":"qt","c":"ok","t":"Fertilizer","loc":"Cage","ld":"3"},{"r":76,"n":"NutraWash Tank Cleaner","ai":"","f":"Liquid","y":"2026","cap":"1 gal","cq":1.0,"cu":"gal","o":"4 Full","q":4.0,"u":"gal","c":"ok","t":"Adjuvant","loc":"Cage","ld":"2"},{"r":77,"n":"Nutrite 24-6-12/ Gal Xe One","ai":"Nitrogen","f":"","y":"","cap":"50 lb","cq":50.0,"cu":"lb","o":"3 bags","q":3.0,"u":"bag","c":"ok","t":"Fertilizer","loc":"Barn","ld":""},{"r":78,"n":"Outlook","ai":"dimethenamid-p","f":"Liquid","y":"","cap":"2.5gal","cq":2.5,"cu":"gal","o":"1/2 gal","q":0.5,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":79,"n":"Pendulum / Herbicide","ai":"Pendimethalin","f":"Liquid","y":"N/A","cap":"15 gallon drum","cq":15.0,"cu":"gal","o":"1 Half","q":7.5,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":80,"n":"Pendulum / Herbicide","ai":"Pendimethalin","f":"Liquid","y":"2020","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"4 Full","q":10.0,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":81,"n":"Pennant Magnum / Herbicide","ai":"S- metolachlor","f":"Liquid","y":"<2017","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"1 partial","q":1.25,"u":"gal","c":"check","t":"Herbicide","loc":"Cage","ld":"3"},{"r":82,"n":"Pillar G / Fungicide","ai":"Pyraclostrobin","f":"Granular","y":"N/A","cap":"30 lbs","cq":30.0,"cu":"lb","o":"1.5 Full","q":45.0,"u":"lb","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":83,"n":"Posterity XT","ai":"pydiflumetofen, azoxystrobin, propiconazole","f":"Liquid","y":"","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"1 Full 1 Low","q":2.875,"u":"gal","c":"check","t":"Fungicide","loc":"Cage","ld":"2"},{"r":84,"n":"Primo Maxx PGR","ai":"Triexapac-ethyl","f":"Liquid","y":"<2017","cap":"1 gal","cq":1.0,"cu":"gal","o":"6 Full","q":6.0,"u":"gal","c":"ok","t":"PGR","loc":"Cage","ld":"3"},{"r":85,"n":"Princep / Herbicide","ai":"Simazine","f":"Liquid","y":"<2017","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"3 Full","q":7.5,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":86,"n":"Professional Choice 00-20-20","ai":"","f":"","y":"","cap":"50 lb","cq":50.0,"cu":"lb","o":"44 bags","q":44.0,"u":"bag","c":"ok","t":"Fertilizer","loc":"Barn","ld":""},{"r":87,"n":"Professional Choice 21-0-0/ Ammonium Sulfate","ai":"","f":"","y":"","cap":"50 lb","cq":50.0,"cu":"lb","o":"4 bags","q":4.0,"u":"bag","c":"ok","t":"Fertilizer","loc":"Barn","ld":""},{"r":88,"n":"Professional Choice 46-0-0/ W/Nutrisphere-N","ai":"","f":"","y":"","cap":"50 lb","cq":50.0,"cu":"lb","o":"32 bags","q":32.0,"u":"bag","c":"ok","t":"Fertilizer","loc":"Barn","ld":""},{"r":89,"n":"Pylex","ai":"Topramezone","f":"Liquid","y":"2024","cap":"4 oz","cq":4.0,"cu":"oz","o":"4 Full","q":16.0,"u":"oz","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":90,"n":"Quicksilver","ai":"carfentrazone-ethyl","f":"Liquid","y":"","cap":"12 oz","cq":12.0,"cu":"oz","o":"1/2","q":6.0,"u":"oz","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":91,"n":"Quinclorac","ai":"dimetrylamine","f":"Liquid","y":"","cap":"30 oz","cq":30.0,"cu":"oz","o":"1","q":30.0,"u":"oz","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":92,"n":"Recognition","ai":"Trifloxysulfuron-sodium","f":"Granular","y":"","cap":"14 g","cq":14.0,"cu":"g","o":"Full","q":14.0,"u":"g","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":93,"n":"Regalite","ai":"Nitrogen","f":"Granular","y":"","cap":"50lb","cq":50.0,"cu":"lb","o":"1 Bag","q":1.0,"u":"bag","c":"ok","t":"Fertilizer","loc":"Cage","ld":"1"},{"r":94,"n":"Regal Ronstar  100% XCU 38-0-0 / Herbicide","ai":"Oxadiazon","f":"Granular","y":"2019","cap":"50 lbs","cq":50.0,"cu":"lb","o":"1 Full","q":50.0,"u":"lb","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":95,"n":"Regal Ronstar 1% 38-0-0 / Herbicide","ai":"Oxadiazon","f":"Granular","y":"2019","cap":"50 lbs","cq":50.0,"cu":"lb","o":"4 Full","q":200.0,"u":"lb","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":96,"n":"RegalStar II","ai":"Oxadiazon","f":"Granular","y":"2019","cap":"50 lbs","cq":50.0,"cu":"lb","o":"3 Full 2 Half","q":200.0,"u":"lb","c":"ok","t":"Herbicide","loc":"Cage","ld":"1"},{"r":97,"n":"Regal Ronstar AC 2%","ai":"Oxadiazon","f":"","y":"","cap":"50 lb","cq":50.0,"cu":"lb","o":"1 Bag","q":1.0,"u":"bag","c":"ok","t":"Herbicide","loc":"Chem Room","ld":""},{"r":98,"n":"RegalKade G","ai":"Prodiamine","f":"","y":"","cap":"50 lb","cq":50.0,"cu":"lb","o":"3 full","q":150.0,"u":"lb","c":"ok","t":"Herbicide","loc":"Chem Room","ld":""},{"r":99,"n":"Rely III Soil Surfactant","ai":"Oxirane","f":"Liquid","y":"2026","cap":"2.5 gallons","cq":2.5,"cu":"gal","o":"4 full","q":10.0,"u":"gal","c":"ok","t":"Adjuvant","loc":"Cage","ld":"2"},{"r":100,"n":"Rely III/Wetting Agent","ai":"Oxirane","f":"Liquid","y":"2021","cap":"2.5 gallons","cq":2.5,"cu":"gal","o":"1 Full","q":2.5,"u":"gal","c":"ok","t":"Adjuvant","loc":"Cage","ld":""},{"r":101,"n":"Revolution/Wetting Agent","ai":"Modified Alkylated Polyol","f":"Liquid","y":"2021","cap":"2.5 gallons","cq":2.5,"cu":"gal","o":"1.5 Full","q":3.75,"u":"gal","c":"ok","t":"Adjuvant","loc":"Cage","ld":""},{"r":102,"n":"Ronstar","ai":"Oxadiazon","f":"Liquid","y":"","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"1 Full","q":2.5,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":103,"n":"Round Up Quick Pro","ai":"glyphosate, indaziflam, disquat","f":"Liquid","y":"","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"0.5 gal","q":0.5,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":104,"n":"Round Up Ranger Pro","ai":"glyphosate","f":"Liquid","y":"","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"2 Full","q":5.0,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":105,"n":"Roundup G","ai":"Glyphosate","f":"Liquid","y":"","cap":"10 lbs","cq":10.0,"cu":"lb","o":"Full","q":10.0,"u":"lb","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":106,"n":"SAF 816 Field Conditioner","ai":"","f":"","y":"","cap":"50 lb","cq":50.0,"cu":"lb","o":"4 bags","q":4.0,"u":"bag","c":"ok","t":"Other","loc":"Barn","ld":""},{"r":107,"n":"Safety Guard 0.125%","ai":"Flumioxazin","f":"Granular","y":"2024","cap":"50 lbs","cq":50.0,"cu":"lb","o":"Full","q":50.0,"u":"lb","c":"ok","t":"Herbicide","loc":"Barn","ld":""},{"r":108,"n":"Secure / Fungicide","ai":"Fluazinam","f":"Liquid","y":"N/A","cap":"0.5 gal","cq":0.5,"cu":"gal","o":"2 Full","q":1.0,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":109,"n":"Segway / Fungicide","ai":"Cyazofamid","f":"Liquid","y":"2022","cap":"1 qt","cq":1.0,"cu":"qt","o":"8 Full, 1 Half","q":8.5,"u":"qt","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":110,"n":"Segway / Fungicide","ai":"Cyazofamid","f":"Liquid","y":"2025","cap":"39.2 fl oz","cq":39.2,"cu":"oz","o":"12 Full","q":470.4,"u":"oz","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":111,"n":"Signature Chipco / Fungicide","ai":"Aluminum tris","f":"WG","y":"2019","cap":"5.5 lbs","cq":5.5,"cu":"lb","o":"11 Full","q":60.5,"u":"lb","c":"ok","t":"Fungicide","loc":"Cage","ld":""},{"r":112,"n":"Signature XTRA","ai":"Aluminum tris","f":"WG","y":"2024","cap":"5.5 lbs","cq":5.5,"cu":"lb","o":"1 Full 1 partial","q":8.25,"u":"lb","c":"check","t":"Fungicide","loc":"Cage","ld":"2"},{"r":113,"n":"Simplot 10-18-22/Greens Grade","ai":"Soluble Potash","f":"Granular","y":"","cap":"50 lb","cq":50.0,"cu":"lb","o":"18 bags","q":18.0,"u":"bag","c":"ok","t":"Fertilizer","loc":"Barn","ld":""},{"r":114,"n":"Simplot 18-3-6/Greens Grade","ai":"Nitrogen","f":"Granular","y":"","cap":"50 lb","cq":50.0,"cu":"lb","o":"8 bags","q":8.0,"u":"bag","c":"ok","t":"Fertilizer","loc":"Barn","ld":""},{"r":115,"n":"Simplot 18-3-6 UMaxx","ai":"Urea","f":"Liquid","y":"2026","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"20 Full","q":50.0,"u":"gal","c":"ok","t":"Fertilizer","loc":"Cage","ld":""},{"r":116,"n":"Simplot 18-3-6 UMaxx","ai":"Urea","f":"Liquid","y":"2022","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"4 Full","q":10.0,"u":"gal","c":"ok","t":"Fertilizer","loc":"Cage","ld":""},{"r":117,"n":"Simplot 30-0-0 UMaxx","ai":"Urea","f":"Liquid","y":"2026","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"4 Full","q":10.0,"u":"gal","c":"ok","t":"Fertilizer","loc":"Cage","ld":""},{"r":118,"n":"Simplot 30-0-0","ai":"nitrogen","f":"Liquid","y":"","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"22.5 gal","q":22.5,"u":"gal","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":119,"n":"SpeedZone EW","ai":"24D+MCPP+Dicamba+ Carfentrazone","f":"Liquid","y":"2022","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"2  Full","q":5.0,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":120,"n":"Spotlight / Herbicide","ai":"Fluroxypyr","f":"Liquid","y":"<2017","cap":"1 gal","cq":1.0,"cu":"gal","o":"1 Full","q":1.0,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":121,"n":"Stellar/Fungicide","ai":"Fluopicolide","f":"Liquid","y":"<2017","cap":"104 oz","cq":104.0,"cu":"oz","o":"1 Half","q":52.0,"u":"oz","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":122,"n":"Subdue Maxx / Fungicide","ai":"Mefenoxam","f":"Liquid","y":"<2017","cap":"1 gal","cq":1.0,"cu":"gal","o":"4 Full 1 Half","q":4.5,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":123,"n":"SURGE","ai":"24D+Mecoprop-p+Dicamba+Sulfentrazone","f":"Liquid","y":"2022","cap":"2.5","cq":2.5,"cu":"gal","o":"1 Full 1 half","q":3.75,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":124,"n":"Target 6","ai":"msma","f":"Liquid","y":"","cap":"2.5gal","cq":2.5,"cu":"gal","o":"Half","q":1.25,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":125,"n":"Target 6.6","ai":"msma","f":"Liquid","y":"","cap":"2.5gal","cq":2.5,"cu":"gal","o":"Full","q":2.5,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":126,"n":"Tartan / Fungicide","ai":"Trifloxystrobin","f":"Liquid","y":"N/A","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"1 Full 1 Half","q":3.75,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":127,"n":"Tebuconazole / Fungicide","ai":"Tebuconazole","f":"Liquid","y":"2018","cap":"1 gal","cq":1.0,"cu":"gal","o":"1 Full","q":1.0,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":128,"n":"Tenacity","ai":"Mesotrione","f":"Liquid","y":"","cap":"96 oz","cq":96.0,"cu":"oz","o":"Full","q":96.0,"u":"oz","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":129,"n":"Terminator II Defoamer","ai":"","f":"Liquid","y":"2022","cap":"1 qt","cq":1.0,"cu":"qt","o":"13","q":13.0,"u":"qt","c":"ok","t":"Adjuvant","loc":"Cage","ld":""},{"r":130,"n":"Touchdown Total / Herbicide","ai":"Glyphosate","f":"Liquid","y":"<2017","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"2 Full","q":5.0,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":131,"n":"Track-IT Foam Marker","ai":"","f":"Liquid","y":"2022","cap":"1 gal","cq":1.0,"cu":"gal","o":"3.5 gal","q":3.5,"u":"gal","c":"ok","t":"Adjuvant","loc":"Cage","ld":""},{"r":132,"n":"Tru-Prill 15-2-15/ Greens Grade","ai":"","f":"","y":"","cap":"50 lb","cq":50.0,"cu":"lb","o":"3 Bags","q":3.0,"u":"bag","c":"ok","t":"Fertilizer","loc":"Barn","ld":""},{"r":133,"n":"Tupersan / Herbicide","ai":"Siduron","f":"WP","y":"N/A","cap":"5 lbs","cq":5.0,"cu":"lb","o":"4 Full","q":20.0,"u":"lb","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":134,"n":"32-0-4","ai":"","f":"Granular","y":"2026","cap":"2 ton","cq":2.0,"cu":"ton","o":"Full","q":2.0,"u":"ton","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":135,"n":"46-0-0 (U-Flexx?)","ai":"Nitrogen","f":"Granular","y":"","cap":"50 lb","cq":50.0,"cu":"lb","o":"6 bags","q":6.0,"u":"bag","c":"ok","t":"Fertilizer","loc":"Cage Barn?","ld":""},{"r":136,"n":"Union","ai":"cyazofamid, azoxystrobin","f":"Liquid","y":"2025","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"4 Full","q":10.0,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":137,"n":"Union","ai":"cyazofamid, azoxystrobin","f":"Liquid","y":"","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"2 Full","q":5.0,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":138,"n":"Velista / Fungicide","ai":"Penthiopyrad","f":"Liquid","y":"2019","cap":"22 oz","cq":22.0,"cu":"oz","o":"2 Full","q":44.0,"u":"oz","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":139,"n":"Velista / Fungicide","ai":"Penthiopyrad","f":"Liquid","y":"2018","cap":"500 g","cq":500.0,"cu":"g","o":"1 Half","q":250.0,"u":"g","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":140,"n":"Verdi-Cal G","ai":"Calcium Sulfate Dihydrate","f":"","y":"","cap":"50 lb","cq":50.0,"cu":"lb","o":"4 bags","q":4.0,"u":"bag","c":"ok","t":"Fertilizer","loc":"Barn","ld":""},{"r":141,"n":"Xzemplar / Fungicide","ai":"Fluxapyroxad","f":"Liquid","y":"2019","cap":"114 fl oz","cq":114.0,"cu":"oz","o":"1 Full","q":114.0,"u":"oz","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":142,"n":"Zylam/Insecticide","ai":"Dinotefuran","f":"Liquid","y":"2018","cap":"64 fl. oz.","cq":64.0,"cu":"oz","o":"1 Full","q":64.0,"u":"oz","c":"ok","t":"Insecticide","loc":"Cage","ld":"2"},{"r":143,"n":"Briskway","ai":"Prototype?","f":"Liquid","y":"2014","cap":"1 liter","cq":1.0,"cu":"L","o":"4 Full","q":4.0,"u":"L","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":144,"n":"Musketeer","ai":"Flurprimidol; Paclobutrazol","f":"Liquid","y":"<2017","cap":"1 quart","cq":1.0,"cu":"qt","o":"2 Full","q":2.0,"u":"qt","c":"ok","t":"PGR","loc":"Cage","ld":"3"},{"r":145,"n":"Musketeer","ai":"fulrprimidol","f":"Liquid","y":"<2017","cap":"1 quart","cq":1.0,"cu":"qt","o":"Full","q":1.0,"u":"qt","c":"ok","t":"PGR","loc":"Chem Room","ld":""},{"r":146,"n":"Monument 75 WG (8 packets)","ai":"","f":"Granular","y":"2020","cap":"5 gram","cq":5.0,"cu":"g","o":"Full","q":5.0,"u":"g","c":"ok","t":"Herbicide","loc":"Chem Room","ld":""},{"r":147,"n":"Destiny","ai":"Methylated Soybean Oil, soybean oil, Alkylphenol ethoxylate","f":"Liquid","y":"<2017","cap":"2.5 gallons","cq":2.5,"cu":"gal","o":"Full","q":2.5,"u":"gal","c":"ok","t":"Adjuvant","loc":"Chem Room","ld":""},{"r":148,"n":"Touche","ai":"Vinclozolin","f":"EG","y":"<2017","cap":"2.75 lbs","cq":2.75,"cu":"lb","o":"2.5 lbs","q":2.5,"u":"lb","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":149,"n":"Surf 80","ai":"Alkyl Polyoxythylene","f":"Liquid","y":"2018","cap":"1 gallon","cq":1.0,"cu":"gal","o":"Full","q":1.0,"u":"gal","c":"ok","t":"Adjuvant","loc":"Chem Room","ld":""},{"r":150,"n":"Signature XTRA","ai":"Aluminum tris","f":"WDG","y":"2022","cap":"","cq":null,"cu":null,"o":"Low","q":0.15,"u":"container","c":"check","t":"Fungicide","loc":"Cage","ld":""},{"r":151,"n":"Signature/ Chipco","ai":"Aluminum tris","f":"Granular","y":"","cap":"5.5 lbs","cq":5.5,"cu":"lb","o":"8 Full","q":44.0,"u":"lb","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":152,"n":"Lesco Stonewall-0.43%","ai":"","f":"Granular","y":"","cap":"","cq":null,"cu":null,"o":"40lbs","q":40.0,"u":"lb","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":153,"n":"3800 - ronstar + fertilizer","ai":"","f":"Granular","y":"","cap":"","cq":null,"cu":null,"o":"290lbs","q":290.0,"u":"lb","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":154,"n":"harrells 0-0-51","ai":"","f":"Granular","y":"","cap":"","cq":null,"cu":null,"o":"25lbs","q":25.0,"u":"lb","c":"ok","t":"Fertilizer","loc":"Cage","ld":""},{"r":155,"n":"harrells 43-0-0","ai":"","f":"Granular","y":"","cap":"","cq":null,"cu":null,"o":"50lbs","q":50.0,"u":"lb","c":"ok","t":"Fertilizer","loc":"Cage","ld":""},{"r":156,"n":"roots 3-3-3","ai":"nitrogen","f":"Granular","y":"","cap":"","cq":null,"cu":null,"o":"20lbs","q":20.0,"u":"lb","c":"ok","t":"Fertilizer","loc":"Cage","ld":""},{"r":157,"n":"spray 007","ai":"Alcohol Ethoxylate","f":"Liquid","y":"","cap":"","cq":null,"cu":null,"o":"3.5 gal","q":3.5,"u":"gal","c":"ok","t":"Adjuvant","loc":"Cage","ld":""},{"r":158,"n":"ambient plus","ai":"","f":"Liquid","y":"","cap":"","cq":null,"cu":null,"o":"1gal","q":1.0,"u":"gal","c":"ok","t":"Adjuvant","loc":"Cage","ld":""},{"r":159,"n":"farmworks spray tank cleaner","ai":"","f":"Liquid","y":"","cap":"","cq":null,"cu":null,"o":"1.5 lb","q":1.5,"u":"lb","c":"ok","t":"Adjuvant","loc":"Cage","ld":""},{"r":160,"n":"foam concentrate","ai":"","f":"Liquid","y":"","cap":"","cq":null,"cu":null,"o":"1 pint","q":1.0,"u":"pt","c":"ok","t":"Adjuvant","loc":"Cage","ld":""},{"r":161,"n":"harrells 0-0-10","ai":"Oxadiazon","f":"Granular","y":"","cap":"50lbs","cq":50.0,"cu":"lb","o":"2 Half Bags","q":50.0,"u":"lb","c":"ok","t":"Herbicide","loc":"Cage","ld":""},{"r":162,"n":"Foliar Pak 2-0-0","ai":"Nitrogen","f":"Liquid","y":"","cap":"","cq":null,"cu":null,"o":"1.5gal","q":1.5,"u":"gal","c":"ok","t":"Fertilizer","loc":"Cage","ld":""},{"r":163,"n":"brandt","ai":"","f":"Liquid","y":"","cap":"","cq":null,"cu":null,"o":"3.5 gal","q":3.5,"u":"gal","c":"ok","t":"Adjuvant","loc":"Cage","ld":""},{"r":164,"n":"armament concentrate","ai":"","f":"Liquid","y":"","cap":"","cq":null,"cu":null,"o":"2.5gal","q":2.5,"u":"gal","c":"ok","t":"Adjuvant","loc":"Cage","ld":""},{"r":165,"n":"foliar pak csi 2-0-0","ai":"","f":"Liquid","y":"","cap":"","cq":null,"cu":null,"o":"4.5 gal","q":4.5,"u":"gal","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":166,"n":"floratine","ai":"","f":"Liquid","y":"","cap":"","cq":null,"cu":null,"o":"10gal","q":10.0,"u":"gal","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":167,"n":"Curalan EG","ai":"Vinclozolin, 4-oxazolidinedionej","f":"Granular","y":"","cap":"2.75 lbs","cq":2.75,"cu":"lb","o":"Full","q":2.75,"u":"lb","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":168,"n":"Honor","ai":"Pyraclostrobin, Boscalid","f":"Granular","y":"","cap":"3 lbs","cq":3.0,"cu":"lb","o":"Low","q":0.45,"u":"lb","c":"check","t":"Fungicide","loc":"Cage","ld":"2"},{"r":169,"n":"Fame","ai":"Fluoxastrobin, Chlorothalonil","f":"Liquid","y":"","cap":"2.5 lbs","cq":2.5,"cu":"lb","o":"Full","q":2.5,"u":"lb","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":170,"n":"Maxtima","ai":"","f":"Liquid","y":"","cap":"8 oz","cq":8.0,"cu":"oz","o":"Full","q":8.0,"u":"oz","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":171,"n":"Prostar","ai":"Flutolanil","f":"Granular","y":"","cap":"3 lbs","cq":3.0,"cu":"lb","o":"2 Low","q":0.9,"u":"lb","c":"check","t":"Fungicide","loc":"Cage","ld":"2"},{"r":172,"n":"Mirage Stressguard","ai":"Triazole-1-ethanol","f":"Liquid","y":"2019","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"1 Full","q":2.5,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":173,"n":"Insignia","ai":"Pryaclostrobin","f":"Granular","y":"","cap":"2.4 lbs","cq":2.4,"cu":"lb","o":"0.4lbs Low","q":0.4,"u":"lb","c":"ok","t":"Fungicide","loc":"Cage","ld":""},{"r":174,"n":"Rayora","ai":"Fluteiafol","f":"Liquid","y":"2020","cap":"1 gal","cq":1.0,"cu":"gal","o":"3/4","q":0.75,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":175,"n":"Heritage TL","ai":"Azoxystrobin","f":"Liquid","y":"","cap":"1 gal","cq":1.0,"cu":"gal","o":"Low","q":0.15,"u":"gal","c":"check","t":"Fungicide","loc":"Cage","ld":""},{"r":176,"n":"3336","ai":"Thiophanate-methyl","f":"Liquid","y":"<2017","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"1 partial","q":1.25,"u":"gal","c":"check","t":"Fungicide","loc":"Cage","ld":"2"},{"r":177,"n":"Posterity XT","ai":"Pydiflumetofen, Azoxystrobin, Propiconazole","f":"Liquid","y":"","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"2 Full","q":5.0,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":""},{"r":178,"n":"Nutrol","ai":"","f":"Granular","y":"","cap":"40 lbs","cq":40.0,"cu":"lb","o":"Full","q":40.0,"u":"lb","c":"ok","t":"Fungicide","loc":"Cage","ld":""},{"r":179,"n":"Fore 80WP","ai":"Mancozeb","f":"Granular","y":"","cap":"1.5 lbs","cq":1.5,"cu":"lb","o":"20 lbs","q":20.0,"u":"lb","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":180,"n":"simplot rely III","ai":"oxirain","f":"Liquid","y":"","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"19gal","q":19.0,"u":"gal","c":"ok","t":"Adjuvant","loc":"Cage","ld":""},{"r":181,"n":"fleet","ai":"","f":"Liquid","y":"","cap":"","cq":null,"cu":null,"o":"2.5gal","q":2.5,"u":"gal","c":"ok","t":"Adjuvant","loc":"Cage","ld":""},{"r":182,"n":"revolution","ai":"modified alkyated polyol","f":"Liquid","y":"","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"3.5 gal","q":3.5,"u":"gal","c":"ok","t":"Adjuvant","loc":"Cage","ld":""},{"r":183,"n":"9-3-6","ai":"","f":"Liquid","y":"","cap":"","cq":null,"cu":null,"o":"2.5 gal","q":2.5,"u":"gal","c":"ok","t":"Fertilizer","loc":"Cage","ld":""},{"r":184,"n":"foliar pak 4-0-6","ai":"","f":"Liquid","y":"","cap":"","cq":null,"cu":null,"o":"2gal","q":2.0,"u":"gal","c":"ok","t":"Fertilizer","loc":"Cage","ld":""},{"r":185,"n":"Avalon","ai":"bifenthrin","f":"Liquid","y":"","cap":"1gal","cq":1.0,"cu":"gal","o":"0.5gal","q":0.5,"u":"gal","c":"ok","t":"Insecticide","loc":"Cage","ld":"3"},{"r":186,"n":"talestar","ai":",zeta-cypermethrine, bifenthrin","f":"Granular","y":"","cap":"25lbs","cq":25.0,"cu":"lb","o":"Low","q":3.75,"u":"lb","c":"check","t":"Insecticide","loc":"Cage","ld":""},{"r":187,"n":"Speed XT","ai":"isooctyl","f":"Liquid","y":"","cap":"2.5gal","cq":2.5,"cu":"gal","o":"1 gal","q":1.0,"u":"gal","c":"ok","t":"Herbicide","loc":"Cage","ld":"3"},{"r":188,"n":"KOCH-U Flexible u6-0-0","ai":"","f":"Granular","y":"","cap":"","cq":null,"cu":null,"o":"325lbs","q":325.0,"u":"lb","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":189,"n":"816 field conditioner","ai":"","f":"Granular","y":"","cap":"","cq":null,"cu":null,"o":"150lbs","q":150.0,"u":"lb","c":"ok","t":"Other","loc":"","ld":""},{"r":190,"n":"simplot 10-18-22","ai":"","f":"Granular","y":"","cap":"","cq":null,"cu":null,"o":"550lbs","q":550.0,"u":"lb","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":191,"n":"Simply 18-3-16","ai":"","f":"","y":"","cap":"","cq":null,"cu":null,"o":"8- 50 lbs","q":8.0,"u":"bag","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":192,"n":"Extreme Green 16","ai":"","f":"","y":"","cap":"","cq":null,"cu":null,"o":"125 lbs","q":125.0,"u":"lb","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":193,"n":"Milorganite","ai":"","f":"Granular","y":"","cap":"","cq":null,"cu":null,"o":"106 lbs","q":106.0,"u":"lb","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":194,"n":"Ascernity","ai":"Benzovindiflupyr, Difenoconazole","f":"Liquid","y":"2021","cap":"2 gal","cq":2.0,"cu":"gal","o":"5.5 gal","q":5.5,"u":"gal","c":"ok","t":"Fungicide","loc":"Cage","ld":"2"},{"r":195,"n":"Turflawn Ester","ai":"triclopyr, pyridinyloxyacetic acid, butoxyethyl","f":"Liquid","y":"","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"1 Gal","q":1.0,"u":"gal","c":"ok","t":"Herbicide","loc":"","ld":""},{"r":196,"n":"Lesco 12-0-0","ai":"urea nitrogen","f":"Liquid","y":"2016","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"1 gal","q":1.0,"u":"gal","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":197,"n":"Biophase SBE","ai":"humic acid","f":"Liquid","y":"2009","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"7 gal","q":7.0,"u":"gal","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":198,"n":"Nutrigrow Magnum","ai":"ammoniacil nitrogen,","f":"Liquid","y":"","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"5 gal","q":5.0,"u":"gal","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":199,"n":"Simplot Spray Slick","ai":"methylated seed oil, polyether modified polysiloxane, alkophenol ethoxylate","f":"Liquid","y":"2021","cap":"1 gal","cq":1.0,"cu":"gal","o":"1 gal","q":1.0,"u":"gal","c":"ok","t":"Adjuvant","loc":"","ld":""},{"r":200,"n":"Foundation Forty","ai":"nitrogen, potash","f":"Liquid","y":"","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"2.5 gal","q":2.5,"u":"gal","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":201,"n":"RhizoMate","ai":"humic acid","f":"Liquid","y":"","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"4 gal","q":4.0,"u":"gal","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":202,"n":"Fight's On","ai":"potash","f":"Liquid","y":"2017","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"2 gal","q":2.0,"u":"gal","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":203,"n":"Glycofuse","ai":"urea","f":"Liquid","y":"2021","cap":"2.5gal","cq":2.5,"cu":"gal","o":"1.5 gal","q":1.5,"u":"gal","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":204,"n":"Maxiplex","ai":"humic acid","f":"Liquid","y":"2019","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"1.5 gal","q":1.5,"u":"gal","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":205,"n":"Pervade","ai":"disulfosuccinate","f":"Liquid","y":"","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"1 gal","q":1.0,"u":"gal","c":"ok","t":"Adjuvant","loc":"","ld":""},{"r":206,"n":"Spray wet","ai":"Alkylphenol ethoxylate, propylene glycol, tall oil fatty acids","f":"Liquid","y":"","cap":"1 gal","cq":1.0,"cu":"gal","o":"3/4 gal","q":0.75,"u":"gal","c":"ok","t":"Adjuvant","loc":"","ld":""},{"r":207,"n":"Schaben's Foam","ai":"","f":"Liquid","y":"","cap":"1 gal","cq":1.0,"cu":"gal","o":"3/4 gal","q":0.75,"u":"gal","c":"ok","t":"Adjuvant","loc":"","ld":""},{"r":208,"n":"Managnese 2-0-0","ai":"","f":"","y":"","cap":"","cq":null,"cu":null,"o":"2 gal","q":2.0,"u":"gal","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":209,"n":"Oxifloor","ai":"","f":"","y":"","cap":"","cq":null,"cu":null,"o":"2 gal","q":2.0,"u":"gal","c":"ok","t":"Other","loc":"","ld":""},{"r":210,"n":"Harrol's HydroMax","ai":"polyoxialkylene polymer","f":"Liquid","y":"","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"2.5 gal","q":2.5,"u":"gal","c":"ok","t":"Adjuvant","loc":"","ld":""},{"r":211,"n":"Spray Rite","ai":"Ammonium Sulfat","f":"WSP","y":"","cap":"4 lbs","cq":4.0,"cu":"lb","o":"16 lbs","q":16.0,"u":"lb","c":"ok","t":"Adjuvant","loc":"","ld":""},{"r":212,"n":"NonIonic Surfactant MS-9","ai":"ethylene oxide","f":"Liquid","y":"","cap":"1 gal","cq":1.0,"cu":"gal","o":"1/2 gal","q":0.5,"u":"gal","c":"ok","t":"Adjuvant","loc":"","ld":""},{"r":213,"n":"Lesco Spar Tech 0-8-5","ai":"phosphate","f":"lliquid","y":"","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"4 gal","q":4.0,"u":"gal","c":"ok","t":"Fertilizer","loc":"","ld":""},{"r":214,"n":"Anew EZ","ai":"prohexadione calcium","f":"Liquid","y":"2024","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"4 gal","q":4.0,"u":"gal","c":"ok","t":"PGR","loc":"","ld":""},{"r":215,"n":"4-Speed XT","ai":"isooctyl ester of 2, 4-dichlorophenoxyacetic acid","f":"Liquid","y":"","cap":"2.5 gal","cq":2.5,"cu":"gal","o":"1 gal","q":1.0,"u":"gal","c":"ok","t":"Herbicide","loc":"","ld":""},{"r":216,"n":"Tal Star Extra","ai":"zeta-cypermethrin","f":"Granular","y":"","cap":"25 lbs","cq":25.0,"cu":"lb","o":"10 lbs","q":10.0,"u":"lb","c":"ok","t":"Insecticide","loc":"","ld":""}];
+</script>
+<script>
+/* ============================================================
+   UT Turf Farm - Inventory Entry
+   Single file. Works offline. Saves to this device on every tap.
+   ============================================================ */
+
+const KEY='ut_inv_v1';
+const VERSION='1.0';
+const UNITS=['gal','qt','pt','L','mL','oz','lb','g','kg','ton','bag','packet','container'];
+const STEP={gal:.5,qt:1,pt:1,L:.5,mL:50,oz:1,lb:1,g:10,kg:1,ton:.25,bag:1,packet:1,container:.5};
+
+const TYPES=['Fungicide','Herbicide','Insecticide','PGR','Fertilizer','Adjuvant','Other'];
+let items=[], filter='all', place='', q='', openId=null;
+
+function scrollTo_(el,block){ try{ if(el&&el.scrollIntoView) el.scrollIntoView({block:block||'center',behavior:'smooth'}); }catch(e){} }
+
+/* Some phones block storage for files opened straight off the filesystem.
+   Detect it up front so nobody loses a morning of counts. */
+const CAN_STORE=(()=>{ try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); return true; }catch(e){ return false; } })();
+
+/* ---------- storage ---------- */
+function load(){
+  let saved=null;
+  try{ saved=JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){}
+  const byId={};
+  SEED.forEach(s=>{
+    byId[s.r]={...s, id:'s'+s.r, q0:s.q, u0:s.u, t0:s.t, isNew:false};
+  });
+  if(saved && saved.items){
+    saved.items.forEach(v=>{
+      if(v.isNew){ byId[v.id]={...v}; }
+      else if(byId[v.r]){ byId[v.r].q=v.q; byId[v.r].u=v.u; if(v.t) byId[v.r].t=v.t; }
+    });
+  }
+  items=Object.values(byId).sort((a,b)=>a.n.toLowerCase()<b.n.toLowerCase()?-1:1);
+}
+function save(){
+  const out=items.filter(i=>i.isNew||i.q!==i.q0||i.u!==i.u0||i.t!==i.t0)
+    .map(i=>i.isNew?i:{r:i.r,q:i.q,u:i.u,t:i.t});
+  try{ localStorage.setItem(KEY,JSON.stringify({t:Date.now(),items:out})); }
+  catch(e){ toast('Could not save to this device'); }
+}
+
+/* ---------- helpers ---------- */
+const fmt=n=>{
+  if(n===null||n===undefined||isNaN(n)) return '0';
+  const r=Math.round(n*1000)/1000;
+  return String(r);
+};
+const COUNTU=['bag','packet','container'];
+function uLabel(q,u){ return (COUNTU.includes(u) && Math.abs(q)!==1) ? u+'s' : u; }
+function changed(i){ return i.isNew || i.q!==i.q0 || i.u!==i.u0; }
+function retyped(i){ return !i.isNew && i.t!==i.t0; }
+function nChanged(){ return items.filter(changed).length; }
+let tT;
+function toast(m){
+  const t=document.getElementById('toast');
+  t.textContent=m; t.classList.add('on');
+  clearTimeout(tT); tT=setTimeout(()=>t.classList.remove('on'),1700);
+}
+
+/* ---------- filters ---------- */
+const FILTERS=[
+  {k:'all', l:'All',     f:()=>true},
+  {k:'chg', l:'Changed', f:i=>changed(i)},
+  ...TYPES.map(t=>({k:t, l:t, f:i=>i.t===t})),
+  {k:'rev', l:'Check',   f:i=>i.c==='check'&&!changed(i)},
+];
+/* Location narrows whatever type is selected, rather than competing with it. */
+function inPlace(i){ return !place || (i.loc||'')===place; }
+function visible(){
+  const F=FILTERS.find(x=>x.k===filter)||FILTERS[0];
+  const s=q.trim().toLowerCase();
+  return items.filter(i=>{
+    if(!F.f(i)||!inPlace(i)) return false;
+    if(!s) return true;
+    return (i.n+' '+(i.ai||'')+' '+(i.loc||'')+' '+i.t).toLowerCase().includes(s);
+  });
+}
+function drawChips(){
+  document.getElementById('chips').innerHTML=FILTERS.map(F=>{
+    const n=items.filter(i=>F.f(i)&&inPlace(i)).length;
+    return `<button class="chip ${filter===F.k?'on':''}" data-f="${F.k}">${F.l}<span class="ct">${n}</span></button>`;
+  }).join('');
+}
+function drawPlaces(){
+  const seen={}; items.forEach(i=>{ const L=i.loc||''; if(L) seen[L]=(seen[L]||0)+1; });
+  const opts=['<option value="">All places</option>']
+    .concat(Object.keys(seen).sort().map(L=>`<option value="${esc(L)}" ${place===L?'selected':''}>${esc(L)}</option>`));
+  document.getElementById('place').innerHTML=opts.join('');
+}
+
+/* ---------- render ---------- */
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+function draw(){
+  drawPlaces();
+  drawChips();
+  const list=document.getElementById('list');
+  const vis=visible();
+  if(!vis.length){
+    list.innerHTML='<div class="empty">Nothing matches.<br>Try a different search or filter.</div>';
+  } else {
+    list.innerHTML=vis.map(i=>card(i)).join('');
+  }
+  const n=nChanged();
+  document.getElementById('fcount').textContent = n? (n+' item'+(n>1?'s':'')+' changed') : 'No changes';
+  document.getElementById('fsub').textContent = n? 'Saved on this phone - tap Save file to write it out' : 'Everything saved on this phone';
+  document.getElementById('revertBtn').disabled = !n;
+}
+
+function card(i){
+  const sub=`<span class="ty ty-${esc(i.t)}">${esc(i.t)}</span>` +
+    [i.ai, i.cap&&('Container '+i.cap), i.loc&&(i.loc+(i.ld?' '+i.ld:'')), i.y&&('Yr '+i.y)]
+      .filter(Boolean).map(esc).join('  ·  ');
+  let tag='';
+  if(i.isNew) tag=' <span class="tag">NEW</span>';
+  else if(i.c==='check'&&!changed(i)) tag=' <span class="tag">CHECK</span>';
+  if(i.q<=0) tag+=' <span class="tag d">OUT</span>';
+  const open=openId===i.id;
+  return `
+  <div class="card ${changed(i)?'chg':''} ${open?'open':''}" data-id="${i.id}">
+    <button class="chead" data-act="toggle">
+      <div class="cmeta">
+        <div class="cname">${esc(i.n)}${tag}</div>
+        <div class="csub">${sub}</div>
+      </div>
+      <div class="camt">
+        <div class="cq ${i.q<=0?'zero':''}">${fmt(i.q)}</div>
+        <div class="cu">${esc(uLabel(i.q,i.u))}</div>
+      </div>
+    </button>
+    ${open?editor(i):''}
+  </div>`;
+}
+
+function editor(i){
+  const st=STEP[i.u]||1;
+  // "one whole container" is only meaningful when the stock unit matches the container's unit
+  const cq=(i.cu===i.u && i.cq)?i.cq:0;
+  const quick=[];
+  quick.push(`<button class="qb dn" data-act="d" data-v="${st}">- ${fmt(st)}</button>`);
+  if(cq && Math.abs(cq-st)>1e-9) quick.push(`<button class="qb dn" data-act="d" data-v="${cq}">- 1 full<br><span style="font-weight:400;font-size:11px">${fmt(cq)} ${esc(i.u)}</span></button>`);
+  if(i.q>0) quick.push(`<button class="qb dn" data-act="half">Halve</button>`);
+  quick.push(`<button class="qb zero" data-act="zero">Used up</button>`);
+  const orig = i.isNew ? 'Added on this device.' :
+    `Original sheet entry: <b>${esc(i.o||'(blank)')}</b>${i.c==='check'?' &mdash; converted from a vague amount, worth confirming.':''}`;
+  return `
+  <div class="edit">
+    <div class="stepper">
+      <button class="sbtn minus" data-act="d" data-v="${st}">&minus;</button>
+      <input class="qin" type="number" inputmode="decimal" step="any" min="0" value="${fmt(i.q)}" data-act="set">
+      <button class="sbtn plus" data-act="i" data-v="${st}">+</button>
+    </div>
+    <div class="quick">${quick.join('')}</div>
+    <div class="erow">
+      <label>Unit</label>
+      <select class="unit" data-act="unit">${UNITS.map(u=>`<option ${u===i.u?'selected':''}>${u}</option>`).join('')}</select>
+      ${changed(i)&&!i.isNew?'<button class="undo" data-act="undo">Undo</button>':''}
+    </div>
+    <div class="erow">
+      <label>Type</label>
+      <select class="unit" data-act="type">${TYPES.map(t=>`<option ${t===i.t?'selected':''}>${t}</option>`).join('')}</select>
+    </div>
+    <div class="orig">${orig}</div>
+  </div>`;
+}
+
+/* ---------- mutations ---------- */
+function get(id){ return items.find(x=>x.id===id); }
+function setQ(i,v){
+  v=Math.round(Math.max(0,(isNaN(v)?0:v))*1000)/1000;
+  i.q=v; save();
+}
+function redrawCard(id){
+  const i=get(id); if(!i) return;
+  const el=document.querySelector(`.card[data-id="${id}"]`);
+  if(!el){ draw(); return; }
+  el.outerHTML=card(i);
+  const n=nChanged();
+  document.getElementById('fcount').textContent = n? (n+' item'+(n>1?'s':'')+' changed') : 'No changes';
+  document.getElementById('fsub').textContent = n? 'Saved on this phone - tap Save file to write it out' : 'Everything saved on this phone';
+  document.getElementById('revertBtn').disabled=!n;
+  drawChips();
+}
+
+document.getElementById('list').addEventListener('click',e=>{
+  const btn=e.target.closest('[data-act]'); if(!btn) return;
+  const cardEl=e.target.closest('.card'); if(!cardEl) return;
+  const id=cardEl.dataset.id, i=get(id); if(!i) return;
+  const act=btn.dataset.act;
+  if(act==='toggle'){ openId = openId===id ? null : id; draw();
+    if(openId) scrollTo_(document.querySelector(`.card[data-id="${id}"]`),'nearest');
+    return; }
+  if(act==='d'){ setQ(i,i.q-parseFloat(btn.dataset.v)); redrawCard(id); return; }
+  if(act==='i'){ setQ(i,i.q+parseFloat(btn.dataset.v)); redrawCard(id); return; }
+  if(act==='half'){ setQ(i,i.q/2); redrawCard(id); return; }
+  if(act==='zero'){ setQ(i,0); redrawCard(id); return; }
+  if(act==='undo'){ i.q=i.q0; i.u=i.u0; i.t=i.t0; save(); redrawCard(id); toast('Reverted to sheet value'); return; }
+});
+document.getElementById('list').addEventListener('change',e=>{
+  const el=e.target.closest('[data-act]'); if(!el) return;
+  const cardEl=e.target.closest('.card'); const i=get(cardEl.dataset.id); if(!i) return;
+  if(el.dataset.act==='set'){ setQ(i,parseFloat(el.value)); redrawCard(i.id); }
+  if(el.dataset.act==='unit'){ i.u=el.value; save(); redrawCard(i.id); }
+  if(el.dataset.act==='type'){ i.t=el.value; save(); draw(); }
+});
+document.getElementById('list').addEventListener('input',e=>{
+  const el=e.target.closest('[data-act="set"]'); if(!el) return;
+  const i=get(e.target.closest('.card').dataset.id); if(!i) return;
+  setQ(i,parseFloat(el.value));
+  const c=document.querySelector(`.card[data-id="${i.id}"]`);
+  if(c){ c.classList.toggle('chg',changed(i)); c.querySelector('.cq').textContent=fmt(i.q); }
+});
+
+/* ---------- search + chips ---------- */
+const si=document.getElementById('search');
+si.addEventListener('input',()=>{ q=si.value; openId=null; draw(); });
+document.getElementById('clear').addEventListener('click',()=>{ si.value=''; q=''; draw(); si.focus(); });
+document.getElementById('place').addEventListener('change',e=>{
+  place=e.target.value; openId=null; draw(); window.scrollTo({top:0});
+});
+document.getElementById('chips').addEventListener('click',e=>{
+  const b=e.target.closest('.chip'); if(!b) return;
+  filter=b.dataset.f; openId=null; draw(); window.scrollTo({top:0});
+});
+
+/* ---------- sheets ---------- */
+function openSheet(id){ document.getElementById('scrim').classList.add('on'); document.getElementById(id).classList.add('on'); }
+function closeSheets(){ document.getElementById('scrim').classList.remove('on');
+  document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('on')); }
+document.getElementById('scrim').addEventListener('click',closeSheets);
+document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',closeSheets));
+
+/* add item */
+document.getElementById('a_u').innerHTML=UNITS.map(u=>`<option ${u==='gal'?'selected':''}>${u}</option>`).join('');
+document.getElementById('a_t').innerHTML=TYPES.map(t=>`<option>${t}</option>`).join('');
+document.getElementById('addBtn').addEventListener('click',()=>{
+  ['a_name','a_ai','a_cap','a_ld'].forEach(k=>document.getElementById(k).value='');
+  document.getElementById('a_q').value='1';
+  openSheet('addSheet');
+});
+document.getElementById('a_save').addEventListener('click',()=>{
+  const n=document.getElementById('a_name').value.trim();
+  if(!n){ toast('Product name is required'); return; }
+  const cap=document.getElementById('a_cap').value.trim();
+  const cm=cap.match(/(\d*\.?\d+)/);
+  const it={
+    id:'n'+Date.now(), r:9000+items.filter(x=>x.isNew).length, isNew:true,
+    n:n, ai:document.getElementById('a_ai').value.trim(), f:document.getElementById('a_f').value,
+    y:'', cap:cap, cq:cm?parseFloat(cm[1]):null, cu:document.getElementById('a_u').value,
+    o:'', q:parseFloat(document.getElementById('a_q').value)||0,
+    u:document.getElementById('a_u').value, c:'ok', t:document.getElementById('a_t').value,
+    loc:document.getElementById('a_loc').value, ld:document.getElementById('a_ld').value.trim()
+  };
+  it.q0=null; it.u0=null; it.t0=null;
+  items.push(it); items.sort((a,b)=>a.n.toLowerCase()<b.n.toLowerCase()?-1:1);
+  save(); closeSheets(); openId=it.id; q=''; si.value=''; filter='all'; draw();
+  scrollTo_(document.querySelector(`.card[data-id="${it.id}"]`),'center');
+  toast('Added '+n);
+});
+
+/* confirm helper */
+let cfFn=null;
+function confirmSheet(t,m,fn){
+  document.getElementById('cf_t').textContent=t;
+  document.getElementById('cf_m').textContent=m;
+  cfFn=fn; openSheet('cfSheet');
+}
+document.getElementById('cf_ok').addEventListener('click',()=>{ closeSheets(); if(cfFn) cfFn(); cfFn=null; });
+
+document.getElementById('revertBtn').addEventListener('click',()=>{
+  confirmSheet('Revert all changes?','This puts every item back to the value from the original spreadsheet and deletes items you added on this phone. It cannot be undone.',()=>{
+    localStorage.removeItem(KEY); load(); openId=null; draw(); toast('All changes reverted');
+  });
+});
+document.getElementById('saveBtn').addEventListener('click',()=>{
+  document.getElementById('verline').textContent =
+    'Version '+VERSION+'  \u00b7  '+items.length+' products  \u00b7  '+nChanged()+' changed';
+  openSheet('exSheet');
+});
+
+/* ============================================================
+   EXPORT
+   ============================================================ */
+const HEAD=['Herbicide/Fungicide','Active Ingredient','Formulation','Year','Bottle Capacity','Amount in Stock','Location','Location Description','Original Entry','Type'];
+
+function amountText(i){
+  return fmt(i.q)+' '+uLabel(i.q,i.u);
+}
+function exportRows(){
+  return items.slice().sort((a,b)=>a.r-b.r).map(i=>[
+    i.n, i.ai||'', i.f||'', i.y||'', i.cap||'', amountText(i), i.loc||'', i.ld||'', i.o||'', i.t||''
+  ]);
+}
+function stamp(){
+  const d=new Date(), p=n=>String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+}
+function download(blob,name){
+  const u=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=u; a.download=name; document.body.appendChild(a); a.click();
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(u);},1500);
+}
+function csv(rows){
+  return '﻿'+rows.map(r=>r.map(c=>{
+    const s=String(c==null?'':c);
+    return /[",\n]/.test(s)? '"'+s.replace(/"/g,'""')+'"' : s;
+  }).join(',')).join('\r\n');
+}
+
+document.getElementById('ex_csv').addEventListener('click',()=>{
+  download(new Blob([csv([HEAD,...exportRows()])],{type:'text/csv;charset=utf-8'}),
+    'Inventory of Cages_Bulk Materials '+stamp()+'.csv');
+  closeSheets(); toast('CSV saved');
+});
+document.getElementById('ex_chg').addEventListener('click',()=>{
+  const ch=items.filter(changed);
+  if(!ch.length){ toast('No changes to export'); return; }
+  const rows=[['Product','Type','Location','Was','Now','Status']];
+  ch.sort((a,b)=>a.r-b.r).forEach(i=>rows.push([
+    i.n, i.t||'', (i.loc||'')+(i.ld?' '+i.ld:''),
+    i.isNew?'(new item)':(i.o||fmt(i.q0)+' '+uLabel(i.q0,i.u0)),
+    amountText(i), i.isNew?'Added':(i.q<i.q0?'Decreased':(i.q>i.q0?'Increased':'Unit changed'))
+  ]));
+  download(new Blob([csv(rows)],{type:'text/csv;charset=utf-8'}),'Inventory changes '+stamp()+'.csv');
+  closeSheets(); toast('Change list saved');
+});
+document.getElementById('ex_xlsx').addEventListener('click',()=>{
+  try{
+    download(new Blob([buildXlsx(HEAD,exportRows())],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),
+      'Inventory of Cages_Bulk Materials '+stamp()+'.xlsx');
+    closeSheets(); toast('Excel file saved');
+  }catch(e){ toast('Could not build .xlsx - try CSV'); }
+});
+
+/* ---------- minimal XLSX writer (no libraries, works offline) ---------- */
+const CRCT=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;
+  for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
+function crc32(b){let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=CRCT[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+const ENC=new TextEncoder();
+function xesc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]))
+  .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'');}
+function colRef(n){let s='';n++;while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=(n-m-1)/26;}return s;}
+
+function buildXlsx(head,rows){
+  const all=[head,...rows];
+  let sheet='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+    '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'+
+    '<cols><col min="1" max="1" width="34"/><col min="2" max="2" width="30"/><col min="3" max="3" width="12"/>'+
+    '<col min="4" max="4" width="9"/><col min="5" max="5" width="15"/><col min="6" max="6" width="16"/>'+
+    '<col min="7" max="7" width="12"/><col min="8" max="8" width="18"/><col min="9" max="9" width="18"/><col min="10" max="10" width="13"/></cols><sheetData>';
+  all.forEach((r,ri)=>{
+    sheet+='<row r="'+(ri+1)+'">';
+    r.forEach((v,ci)=>{
+      if(v===''||v==null) return;
+      const ref=colRef(ci)+(ri+1);
+      if(ri>0 && typeof v!=='object' && v!=='' && !isNaN(v) && String(v).trim()!=='' && /^-?\d*\.?\d+$/.test(String(v).trim())){
+        sheet+='<c r="'+ref+'"><v>'+String(v).trim()+'</v></c>';
+      } else {
+        sheet+='<c r="'+ref+'" t="inlineStr"'+(ri===0?' s="1"':'')+'><is><t xml:space="preserve">'+xesc(v)+'</t></is></c>';
+      }
+    });
+    sheet+='</row>';
+  });
+  sheet+='</sheetData></worksheet>';
+
+  const files=[
+    ['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
+    ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+    ['xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Inventory" sheetId="1" r:id="rId1"/></sheets></workbook>'],
+    ['xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+    ['xl/styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>'],
+    ['xl/worksheets/sheet1.xml',sheet]
+  ];
+
+  // ZIP (stored, no compression) - valid and accepted by Excel/Numbers/Sheets
+  const parts=[], central=[]; let offset=0;
+  const d=new Date();
+  const dosTime=((d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1))&0xFFFF;
+  const dosDate=(((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate())&0xFFFF;
+  files.forEach(([name,content])=>{
+    const nb=ENC.encode(name), cb=ENC.encode(content), crc=crc32(cb);
+    const lh=new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true); lh.setUint16(4,20,true); lh.setUint16(6,0,true);
+    lh.setUint16(8,0,true); lh.setUint16(10,dosTime,true); lh.setUint16(12,dosDate,true);
+    lh.setUint32(14,crc,true); lh.setUint32(18,cb.length,true); lh.setUint32(22,cb.length,true);
+    lh.setUint16(26,nb.length,true); lh.setUint16(28,0,true);
+    parts.push(new Uint8Array(lh.buffer),nb,cb);
+    const ch=new DataView(new ArrayBuffer(46));
+    ch.setUint32(0,0x02014b50,true); ch.setUint16(4,20,true); ch.setUint16(6,20,true);
+    ch.setUint16(8,0,true); ch.setUint16(10,0,true); ch.setUint16(12,dosTime,true); ch.setUint16(14,dosDate,true);
+    ch.setUint32(16,crc,true); ch.setUint32(20,cb.length,true); ch.setUint32(24,cb.length,true);
+    ch.setUint16(28,nb.length,true); ch.setUint16(30,0,true); ch.setUint16(32,0,true);
+    ch.setUint16(34,0,true); ch.setUint16(36,0,true); ch.setUint32(38,0,true); ch.setUint32(42,offset,true);
+    central.push(new Uint8Array(ch.buffer),nb);
+    offset += 30+nb.length+cb.length;
+  });
+  const cdStart=offset;
+  let cdSize=0; central.forEach(p=>cdSize+=p.length);
+  const eo=new DataView(new ArrayBuffer(22));
+  eo.setUint32(0,0x06054b50,true); eo.setUint16(4,0,true); eo.setUint16(6,0,true);
+  eo.setUint16(8,files.length,true); eo.setUint16(10,files.length,true);
+  eo.setUint32(12,cdSize,true); eo.setUint32(16,cdStart,true); eo.setUint16(20,0,true);
+  return new Blob([...parts,...central,new Uint8Array(eo.buffer)]);
+}
+
+/* ---------- init ---------- */
+load();
+draw();
+if(!CAN_STORE) document.getElementById('nostore').classList.add('on');
+
+/* Cache the app on the phone so it opens with no signal out at the cage. */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      if(!localStorage.getItem('ut_inv_offline_told')){
+        navigator.serviceWorker.ready.then(()=>{
+          try{ localStorage.setItem('ut_inv_offline_told','1'); }catch(e){}
+          toast('Saved to this phone - works without signal');
+        });
+      }
+    }).catch(()=>{});
+  });
+}
+// If another tab/window edited the same inventory, pick it up on return.
+window.addEventListener('storage',e=>{ if(e.key===KEY){ load(); draw(); } });
+</script>
+<!--
+  ===========================================================================
+  UT TURF FARM - INVENTORY ENTRY
+  ===========================================================================
+
+  WHAT THIS IS
+  A phone entry screen for "Inventory of Cages_Bulk Materials.xlsx". All 215
+  products are built into this file. Every tap is written to the phone the
+  moment you make it, so nothing is lost if the screen sleeps or the app gets
+  swiped away.
+
+  THIS FOLDER
+    index.html             the app (this file)
+    sw.js                  offline cache - lets it open with no signal
+    manifest.webmanifest   home screen name and icon
+    icon-*.png             home screen icon
+
+  PUTTING IT ON AN IPHONE  (one time, about two minutes)
+    1. On the computer, go to  app.netlify.com/drop
+    2. Drag this whole Inventory-App folder onto the page.
+    3. It gives back a link. Text or AirDrop that link to the phone.
+    4. Open the link in Safari, then Share > Add to Home Screen.
+  From then on tap the home screen icon. It opens full screen and works with
+  no signal. Note: iOS cannot run this file straight off the phone's Files
+  app - Safari will not execute the scripts - which is why it comes from a
+  link instead.
+
+  UPDATING IT LATER
+  Replace index.html, bump the CACHE version at the top of sw.js, and drag
+  the folder onto Netlify Drop again (Deploys > drag to redeploy if you
+  claimed the site). Phones pick up the new copy next time they have signal.
+
+  FILTERS
+  The chip row across the top filters by product type - Fungicide,
+  Herbicide, Insecticide, PGR, Fertilizer, Adjuvant, Other - alongside All,
+  Changed and Check. The dropdown next to the search box narrows any of
+  those to one location (Cage, Barn, Chem Room). Search matches product
+  name, active ingredient, location and type.
+
+  Types were assigned from each product's active ingredient, falling back to
+  the product name. A handful of one-word entries were educated guesses; if
+  one is wrong, open the item and change Type in the editor. The choice is
+  remembered and is written to a "Type" column on export, so the spreadsheet
+  keeps the classification.
+
+  DAILY USE
+  Search or filter, tap the product, then use the big minus button or the
+  quick buttons (- one step / - 1 full container / Halve / Used up). The
+  number field also takes a typed value. Edited items get an orange border
+  and show up under the Changed filter.
+
+  GETTING IT BACK INTO THE SPREADSHEET
+  Save file > Excel workbook produces the same eight columns as the original
+  sheet in the same row order, plus an "Original Entry" column holding the
+  old free-text amount. Drop it in the Turf Farm folder to replace the
+  original. "Changes only" gives a short before/after list instead.
+  Worth exporting after any big count, as a backup.
+
+  ABOUT THE NUMBERS
+  The old sheet recorded stock as text - "2 Full", "1 Full 1 partial",
+  "Low", "44 bags". Those were converted to a number plus a unit by
+  multiplying container count by container size. Entries that were genuinely
+  vague (partial, Low) were estimated and are marked CHECK - use that filter
+  to confirm them the first time through. Editing an item clears the mark.
+
+  RESETTING
+  Revert puts every item back to the original spreadsheet values and removes
+  anything added on the phone. There is a confirmation step.
+  ===========================================================================
+-->
+</body>
+</html>

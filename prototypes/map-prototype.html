@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>UT Turf Farm — Hybrid Satellite Map (Prototype)</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{ --ut-orange:#ff8200; --ut-smokey:#58595b; --ink:#1f2328; --line:#e6e8eb; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink)}
+  #app{display:flex;flex-direction:column;height:100%}
+  header{background:linear-gradient(135deg,var(--ut-smokey) 0%,#3f4042 100%);color:#fff;padding:12px 16px;border-bottom:5px solid var(--ut-orange);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  header h1{margin:0;font-size:1.05rem;letter-spacing:-.3px}
+  header .tag{font-size:.7rem;text-transform:uppercase;letter-spacing:.6px;background:var(--ut-orange);padding:3px 9px;border-radius:20px;font-weight:700}
+  .bar{display:flex;gap:6px;padding:8px 12px;background:#fff;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center}
+  .bar b{font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;color:var(--ut-smokey);margin-right:2px}
+  .chip{font:600 12px/1 inherit;padding:7px 12px;border-radius:8px;background:#f1f2f4;color:#4b5563;border:1px solid transparent;cursor:pointer}
+  .chip.on{background:var(--ut-orange);color:#fff}
+  .chip.tog{background:#eafaef;color:#2f7d3a;border-color:#bfe6c9}
+  .chip.tog.off{background:#f1f2f4;color:#9aa1ab;border-color:transparent}
+  #map{flex:1;min-height:0}
+  .legend{background:#fff;padding:8px 10px;border-radius:8px;box-shadow:0 1px 5px rgba(0,0,0,.3);font-size:12px;line-height:1.5}
+  .legend .row{display:flex;align-items:center;gap:6px;margin:2px 0}
+  .legend .sw{width:13px;height:13px;border-radius:3px;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.2)}
+  .leaflet-popup-content{margin:10px 12px;font-size:13px;line-height:1.5}
+  .leaflet-popup-content b{color:var(--ut-smokey)}
+  .pn{font:800 11px/1 'Archivo',sans-serif;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.8)}
+  .restrict-pill{display:inline-block;background:#c0392b;color:#fff;font-size:11px;font-weight:700;padding:1px 7px;border-radius:20px}
+  .note{font-size:11px;color:#6b7280;padding:6px 12px;background:#fff6ec;border-top:1px solid #ffe0bd}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>UT Turf Farm — Interactive Map</h1>
+    <span class="tag">Hybrid Satellite · Prototype</span>
+  </header>
+
+  <div class="bar">
+    <b>Base</b>
+    <button class="chip on" data-base="sat">Satellite (Esri)</button>
+    <button class="chip" data-base="usda">USDA NAIP aerial</button>
+    <button class="chip" data-base="topo">Topo</button>
+    <button class="chip" data-base="street">Street</button>
+    <span style="width:12px"></span>
+    <b>Layers</b>
+    <button class="chip tog" data-layer="plots">Plots</button>
+    <button class="chip tog" data-layer="labels">Labels</button>
+    <button class="chip tog" data-layer="restrict">Restrictions</button>
+  </div>
+
+  <div id="map"></div>
+  <div class="note">Prototype centered on ETREC Plant Sciences Unit, 3450 Maloney Rd, Knoxville. Plot shapes below are <b>demo placeholders</b> — real plots would be traced once over the imagery and saved as coordinates. Free imagery, no API key.</div>
+</div>
+
+<script>
+// ---- Farm center (fine-tune later) --------------------------------------
+const FARM = [35.90122, -83.96050];   // UT Turf Farm — actual coordinates
+
+const map = L.map('map', { center: FARM, zoom: 17, zoomControl: true, maxZoom: 21 });
+
+// ---- Base layers (all free, no key) -------------------------------------
+const bases = {
+  sat: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom:21, maxNativeZoom:19, attribution:'Imagery © Esri, Maxar, Earthstar Geographics' }),
+  usda: L.tileLayer('https://gis.apfo.usda.gov/arcgis/rest/services/NAIP/USDA_CONUS_PRIME/ImageServer/tile/{z}/{y}/{x}', {
+        maxZoom:21, maxNativeZoom:18, attribution:'USDA NAIP / FSA APFO' }),
+  topo: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom:21, maxNativeZoom:19, attribution:'© Esri' }),
+  street: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom:19, attribution:'© OpenStreetMap contributors' })
+};
+let currentBase = bases.sat.addTo(map);
+
+// ---- Demo plots (placeholders) ------------------------------------------
+// Real version: each plot is a polygon of [lat,lng] points traced over imagery,
+// plus attributes read by tasks/field-ops/inventory/trials.
+function rect(latC, lngC, dLat, dLng){
+  return [[latC-dLat,lngC-dLng],[latC-dLat,lngC+dLng],[latC+dLat,lngC+dLng],[latC+dLat,lngC-dLng]];
+}
+const plots = [];   // demo plots removed — real plots load from the tracer's GeoJSON
+
+const plotLayer = L.layerGroup();
+const labelLayer = L.layerGroup();
+const restrictLayer = L.layerGroup();
+
+plots.forEach(p=>{
+  const restricted = !!p.restrict;
+  const poly = L.polygon(rect(p.c[0],p.c[1],p.s[0],p.s[1]), {
+    color: restricted ? '#ff5a48' : '#ffffff',
+    weight: 2,
+    fillColor: restricted ? '#c0392b' : '#ffffff',
+    fillOpacity: restricted ? 0.28 : 0.10
+  });
+  poly.bindPopup(
+    `<b>Plot ${p.n}</b><br>Mower: ${p.mower}<br>Cut height: ${p.cut}` +
+    (restricted ? `<br><span class="restrict-pill">${p.restrict}</span>` : '')
+  );
+  poly.addTo(plotLayer);
+
+  const lbl = L.marker(p.c, { icon: L.divIcon({ className:'', html:`<span class="pn">${p.n}</span>`, iconSize:[24,14] }) });
+  lbl.addTo(labelLayer);
+
+  if(restricted){
+    const rp = L.polygon(rect(p.c[0],p.c[1],p.s[0],p.s[1]), {
+      color:'#ff5a48', weight:2, dashArray:'4 3', fillColor:'#c0392b', fillOpacity:0.35 });
+    rp.addTo(restrictLayer);
+  }
+});
+plotLayer.addTo(map);
+labelLayer.addTo(map);
+restrictLayer.addTo(map);
+const layers = { plots:plotLayer, labels:labelLayer, restrict:restrictLayer };
+
+// ---- Legend --------------------------------------------------------------
+const legend = L.control({position:'bottomright'});
+legend.onAdd = function(){
+  const d = L.DomUtil.create('div','legend');
+  d.innerHTML = '<div class="row"><span class="sw" style="background:#ffffff"></span>Plot</div>'+
+                '<div class="row"><span class="sw" style="background:#c0392b"></span>Active restriction</div>';
+  return d;
+};
+legend.addTo(map);
+
+// ---- Controls ------------------------------------------------------------
+document.querySelectorAll('.chip[data-base]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.chip[data-base]').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    map.removeLayer(currentBase);
+    currentBase = bases[btn.dataset.base].addTo(map);
+    currentBase.bringToBack();
+  });
+});
+document.querySelectorAll('.chip[data-layer]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const lay = layers[btn.dataset.layer];
+    if(map.hasLayer(lay)){ map.removeLayer(lay); btn.classList.add('off'); }
+    else { lay.addTo(map); btn.classList.remove('off'); }
+  });
+});
+</script>
+</body>
+</html>

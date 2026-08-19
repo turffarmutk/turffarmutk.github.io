@@ -1,0 +1,17 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<meta name="robots" content="noindex,nofollow">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>html,body,#map{margin:0;height:100%}
+#cap{position:absolute;z-index:1000;top:8px;left:8px;background:#fff;padding:6px 10px;border-radius:8px;font:600 12px sans-serif;box-shadow:0 1px 5px rgba(0,0,0,.3)}
+.k{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:middle;margin:0 4px}</style></head>
+<body><div id="cap"><span class="k" style="background:#00E676"></span>O1-O4 plots &nbsp; <span class="k" style="background:#ff8200"></span>O5 border (25 ft, square)</div>
+<div id="map"></div>
+<script>
+const O={"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"number": "O1"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.961728, 35.902102], [-83.961556, 35.90217], [-83.961417, 35.901946], [-83.961582, 35.901875], [-83.961728, 35.902102]]]}}, {"type": "Feature", "properties": {"number": "O2"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.961507, 35.902181], [-83.961352, 35.902248], [-83.961213, 35.902026], [-83.96137, 35.901966], [-83.961507, 35.902181]]]}}, {"type": "Feature", "properties": {"number": "O4"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.961343, 35.90194], [-83.961178, 35.902009], [-83.961055, 35.90182], [-83.961141, 35.901781], [-83.961218, 35.901744], [-83.961343, 35.90194]]]}}, {"type": "Feature", "properties": {"number": "O3"}, "geometry": {"type": "Polygon", "coordinates": [[[-83.961564, 35.901847], [-83.961393, 35.90192], [-83.961269, 35.901722], [-83.961433, 35.901644], [-83.961564, 35.901847]]]}}]}, B={"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"number": "O5", "name": "O1-O4 Border", "type": "border", "around": ["O1", "O2", "O3", "O4"], "width_ft": 25}, "geometry": {"type": "Polygon", "coordinates": [[[-83.96184247610036, 35.902130768239374], [-83.96146874392595, 35.90155162601488], [-83.96093287796747, 35.90177852088865], [-83.96130661014188, 35.902357663113136], [-83.96184247610036, 35.902130768239374]], [[-83.96172843719202, 35.90210181488536], [-83.96134235406782, 35.90226528912802], [-83.9610469168758, 35.90180747424265], [-83.961433, 35.901644], [-83.96172843719202, 35.90210181488536]]]}}]};
+const map=L.map('map',{maxZoom:22});
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:22,maxNativeZoom:19}).addTo(map);
+const bl=L.geoJSON(B,{style:{color:'#ff8200',weight:2,fillColor:'#ff8200',fillOpacity:0.45}}).addTo(map);
+L.geoJSON(O,{style:{color:'#00E676',weight:2,fillColor:'#00E676',fillOpacity:0.35},onEachFeature:function(f,l){l.bindTooltip(f.properties.number,{permanent:true,direction:'center',opacity:1});}}).addTo(map);
+map.fitBounds(bl.getBounds().pad(0.3));
+</script></body></html>

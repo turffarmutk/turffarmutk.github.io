@@ -1,0 +1,1772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UT Turf Farm App — Overview &amp; Full Specs</title>
+<style>
+
+
+  :root{
+    --ut-orange:#ff8200;--ut-smokey:#58595b;--ink:#1f2328;--muted:#5b6470;
+    --line:#e6e8eb;--bg:#ffffff;--panel:#faf9f7;--panel-2:#fff6ec;--accent-soft:#fff1e0;--good:#2f7d3a;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.65;font-size:16px;}
+  .wrap{max-width:820px;margin:0 auto;padding:0 22px 72px;}
+  header.hero{background:linear-gradient(135deg,var(--ut-smokey) 0%,#3f4042 100%);color:#fff;padding:46px 22px 38px;border-bottom:6px solid var(--ut-orange);}
+  header.hero .inner{max-width:820px;margin:0 auto;}
+  header.hero .kicker{font-size:.74rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--ut-orange);margin-bottom:10px;}
+  header.hero h1{margin:0 0 10px;font-size:2rem;letter-spacing:-.5px;}
+  header.hero p{margin:0;color:#d7d8da;font-size:1.05rem;}
+  h2{font-size:1.25rem;margin:40px 0 12px;color:var(--ut-smokey);padding-bottom:6px;border-bottom:2px solid var(--ut-orange);}
+  p{margin:12px 0;}
+  strong{color:var(--ink);}
+  .lead{font-size:1.08rem;}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0;}
+  .card{display:block;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--ut-orange);border-radius:0 10px 10px 0;padding:14px 16px;text-decoration:none;color:inherit;transition:background .12s,border-left-color .12s;}
+  .card:hover{background:var(--panel-2);border-left-color:var(--ut-smokey);}
+  .card h3{margin:0 0 5px;font-size:1rem;color:var(--ut-smokey);}
+  .card p{margin:0;font-size:.94rem;color:var(--muted);}
+  .card .more{display:inline-block;margin-top:8px;font-size:.82rem;font-weight:700;color:var(--ut-orange);}
+  .detail-sec{scroll-margin-top:16px;border-top:1px solid var(--line);padding-top:6px;margin-top:24px;}
+  .detail-sec h3{font-size:1.12rem;color:var(--ut-smokey);margin:14px 0 6px;}
+  .detail-sec ul{margin:8px 0;padding-left:22px;}
+  .detail-sec li{margin:5px 0;font-size:.95rem;}
+  .toplink{display:inline-block;margin-top:8px;font-size:.82rem;color:var(--ut-orange);text-decoration:none;font-weight:700;}
+  .toplink:hover{text-decoration:underline;}
+  .benefits{background:var(--accent-soft);border:1px solid #ffd9ac;border-radius:12px;padding:8px 22px;margin:20px 0;}
+  ul{margin:12px 0;padding-left:22px;}
+  li{margin:7px 0;}
+  .phase-row{display:flex;gap:14px;align-items:flex-start;margin:12px 0;}
+  .phase-row .n{flex:0 0 auto;width:34px;height:34px;border-radius:50%;background:var(--ut-orange);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;}
+  .phase-row .b{flex:1;}
+  .phase-row .b strong{display:block;}
+  .phase-row .b span{color:var(--muted);font-size:.94rem;}
+  .highlight{background:#eafaef;border:1px solid #bfe6c9;border-radius:12px;padding:14px 20px;margin:20px 0;}
+  footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem;}
+  @media (max-width:640px){.cards{grid-template-columns:1fr;}header.hero h1{font-size:1.5rem;}}
+
+
+  :root{
+    --ut-orange:#ff8200;--ut-smokey:#58595b;--ink:#1f2328;--muted:#5b6470;
+    --line:#e6e8eb;--bg:#ffffff;--panel:#faf9f7;--panel-2:#fff6ec;--accent-soft:#fff1e0;
+    --good:#2f7d3a;--warn:#b26a00;--blue:#2456b8;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6;font-size:16px;}
+  .wrap{max-width:900px;margin:0 auto;padding:0 20px 80px;}
+  header.hero{background:linear-gradient(135deg,var(--ut-smokey) 0%,#3f4042 100%);color:#fff;padding:44px 20px 36px;border-bottom:6px solid var(--ut-orange);}
+  header.hero .inner{max-width:900px;margin:0 auto;}
+  header.hero h1{margin:0 0 8px;font-size:1.9rem;letter-spacing:-.5px;}
+  header.hero p{margin:0;color:#d7d8da;}
+  .badge{display:inline-block;background:var(--ut-orange);color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:14px;}
+  nav.toc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:26px 0;}
+  nav.toc h2{margin:0 0 10px;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+  nav.toc ol{margin:0;padding-left:20px;columns:2;column-gap:32px;}
+  nav.toc a{color:var(--ink);text-decoration:none;}
+  nav.toc a:hover{color:var(--ut-orange);text-decoration:underline;}
+  h2.section{font-size:1.35rem;margin:44px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--ut-orange);scroll-margin-top:20px;}
+  h3{font-size:1.05rem;margin:24px 0 8px;color:var(--ut-smokey);}
+  p{margin:12px 0;}
+  strong{color:var(--ink);}
+  em{color:var(--muted);}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:.94rem;}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:var(--panel-2);color:var(--ut-smokey);font-size:.78rem;text-transform:uppercase;letter-spacing:.5px;}
+  tr:last-child td{border-bottom:none;}
+  code{background:#f1f2f4;padding:1px 6px;border-radius:5px;font-size:.88em;}
+  .callout{background:var(--accent-soft);border:1px solid #ffd9ac;border-radius:10px;padding:14px 18px;margin:18px 0;}
+  .callout.q{background:#eef4ff;border-color:#cfe0ff;}
+  .callout.out{background:#f6f6f7;border-color:#e2e2e5;}
+  ul,ol{margin:12px 0;padding-left:24px;}
+  li{margin:6px 0;}
+  .pill{display:inline-block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 9px;border-radius:20px;color:#fff;}
+  .p-open{background:var(--blue);}
+  .p-claimed{background:var(--warn);}
+  .p-done{background:var(--good);}
+  .flow{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 20px;margin:16px 0;}
+  .flow h4{margin:16px 0 6px;color:var(--ut-smokey);}
+  .statebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0;font-size:.9rem;}
+  .statebar .arrow{color:var(--muted);font-weight:700;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:14px 0;}
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem;}
+  @media (max-width:640px){nav.toc ol{columns:1;}header.hero h1{font-size:1.4rem;}}
+
+
+  :root{
+    --ut-orange:#ff8200;--ut-smokey:#58595b;--ink:#1f2328;--muted:#5b6470;
+    --line:#e6e8eb;--bg:#ffffff;--panel:#faf9f7;--panel-2:#fff6ec;--accent-soft:#fff1e0;
+    --good:#2f7d3a;--warn:#b26a00;--blue:#2456b8;--flag:#c0392b;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6;font-size:16px;}
+  .wrap{max-width:900px;margin:0 auto;padding:0 20px 80px;}
+  header.hero{background:linear-gradient(135deg,var(--ut-smokey) 0%,#3f4042 100%);color:#fff;padding:44px 20px 36px;border-bottom:6px solid var(--ut-orange);}
+  header.hero .inner{max-width:900px;margin:0 auto;}
+  header.hero h1{margin:0 0 8px;font-size:1.9rem;letter-spacing:-.5px;}
+  header.hero p{margin:0;color:#d7d8da;}
+  .badge{display:inline-block;background:var(--ut-orange);color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:14px;}
+  nav.toc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:26px 0;}
+  nav.toc h2{margin:0 0 10px;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+  nav.toc ol{margin:0;padding-left:20px;columns:2;column-gap:32px;}
+  nav.toc a{color:var(--ink);text-decoration:none;}
+  nav.toc a:hover{color:var(--ut-orange);text-decoration:underline;}
+  h2.section{font-size:1.35rem;margin:44px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--ut-orange);scroll-margin-top:20px;}
+  h3{font-size:1.05rem;margin:24px 0 8px;color:var(--ut-smokey);}
+  p{margin:12px 0;}
+  strong{color:var(--ink);}
+  em{color:var(--muted);}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:.93rem;}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:var(--panel-2);color:var(--ut-smokey);font-size:.76rem;text-transform:uppercase;letter-spacing:.4px;}
+  tr:last-child td{border-bottom:none;}
+  code{background:#f1f2f4;padding:1px 6px;border-radius:5px;font-size:.88em;}
+  .callout{background:var(--accent-soft);border:1px solid #ffd9ac;border-radius:10px;padding:14px 18px;margin:18px 0;}
+  .callout.q{background:#eef4ff;border-color:#cfe0ff;}
+  .callout.key{background:#eafaef;border-color:#bfe6c9;}
+  .callout.out{background:#f6f6f7;border-color:#e2e2e5;}
+  ul,ol{margin:12px 0;padding-left:24px;}
+  li{margin:6px 0;}
+  .rule{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--ut-orange);border-radius:0 10px 10px 0;padding:12px 18px;margin:12px 0;}
+  .rule h4{margin:0 0 6px;color:var(--ut-smokey);font-size:1rem;}
+  .flag-chip{display:inline-block;background:var(--flag);color:#fff;font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:20px;}
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem;}
+  @media (max-width:640px){nav.toc ol{columns:1;}header.hero h1{font-size:1.4rem;}}
+
+
+  :root{
+    --ut-orange:#ff8200;--ut-smokey:#58595b;--ink:#1f2328;--muted:#5b6470;
+    --line:#e6e8eb;--bg:#ffffff;--panel:#faf9f7;--panel-2:#fff6ec;--accent-soft:#fff1e0;
+    --good:#2f7d3a;--warn:#b26a00;--blue:#2456b8;--restrict:#c0392b;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6;font-size:16px;}
+  .wrap{max-width:900px;margin:0 auto;padding:0 20px 80px;}
+  header.hero{background:linear-gradient(135deg,var(--ut-smokey) 0%,#3f4042 100%);color:#fff;padding:44px 20px 36px;border-bottom:6px solid var(--ut-orange);}
+  header.hero .inner{max-width:900px;margin:0 auto;}
+  header.hero h1{margin:0 0 8px;font-size:1.9rem;letter-spacing:-.5px;}
+  header.hero p{margin:0;color:#d7d8da;}
+  .badge{display:inline-block;background:var(--ut-orange);color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:14px;}
+  nav.toc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:26px 0;}
+  nav.toc h2{margin:0 0 10px;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+  nav.toc ol{margin:0;padding-left:20px;columns:2;column-gap:32px;}
+  nav.toc a{color:var(--ink);text-decoration:none;}
+  nav.toc a:hover{color:var(--ut-orange);text-decoration:underline;}
+  h2.section{font-size:1.35rem;margin:44px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--ut-orange);scroll-margin-top:20px;}
+  h3{font-size:1.05rem;margin:24px 0 8px;color:var(--ut-smokey);}
+  p{margin:12px 0;}
+  strong{color:var(--ink);}
+  em{color:var(--muted);}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:.93rem;}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:var(--panel-2);color:var(--ut-smokey);font-size:.76rem;text-transform:uppercase;letter-spacing:.4px;}
+  tr:last-child td{border-bottom:none;}
+  code{background:#f1f2f4;padding:1px 6px;border-radius:5px;font-size:.88em;}
+  .callout{background:var(--accent-soft);border:1px solid #ffd9ac;border-radius:10px;padding:14px 18px;margin:18px 0;}
+  .callout.q{background:#eef4ff;border-color:#cfe0ff;}
+  .callout.key{background:#eafaef;border-color:#bfe6c9;}
+  .callout.out{background:#f6f6f7;border-color:#e2e2e5;}
+  ul,ol{margin:12px 0;padding-left:24px;}
+  li{margin:6px 0;}
+  .layerbox{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--ut-orange);border-radius:0 10px 10px 0;padding:14px 18px;margin:14px 0;}
+  .layerbox h4{margin:0 0 6px;color:var(--ut-smokey);}
+  .restrict-chip{display:inline-block;background:var(--restrict);color:#fff;font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:20px;}
+  .dot{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:middle;margin-right:4px;}
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem;}
+  @media (max-width:640px){nav.toc ol{columns:1;}header.hero h1{font-size:1.4rem;}}
+
+
+  :root{
+    --ut-orange:#ff8200;--ut-smokey:#58595b;--ink:#1f2328;--muted:#5b6470;
+    --line:#e6e8eb;--bg:#ffffff;--panel:#faf9f7;--panel-2:#fff6ec;--accent-soft:#fff1e0;
+    --good:#2f7d3a;--warn:#b26a00;--blue:#2456b8;--restrict:#c0392b;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6;font-size:16px;}
+  .wrap{max-width:900px;margin:0 auto;padding:0 20px 80px;}
+  header.hero{background:linear-gradient(135deg,var(--ut-smokey) 0%,#3f4042 100%);color:#fff;padding:44px 20px 36px;border-bottom:6px solid var(--ut-orange);}
+  header.hero .inner{max-width:900px;margin:0 auto;}
+  header.hero h1{margin:0 0 8px;font-size:1.9rem;letter-spacing:-.5px;}
+  header.hero p{margin:0;color:#d7d8da;}
+  .badge{display:inline-block;background:var(--ut-orange);color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:14px;}
+  nav.toc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:26px 0;}
+  nav.toc h2{margin:0 0 10px;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+  nav.toc ol{margin:0;padding-left:20px;columns:2;column-gap:32px;}
+  nav.toc a{color:var(--ink);text-decoration:none;}
+  nav.toc a:hover{color:var(--ut-orange);text-decoration:underline;}
+  h2.section{font-size:1.35rem;margin:44px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--ut-orange);scroll-margin-top:20px;}
+  h3{font-size:1.05rem;margin:24px 0 8px;color:var(--ut-smokey);}
+  p{margin:12px 0;}
+  strong{color:var(--ink);}
+  em{color:var(--muted);}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:.93rem;}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:var(--panel-2);color:var(--ut-smokey);font-size:.76rem;text-transform:uppercase;letter-spacing:.4px;}
+  tr:last-child td{border-bottom:none;}
+  code{background:#f1f2f4;padding:1px 6px;border-radius:5px;font-size:.88em;}
+  .callout{background:var(--accent-soft);border:1px solid #ffd9ac;border-radius:10px;padding:14px 18px;margin:18px 0;}
+  .callout.q{background:#eef4ff;border-color:#cfe0ff;}
+  .callout.key{background:#eafaef;border-color:#bfe6c9;}
+  .callout.out{background:#f6f6f7;border-color:#e2e2e5;}
+  ul,ol{margin:12px 0;padding-left:24px;}
+  li{margin:6px 0;}
+  .rule{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--ut-orange);border-radius:0 10px 10px 0;padding:12px 18px;margin:12px 0;}
+  .rule h4{margin:0 0 6px;color:var(--ut-smokey);font-size:1rem;}
+  .stage{display:inline-block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 9px;border-radius:20px;color:#fff;}
+  .st-plan{background:var(--blue);}
+  .st-active{background:var(--good);}
+  .st-done{background:var(--muted);}
+  .restrict-chip{display:inline-block;background:var(--restrict);color:#fff;font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:20px;}
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem;}
+  @media (max-width:640px){nav.toc ol{columns:1;}header.hero h1{font-size:1.4rem;}}
+
+
+  :root{
+    --ut-orange:#ff8200;--ut-smokey:#58595b;--ink:#1f2328;--muted:#5b6470;
+    --line:#e6e8eb;--bg:#ffffff;--panel:#faf9f7;--panel-2:#fff6ec;--accent-soft:#fff1e0;
+    --good:#2f7d3a;--warn:#b26a00;--blue:#2456b8;--low:#c0392b;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6;font-size:16px;}
+  .wrap{max-width:900px;margin:0 auto;padding:0 20px 80px;}
+  header.hero{background:linear-gradient(135deg,var(--ut-smokey) 0%,#3f4042 100%);color:#fff;padding:44px 20px 36px;border-bottom:6px solid var(--ut-orange);}
+  header.hero .inner{max-width:900px;margin:0 auto;}
+  header.hero h1{margin:0 0 8px;font-size:1.9rem;letter-spacing:-.5px;}
+  header.hero p{margin:0;color:#d7d8da;}
+  .badge{display:inline-block;background:var(--ut-orange);color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:14px;}
+  nav.toc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:26px 0;}
+  nav.toc h2{margin:0 0 10px;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+  nav.toc ol{margin:0;padding-left:20px;columns:2;column-gap:32px;}
+  nav.toc a{color:var(--ink);text-decoration:none;}
+  nav.toc a:hover{color:var(--ut-orange);text-decoration:underline;}
+  h2.section{font-size:1.35rem;margin:44px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--ut-orange);scroll-margin-top:20px;}
+  h3{font-size:1.05rem;margin:24px 0 8px;color:var(--ut-smokey);}
+  p{margin:12px 0;}
+  strong{color:var(--ink);}
+  em{color:var(--muted);}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:.93rem;}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:var(--panel-2);color:var(--ut-smokey);font-size:.76rem;text-transform:uppercase;letter-spacing:.4px;}
+  tr:last-child td{border-bottom:none;}
+  code{background:#f1f2f4;padding:1px 6px;border-radius:5px;font-size:.88em;}
+  .callout{background:var(--accent-soft);border:1px solid #ffd9ac;border-radius:10px;padding:14px 18px;margin:18px 0;}
+  .callout.q{background:#eef4ff;border-color:#cfe0ff;}
+  .callout.key{background:#eafaef;border-color:#bfe6c9;}
+  .callout.out{background:#f6f6f7;border-color:#e2e2e5;}
+  ul,ol{margin:12px 0;padding-left:24px;}
+  li{margin:6px 0;}
+  .rule{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--ut-orange);border-radius:0 10px 10px 0;padding:12px 18px;margin:12px 0;}
+  .rule h4{margin:0 0 6px;color:var(--ut-smokey);font-size:1rem;}
+  .low-chip{display:inline-block;background:var(--low);color:#fff;font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:20px;}
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem;}
+  @media (max-width:640px){nav.toc ol{columns:1;}header.hero h1{font-size:1.4rem;}}
+
+
+  :root{
+    --ut-orange:#ff8200;--ut-smokey:#58595b;--ink:#1f2328;--muted:#5b6470;
+    --line:#e6e8eb;--bg:#ffffff;--panel:#faf9f7;--panel-2:#fff6ec;--accent-soft:#fff1e0;
+    --good:#2f7d3a;--warn:#b26a00;--blue:#2456b8;--down:#c0392b;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6;font-size:16px;}
+  .wrap{max-width:900px;margin:0 auto;padding:0 20px 80px;}
+  header.hero{background:linear-gradient(135deg,var(--ut-smokey) 0%,#3f4042 100%);color:#fff;padding:44px 20px 36px;border-bottom:6px solid var(--ut-orange);}
+  header.hero .inner{max-width:900px;margin:0 auto;}
+  header.hero h1{margin:0 0 8px;font-size:1.9rem;letter-spacing:-.5px;}
+  header.hero p{margin:0;color:#d7d8da;}
+  .badge{display:inline-block;background:var(--ut-orange);color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:14px;}
+  nav.toc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:26px 0;}
+  nav.toc h2{margin:0 0 10px;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+  nav.toc ol{margin:0;padding-left:20px;columns:2;column-gap:32px;}
+  nav.toc a{color:var(--ink);text-decoration:none;}
+  nav.toc a:hover{color:var(--ut-orange);text-decoration:underline;}
+  h2.section{font-size:1.35rem;margin:44px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--ut-orange);scroll-margin-top:20px;}
+  h3{font-size:1.05rem;margin:24px 0 8px;color:var(--ut-smokey);}
+  p{margin:12px 0;}
+  strong{color:var(--ink);}
+  em{color:var(--muted);}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:.93rem;}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:var(--panel-2);color:var(--ut-smokey);font-size:.76rem;text-transform:uppercase;letter-spacing:.4px;}
+  tr:last-child td{border-bottom:none;}
+  code{background:#f1f2f4;padding:1px 6px;border-radius:5px;font-size:.88em;}
+  .callout{background:var(--accent-soft);border:1px solid #ffd9ac;border-radius:10px;padding:14px 18px;margin:18px 0;}
+  .callout.q{background:#eef4ff;border-color:#cfe0ff;}
+  .callout.key{background:#eafaef;border-color:#bfe6c9;}
+  .callout.out{background:#f6f6f7;border-color:#e2e2e5;}
+  ul,ol{margin:12px 0;padding-left:24px;}
+  li{margin:6px 0;}
+  .rule{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--ut-orange);border-radius:0 10px 10px 0;padding:12px 18px;margin:12px 0;}
+  .rule h4{margin:0 0 6px;color:var(--ut-smokey);font-size:1rem;}
+  .pill{display:inline-block;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:2px 9px;border-radius:20px;color:#fff;}
+  .s-avail{background:var(--good);}
+  .s-use{background:var(--warn);}
+  .s-down{background:var(--down);}
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem;}
+  @media (max-width:640px){nav.toc ol{columns:1;}header.hero h1{font-size:1.4rem;}}
+
+
+  :root{
+    --ut-orange:#ff8200;--ut-smokey:#58595b;--ink:#1f2328;--muted:#5b6470;
+    --line:#e6e8eb;--bg:#ffffff;--panel:#faf9f7;--panel-2:#fff6ec;--accent-soft:#fff1e0;
+    --good:#2f7d3a;--warn:#b26a00;--blue:#2456b8;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6;font-size:16px;}
+  .wrap{max-width:900px;margin:0 auto;padding:0 20px 80px;}
+  header.hero{background:linear-gradient(135deg,var(--ut-smokey) 0%,#3f4042 100%);color:#fff;padding:44px 20px 36px;border-bottom:6px solid var(--ut-orange);}
+  header.hero .inner{max-width:900px;margin:0 auto;}
+  header.hero h1{margin:0 0 8px;font-size:1.9rem;letter-spacing:-.5px;}
+  header.hero p{margin:0;color:#d7d8da;}
+  .badge{display:inline-block;background:var(--ut-orange);color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:14px;}
+  nav.toc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:26px 0;}
+  nav.toc h2{margin:0 0 10px;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+  nav.toc ol{margin:0;padding-left:20px;columns:2;column-gap:32px;}
+  nav.toc a{color:var(--ink);text-decoration:none;}
+  nav.toc a:hover{color:var(--ut-orange);text-decoration:underline;}
+  h2.section{font-size:1.35rem;margin:44px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--ut-orange);scroll-margin-top:20px;}
+  h3{font-size:1.05rem;margin:24px 0 8px;color:var(--ut-smokey);}
+  p{margin:12px 0;}
+  strong{color:var(--ink);}
+  em{color:var(--muted);}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:.93rem;}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:var(--panel-2);color:var(--ut-smokey);font-size:.76rem;text-transform:uppercase;letter-spacing:.4px;}
+  tr:last-child td{border-bottom:none;}
+  code{background:#f1f2f4;padding:1px 6px;border-radius:5px;font-size:.88em;}
+  .callout{background:var(--accent-soft);border:1px solid #ffd9ac;border-radius:10px;padding:14px 18px;margin:18px 0;}
+  .callout.q{background:#eef4ff;border-color:#cfe0ff;}
+  .callout.key{background:#eafaef;border-color:#bfe6c9;}
+  .callout.out{background:#f6f6f7;border-color:#e2e2e5;}
+  .callout.warn{background:#fff4e5;border-color:#ffd08a;}
+  ul,ol{margin:12px 0;padding-left:24px;}
+  li{margin:6px 0;}
+  .rule{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--ut-orange);border-radius:0 10px 10px 0;padding:12px 18px;margin:12px 0;}
+  .rule h4{margin:0 0 6px;color:var(--ut-smokey);font-size:1rem;}
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem;}
+  @media (max-width:640px){nav.toc ol{columns:1;}header.hero h1{font-size:1.4rem;}}
+
+
+  :root{
+    --ut-orange:#ff8200;--ut-smokey:#58595b;--ink:#1f2328;--muted:#5b6470;
+    --line:#e6e8eb;--bg:#ffffff;--panel:#faf9f7;--panel-2:#fff6ec;--accent-soft:#fff1e0;
+    --good:#2f7d3a;--warn:#b26a00;--blue:#2456b8;--frost:#2f6fb0;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6;font-size:16px;}
+  .wrap{max-width:900px;margin:0 auto;padding:0 20px 80px;}
+  header.hero{background:linear-gradient(135deg,var(--ut-smokey) 0%,#3f4042 100%);color:#fff;padding:44px 20px 36px;border-bottom:6px solid var(--ut-orange);}
+  header.hero .inner{max-width:900px;margin:0 auto;}
+  header.hero h1{margin:0 0 8px;font-size:1.9rem;letter-spacing:-.5px;}
+  header.hero p{margin:0;color:#d7d8da;}
+  .badge{display:inline-block;background:var(--ut-orange);color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:14px;}
+  nav.toc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:26px 0;}
+  nav.toc h2{margin:0 0 10px;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+  nav.toc ol{margin:0;padding-left:20px;columns:2;column-gap:32px;}
+  nav.toc a{color:var(--ink);text-decoration:none;}
+  nav.toc a:hover{color:var(--ut-orange);text-decoration:underline;}
+  h2.section{font-size:1.35rem;margin:44px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--ut-orange);scroll-margin-top:20px;}
+  h3{font-size:1.05rem;margin:24px 0 8px;color:var(--ut-smokey);}
+  p{margin:12px 0;}
+  strong{color:var(--ink);}
+  em{color:var(--muted);}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:.93rem;}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:var(--panel-2);color:var(--ut-smokey);font-size:.76rem;text-transform:uppercase;letter-spacing:.4px;}
+  tr:last-child td{border-bottom:none;}
+  code{background:#f1f2f4;padding:1px 6px;border-radius:5px;font-size:.88em;}
+  .callout{background:var(--accent-soft);border:1px solid #ffd9ac;border-radius:10px;padding:14px 18px;margin:18px 0;}
+  .callout.q{background:#eef4ff;border-color:#cfe0ff;}
+  .callout.key{background:#eafaef;border-color:#bfe6c9;}
+  .callout.out{background:#f6f6f7;border-color:#e2e2e5;}
+  ul,ol{margin:12px 0;padding-left:24px;}
+  li{margin:6px 0;}
+  .rule{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--ut-orange);border-radius:0 10px 10px 0;padding:12px 18px;margin:12px 0;}
+  .rule h4{margin:0 0 6px;color:var(--ut-smokey);font-size:1rem;}
+  .frost-chip{display:inline-block;background:var(--frost);color:#fff;font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:20px;}
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem;}
+  @media (max-width:640px){nav.toc ol{columns:1;}header.hero h1{font-size:1.4rem;}}
+
+  .specsection{border-top:6px solid var(--ut-orange);margin-top:46px;padding-top:6px;}
+  .specbanner{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 15px;margin:18px 0 6px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+  .specbanner strong{color:var(--ut-smokey);font-size:1.05rem;}
+
+
+  .screen{display:none;}
+  .screen.active{display:block;}
+  .specsection{padding-top:6px;}
+  .specbanner{position:sticky;top:0;z-index:5;background:var(--panel-2);border:1px solid var(--line);border-radius:0 0 10px 10px;padding:11px 15px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+  .specbanner strong{color:var(--ut-smokey);font-size:1.02rem;}
+  .backbtn{display:inline-block;background:var(--ut-orange);color:#fff;text-decoration:none;font-weight:700;font-size:.85rem;padding:6px 13px;border-radius:8px;}
+  .backbtn:hover{background:#e57500;}
+  .phone{max-width:342px;margin:14px auto 6px;background:#fff;border:1px solid var(--line);border-radius:26px;box-shadow:0 10px 34px rgba(0,0,0,.11);overflow:hidden;}
+  .phone-top{background:linear-gradient(135deg,var(--ut-smokey),#3f4042);color:#fff;padding:18px 18px 15px;}
+  .phone-app{font-weight:800;letter-spacing:.2px;font-size:1.05rem;}
+  .phone-app .o{color:var(--ut-orange);}
+  .phone-user{font-size:.78rem;color:#d7d8da;margin-top:3px;}
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:11px;padding:15px;background:var(--panel);}
+  .tile{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px 8px 11px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:7px;}
+  .tile .ic{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.35rem;}
+  .tile .lbl{font-size:.83rem;font-weight:700;color:var(--ink);line-height:1.2;}
+  .tile small{font-size:.68rem;color:var(--muted);}
+  .phone-cap{max-width:342px;margin:0 auto;text-align:center;color:var(--muted);font-size:.85rem;font-style:italic;}
+
+</style>
+</head>
+<body>
+<div class="screen active" id="home">
+
+
+<header class="hero">
+  <div class="inner">
+    <div class="kicker">UT Turfgrass Research Team</div>
+    <h1>Turf Farm App — Executive Summary</h1>
+    <p>One place to run and see everything happening on the research farm.</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <p class="lead">We're planning a simple app to bring the daily running of the turf farm into one place. Today, work and information live across whiteboards, spreadsheets, and group texts. The app pulls it together so <strong>everyone can see what's happening, what's planned, and what's off-limits</strong> — with the farm manager, Bill, as the primary user it's built to help.</p>
+
+  <h2 id="whatitdoes">What it does</h2>
+  <div class="cards">
+    <a class="card" href="#full-task"><h3>Daily task board</h3><p>Bill assigns the day's jobs to the crew, who check them off as they go. Everyone sees what's done and what's left, live.</p><span class="more">Read more →</span></a>
+    <a class="card" href="#full-crew"><h3>Crew scheduling &amp; time clock</h3><p>Student workers set their availability and clock in on site, so Bill knows who's coming in and can plan the day around it.</p><span class="more">Read more →</span></a>
+    <a class="card" href="#full-map"><h3>Interactive farm map</h3><p>An aerial of the farm where each plot shows its mowing details and — importantly — any research restrictions, so the crew never mows or sprays a protected trial.</p><span class="more">Read more →</span></a>
+    <a class="card" href="#full-trials"><h3>Research trials &amp; study plans</h3><p>Each study's protocol and plot restrictions live in the app, and upcoming studies are shared in advance so Bill can prepare.</p><span class="more">Read more →</span></a>
+    <a class="card" href="#full-inv"><h3>Chemical &amp; supply inventory</h3><p>A live count of chemicals, fertilizer, and seed, updated as products are used, with a low-stock heads-up before anything runs out.</p><span class="more">Read more →</span></a>
+    <a class="card" href="#full-equip"><h3>Equipment status</h3><p>See what's available, in use, or broken at a glance, with problems reported in a tap.</p><span class="more">Read more →</span></a>
+    <a class="card" href="#full-fieldops"><h3>Field operations record</h3><p>A clean, searchable log of mowing, sprays, and fertilizer by plot and date — the record we need for compliance.</p><span class="more">Read more →</span></a>
+    <a class="card" href="#full-weather"><h3>Weather at the farm</h3><p>Current conditions, forecast, rainfall, growing degree days, and frost warnings for the farm's location.</p><span class="more">Read more →</span></a>
+  </div>
+
+  <h2>Why it helps</h2>
+  <div class="benefits">
+    <ul>
+      <li><strong>Protects the research.</strong> Plot restrictions are visible on the map before anyone mows or sprays, reducing costly mistakes on trials.</li>
+      <li><strong>Saves Bill time.</strong> Assigning work, tracking who's in, and knowing what's in stock all happen in one place instead of many.</li>
+      <li><strong>Keeps everyone informed.</strong> Faculty, students, and crew see the same up-to-date picture of the farm.</li>
+      <li><strong>Builds a real record.</strong> Chemical applications and farm activity are logged automatically as work gets done.</li>
+    </ul>
+  </div>
+
+  <h2>How the team will use it</h2>
+  <p>It's a <strong>phone-first app</strong> the crew opens like any website and adds to their home screen — no app store, no installs. Everyone signs in with their UT email, and <strong>each person sees a screen tailored to their role</strong>: a student sees today's tasks and the map; Bill sees everything. Access is invite-only, so only our team can get in.</p>
+
+  <h2>Rollout</h2>
+  <p>We'll build it in order, foundation first, so each piece has what it needs to work:</p>
+  <div class="phase-row"><div class="n">1</div><div class="b"><strong>Build the interactive map</strong><span>Upload the aerial, trace the plots and numbering, and set each plot's mower and cut height (plus the indoor map). This is the foundation every other feature builds on.</span></div></div>
+  <div class="phase-row"><div class="n">2</div><div class="b"><strong>Load the current trials</strong><span>Enter the active studies and their plot restrictions onto the map, so it immediately shows the crew what's off-limits — protecting the research from day one.</span></div></div>
+  <div class="phase-row"><div class="n">3</div><div class="b"><strong>Add the task board</strong><span>Bill assigns the day's work and the crew checks it off; mowing jobs open the map filtered to just their plots. The daily engine of the app.</span></div></div>
+  <div class="phase-row"><div class="n">4</div><div class="b"><strong>Add inventory &amp; crew scheduling</strong><span>Live chemical, fertilizer, and seed counts with quick logging, plus the availability board and time clock — so Bill can keep the farm stocked and staffed.</span></div></div>
+  <div class="phase-row"><div class="n">5</div><div class="b"><strong>Round it out</strong><span>Equipment status, weather, and the fuller field-operations record.</span></div></div>
+
+  <h2 id="roles">What each person sees</h2>
+  <p>Everyone opens the same app, but the home screen is <strong>tailored to their role</strong> — a student sees today's work, Bill sees the whole operation. Tap a role to see an example of its home screen.</p>
+  <div class="cards">
+    <a class="card" href="#role-bill"><h3>Bill — Farm Manager</h3><p>The full control center: assign work and manage the map, inventory, equipment, schedule, and team.</p><span class="more">See home screen →</span></a>
+    <a class="card" href="#role-faculty"><h3>Faculty (PI)</h3><p>Oversight of their lab's trials plus farm-wide visibility; assign work within their own lab.</p><span class="more">See home screen →</span></a>
+    <a class="card" href="#role-grad"><h3>Grad student</h3><p>Run their own studies, log work, and pick up tasks from the shared board.</p><span class="more">See home screen →</span></a>
+    <a class="card" href="#role-tech"><h3>Research technician</h3><p>Log field ops and inventory, handle equipment, and help keep the map current.</p><span class="more">See home screen →</span></a>
+    <a class="card" href="#role-undergrad"><h3>Undergrad worker</h3><p>A clean, focused screen: today's tasks, schedule, maps, and equipment.</p><span class="more">See home screen →</span></a>
+  </div>
+
+  </div>
+</div>
+<section id="full-task" class="specsection screen"><div class="wrap"><div class="specbanner"><a class="backbtn" href="#home">← Back to summary</a><strong>Daily Task Board — full spec</strong></div>
+  
+
+  <h2 class="section" id="full-task__goal">1. What this ships</h2>
+  <p>A phone-first task board that closes Bill's daily loop: <strong>create a job → get it to a student → student taps it done → Bill sees status at a glance.</strong> Jobs can be <strong>assigned to a specific student</strong> or <strong>posted to an open pool</strong> anyone can claim. Completion is <strong>one tap</strong>. Because much of the work repeats, <strong>recurring/templated jobs</strong> are built in from day one.</p>
+  <p>Everything updates live — when a student marks a job done, it changes on Bill's screen without a refresh.</p>
+
+  <h2 class="section" id="full-task__roles">2. Who does what</h2>
+  <table>
+    <thead><tr><th>Role</th><th>Can do in the task board</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Bill (manager)</strong></td><td>Everything on this tile — create, edit, assign to anyone, pull posted pool jobs and assign them to undergrads, reassign, delete; create recurring templates; see all tasks across everyone and every status</td></tr>
+      <tr><td><strong>Faculty (PI)</strong></td><td>Create tasks and assign them to <strong>their own technicians or grad students</strong>; see the board</td></tr>
+      <tr><td><strong>Technicians</strong></td><td>Create tasks and either <strong>self-assign</strong> or <strong>post to the pool</strong>; can also <strong>claim a pool task for themselves</strong>. (Bill assigns remaining pool tasks to undergrads.) Complete their own tasks</td></tr>
+      <tr><td><strong>Grad students</strong></td><td>Same as technicians — create tasks, self-assign, post to the pool, or claim a pool task for themselves; complete their own tasks</td></tr>
+      <tr><td><strong>Undergrad hourly</strong></td><td>See <strong>only their own assigned tasks</strong> and check off completion. No creating, no claiming, no browsing the pool</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="section" id="full-task__anatomy">3. Anatomy of a task</h2>
+  <p>What's filled in when creating a job (only task type + assignment are required — keep it fast):</p>
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Task type</strong> *</td><td>Picked from the <a href="#full-task__catalog">Farm Task Catalog</a> (e.g. "Rotary Mow → Border," "Spray Pesticide (Backpack) → Fungicide"). Bill can also <strong>free-type a new job and save it as a template into the catalog</strong> for reuse</td></tr>
+      <tr><td><strong>Assignment</strong> *</td><td>Assign to a person, self-assign, or post to the pool (see §2)</td></tr>
+      <tr><td>Details / instructions</td><td>Optional free text</td></tr>
+      <tr><td>Location / map</td><td>For map-backed types — <strong>Rotary Mow (Plots &amp; Borders), Fairway Mow, 2653 Mow, Greens Triplex Mow, Paint Trial Dots, Weedeat</strong> — the task <strong>auto-loads the most recent interactive map</strong> for that job. All other types use a <strong>free-text</strong> location field</td></tr>
+      <tr><td>Equipment</td><td>the machine the job needs, from the <a href="#full-equip">equipment roster</a> (often pre-suggested by the catalog type). <strong>Entering it drives the automatic checkout</strong> when the task starts — the machine goes "in use" to whoever's on the job</td></tr>
+      <tr><td>Priority</td><td>Normal / High</td></tr>
+      <tr><td>Checklist</td><td>For map-backed types, <strong>the interactive map is the checklist</strong>: the worker taps each area as they finish it, and progress <strong>updates in real time</strong> so if another student comes to help they can see exactly what's left and where to go next. Non-map types can use a simple sub-item list or one-tap done</td></tr>
+    </tbody>
+  </table>
+  <p><em>Completion is a one-tap check-off for simple jobs. Map-backed tasks complete as areas are tapped off on the shared map — updating live for everyone on the job. No required note in v1; optional notes/photos can come later.</em></p>
+
+  <h3 id="full-task__catalog">Farm Task Catalog</h3>
+  <p>The predefined menu of jobs Bill assigns (from <code>Farm_Task_List.docx</code>). Creating a task starts by picking a <strong>type</strong>, and some types carry a <strong>variant</strong> (mower area, chemical, or lab). Picking a type can pre-wire behavior — mowing types auto-log a mowing event, spray types open the chemical/fertilizer app fields. Bill maintains the catalog (add, rename, retire), and any type can be saved as a <a href="#full-task__recurring">recurring template</a>.</p>
+  <table>
+    <thead><tr><th>Group</th><th>Task type</th><th>Variant / sub-option</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="6">Mowing <span style="font-weight:400;color:var(--muted);">(auto-logs mowing)</span></td><td>Rotary Mow</td><td>Plots / Alleys / Border</td></tr>
+      <tr><td>Dennis Mow</td><td>—</td></tr>
+      <tr><td>Fairway Mow</td><td>—</td></tr>
+      <tr><td>2653 Mow</td><td>—</td></tr>
+      <tr><td>Greens Triplex Mow</td><td>—</td></tr>
+      <tr><td>Greens Walk Mow</td><td>—</td></tr>
+      <tr><td rowspan="5">Applications <span style="font-weight:400;color:var(--muted);">(logs a spray/fert record)</span></td><td>Spray Pesticide (John Deere)</td><td>Herbicide / Fungicide / Insecticide</td></tr>
+      <tr><td>Spray Pesticide (Backpack)</td><td>Herbicide / Fungicide / Insecticide</td></tr>
+      <tr><td>Spray Fertilizer (John Deere)</td><td>—</td></tr>
+      <tr><td>Spray Fertilizer (Backpack)</td><td>—</td></tr>
+      <tr><td>Fertilize (granular)</td><td>—</td></tr>
+      <tr><td rowspan="6">Cultural / renovation</td><td>Aeration (John Deere)</td><td>—</td></tr>
+      <tr><td>Traffic Plots</td><td>—</td></tr>
+      <tr><td>Blecavate</td><td>—</td></tr>
+      <tr><td>Fraise Mow</td><td>—</td></tr>
+      <tr><td>Topdress</td><td>—</td></tr>
+      <tr><td>Handwater</td><td>—</td></tr>
+      <tr><td>Trial support</td><td>Paint Trial Dots</td><td>Dr. Brosnan / Dr. Horvath / Dr. Bowling</td></tr>
+      <tr><td rowspan="4">Equipment / shop</td><td>Grind Reels</td><td>—</td></tr>
+      <tr><td>Backlap Reels</td><td>—</td></tr>
+      <tr><td>Oil Change</td><td>—</td></tr>
+      <tr><td>Irrigation Fix</td><td>—</td></tr>
+      <tr><td>Grounds</td><td>Weedeat</td><td>—</td></tr>
+      <tr><td>Facility</td><td>Take Trash Out</td><td>—</td></tr>
+    </tbody>
+  </table>
+  <div class="callout q"><strong>To confirm:</strong> for multi-plot jobs (e.g. Rotary Mow → Plots, or Paint Trial Dots), the plots/areas become the task's <a href="#full-task__data">checklist items</a> so the worker ticks them off as they go. Should the catalog also pin a default mower and cut height per type, pulled from the maps?</div>
+
+  <h2 class="section" id="full-task__states">4. Task states</h2>
+  <p>Deliberately minimal. Two short lifecycles depending on how the job was handed out:</p>
+  <div class="card">
+    <p><strong>Assigned to a person:</strong></p>
+    <div class="statebar"><span class="pill p-open">Open</span><span class="arrow">→</span><span class="pill p-done">Done</span> <em style="margin-left:6px;">(assignee taps done)</em></div>
+    <p style="margin-top:18px;"><strong>Posted to the pool:</strong></p>
+    <div class="statebar"><span class="pill p-open">Open (unclaimed)</span><span class="arrow">→</span><span class="pill p-claimed">Claimed</span><span class="arrow">→</span><span class="pill p-done">Done</span> <em style="margin-left:6px;">(claimer's name shows once grabbed)</em></div>
+  </div>
+
+  <h2 class="section" id="full-task__flows">5. Core flows</h2>
+  <div class="flow">
+    <h4>Bill assigns the day's work</h4>
+    <p>Opens the board → taps <strong>+ New task</strong> → picks a task type from the <a href="#full-task__catalog">catalog</a> (or free-types one and saves it as a template) → assigns to a person or posts to the pool → sets priority → save. The assignee is notified. Jobs he hands out regularly live in the catalog so he isn't recreating them each time.</p>
+    <h4>Technicians &amp; grad students</h4>
+    <p>See the <strong>whole board</strong> — everyone's tasks, with live completions and claim/sub-assignment updates — plus the <strong>Available</strong> pool. They can <strong>claim a pool task</strong> (their name attaches) or work their self-assigned ones, but can only assign to <strong>themselves</strong>, never to another person. Finish the job → tap <strong>Done</strong>; on map-backed jobs they tap off areas on the shared map as they go.</p>
+    <h4>Undergrad students</h4>
+    <p>See <strong>only their own assigned tasks</strong> — no pool, and they <strong>cannot self-assign or claim</strong>. They do the assigned work and tap <strong>Done</strong> (or tap off completed areas on the map). Bill is who assigns them their work.</p>
+    <h4>Opening a map-backed job (step by step)</h4>
+    <p>When a worker taps into the task, it walks them through:</p>
+    <ol>
+      <li><strong>Log the mower</strong> — if the job can be done with more than one machine (e.g. Rotary Mow, Greens Mow), they first pick which mower they used. Single-machine jobs skip this step.</li>
+      <li><strong>The task map opens</strong> — for <strong>Rotary Mow</strong> the map also shows the <strong>height of cut</strong> the mower should be set to (rotary only).</li>
+      <li><strong>Restrictions are shown</strong> — any active restrictions on <strong>whole plots</strong> <em>or</em> on <strong>specific areas within a plot</strong> (where a trial sits) are flagged on the map so the worker steers clear.</li>
+      <li><strong>Tap plots as they finish</strong> — each completed plot is tapped off; progress syncs <strong>live</strong> so if another student joins they see exactly what's left and where to go next.</li>
+    </ol>
+    <h4>Bill checks in</h4>
+    <p>Board shows, live: what's <span class="pill p-done">Done</span> today, what's still <span class="pill p-open">Open</span>, and what's <span class="pill p-claimed">Claimed</span> and by whom. He can filter by person or by day.</p>
+  </div>
+
+  <h2 class="section" id="full-task__recurring">6. Recurring jobs</h2>
+  <p>Most farm jobs repeat, so recurrence is built to save Bill as much time as possible. Any <a href="#full-task__catalog">catalog task type</a> — or a job Bill free-types and saves as a template — can be given a <strong>repeat schedule</strong> (e.g. "Greens Triplex Mow, every weekday," "Rotary Mow → Plots, Mon/Wed/Fri"). The app then auto-creates a fresh task each time it's due, already carrying its map, cut height, and restrictions. Completing today's instance never affects tomorrow's.</p>
+  <p><strong>No auto-assignment to a person.</strong> A recurring job is generated straight into the <strong>pool</strong> — it is <em>never</em> auto-assigned to someone unless Bill has explicitly pinned an assignee on that template. Since who's on the farm changes day to day (see the crew schedule), this keeps Bill in control of who does what each morning.</p>
+  <p>v1 keeps recurrence simple: <strong>Daily</strong>, <strong>Weekly on chosen days</strong>, or <strong>None</strong>. Bill can edit or pause a template anytime. (More complex patterns can come later.)</p>
+  <div class="callout key"><strong>Decided:</strong> recurring instances drop into the pool by default; a person is set only if Bill pins one on the template.</div>
+
+  <h2 class="section" id="full-task__screens">7. Screens (v1)</h2>
+  <ol>
+    <li><strong>Board / Today</strong> — the default. Bill sees all tasks grouped by status (or by person, toggle). Techs/grads see the <strong>whole board</strong> (everyone's tasks, with live completions and claim/sub-assignment updates) but can only assign to themselves or the pool; undergrads see <strong>only their own assigned tasks</strong>.</li>
+    <li><strong>Task detail</strong> — full info plus the map-backed work flow (mower log, map, cut height, restrictions, tap-off). Buttons vary by role: <strong>complete</strong> for the assignee, <strong>claim</strong> for techs/grads on pool tasks, <strong>reassign / edit / delete</strong> for Bill. Activity stamp shows who created, claimed, and completed it, with times.</li>
+    <li><strong>New / edit task</strong> — the create form from §3. <em>Hidden from undergrads</em> (only Bill, faculty, techs, and grads can create tasks).</li>
+    <li><strong>Templates</strong> — Bill's list of recurring jobs, with edit/pause. <em>Bill only — hidden from everyone else, including undergrads.</em></li>
+  </ol>
+
+  <h2 class="section" id="full-task__notifs">8. Notifications (v1)</h2>
+  <p>Exactly one push notification in v1, kept deliberately minimal so alerts always mean something:</p>
+  <ul>
+    <li><strong>Task assigned to you</strong> → a push to the assignee (grad students, technicians, and undergrads). This is the only push.</li>
+    <li><strong>New task posted to the pool</strong> → <strong>no push.</strong> Techs/grads see it appear on the board's Available list.</li>
+    <li><strong>Task completed</strong> → <strong>no push.</strong> Bill sees it update live on the board.</li>
+  </ul>
+
+  <h3>Onboarding so notifications actually work</h3>
+  <p>For a PWA, a push won't arrive unless two things happen first — so onboarding, right after a person's first login, walks them through both:</p>
+  <ol>
+    <li><strong>Add to Home Screen</strong> — on iPhone, web push only works once the app is installed to the home screen. Onboarding shows the exact Share → "Add to Home Screen" steps (and the equivalent install prompt on Android).</li>
+    <li><strong>Allow notifications</strong> — after install, the app asks for notification permission and confirms it's granted, so "task assigned to you" reliably lands on their phone.</li>
+  </ol>
+  <p><em>If someone skips or denies it, the app keeps a visible reminder to finish setup, since the assignment push is how the crew learns they have work.</em></p>
+
+  <h2 class="section" id="full-task__data">9. Data model (starting point)</h2>
+  <p>Core tables, kept intentionally small so Phase 2 modules can attach later.</p>
+  <table>
+    <thead><tr><th>tasks</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>catalog_item_id</td><td>link to <code>task_catalog</code>, nullable (null = free-typed one-off)</td></tr>
+      <tr><td>title</td><td>text — the catalog type's name, or free-typed</td></tr>
+      <tr><td>variant</td><td>text — the sub-option (mower area / chemical / lab), nullable</td></tr>
+      <tr><td>details</td><td>text, optional</td></tr>
+      <tr><td>location</td><td>text — free-form; used for non-map task types, nullable</td></tr>
+      <tr><td>map_id</td><td>link to the interactive map auto-loaded for map-backed types, nullable</td></tr>
+      <tr><td>equipment_id</td><td>the machine the task needs (from the equipment roster) — entered at creation, drives auto-checkout; nullable for jobs with no machine</td></tr>
+      <tr><td>mower_used</td><td>which specific machine the worker confirms when more than one could do the job, nullable</td></tr>
+      <tr><td>assignment_type</td><td><code>assigned</code> | <code>pool</code></td></tr>
+      <tr><td>assignee_id</td><td>user, nullable (set when Bill assigns, or a tech/grad claims)</td></tr>
+      <tr><td>status</td><td><code>open</code> | <code>claimed</code> | <code>done</code></td></tr>
+      <tr><td>priority</td><td><code>normal</code> | <code>high</code></td></tr>
+      <tr><td>template_id</td><td>link to the recurring template it came from, nullable</td></tr>
+      <tr><td>created_by / created_at</td><td>user + timestamp</td></tr>
+      <tr><td>completed_by / completed_at</td><td>user + timestamp, nullable</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>task_items <span style="font-weight:400;text-transform:none;letter-spacing:0;">(checklist)</span></th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>task_id</td><td>parent task</td></tr>
+      <tr><td>label</td><td>text — e.g. a plot name/number to mow or dot</td></tr>
+      <tr><td>plot_ref</td><td>the plot (and optional area-within-plot) this item maps to on the interactive map, nullable</td></tr>
+      <tr><td>done</td><td>boolean</td></tr>
+      <tr><td>done_by / done_at</td><td>user + timestamp, nullable</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>task_catalog <span style="font-weight:400;text-transform:none;letter-spacing:0;">(farm task types)</span></th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>name</td><td>text — e.g. "Rotary Mow," "Spray Pesticide (Backpack)"</td></tr>
+      <tr><td>group</td><td>Mowing / Applications / Cultural / Trial support / Equipment / Facility</td></tr>
+      <tr><td>variants</td><td>list of sub-options, nullable — e.g. [Plots, Alleys, Border] or [Herbicide, Fungicide, Insecticide]</td></tr>
+      <tr><td>map_backed</td><td>boolean — if true, tasks auto-load the interactive map (Rotary Mow, Fairway Mow, 2653 Mow, Greens Triplex Mow, Paint Trial Dots, Weedeat)</td></tr>
+      <tr><td>mowers</td><td>list, nullable — if more than one, the worker logs which was used (e.g. Rotary Mow, Greens Mow)</td></tr>
+      <tr><td>shows_cut_height</td><td>boolean — display the cut height on the map (Rotary Mow only)</td></tr>
+      <tr><td>auto_log</td><td>what completing it records — <code>mowing</code> | <code>spray</code> | <code>fertilizer</code> | <code>none</code></td></tr>
+      <tr><td>active</td><td>on / retired (Bill maintains the catalog)</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>task_templates</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>catalog_item_id</td><td>the catalog type this recurring job is, nullable</td></tr>
+      <tr><td>title / variant / details / location / priority</td><td>same as a task</td></tr>
+      <tr><td>default_assignment</td><td><code>pool</code> (default) — a pinned user only if Bill sets one; instances never auto-assign otherwise</td></tr>
+      <tr><td>repeat</td><td><code>daily</code> | <code>weekly</code></td></tr>
+      <tr><td>repeat_days</td><td>which weekdays (for weekly)</td></tr>
+      <tr><td>active</td><td>on / paused</td></tr>
+    </tbody>
+  </table>
+  <p>A <code>users</code> table (name, role, group) already comes from the roles/login work in the main plan.</p>
+
+  <h2 class="section" id="full-task__scope">10. Out of scope for v1 <span style="font-weight:400;color:var(--muted);font-size:.9rem;">(comes later)</span></h2>
+  <div class="callout out">
+    <ul style="margin:0;">
+      <li>Photos/notes on completion (design leaves room for it)</li>
+      <li>Drawing/defining new plots &amp; trial sub-areas on the map (v1 uses the existing interactive maps)</li>
+      <li>Field-ops detail (spray rates, REIs) — that's Module 2</li>
+      <li>Inventory, study planning, equipment, weather</li>
+      <li>Complex recurrence (every-other-week, monthly, seasonal)</li>
+      <li>Time tracking / hours for hourly payroll</li>
+    </ul>
+  </div>
+
+  <h2 class="section" id="full-task__open">11. Decisions &amp; dependencies</h2>
+  <p><strong>Resolved:</strong> recurring jobs default to the pool, never auto-assigned unless Bill pins someone (§6); faculty/techs/grads can create tasks, only Bill assigns undergrads (§2); the only push is "task assigned to you" (§8); login = magic-link email + invite-only roster.</p>
+  <ul>
+    <li><strong>Board scope (techs/grads):</strong> they see the <strong>whole board</strong> — everyone's tasks, live completions, and real-time claim/sub-assignment updates — but can only assign tasks to <strong>themselves</strong> (or post to the pool); they cannot assign work to another person.</li>
+    <li><strong>Saving free-typed jobs to the catalog:</strong> Bill, technicians, and grad students (not faculty or undergrads).</li>
+    <li><strong>Interactive maps (dependency):</strong> built as a <strong>separate module</strong>, not part of the task board itself. It must be <strong>live-updatable</strong> as technicians, faculty, and grad students add trials and restrictions — those edits flow straight into the map a worker opens from a task. Depends on the plot numbering being settled (see Access &amp; Roles).</li>
+  </ul>
+
+  
+</div></section>
+<section id="full-crew" class="specsection screen"><div class="wrap"><div class="specbanner"><a class="backbtn" href="#home">← Back to summary</a><strong>Crew Schedule & Time Clock — full spec</strong></div>
+  
+
+  <h2 class="section" id="full-crew__goal">1. What this module does</h2>
+  <p>Undergrads don't all work every day, so Bill needs to know <strong>who's coming in and when</strong> before he hands out the day's tasks. This module <strong>replaces the availability whiteboard</strong>: each hourly worker enters their available <strong>days and times</strong>, logs time off, and can flag a same-day absence. Separately, a <strong>time clock</strong> records actual punch in/out and totals weekly hours so Bill can cross-check payroll. Together they give Bill a live forward roster that feeds task assignment.</p>
+
+  <h2 class="section" id="full-crew__roles">2. Who can do what</h2>
+  <table>
+    <thead><tr><th>Role</th><th>In this module</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Undergrad hourly</strong> (+ future hourly)</td><td>Set their own availability (days + times), log time off, send a same-day call-out, clock in/out, see their own schedule and hours</td></tr>
+      <tr><td><strong>Bill (manager)</strong></td><td>See everyone's schedule and edit it; see the punch log + weekly hours totals; edit/annotate punches; mark no-shows (Bill-only count)</td></tr>
+      <tr><td><strong>Technicians / grad students</strong></td><td>View the crew schedule / who's in each day to coordinate work. Do not clock in and do not enter availability (salaried); do not see individual hours</td></tr>
+      <tr><td><strong>Faculty</strong></td><td>Not shown — this tile is off their dashboard</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="section" id="full-crew__availability">3. Availability schedule</h2>
+  <p>The core replacement for the whiteboard, in two layers:</p>
+  <div class="rule"><h4>Usual weekly pattern — set each semester</h4>
+    <p>Each worker sets their standing availability — for each weekday, available or not, with a <strong>time window</strong> (e.g. "Mon 7am–1pm, Wed 8am–12pm, Fri off"). This is what they'd normally write on the board.</p>
+    <p>Because class schedules change, patterns are tied to a <strong>semester — Fall, Winter, and Summer — and must be re-entered each term</strong>. At the start of a new term the app <strong>prompts each worker to enter their new pattern</strong>, and the prior term's pattern is archived rather than carried over.</p>
+  </div>
+  <div class="rule"><h4>Exceptions — vacations &amp; conflicts</h4>
+    <p>Any specific date can override the pattern — an extra day, different hours, or a day off. This is where workers enter <strong>vacations and one-off conflicts</strong> with their usual pattern (a class event, an appointment, a trip). Exceptions win over the standing pattern for that date.</p>
+  </div>
+  <p>Entry is <strong>self-service</strong>; every add or change posts an <strong>in-app notice to Bill</strong> (no push). Bill sees a combined <strong>week/day roster</strong> of who's available and when, and a "who's in today" summary that drives task assignment.</p>
+
+  <h2 class="section" id="full-crew__timeoff">4. Time off &amp; same-day call-outs</h2>
+  <div class="rule"><h4>Time off / unavailability calendar</h4>
+    <p>Workers log planned absences over a date range (vacation, travel, exams). These show on a <strong>calendar</strong> so Bill sees gaps well ahead and can plan around them.</p>
+  </div>
+  <div class="rule"><h4>24-hour cutoff — short notice needs Bill's approval</h4>
+    <p>How a time-off request comes off the schedule depends on how close the shift is:</p>
+    <ul>
+      <li><strong>More than 24 hours out</strong> → self-service. The shift comes off <strong>automatically</strong> and Bill gets an in-app notice.</li>
+      <li><strong>Within 24 hours of the shift start</strong> → it becomes a <strong>request Bill must approve</strong>. The worker <strong>stays on the schedule until Bill approves</strong>; on approval the shift is removed. Bill sees pending requests to approve or deny.</li>
+    </ul>
+  </div>
+  <div class="rule"><h4>Same-day call-out</h4>
+    <p>A quick <strong>"I can't come in today"</strong> action for sickness or life events. Because it's within 24 hours, it follows the cutoff above — it posts an <strong>in-app notice to Bill</strong> (no push) and stays on the schedule as a <strong>pending request until Bill approves</strong> the removal. It's logged the instant it's sent, but it only <strong>excuses the day once Bill approves it</strong> — an unapproved absence with no clock-in that day becomes a no-show (§5). <em>Workers are still expected to contact Bill directly as well</em> — the call-out is the record, not a replacement for that heads-up.</p>
+  </div>
+
+  <h2 class="section" id="full-crew__noshow">5. No-show tracking <span style="font-weight:400;color:var(--muted);font-size:.9rem;">(Bill only)</span></h2>
+  <p>A day is a <span class="flag-chip">NO-SHOW</span> when a scheduled worker <strong>never clocks in that day</strong> and has <strong>no approved absence</strong> for it. Bill's approval is the deciding switch:</p>
+  <ul>
+    <li><strong>Bill approves the absence</strong> → the day is excused and any no-show for it is <strong>wiped</strong>.</li>
+    <li><strong>Absence not approved</strong> (denied or never approved) <strong>and no clock-in at any point that day</strong> → it stands as a <strong>no-show</strong>.</li>
+  </ul>
+  <p>Each no-show increments a <strong>running count per worker</strong> that <strong>only Bill sees</strong> — a simple accountability tally. The clock-in data does the detecting; Bill's approve/deny decides whether it's excused, so he stays in control.</p>
+
+  <h2 class="section" id="full-crew__clock">6. Time clock</h2>
+  <p><strong>Informal presence tracking</strong>, not the official payroll record — it gives Bill clean timestamps to <strong>cross-check when approving payroll</strong>.</p>
+  <ul>
+    <li><strong>Who:</strong> undergrad hourly + future hourly (role-based, so new hourly staff get it automatically).</li>
+    <li><strong>Clock in / out:</strong> one big button on arrival and departure. <strong>Location-gated</strong> to a <strong>0.5-mile geofence</strong> around the farm (35.90203° N, 83.95762° W). A worker can punch <strong>multiple times a day</strong> — out for lunch, back in — and every in/out pair counts toward the day's hours.</li>
+    <li><strong>Captures:</strong> clock-in, clock-out, date, person, and whether the location was verified.</li>
+    <li><strong>Bill's view:</strong> the punch log per person <strong>plus an auto-summed weekly (Mon–Fri) hours total</strong>, side-by-side-ready with the payroll timesheet. Location-unverified punches are flagged for him to confirm.</li>
+    <li><strong>Worker's view:</strong> each worker sees their <strong>own</strong> weekly hours total (not anyone else's).</li>
+    <li><strong>Corrections:</strong> Bill can <strong>edit or add a missed punch and annotate</strong> it.</li>
+    <li><strong>Not doing (v1):</strong> calculating pay, enforcing breaks, or acting as the legal timekeeping record.</li>
+  </ul>
+
+  <h2 class="section" id="full-crew__planvsactual">7. Planned vs. actual</h2>
+  <p>Two different things that work together:</p>
+  <table>
+    <thead><tr><th></th><th>Schedule</th><th>Time clock</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Is</strong></td><td>planned availability (days + times)</td><td>actual presence (punches)</td></tr>
+      <tr><td><strong>Set by</strong></td><td>the worker, ahead of time</td><td>stamped when they clock in/out</td></tr>
+      <tr><td><strong>Bill uses for</strong></td><td>assigning the day's tasks</td><td>payroll cross-check</td></tr>
+    </tbody>
+  </table>
+  <p>A <strong>no-show</strong> is exactly the gap between the two: expected on the schedule, no clock-in all day, and no approved absence.</p>
+
+  <h2 class="section" id="full-crew__screens">8. Screens (v1)</h2>
+  <ol>
+    <li><strong>My schedule</strong> (worker) — set weekly availability + times, add time off, and the same-day call-out button; see their own upcoming days and their own <strong>weekly hours total</strong>.</li>
+    <li><strong>Crew roster</strong> (Bill + techs/grads) — week/day grid of who's available and when, the time-off calendar, and "who's in today." Bill also sees and acts on <strong>pending short-notice (≤24h) requests</strong> to approve or deny. This is <strong>one shared calendar</strong> component with a <strong>toggle</strong> to overlay the <strong>Studies</strong> layer (see Trial Protocols &amp; Study Plans), so Bill can view crew availability and research together or separately.</li>
+    <li><strong>Clock in / out</strong> (worker) — the big location-gated button.</li>
+    <li><strong>Time &amp; hours</strong> (Bill) — punch log per person, weekly hours totals, edit/annotate, mark no-show, and the per-worker no-show count. <em>Bill only.</em></li>
+  </ol>
+
+  <h2 class="section" id="full-crew__notifs">9. Notifications</h2>
+  <ul>
+    <li>Schedule add/change → <strong>in-app notice to Bill</strong>.</li>
+    <li>Short-notice (≤24h) request or same-day call-out → <strong>in-app notice to Bill</strong>, flagged as <strong>awaiting his approval</strong>.</li>
+  </ul>
+  <p><em>No push anywhere in this module — consistent with the app's minimal-push approach (the only push is "task assigned to you").</em></p>
+
+  <h2 class="section" id="full-crew__data">10. Data model</h2>
+  <table>
+    <thead><tr><th>availability_pattern</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>user_id</td><td>the worker</td></tr>
+      <tr><td>term</td><td>which semester — e.g. "Fall 2026" (patterns are per-term, re-entered each semester)</td></tr>
+      <tr><td>weekday</td><td>Mon–Sun</td></tr>
+      <tr><td>available</td><td>boolean</td></tr>
+      <tr><td>start_time / end_time</td><td>the time window, nullable if unavailable</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>schedule_exception</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>user_id</td><td>the worker</td></tr>
+      <tr><td>date</td><td>the specific day (or range via start/end)</td></tr>
+      <tr><td>type</td><td><code>extra</code> | <code>changed_hours</code> | <code>time_off</code> | <code>callout</code></td></tr>
+      <tr><td>start_time / end_time</td><td>for extra/changed hours, nullable</td></tr>
+      <tr><td>reason</td><td>text, optional</td></tr>
+      <tr><td>status</td><td><code>auto</code> (&gt;24h, self-applied) | <code>pending</code> | <code>approved</code> | <code>denied</code> (≤24h needs Bill)</td></tr>
+      <tr><td>created_at</td><td>timestamp (used to check the 24-hour cutoff vs. the shift)</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>time_punch</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>user_id</td><td>the worker</td></tr>
+      <tr><td>date</td><td>work date</td></tr>
+      <tr><td>clock_in / clock_out</td><td>timestamps</td></tr>
+      <tr><td>location_ok</td><td>boolean — passed the at-farm check</td></tr>
+      <tr><td>edited_by / note</td><td>set if Bill corrected/annotated it, nullable</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>no_show</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>user_id</td><td>the worker</td></tr>
+      <tr><td>date</td><td>the missed day</td></tr>
+      <tr><td>source / note</td><td>rule-created (no clock-in + no approved absence); cleared if the absence is later approved. Bill can add a note</td></tr>
+    </tbody>
+  </table>
+  <p><em>Weekly hours totals are derived from <code>time_punch</code>. A no-show is rule-based — a scheduled day with no clock-in and no approved absence — so a <code>no_show</code> row is created when that holds at day's end and <strong>cleared if Bill later approves the absence</strong>. The count is the worker's standing <code>no_show</code> rows.</em></p>
+
+  <h2 class="section" id="full-crew__scope">11. Out of scope for v1 <span style="font-weight:400;color:var(--muted);font-size:.9rem;">(comes later)</span></h2>
+  <div class="callout out">
+    <ul style="margin:0;">
+      <li>Payroll calculation or export to a payroll system (this only informs Bill's approval)</li>
+      <li>Break tracking and legal timekeeping compliance</li>
+      <li>Shift swapping / approval workflows</li>
+      <li>Techs, grads, and faculty entering their own availability (v1 is hourly-focused)</li>
+    </ul>
+  </div>
+
+  <h2 class="section" id="full-crew__open">12. Decisions &amp; open items</h2>
+  <p><strong>Resolved:</strong></p>
+  <ul>
+    <li><strong>Clock-in geofence:</strong> centered on the farm at <strong>35.90203° N, 83.95762° W</strong> (3450 Maloney Rd, Knoxville, TN), <strong>0.5-mile radius</strong>. Inside → passes; outside → blocked.</li>
+    <li><strong>If location is unavailable</strong> (permission denied, location services off, airplane mode, or poor signal): the punch is <strong>allowed but flagged "location unverified"</strong> for Bill to confirm — no hard block over a phone glitch.</li>
+    <li><strong>Multiple punches per day:</strong> allowed — clock out and back in (lunch, leaving and returning); each in/out pair is its own punch and all count toward the day's hours.</li>
+    <li><strong>Payroll week:</strong> <strong>Monday–Friday</strong> for the weekly hours total.</li>
+    <li><strong>Semester start dates:</strong> Fall begins <strong>Aug 1</strong>, Winter <strong>Jan 1</strong>, Summer <strong>Jun 1</strong> — each triggers the availability re-entry prompt.</li>
+  </ul>
+  <div class="callout"><strong>When is location "unavailable"?</strong> The phone can fail to return a position if the worker <em>denies</em> the location permission, has <em>location services off</em>, is in <em>airplane mode</em>, or is somewhere with poor signal (inside a metal barn) so the fix times out or is too inaccurate. A 0.5-mile radius is generous, so genuine on-site punches almost always pass; the "unverified, flag for Bill" path is the safety valve for the rest.</div>
+
+  
+</div></section>
+<section id="full-map" class="specsection screen"><div class="wrap"><div class="specbanner"><a class="backbtn" href="#home">← Back to summary</a><strong>Interactive Map — full spec</strong></div>
+  
+
+  <h2 class="section" id="full-map__goal">1. What this module does</h2>
+  <p>The map is where the farm's geography lives. It's an <strong>uploaded aerial image</strong> with the plots overlaid as <strong>tappable regions</strong>, and each plot carries data — which <strong>mower</strong> cuts it, its <strong>cut height</strong>, any active <strong>restrictions</strong>, and the <strong>trials</strong> pinned inside it. Other modules read this map: tasks and field-ops use it to pick where work happened, inventory uses it for spray locations and treated area, and trials place their pins and restrictions here. Get this right and the whole app clicks together.</p>
+
+  <h2 class="section" id="full-map__roles">2. Who can do what</h2>
+  <table>
+    <thead><tr><th>Role</th><th>On the map</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Bill (manager)</strong></td><td>Upload the aerial(s), define plot regions + the building link, set each plot's <strong>mower(s)</strong>, edit <strong>cut heights</strong>, lift any restriction</td></tr>
+      <tr><td><strong>Technicians</strong></td><td>View; <strong>edit cut heights</strong>; add trials (pins) + restrictions on own-lab plots</td></tr>
+      <tr><td><strong>Grad students</strong></td><td>View; add trials (pins) + restrictions on own-lab plots</td></tr>
+      <tr><td><strong>Faculty</strong></td><td>View; <strong>request</strong> a cut-height change; add trials + restrictions on own-lab plots</td></tr>
+      <tr><td><strong>Undergrad hourly</strong></td><td>View — to see restrictions, mower, and cut height for the job at hand</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="section" id="full-map__base">3. Base map &amp; plots</h2>
+  <p>The base is an <strong>aerial image Bill uploads</strong> — no GPS or satellite service, just the picture of the farm. The uploaded aerial <strong>already shows the plot numbering and all plots traced</strong>, which is the guide for setup: each plot is turned into a <strong>tappable region</strong> over the image with its number/name. Regions and pins are stored as coordinates <strong>relative to the image</strong>, so nothing depends on real-world GPS. The outdoor aerial is <strong>a single image</strong> and won't be replaced unless the farm expands.</p>
+  <div class="layerbox"><h4>Indoor research plots — a linked second map</h4><p>Indoor plots get their <strong>own separate aerial</strong>. On the main (outdoor) map, the <strong>building is a selectable region</strong> — tapping it <strong>opens the indoor aerial</strong>, which behaves like the main map (tappable indoor plots, restrictions, pins). The two maps are linked: main → building → indoor.</p></div>
+  <div class="callout"><strong>Reminder — what a "plot" is:</strong> a turf area of one grass type; trials and restrictions live <em>inside</em> plots. Non-plot spots (alleyways, borders) are handled with labeled pins (§7).</div>
+
+  <h2 class="section" id="full-map__attrs">4. Plot attributes</h2>
+  <p>Each plot region carries the data the other modules need. Bill sets the stable ones (from the farm's existing mowing and cut-height maps):</p>
+  <table>
+    <thead><tr><th>Attribute</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Number / name</strong></td><td>the plot's identifier</td></tr>
+      <tr><td><strong>Region</strong></td><td>the tappable shape on the aerial (image coordinates)</td></tr>
+      <tr><td><strong>Mower(s)</strong></td><td>which machine(s) cut this plot — powers the mowing-by-mower layer and the task view</td></tr>
+      <tr><td><strong>Cut height</strong></td><td>target height (shown for rotary), nullable — editable by Bill and technicians</td></tr>
+      <tr><td>Grass type / size</td><td>optional; size (sq ft) feeds treated-area math for sprays</td></tr>
+    </tbody>
+  </table>
+  <p><em>The farm's existing "what to mow with which mower" and "cut height" maps become this per-plot data during setup — so the images turn into interactive attributes.</em></p>
+
+  <h2 class="section" id="full-map__layers">5. Layers &amp; toggles</h2>
+  <p>The map view has toggleable layers over the aerial:</p>
+  <div class="layerbox"><h4>Plots + restrictions <span class="restrict-chip">live</span></h4><p>Tap a plot to see its details; plots with an active restriction are flagged clearly. The always-on base interactive layer.</p></div>
+  <div class="layerbox"><h4>Mowing by mower</h4><p>Pick a mower and the plots it cuts light up — the interactive version of the "what to mow" map.</p></div>
+  <div class="layerbox"><h4>Cut height</h4><p>Target height per plot, shown on tap and shaded across the map (rotary).</p></div>
+  <div class="layerbox"><h4>Trial pins — colored by research group</h4><p>Pins mark where trials sit, <strong>color-coded by lab</strong> so you can see each group's studies at a glance:
+    <br><span class="dot" style="background:#0072B2"></span>Brosnan &nbsp;<span class="dot" style="background:#E69F00"></span>Horvath &nbsp;<span class="dot" style="background:#009E73"></span>Bowling &nbsp;<span class="dot" style="background:#D55E00"></span>Sorochan &nbsp;<em>(colorblind-friendly Okabe–Ito palette)</em>. Pins also show the <strong>lab's initial</strong>, so they're distinguishable without relying on color alone. Tap a pin for the study. <em>Dr. Stier is an administrator — no lab, no color.</em></p></div>
+
+  <h2 class="section" id="full-map__restrictions">6. Restrictions on the map</h2>
+  <p>Restrictions (authored in <a href="#full-trials">Trial Protocols</a>) render here live. Seven types — <strong>No mow, No irrigate, No fungicide, No herbicide, No insecticide, No fertilizer, No wetting agent</strong> — each on a whole plot, a spot within a plot (the trial's pin), or a non-plot area, with start/end dates. A restricted plot is <strong>visually unmistakable</strong>, so crew see it before touching that area. This is the piece that protects the research.</p>
+
+  <h2 class="section" id="full-map__pins">7. Trial pins &amp; non-plot areas</h2>
+  <p>A trial's location is a <strong>push-pin dropped anywhere on the aerial</strong> — inside a numbered plot, or on a <strong>non-plot area</strong> (alleyway, border) with a short label. Pins are colored by lab (§5). No footprint drawing — a pin marks the spot, which is enough for the crew to know where a study sits.</p>
+
+  <h2 class="section" id="full-map__interactions">8. Interactions</h2>
+  <ul>
+    <li><strong>Tap a plot</strong> → its details: number, mower, cut height, active restrictions, trials inside it.</li>
+    <li><strong>Select plots</strong> → for tasks, field-ops, and inventory sprays (the "where" picker everywhere).</li>
+    <li><strong>Drop a pin</strong> → anywhere, for a trial or a non-plot area.</li>
+    <li><strong>Tap plots off</strong> → mark them done during a job; progress syncs <strong>live</strong> so a second worker sees what's left.</li>
+  </ul>
+
+  <h2 class="section" id="full-map__taskview">9. Task-contextual view <span style="font-weight:400;color:var(--muted);font-size:.9rem;">(the key trick)</span></h2>
+  <p>When a student opens a <strong>mowing task</strong>, the map doesn't show everything — it <strong>highlights only the plots that mower cuts</strong>, cutting the clutter to exactly the job at hand. For <strong>rotary</strong> mowers, each highlighted plot also <strong>shows its cut height</strong> so the machine is set right. The student then taps plots off as they finish (live progress). Restrictions still show, so they steer clear of protected areas.</p>
+
+  <h2 class="section" id="full-map__editing">10. Editing &amp; who</h2>
+  <ul>
+    <li><strong>Base &amp; plot regions:</strong> Bill uploads the outdoor and indoor aerials and traces the plots once (plus the building link); won't change unless the farm expands.</li>
+    <li><strong>Mower:</strong> Bill owns the mower assignments (mostly stable). <strong>Cut height:</strong> editable by Bill and technicians; faculty can request a change.</li>
+    <li><strong>Trials &amp; restrictions:</strong> faculty/grads/techs add them on their own-lab plots; live on the map immediately. Bill or the setter lifts a restriction.</li>
+    <li><strong>Live:</strong> every add/edit reflects for everyone right away — the map is always current.</li>
+  </ul>
+
+  <h2 class="section" id="full-map__screens">11. Screens (v1)</h2>
+  <ol>
+    <li><strong>Map</strong> — the aerial with the layer toggles (§5); tap plots/pins for detail. Default view.</li>
+    <li><strong>Plot detail</strong> — number, mower, cut height, restrictions, trials; edit controls per role.</li>
+    <li><strong>Map setup</strong> — Bill uploads the outdoor + indoor aerials, traces plot regions and the building link, sets mower + cut height. <em>Bill only.</em> (Techs edit cut heights from plot detail.)</li>
+    <li><strong>(Embedded)</strong> — the same map is embedded in task, field-ops, inventory, and trial screens as the picker/viewer.</li>
+  </ol>
+
+  <h2 class="section" id="full-map__data">12. Data model</h2>
+  <table>
+    <thead><tr><th>farm_map</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>name / type</td><td>e.g. "Outdoor farm" / "Indoor" — <code>outdoor</code> | <code>indoor</code></td></tr>
+      <tr><td>aerial_image_url</td><td>the uploaded aerial</td></tr>
+      <tr><td>is_primary</td><td>the main map opened by default (the outdoor one)</td></tr>
+      <tr><td>uploaded_by / at</td><td>Bill + timestamp</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>plot</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>map_id</td><td>which map this plot is on (outdoor or indoor)</td></tr>
+      <tr><td>number / name</td><td>identifier</td></tr>
+      <tr><td>region</td><td>polygon in image coordinates (relative, not GPS)</td></tr>
+      <tr><td>mowers</td><td>list of equipment ids that cut this plot</td></tr>
+      <tr><td>cut_height</td><td>target height (rotary), nullable</td></tr>
+      <tr><td>grass_type / size_sqft</td><td>optional; size feeds treated-area math</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>map_link <span style="font-weight:400;text-transform:none;letter-spacing:0;">(building → indoor)</span></th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>from_map_id</td><td>the map the hotspot sits on (outdoor)</td></tr>
+      <tr><td>region</td><td>the selectable area (the building), image coordinates</td></tr>
+      <tr><td>to_map_id</td><td>the map it opens (indoor)</td></tr>
+      <tr><td>label</td><td>e.g. "Indoor building"</td></tr>
+    </tbody>
+  </table>
+  <p><em>Restrictions and trial pins come from the Trial Protocols module (its <code>restriction</code> and <code>study_location</code> tables reference <code>plot</code> or a non-plot pin); the map renders them. Lab colors map research group → color.</em></p>
+
+  <h2 class="section" id="full-map__scope">13. Out of scope for v1 <span style="font-weight:400;color:var(--muted);font-size:.9rem;">(comes later)</span></h2>
+  <div class="callout out">
+    <ul style="margin:0;">
+      <li>GPS / satellite basemap and "you are here" (v1 is an uploaded image)</li>
+      <li>Drawing precise trial footprint polygons (pins only)</li>
+      <li>Auto-segmentation of the aerial into plots (traced by hand in setup)</li>
+      <li>Historical map versions / time-travel</li>
+      <li>Measuring distances/areas by drawing on the map (plot size is a stored value)</li>
+    </ul>
+  </div>
+
+  <h2 class="section" id="full-map__open">14. Decisions</h2>
+  <ul>
+    <li><strong>Plot numbering &amp; tracing:</strong> comes from the uploaded aerial — one aerial shows all plots numbered and traced; it's the setup guide.</li>
+    <li><strong>Single outdoor aerial:</strong> one image, not replaced unless the farm expands.</li>
+    <li><strong>Lab colors:</strong> a <strong>colorblind-friendly palette</strong> (Okabe–Ito) for Brosnan, Horvath, Bowling, and Sorochan, and pins also carry the lab's <strong>initial</strong> so color isn't the only cue. Dr. Stier is an administrator — no lab, no color.</li>
+    <li><strong>Cut heights:</strong> editable by Bill and technicians (faculty can request).</li>
+    <li><strong>Indoor research plots:</strong> a separate uploaded aerial; the building on the main map is selectable and opens the indoor map (main → building → indoor).</li>
+  </ul>
+
+  
+</div></section>
+<section id="full-trials" class="specsection screen"><div class="wrap"><div class="specbanner"><a class="backbtn" href="#home">← Back to summary</a><strong>Trial Protocols & Study Plans — full spec</strong></div>
+  
+
+  <h2 class="section" id="full-trials__goal">1. What this module does</h2>
+  <p>Every research study on the farm gets a <strong>protocol</strong> — who owns it, its objective, which plots and dates, the treatments it applies, and the <strong>restrictions</strong> it needs (no-mow, no-spray, etc.). Protocols are <strong>visible to everyone</strong>, so the crew and Bill always know what's living on a plot. A <strong>forward calendar</strong> shows planned and active studies so Bill can prep, and he's <strong>alerted whenever a restriction is placed on a plot</strong> so new constraints never surprise him. <em>v1 is protocols and planning only — no measurement/data collection.</em></p>
+
+  <h2 class="section" id="full-trials__roles">2. Who can do what</h2>
+  <table>
+    <thead><tr><th>Role</th><th>In this module</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Faculty / grad students / technicians</strong></td><td>Create and edit studies for <strong>their own lab</strong>, advance the stage, set restrictions on their own-lab plots, submit planned studies</td></tr>
+      <tr><td><strong>Bill (manager)</strong></td><td>Sees all studies and the forward calendar; can also add a study he's been told about; alerted when any restriction is placed. Can lift any restriction</td></tr>
+      <tr><td><strong>Undergrad hourly</strong></td><td>View protocols and restrictions (so they know what's on a plot); no editing</td></tr>
+    </tbody>
+  </table>
+  <p><em>Everyone can <strong>see</strong> every protocol — transparency is the point. Editing is scoped to the owning lab (plus Bill).</em></p>
+
+  <h2 class="section" id="full-trials__lifecycle">3. The study record — one entry, three stages</h2>
+  <p>A study is a <strong>single record</strong> that moves through stages; no re-entering it when it starts:</p>
+  <table>
+    <thead><tr><th>Stage</th><th>Means</th></tr></thead>
+    <tbody>
+      <tr><td><span class="stage st-plan">Planned</span></td><td>submitted as an upcoming study — shows on Bill's forward calendar so he can prep</td></tr>
+      <tr><td><span class="stage st-active">Active</span></td><td>the study is running — its protocol is live and its restrictions are in force on the map</td></tr>
+      <tr><td><span class="stage st-done">Completed</span></td><td>finished and archived — kept for the record; its restrictions have ended</td></tr>
+    </tbody>
+  </table>
+  <p>The owning lab advances the stages. <strong>No approval gate</strong> — the module is informational: Bill sees what's planned and coordinates directly rather than signing off. Restrictions carry their own start/end dates, so they activate and expire on schedule regardless of stage.</p>
+
+  <h2 class="section" id="full-trials__fields">4. Protocol fields</h2>
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Protocol PDF</strong> <span style="font-weight:400;color:var(--muted)">(optional)</span></td><td>upload the study's protocol document; the app <strong>reads it and auto-fills</strong> the fields below (all editable). See "Smart entry"</td></tr>
+      <tr><td><strong>Title</strong></td><td>short study name</td></tr>
+      <tr><td><strong>PI / lab</strong></td><td><strong>auto-filled</strong> from the person entering it (their lab + PI, from the roster); editable if entering on someone's behalf</td></tr>
+      <tr><td><strong>Objective</strong></td><td>the target effect / goal of the study</td></tr>
+      <tr><td><strong>Plots / areas</strong></td><td>where the study sits — a <strong>numbered plot</strong> <em>or</em> a <strong>non-plot area</strong> (alleyway, border, surround). Drop a <strong>push-pin anywhere on the map</strong>; for non-plot spots add a short label. Each location also takes a <strong>square-footage</strong> value</td></tr>
+      <tr><td><strong>Start / end dates</strong></td><td>chosen from <strong>date-picker dropdowns</strong></td></tr>
+      <tr><td><strong>Treatments / products</strong></td><td>the treatments or products the study applies — <strong>free text</strong> in v1</td></tr>
+      <tr><td><strong>Associated restrictions</strong></td><td>the restrictions this trial needs, each with a type, plot/area, and its own dates (§5)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Smart entry — upload a protocol PDF</h3>
+  <p>Instead of typing everything, the person can <strong>upload the study's protocol PDF</strong>. The app reads it and <strong>pre-fills</strong> what it can detect — title, objective, dates, treatments/products, and plots — leaving every field <strong>editable</strong> to fix anything misread. The PDF is also <strong>kept attached</strong> to the study as the source of record. Fields the PDF doesn't cover (like the on-map push-pin) are still set by hand. Treat extraction as best-effort, not authoritative.</p>
+
+  <h2 class="section" id="full-trials__restrictions">5. Restrictions</h2>
+  <p>Restrictions are attached to a study and are what protect the research from routine farm work. They flow straight onto the <strong>interactive map</strong> and surface to the crew through tasks (and to spray logging in inventory).</p>
+  <div class="rule"><h4>Types &amp; scope</h4>
+    <p>Seven types: <strong>No mow, No irrigate, No fungicide, No herbicide, No insecticide, No fertilizer, No wetting agent.</strong> Each targets a <strong>whole plot</strong>, a <strong>spot within a plot</strong> (the trial's pin), or a <strong>non-plot area</strong> (alleyway, border), and carries its own <strong>start and end date</strong>.</p>
+  </div>
+  <div class="rule"><h4>Who sets &amp; lifts</h4>
+    <p>Bill, faculty, grad students, and technicians can place restrictions on their <strong>own lab's</strong> plots. A restriction can be <strong>lifted only by Bill or the person who set it</strong>.</p>
+  </div>
+  <div class="rule"><h4>Bill is alerted</h4>
+    <p>Whenever a restriction is <strong>placed on a plot</strong>, Bill gets an <strong>in-app alert</strong> — this is the key signal that a plot's constraints just changed, so he can plan crew work around it. (This is the module's "conflict" handling: the calendar shows everything; the alert flags new restrictions specifically.)</p>
+  </div>
+
+  <h2 class="section" id="full-trials__calendar">6. The shared calendar (studies + crew)</h2>
+  <p>The study calendar and the <a href="#full-crew">crew-availability calendar</a> are <strong>one calendar</strong> with a <strong>layer toggle</strong>: you switch the <strong>Studies</strong> layer and the <strong>Crew availability</strong> layer on or off independently. On its own, the Studies layer lays out planned and active studies by <strong>plot and date</strong>; turning on Crew availability overlays who's working which days, so Bill can line up labor against what the research needs in a given week.</p>
+  <p>v1 <strong>shows</strong> studies rather than auto-flagging plot overlaps — Bill eyeballs the calendar for clashes — but it <strong>does actively alert him when a restriction is placed</strong> (§5), the constraint that most affects crew scheduling. Each person sees the layers they have access to: everyone sees Studies; Crew availability is Bill + techs/grads, with undergrads seeing their own.</p>
+
+  <h2 class="section" id="full-trials__screens">7. Screens (v1)</h2>
+  <ol>
+    <li><strong>Studies list</strong> — all studies by stage (Planned / Active / Completed), searchable, filter by lab or plot. Default screen.</li>
+    <li><strong>Study detail</strong> — protocol fields, plots shown on the map, treatments, the restriction list, and the stage control.</li>
+    <li><strong>New / edit study</strong> — the protocol form (faculty/grad/tech for their lab; Bill anytime).</li>
+    <li><strong>Shared calendar</strong> — planned + active studies by plot/date, with a toggle to overlay crew availability (§6).</li>
+  </ol>
+
+  <h2 class="section" id="full-trials__notifs">8. Notifications</h2>
+  <ul>
+    <li>Restriction placed on a plot → <strong>in-app alert to Bill</strong>.</li>
+    <li>New planned study submitted → <strong>in-app notice to Bill</strong> (appears on his calendar).</li>
+  </ul>
+  <p><em>No push in this module — consistent with the app's minimal-push approach.</em></p>
+
+  <h2 class="section" id="full-trials__data">9. Data model</h2>
+  <table>
+    <thead><tr><th>study</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>title</td><td>text</td></tr>
+      <tr><td>lab_id / pi_id</td><td>owning lab + PI</td></tr>
+      <tr><td>objective</td><td>text — target effect</td></tr>
+      <tr><td>stage</td><td><code>planned</code> | <code>active</code> | <code>completed</code></td></tr>
+      <tr><td>start_date / end_date</td><td>study run dates (date-picker)</td></tr>
+      <tr><td>protocol_pdf_url</td><td>the uploaded protocol document, nullable (source for autofill, kept attached)</td></tr>
+      <tr><td>created_by / created_at</td><td>who + when</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>study_location</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>study_id</td><td>the study</td></tr>
+      <tr><td>plot_id</td><td>a numbered plot, <strong>nullable</strong> (null = a non-plot area)</td></tr>
+      <tr><td>area_label</td><td>free text for non-plot spots (e.g. "alley between 4 &amp; 5"), nullable</td></tr>
+      <tr><td>square_footage</td><td>the trial's area at that location</td></tr>
+      <tr><td>pin_location</td><td>a push-pin dropped anywhere on the interactive map, nullable</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>treatment</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>study_id</td><td>the study</td></tr>
+      <tr><td>product / description</td><td>treatment or product — free text</td></tr>
+      <tr><td>notes</td><td>optional (rate, timing)</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>restriction</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>study_id</td><td>the study it belongs to</td></tr>
+      <tr><td>plot_id</td><td>a numbered plot, nullable (null = non-plot area)</td></tr>
+      <tr><td>area_label / pin_location</td><td>label + map pin for a spot within a plot or a non-plot area, nullable</td></tr>
+      <tr><td>type</td><td>no_mow / no_irrigate / no_fungicide / no_herbicide / no_insecticide / no_fertilizer / no_wetting_agent</td></tr>
+      <tr><td>start_date / end_date</td><td>when it's in force</td></tr>
+      <tr><td>set_by / created_at</td><td>who + when (drives the Bill alert)</td></tr>
+    </tbody>
+  </table>
+  <p><em>Restrictions are read by the interactive map, the task board, and inventory spray logging — this table is their source.</em></p>
+
+  <h2 class="section" id="full-trials__scope">10. Out of scope for v1 <span style="font-weight:400;color:var(--muted);font-size:.9rem;">(comes later)</span></h2>
+  <div class="callout out">
+    <ul style="margin:0;">
+      <li>Data collection / measurements / ratings / results (the big v1 exclusion)</li>
+      <li>Statistical analysis or export of trial data</li>
+      <li>Approval workflow (module is informational only)</li>
+      <li>Automatic plot-overlap conflict detection (v1 shows the calendar; Bill eyeballs)</li>
+      <li>Linking treatments to inventory products (free text in v1)</li>
+    </ul>
+  </div>
+
+  <h2 class="section" id="full-trials__open">11. Decisions &amp; dependencies</h2>
+  <p><strong>Decisions:</strong></p>
+  <ul>
+    <li><strong>Treatments:</strong> free text in v1 — no link to inventory products.</li>
+    <li><strong>Stage transitions:</strong> the owning lab advances Planned → Active → Completed (no Bill sign-off); a study's restrictions <strong>auto-expire on their end date</strong>.</li>
+    <li><strong>Restriction alert:</strong> <strong>in-app only</strong> to Bill (no push).</li>
+  </ul>
+  <p><strong>Dependencies:</strong></p>
+  <ol>
+    <li><strong>Interactive map:</strong> plot selection <em>and dropping a push-pin within a plot</em> read from the maps module — pins are far simpler than drawing footprints, but the map still needs the plot list/numbering settled (shared across modules).</li>
+    <li><strong>Protocol PDF extraction:</strong> best-effort auto-fill (title/objective/dates/treatments likely; plots/footprint less so), always editable — not authoritative.</li>
+  </ol>
+
+  
+</div></section>
+<section id="full-inv" class="specsection screen"><div class="wrap"><div class="specbanner"><a class="backbtn" href="#home">← Back to summary</a><strong>Inventory — full spec</strong></div>
+  
+
+  <h2 class="section" id="full-inv__goal">1. What this module does</h2>
+  <p>A <strong>real-time stock list</strong> for the farm's inputs, so Bill always knows what's on hand and gets warned before anything runs out. The crew logs what they use and what comes in — quickly, via a <strong>shared QR</strong> that opens the logging form — and each item can be viewed as whole <strong>containers</strong> or a <strong>measured amount</strong>. Bill is alerted when an item drops to its reorder point.</p>
+
+  <h2 class="section" id="full-inv__roles">2. Who can do what</h2>
+  <table>
+    <thead><tr><th>Role</th><th>In the inventory module</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Bill (manager)</strong></td><td>Full control — add/edit/retire items, set reorder thresholds and container sizes, post/manage the shared logging QR, correct counts, log usage/restocks; receives low-stock alerts</td></tr>
+      <tr><td><strong>Technicians / grad students / faculty</strong></td><td>View stock; <strong>log usage and restocks</strong> (scan QR, enter amount)</td></tr>
+      <tr><td><strong>Undergrad hourly</strong></td><td>No access by default; can log usage/restocks <strong>only if Bill grants</strong> that person the ability</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="section" id="full-inv__categories">3. Categories &amp; item details</h2>
+  <p>v1 categories: <strong>Fungicides, Herbicides, Insecticides, Fertilizer (granular), Fertilizer (liquid), Paint (cans), Paint (liquid), Seed, Wetting agents.</strong></p>
+  <p>Each item tracks:</p>
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Product name</strong></td><td>Brand/product (e.g. "Daconil Weatherstik")</td></tr>
+      <tr><td><strong>Active ingredient</strong></td><td>e.g. "Chlorothalonil"</td></tr>
+      <tr><td><strong>Resistance-group code</strong></td><td>mode-of-action group for pesticides — <strong>FRAC</strong> (fungicides), <strong>HRAC/WSSA</strong> (herbicides), <strong>IRAC</strong> (insecticides). Shows only for those three categories; the field label adapts to the category</td></tr>
+      <tr><td><strong>Category</strong></td><td>from the list above</td></tr>
+      <tr><td><strong>Formulation type</strong></td><td>dropdown — Liquid, Emulsifiable concentrate (EC), Suspension / flowable (SC), Wettable powder (WP), Water-dispersible granule (WDG/DG), Soluble powder / granule (SP/SG), Dry granular (G), Dry flowable (DF), Other</td></tr>
+      <tr><td><strong>Storage location</strong></td><td>where it's kept (chem room, shed, shelf)</td></tr>
+      <tr><td>Container options</td><td>one or more <strong>type + size</strong> pairs — a product can come in mixed sizes (e.g. 2.5 gal jug <em>and</em> 30 gal drum). Type = jug / bottle / bag / box / case / tote / drum / can; size = amount + unit. These power the units toggle (§4)</td></tr>
+      <tr><td>Quantity on hand</td><td>current stock (see §4)</td></tr>
+      <tr><td>Reorder threshold</td><td>the low-stock trigger (see §6)</td></tr>
+    </tbody>
+  </table>
+  <p><em>EPA reg #, lot #, and expiration tracking are noted for later (§9) — not in v1.</em></p>
+
+  <h3>Smart product entry — autofill from the brand name</h3>
+  <p>To make setup as fast as possible, the module keeps a <strong>product reference list</strong> (brand name → active ingredient, category, formulation type, and resistance-group code). As someone types a <strong>brand name</strong>, it <strong>suggests matches and autofills</strong> those fields. Everything stays <strong>editable</strong> — if a match is wrong or the product isn't listed yet, they just type over it.</p>
+  <p>How the reference gets populated:</p>
+  <ul>
+    <li><strong>Seeded</strong> with the farm's commonly used products up front, so the big ones autofill from day one.</li>
+    <li><strong>Self-learning</strong> — the first time a new product is entered by hand, it's saved to the reference so it autofills next time, for everyone.</li>
+    <li><strong>Optional import</strong> — a public pesticide-product list could be loaded later to broaden coverage.</li>
+  </ul>
+  <div class="callout"><strong>Build note:</strong> before launch we'll need to build a <strong>reference Excel sheet</strong> of the farm's products — brand name → active ingredient, category, formulation, and resistance-group code — to seed the <code>product_reference</code> table. This is the one real prep task behind autofill; the self-learning fills gaps from there.</div>
+
+  <h2 class="section" id="full-inv__counting">4. Counting stock — containers or measured amount</h2>
+  <p>Stock can be viewed two ways, with a <strong>toggle</strong> to switch between them:</p>
+  <ul>
+    <li><strong>Containers</strong> — whole units on the shelf (e.g. 3 jugs, 5 bags, 8 cans). Fast to eyeball.</li>
+    <li><strong>Measured amount</strong> — volume/weight (e.g. 7.5 gal, 250 lb, 6 lb of seed). Precise for partial containers and applications.</li>
+  </ul>
+  <p>The item's <strong>container size</strong> converts between the two (1 jug = 2.5 gal → 3 jugs = 7.5 gal). Under the hood a single quantity is stored; the toggle just changes how it's shown, so the two never disagree. Containers can be <strong>fractional</strong> (a half-used jug = 0.5), since the measured amount is the source of truth. For products with <strong>multiple container sizes</strong>, the measured amount still rules and the containers view shows the breakdown by size (e.g. 2 × 2.5 gal jugs + 1 × 30 gal drum).</p>
+
+  <h2 class="section" id="full-inv__logging">5. Logging usage &amp; restocks</h2>
+  <p>Because the farm carries too many items to label each one, there is <strong>no per-item QR</strong>. Instead a <strong>single shared QR</strong> — posted where it's handy (chem room wall, on the sprayer, at the mix station) — opens the logging screen. From there the user picks what they're doing and which product. The same screen is reachable in-app without scanning.</p>
+
+  <div class="rule"><h4>Step 1 — Open the logging screen (two ways in)</h4>
+    <p>So a lost, damaged, or unreachable QR never blocks logging, there are <strong>two entry points</strong>:</p>
+    <ul>
+      <li><strong>Scan the posted QR</strong> — fastest at the mix station.</li>
+      <li><strong>In the app</strong> — open the <strong>Inventory tile</strong> and tap <strong>Log</strong>. Always available to anyone signed in with inventory access.</li>
+    </ul>
+    <p>Either way you land on two big, glove-friendly buttons: <strong>Log a spray / usage</strong> or <strong>Restock</strong>.</p>
+  </div>
+
+  <div class="rule"><h4>Step 2a — Log a spray / usage</h4>
+    <p>A short form:</p>
+    <ul>
+      <li><strong>Product</strong> — a fast <strong>search / type-ahead picker</strong> over the inventory, with <strong>recent products</strong> and a <strong>category filter</strong> pinned up top since the list is long. This is what replaces scanning a specific item.</li>
+      <li><strong>Amount used (required)</strong> — number + unit, with the containers/measured toggle; decimals allowed. Mandatory, so stock always decrements by a real figure.</li>
+      <li><strong>Where</strong> — opens the <strong>interactive map</strong>; the person <strong>taps the plots they sprayed</strong> (a "plot" = a turf area of one grass type; trials and restrictions live inside plots). This records the exact plots and <strong>auto-sums the total area treated</strong> from the map's plot sizes. When logging from a task, the plots pre-fill from that task.</li>
+      <li><strong>Who / when</strong> — auto-filled from login and the current time (both editable).</li>
+    </ul>
+    <p>Save → stock is <strong>decremented</strong> by the amount, and the entry (product, amount, plots, area, who, when) also feeds the chemical-application record.</p>
+  </div>
+  <div class="callout"><strong>Depends on the interactive map:</strong> the "where" picker and the treated-area total both read from the interactive maps module — plots and their sizes come from there. Until that module is built, "where" falls back to picking plot numbers from a list, without the automatic area total.</div>
+
+  <div class="rule"><h4>Step 2b — Restock</h4>
+    <p>An even shorter form:</p>
+    <ul>
+      <li><strong>Product</strong> — same search picker; if it's brand-new, <strong>+ Add product</strong> opens item setup with brand-name autofill (§3).</li>
+      <li><strong>Container size + quantity received</strong> — pick which size came in (for mixed-size products), then the number of containers (usually whole); auto-converted to a measured amount.</li>
+      <li><strong>Who / when</strong> — auto-filled, editable.</li>
+    </ul>
+    <p>Save → stock is <strong>incremented</strong>. Every movement — usage or restock — is stamped with who, what, how much, and when.</p>
+  </div>
+
+  <h2 class="section" id="full-inv__lowstock">6. Low-stock alerts</h2>
+  <p>Each item has a <strong>reorder threshold</strong>. When on-hand stock drops to or below it, the item shows a <span class="low-chip">LOW</span> flag on the inventory list — <strong>visible to everyone who can see inventory</strong> (techs, grads, faculty, Bill, and any granted undergrad), so anyone who spots it can give Bill a heads-up.</p>
+  <p><strong>No push.</strong> Instead, the next time <strong>Bill opens the app</strong> he sees an <strong>in-app alert</strong> — a banner / badge summarizing what's low — so it catches him without pinging his phone. He can dismiss it or jump straight to the low-stock list. The alert is <strong>Bill's</strong>, since he owns reordering.</p>
+
+  <h2 class="section" id="full-inv__screens">7. Screens (v1)</h2>
+  <ol>
+    <li><strong>Inventory list</strong> — items by category, searchable, low items flagged, with the containers/amount toggle, and a <strong>Log button</strong> (usage/restock) so logging works entirely in-app without the QR. Default screen.</li>
+    <li><strong>Item detail</strong> — stock, location, active ingredient, movement history, and Log usage / Restock buttons.</li>
+    <li><strong>Log usage / restock</strong> — the scan-or-pick → amount flow (§5).</li>
+    <li><strong>Add / edit item</strong> — Bill sets product, category, container type/size, threshold, location. <em>Bill only.</em></li>
+    <li><strong>Low-stock view</strong> — Bill's list of everything at/below reorder point. <em>Bill only.</em></li>
+  </ol>
+
+  <h2 class="section" id="full-inv__data">8. Data model</h2>
+  <table>
+    <thead><tr><th>inventory_items</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>name</td><td>product/brand, text</td></tr>
+      <tr><td>active_ingredient</td><td>text, nullable</td></tr>
+      <tr><td>moa_code</td><td>resistance-group code — FRAC / HRAC / IRAC by category; nullable (fungicides/herbicides/insecticides only)</td></tr>
+      <tr><td>category</td><td>fungicide / herbicide / insecticide / fert_granular / fert_liquid / paint_can / paint_liquid / seed / wetting_agent</td></tr>
+      <tr><td>formulation</td><td>liquid / EC / SC / WP / WDG / SP / granular / DF / other (dropdown)</td></tr>
+      <tr><td>storage_location</td><td>text</td></tr>
+      <tr><td>container_options</td><td>list of {type, size} pairs — a product may have several (mixed sizes)</td></tr>
+      <tr><td>measure_unit</td><td><code>gal</code> | <code>oz</code> | <code>lb</code> | … (the base unit stock is stored in)</td></tr>
+      <tr><td>qty_on_hand</td><td>current stock in the base measure unit (containers derived via container_size)</td></tr>
+      <tr><td>reorder_threshold</td><td>low-stock trigger, in the base unit</td></tr>
+      <tr><td>active</td><td>on / retired</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>inventory_log <span style="font-weight:400;text-transform:none;letter-spacing:0;">(movements)</span></th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>item_id</td><td>which item</td></tr>
+      <tr><td>type</td><td><code>usage</code> | <code>restock</code> | <code>adjustment</code></td></tr>
+      <tr><td>amount</td><td>quantity moved (base unit; sign per type) — required on usage</td></tr>
+      <tr><td>container_option</td><td>which container size a restock came in (mixed-size products), nullable</td></tr>
+      <tr><td>linked_task_id</td><td>task/field-ops record this usage came from, nullable</td></tr>
+      <tr><td>plot_ids</td><td>plots sprayed, selected on the interactive map, nullable</td></tr>
+      <tr><td>area_treated</td><td>total area, auto-summed from the selected plots' sizes, nullable</td></tr>
+      <tr><td>user_id / at</td><td>who + timestamp</td></tr>
+      <tr><td>note</td><td>optional</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>product_reference <span style="font-weight:400;text-transform:none;letter-spacing:0;">(autofill lookup)</span></th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>brand_name</td><td>text — the typed match key</td></tr>
+      <tr><td>active_ingredient</td><td>text</td></tr>
+      <tr><td>moa_code</td><td>FRAC / HRAC / IRAC, nullable</td></tr>
+      <tr><td>category</td><td>same set as items, nullable</td></tr>
+      <tr><td>formulation</td><td>same set as items, nullable</td></tr>
+      <tr><td>source</td><td><code>seeded</code> | <code>learned</code> | <code>imported</code></td></tr>
+    </tbody>
+  </table>
+  <p>Typing a brand name matches against <code>product_reference</code> to autofill an item; a hand-entered product with no match is written back as a <code>learned</code> row. <em>EPA reg #, lot #, and expiration would attach to <code>inventory_items</code> (or a per-lot table) when added later.</em></p>
+
+  <h2 class="section" id="full-inv__scope">9. Out of scope for v1 <span style="font-weight:400;color:var(--muted);font-size:.9rem;">(comes later)</span></h2>
+  <div class="callout out">
+    <ul style="margin:0;">
+      <li>EPA reg # / lot # / expiration tracking and expired-product flags</li>
+      <li>Cost/pricing, purchase orders, vendor info</li>
+      <li>A formal inventory-usage report / export</li>
+      <li>Multiple storage locations with transfers between them</li>
+      <li>Scanning manufacturer barcodes (v1 uses the single shared logging QR)</li>
+    </ul>
+  </div>
+
+  <h2 class="section" id="full-inv__open">10. Decisions</h2>
+  <ul>
+    <li><strong>Shared QR placement:</strong> posted in the <strong>chem room, mix station, and Bill's office</strong> — all pointing to the same logging screen (plus the in-app Log button as backup).</li>
+    <li><strong>Amount used — required:</strong> entering the amount is <strong>mandatory</strong> on every usage/spray log, so stock always decrements by a real figure.</li>
+    <li><strong>Mixed container sizes:</strong> a product can have <strong>more than one container size</strong> (e.g. a 2.5 gal jug <em>and</em> a 30 gal drum). Stock is tracked as the measured amount (single source of truth); on restock you pick which size came in, and the containers view shows the breakdown by size.</li>
+  </ul>
+
+  
+</div></section>
+<section id="full-equip" class="specsection screen"><div class="wrap"><div class="specbanner"><a class="backbtn" href="#home">← Back to summary</a><strong>Equipment — full spec</strong></div>
+  
+
+  <h2 class="section" id="full-equip__goal">1. What this module does</h2>
+  <p>A live board of the farm's machines so anyone can see at a glance what's <span class="pill s-avail">Available</span>, <span class="pill s-use">In use</span>, or <span class="pill s-down">Down</span> — and who has what. Checkout happens <strong>automatically when a task starts</strong>, problems are reported in one tap and <strong>spawn a repair task</strong>, and each machine keeps a <strong>service history</strong>. It keeps Bill from discovering a mower is down when someone's already standing at it.</p>
+
+  <h2 class="section" id="full-equip__roles">2. Who can do what</h2>
+  <table>
+    <thead><tr><th>Role</th><th>In the equipment module</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Bill (manager)</strong></td><td>Manage the roster (add/edit/retire machines), <strong>confirm a machine <span class="pill s-down">Down</span></strong>, file reports on behalf of undergrads, add maintenance; sees everything incl. the checkout log</td></tr>
+      <tr><td><strong>Technicians</strong></td><td>Report problems, <strong>confirm a machine Down</strong>, add maintenance entries, complete repair tasks; auto-checkout via tasks; view all</td></tr>
+      <tr><td><strong>Grad students</strong></td><td>Report problems (cannot set Down); auto-checkout via tasks; view all</td></tr>
+      <tr><td><strong>Undergrad hourly</strong></td><td>View status; auto-checkout via tasks (recorded in the log). Problems <strong>go through Bill</strong> — no direct report</td></tr>
+      <tr><td><strong>Faculty</strong></td><td>View status</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="section" id="full-equip__roster">3. Equipment roster</h2>
+  <p>A list of <strong>named machines</strong> — e.g. "Toro Triplex #3," "John Deere sprayer," "Dennis mower," "2653 mower," "backpack sprayer," "aerator," "utility tractor." Each machine is <strong>linked to the task-catalog types it performs</strong>, so the mower a job runs on is the same record tracked here.</p>
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Name / ID</strong></td><td>the machine as the crew calls it</td></tr>
+      <tr><td><strong>Type</strong></td><td>triplex / rotary / walk mower / sprayer / tractor / aerator / backpack / other</td></tr>
+      <tr><td><strong>Linked catalog types</strong></td><td>the <a href="#full-task">task types</a> this machine runs (e.g. Toro Triplex #3 → Greens Triplex Mow)</td></tr>
+      <tr><td><strong>Status</strong></td><td>available / in use / down (see §4)</td></tr>
+      <tr><td>Notes</td><td>optional</td></tr>
+    </tbody>
+  </table>
+  <p><em>Bill maintains the roster; retired machines are archived, not deleted, so their history stays intact.</em></p>
+
+  <h2 class="section" id="full-equip__status">4. Status &amp; how it changes</h2>
+  <table>
+    <thead><tr><th>Status</th><th>Means</th><th>Set by</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill s-avail">Available</span></td><td>free to use</td><td>default; returns here on task completion, or automatically when a repair task is completed</td></tr>
+      <tr><td><span class="pill s-use">In use</span></td><td>checked out for a task</td><td>automatically when a task using it starts (§5)</td></tr>
+      <tr><td><span class="pill s-down">Down</span></td><td>broken / out of service</td><td>set only when <strong>Bill or a technician confirms</strong> a machine doesn't work. A problem report flags the machine but doesn't itself set Down. Cleared to Available <strong>automatically</strong> when the repair task is completed</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="section" id="full-equip__checkout">5. Automatic checkout</h2>
+  <div class="rule"><h4>Checkout rides the task</h4>
+    <p>There's no separate "check out this machine" step. When a worker <strong>starts a task</strong> that uses a machine (the machine tied to that job — typically <strong>one per task</strong>), the app <strong>checks it out to them automatically</strong>: status → <span class="pill s-use">In use</span>, holder = the worker, timestamped. On <strong>task completion</strong> it checks back in → <span class="pill s-avail">Available</span>.</p>
+  </div>
+  <p>The <strong>checkout log</strong> is simply these task-driven records — who had which machine, when, and for which task — so Bill can always see who last had a machine. (Non-task/manual checkout is out of scope for v1 — checkout is task-driven only.)</p>
+
+  <h2 class="section" id="full-equip__problems">6. Problem reports</h2>
+  <div class="rule"><h4>Report → repair task → confirm Down</h4>
+    <p>A tech or grad taps <strong>Report a problem</strong> on a machine and describes the issue (undergrads route it through Bill instead). That report:</p>
+    <ul>
+      <li><strong>Flags the machine</strong> with an "issue reported" marker so people know it's questionable — but does <strong>not</strong> change its status on its own.</li>
+      <li><strong>Auto-creates a repair task</strong> on the board, linked to the machine, and <strong>assigns it to Bill</strong> — sending the standard "task assigned to you" push (no new alert type).</li>
+    </ul>
+    <p><strong>Only Bill or a technician</strong> can confirm the machine doesn't work and set it <span class="pill s-down">Down</span>. When the <strong>repair task is completed</strong>, the machine returns to <span class="pill s-avail">Available</span> automatically and the report closes.</p>
+  </div>
+
+  <h2 class="section" id="full-equip__maintenance">7. Maintenance history</h2>
+  <p>Each machine keeps a <strong>service history</strong>, built two ways:</p>
+  <ul>
+    <li><strong>Task-linked</strong> — completing a maintenance task tied to a machine (Grind Reels, Backlap Reels, Oil Change, a repair) writes an entry automatically.</li>
+    <li><strong>Manual</strong> — Bill or a tech adds a service entry by hand (date, what was done, notes).</li>
+  </ul>
+  <p>So the history captures both the routine jobs done through the task board and anything logged directly.</p>
+
+  <h2 class="section" id="full-equip__screens">8. Screens (v1)</h2>
+  <ol>
+    <li><strong>Equipment list</strong> — all machines with status and current holder; filter by type/status; down machines flagged. Default screen.</li>
+    <li><strong>Machine detail</strong> — status, who has it, checkout log, maintenance history, linked catalog types, a <strong>Report a problem</strong> button (tech/grad), and a <strong>Confirm Down</strong> control (Bill/tech). Fixed is automatic on repair completion.</li>
+    <li><strong>Report a problem</strong> — description → flags the machine, spawns the repair task, alerts Bill (Bill or a tech then confirms Down if needed).</li>
+    <li><strong>Add / edit machine</strong> — Bill sets name, type, linked catalog types. <em>Bill only.</em></li>
+    <li><strong>Add maintenance entry</strong> — manual service record (Bill/tech).</li>
+  </ol>
+
+  <h2 class="section" id="full-equip__notifs">9. Notifications</h2>
+  <ul>
+    <li>Problem reported → the auto-created repair task is assigned to Bill, so he gets the standard <strong>"task assigned to you"</strong> push. No equipment-specific push type.</li>
+    <li>Down machines are flagged in-app on the board for everyone.</li>
+  </ul>
+
+  <h2 class="section" id="full-equip__data">10. Data model</h2>
+  <table>
+    <thead><tr><th>equipment</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>name</td><td>e.g. "Toro Triplex #3"</td></tr>
+      <tr><td>type</td><td>triplex / rotary / walk / sprayer / tractor / aerator / backpack / other</td></tr>
+      <tr><td>catalog_links</td><td>list of task-catalog type ids this machine performs</td></tr>
+      <tr><td>status</td><td><code>available</code> | <code>in_use</code> | <code>down</code></td></tr>
+      <tr><td>current_holder_id / current_task_id</td><td>set while in use, nullable</td></tr>
+      <tr><td>active</td><td>on / retired</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>equipment_checkout <span style="font-weight:400;text-transform:none;letter-spacing:0;">(log)</span></th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>equipment_id / user_id / task_id</td><td>machine, who, and the task that drove it</td></tr>
+      <tr><td>checked_out_at / checked_in_at</td><td>timestamps (in = task completion), nullable while out</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>problem_report</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>equipment_id / reported_by</td><td>machine + tech/grad</td></tr>
+      <tr><td>description</td><td>text (photo later)</td></tr>
+      <tr><td>repair_task_id</td><td>the auto-created task (completing it resolves the report &amp; auto-returns the machine)</td></tr>
+      <tr><td>down_confirmed_by</td><td>Bill or a technician, if the machine was set Down; nullable</td></tr>
+      <tr><td>status</td><td><code>open</code> | <code>resolved</code></td></tr>
+      <tr><td>created_at</td><td>timestamp</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>maintenance_log</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>equipment_id</td><td>the machine</td></tr>
+      <tr><td>type</td><td>oil_change / reel_grind / backlap / repair / other</td></tr>
+      <tr><td>date / performed_by</td><td>when + who</td></tr>
+      <tr><td>linked_task_id</td><td>task that generated it, nullable (null = manual entry)</td></tr>
+      <tr><td>notes</td><td>optional</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="section" id="full-equip__scope">11. Out of scope for v1 <span style="font-weight:400;color:var(--muted);font-size:.9rem;">(comes later)</span></h2>
+  <div class="callout out">
+    <ul style="margin:0;">
+      <li>Manual / non-task checkout (v1 checkout is task-driven only)</li>
+      <li>Photos on problem reports</li>
+      <li>Preventive/scheduled maintenance reminders (by hours or calendar)</li>
+      <li>Engine-hours / meter tracking and fuel-per-machine</li>
+      <li>Parts inventory linked to repairs</li>
+      <li>More than one machine per task</li>
+    </ul>
+  </div>
+
+  <h2 class="section" id="full-equip__open">12. Decisions</h2>
+  <ul>
+    <li><strong>Checkout:</strong> task-driven only — no manual checkout in v1.</li>
+    <li><strong>Fixed:</strong> completing the repair task <strong>auto-returns</strong> the machine to Available.</li>
+    <li><strong>Reporting &amp; Down:</strong> undergrads route problems through Bill; techs/grads can report; <strong>only Bill or a technician confirms a machine Down</strong>.</li>
+    <li><strong>Photos:</strong> not in v1.</li>
+  </ul>
+
+  
+</div></section>
+<section id="full-fieldops" class="specsection screen"><div class="wrap"><div class="specbanner"><a class="backbtn" href="#home">← Back to summary</a><strong>Field-Ops Logging — full spec</strong></div>
+  
+
+  <h2 class="section" id="full-fieldops__goal">1. What this module does</h2>
+  <p>A <strong>standalone operations log</strong> — a single place to record what was done, where, and when: mowing, pesticide and fertilizer applications, irrigation, aeration, topdressing, and the rest. Ops are entered <strong>explicitly here</strong>, and the chemical applications carry the extra fields needed for a clean <strong>chemical application record</strong> kept for compliance (a formal export is a later add). Anyone signed in can log an op, so the record stays complete.</p>
+
+  <h2 class="section" id="full-fieldops__roles">2. Who can do what</h2>
+  <table>
+    <thead><tr><th>Role</th><th>In this module</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Anyone signed in</strong></td><td>Log a <strong>non-chemical</strong> operation (mowing, irrigation, aeration, topdress, etc.); view the log; edit their own recent entries</td></tr>
+      <tr><td><strong>Techs / grads / Bill</strong> (+ granted undergrads)</td><td>Additionally log <strong>chemical &amp; fertilizer applications</strong> — the same set allowed to make them</td></tr>
+      <tr><td><strong>Bill (manager)</strong></td><td>All of the above, plus edit/correct any entry</td></tr>
+    </tbody>
+  </table>
+  <div class="callout key"><strong>Chemical logging is restricted:</strong> anyone can log a general op, but only people allowed to <em>make</em> chemical/fertilizer applications (techs, grads, Bill — undergrads only if Bill grants) can log one, keeping the compliance record trustworthy.</div>
+
+  <h2 class="section" id="full-fieldops__types">3. Operation types</h2>
+  <p>The op-type picker reuses the <a href="#full-task">Farm Task Catalog</a> so names stay consistent — mowing variants, Spray Pesticide (JD / backpack) → herbicide/fungicide/insecticide, Spray Fertilizer, Fertilize (granular), Aeration, Traffic, Topdress, Handwater, Weedeat, Paint Trial Dots, etc. Each type drives which extra fields appear (§4).</p>
+
+  <h2 class="section" id="full-fieldops__form">4. The log entry</h2>
+  <p>Common fields on every op, then type-specific ones:</p>
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Operation type</strong> *</td><td>from the catalog (§3)</td></tr>
+      <tr><td><strong>Where</strong> *</td><td>plots and/or non-plot areas, selected on the <strong>interactive map</strong> (same picker as everywhere — pins, numbered plots, or labeled non-plot areas)</td></tr>
+      <tr><td><strong>Date / time</strong></td><td>auto-filled to now, editable</td></tr>
+      <tr><td><strong>Person</strong></td><td>auto-filled from login</td></tr>
+      <tr><td>Notes</td><td>optional</td></tr>
+    </tbody>
+  </table>
+  <h3>Type-specific fields</h3>
+  <table>
+    <thead><tr><th>Op type</th><th>Adds</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Pesticide spray</strong> (fungicide / herbicide / insecticide)</td><td>product, amount used, <strong>rate</strong>, <strong>target pest/weed</strong></td></tr>
+      <tr><td><strong>Fertilizer</strong> (spray or granular)</td><td>product, amount used, <strong>rate</strong></td></tr>
+      <tr><td><strong>Mowing</strong></td><td>machine used (from the equipment roster)</td></tr>
+      <tr><td>Others (irrigation, aeration, topdress, …)</td><td>just the common fields + notes for v1</td></tr>
+    </tbody>
+  </table>
+  <p><em>Chemical/fertilizer ops capture a product + amount, so they can decrement inventory — see §6.</em></p>
+
+  <h2 class="section" id="full-fieldops__chem">5. Chemical application record</h2>
+  <p>Any pesticide/fertilizer op is automatically part of the <strong>chemical application record</strong> — a compliance view kept in the log (a formal export/report is a later add). Only people allowed to make chemical applications can create these entries (§2). For v1 it captures: <strong>product, active ingredient, amount used, rate, target pest/weed, plots/area treated, applicator (the logged person), and date/time</strong>. Area treated is summed from the selected plots (interactive map). Fields like EPA reg #, REI/PHI, applicator license, and weather are noted for later (§9).</p>
+
+  <h2 class="section" id="full-fieldops__overlap">6. Relationship to tasks &amp; inventory <span style="font-weight:400;color:var(--muted);font-size:.9rem;">(important)</span></h2>
+  <p>This log is the <strong>single operations record</strong> — tasks and inventory <strong>feed</strong> it so nothing is entered twice:</p>
+  <div class="rule"><h4>Inventory (sprays &amp; fertilizer)</h4>
+    <p>A chemical/fert op records a <strong>product + amount</strong>, which decrements the product's stock. It's <strong>one event</strong>: the field-ops entry and the inventory decrement are the same record, so stock drops <strong>once and is never double-counted</strong>.</p>
+  </div>
+  <div class="rule"><h4>Tasks (mowing auto-log)</h4>
+    <p>Completing a mow task <strong>posts a field-ops entry here</strong> automatically — completing the task and logging the mow are the same record, no double entry.</p>
+  </div>
+  <div class="callout key"><strong>Decided:</strong> field-ops is the one true operations log; task completion and inventory logging feed into it. The <code>source</code> field (manual / task / inventory) records how each entry arrived.</div>
+
+  <h2 class="section" id="full-fieldops__screens">7. Screens (v1)</h2>
+  <ol>
+    <li><strong>Operations log</strong> — the filterable record (by plot/area, date, type, person, product). Default screen.</li>
+    <li><strong>Log an operation</strong> — the entry form (§4): pick type → map location → type-specific fields → save.</li>
+    <li><strong>Op detail</strong> — full entry, editable by its author (or Bill).</li>
+  </ol>
+
+  <h2 class="section" id="full-fieldops__data">8. Data model</h2>
+  <table>
+    <thead><tr><th>field_op</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>type</td><td>catalog op type (mow / pesticide / fertilizer / irrigation / …)</td></tr>
+      <tr><td>variant</td><td>sub-option where relevant (e.g. fungicide), nullable</td></tr>
+      <tr><td>plot_ids / area_labels</td><td>plots and non-plot areas treated (from the map)</td></tr>
+      <tr><td>area_treated</td><td>summed from selected plots, nullable</td></tr>
+      <tr><td>performed_by / performed_at</td><td>who + when</td></tr>
+      <tr><td>equipment_id</td><td>machine used (mowing), nullable</td></tr>
+      <tr><td>source</td><td><code>manual</code> | <code>task</code> | <code>inventory</code> (how the entry was created — supports the §6 feed model)</td></tr>
+      <tr><td>notes</td><td>optional</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>field_op_chemical <span style="font-weight:400;text-transform:none;letter-spacing:0;">(for pesticide/fert ops)</span></th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>field_op_id</td><td>parent op</td></tr>
+      <tr><td>product_id</td><td>inventory item applied</td></tr>
+      <tr><td>amount_used</td><td>decrements stock once — same event as the inventory usage log, never double-counted (§6)</td></tr>
+      <tr><td>rate</td><td>application rate</td></tr>
+      <tr><td>target</td><td>pest/weed (pesticides), nullable</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="section" id="full-fieldops__scope">9. Out of scope for v1 <span style="font-weight:400;color:var(--muted);font-size:.9rem;">(comes later)</span></h2>
+  <div class="callout out">
+    <ul style="margin:0;">
+      <li>EPA reg #, REI/PHI, and applicator license on the chemical record</li>
+      <li>Weather at time of application (auto-pull) — pairs with the Weather module</li>
+      <li>Per-op photos</li>
+      <li>Mowing height / clipping yield capture</li>
+      <li>Irrigation run-times / volumes</li>
+    </ul>
+  </div>
+
+  <h2 class="section" id="full-fieldops__open">10. Decisions</h2>
+  <ul>
+    <li><strong>Single record:</strong> tasks (mow auto-log) and inventory (spray/fert) <strong>feed</strong> this log — it's the one true operations record, no duplicate entry.</li>
+    <li><strong>Chemical logging:</strong> anyone logs general ops, but only those allowed to make chemical/fertilizer applications (techs/grads/Bill, undergrads if granted) can log one.</li>
+    <li><strong>Inventory decrement:</strong> a chemical/fert op decrements the product's stock <strong>once</strong> — the same event as the inventory usage entry, never double-counted.</li>
+  </ul>
+
+  
+</div></section>
+<section id="full-weather" class="specsection screen"><div class="wrap"><div class="specbanner"><a class="backbtn" href="#home">← Back to summary</a><strong>Weather & Conditions — full spec</strong></div>
+  
+
+  <h2 class="section" id="full-weather__goal">1. What this module does</h2>
+  <p>Gives the team the weather that matters for turf work: <strong>current conditions and a forecast</strong>, a <strong>rainfall log</strong> for irrigation decisions and records, and <strong>growing-degree-day (GDD)</strong> tracking for timing models. It runs off a <strong>weather API at the farm's coordinates</strong> — no on-site hardware — and shows an <strong>in-app frost/freeze warning</strong> when a freeze is coming.</p>
+
+  <h2 class="section" id="full-weather__roles">2. Who can do what</h2>
+  <table>
+    <thead><tr><th>Role</th><th>In this module</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Everyone signed in</strong></td><td>View current conditions, forecast, rainfall log, GDD, and the frost/freeze warning</td></tr>
+      <tr><td><strong>Bill (manager)</strong></td><td>Configure settings — GDD base temp &amp; start date, frost threshold (§7)</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="section" id="full-weather__source">3. Data source</h2>
+  <p>A <strong>weather API</strong> keyed to the farm's location — <strong>35.90203° N, 83.95762° W</strong> (3450 Maloney Rd, Knoxville, TN). The app pulls current conditions, forecast, and precipitation on a schedule and caches them, so the tile loads instantly and keeps history for the rainfall log and GDD.</p>
+  <div class="callout q"><strong>To pick:</strong> which weather service. The US National Weather Service API (weather.gov) is free and covers the farm; commercial options (OpenWeather, Visual Crossing) add features. Choice affects cost and which fields are available.</div>
+
+  <h2 class="section" id="full-weather__current">4. Current &amp; forecast</h2>
+  <p>The default view: <strong>right now</strong> (temperature, conditions, wind, humidity) and a <strong>multi-day forecast</strong> (highs/lows, conditions, precip chance). Units in °F, mph, inches.</p>
+
+  <h2 class="section" id="full-weather__rain">5. Rainfall log</h2>
+  <p>A running record of <strong>rainfall over time</strong>, built from the API's precipitation data — daily totals rolling up to weekly/monthly, viewable as a history and chart. Useful for irrigation calls and for the record of how much water a plot has had.</p>
+  <div class="callout q"><strong>To confirm:</strong> allow a <strong>manual rain-gauge override</strong> so Bill can correct the API figure with an actual on-farm gauge reading? (Improves accuracy; small add.)</div>
+
+  <h2 class="section" id="full-weather__gdd">6. Growing degree days</h2>
+  <p><strong>GDD accumulation</strong> for timing models (PGR reapplication, pest/weed emergence). Computed daily as <em>average temp − base temp</em> (floored at zero) and accumulated from a start date. The <strong>base temperature</strong> and <strong>start date</strong> are configurable, since different models use different bases.</p>
+  <div class="callout q"><strong>To set:</strong> which base(s) and start — e.g. base 32°F or 50°F, from Jan 1 or a biofix date. v1 can support one configurable GDD track; multiple named models could come later.</div>
+
+  <h2 class="section" id="full-weather__frost">7. Frost / freeze warning</h2>
+  <p>When the forecast low drops to or below the <strong>frost threshold</strong>, the weather tile shows an <span class="frost-chip">FROST / FREEZE</span> warning so the team can protect turf. <strong>In-app only — no push</strong>, consistent with the app's minimal-push approach. Bill sets the threshold (default at/near 32°F).</p>
+
+  <h2 class="section" id="full-weather__screens">8. Screens (v1)</h2>
+  <ol>
+    <li><strong>Weather</strong> — current conditions + forecast, with the frost/freeze banner when applicable. Default screen.</li>
+    <li><strong>Rainfall</strong> — the rainfall history/chart.</li>
+    <li><strong>GDD</strong> — accumulation value and chart, with the base temp shown.</li>
+    <li><strong>Settings</strong> — GDD base temp &amp; start date, frost threshold. <em>Bill only.</em></li>
+  </ol>
+
+  <h2 class="section" id="full-weather__data">9. Data model</h2>
+  <table>
+    <thead><tr><th>weather_reading <span style="font-weight:400;text-transform:none;letter-spacing:0;">(cached from API)</span></th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>observed_at</td><td>timestamp</td></tr>
+      <tr><td>temp / high / low</td><td>°F</td></tr>
+      <tr><td>conditions</td><td>text (sunny, rain, …)</td></tr>
+      <tr><td>wind / humidity</td><td>mph / %</td></tr>
+      <tr><td>precip</td><td>inches</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>rainfall_log</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>date</td><td>day</td></tr>
+      <tr><td>amount</td><td>inches (from API)</td></tr>
+      <tr><td>manual_override</td><td>on-farm gauge reading, nullable (if enabled)</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>weather_settings</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>gdd_base_temp</td><td>°F (configurable)</td></tr>
+      <tr><td>gdd_start_date</td><td>accumulation start</td></tr>
+      <tr><td>frost_threshold</td><td>°F (default ~32)</td></tr>
+      <tr><td>location</td><td>farm coordinates</td></tr>
+    </tbody>
+  </table>
+  <p><em>GDD accumulation is derived from <code>weather_reading</code> highs/lows against <code>gdd_base_temp</code> from <code>gdd_start_date</code>.</em></p>
+
+  <h2 class="section" id="full-weather__scope">10. Out of scope for v1 <span style="font-weight:400;color:var(--muted);font-size:.9rem;">(comes later)</span></h2>
+  <div class="callout out">
+    <ul style="margin:0;">
+      <li>On-farm weather station integration (v1 is API-only)</li>
+      <li>Spray-window indicator (wind/temp legality flags)</li>
+      <li>Evapotranspiration (ET), soil temperature, soil moisture</li>
+      <li>Push alerts of any kind (frost is in-app only)</li>
+      <li>Multiple named GDD models at once</li>
+    </ul>
+  </div>
+
+  <h2 class="section" id="full-weather__open">11. Open questions</h2>
+  <ol>
+    <li><strong>Weather service:</strong> free NWS (weather.gov) vs a commercial API — which fields and cost.</li>
+    <li><strong>GDD base &amp; start:</strong> which base temp(s) and start date (or biofix) to use.</li>
+    <li><strong>Frost threshold:</strong> exact value — right at 32°F, or a few degrees above for a margin.</li>
+    <li><strong>Rain-gauge override:</strong> allow a manual correction to the API rainfall figure?</li>
+  </ol>
+
+  
+</div></section>
+<section id="role-bill" class="specsection screen"><div class="wrap">
+  <div class="specbanner"><a class="backbtn" href="#home">← Back to summary</a><strong>Bill — Farm Manager · Home screen</strong></div>
+  <p>Bill is the primary user — his home screen is the whole operation at a glance.</p>
+  <div class="phone">
+    <div class="phone-top"><div class="phone-app">UT Turf Farm<span class="o">.</span></div><div class="phone-user">Bill Czekai · Farm Manager</div></div>
+    <div class="tiles">
+      <div class="tile"><span class="ic" style="background:#fff1e0">📋</span><span class="lbl">Tasks</span><small>assign &amp; track</small></div>
+      <div class="tile"><span class="ic" style="background:#eaf3ff">📅</span><span class="lbl">Crew Schedule</span><small>who's in</small></div>
+      <div class="tile"><span class="ic" style="background:#eafaef">⏱️</span><span class="lbl">Time &amp; Hours</span><small>payroll check</small></div>
+      <div class="tile"><span class="ic" style="background:#f3eefc">🗺️</span><span class="lbl">Map</span><small>manage plots</small></div>
+      <div class="tile"><span class="ic" style="background:#fdeaea">🧪</span><span class="lbl">Inventory</span><small>manage stock</small></div>
+      <div class="tile"><span class="ic" style="background:#fff1e0">🚜</span><span class="lbl">Equipment</span><small>status &amp; repairs</small></div>
+      <div class="tile"><span class="ic" style="background:#eafaef">🔬</span><span class="lbl">Trials &amp; Plans</span><small>all studies</small></div>
+      <div class="tile"><span class="ic" style="background:#eaf3ff">📝</span><span class="lbl">Field-Ops Log</span><small>full record</small></div>
+      <div class="tile"><span class="ic" style="background:#e9f4fb">🌤️</span><span class="lbl">Weather</span><small>farm forecast</small></div>
+      <div class="tile"><span class="ic" style="background:#f3eefc">👥</span><span class="lbl">Team</span><small>manage roster</small></div>
+    </div>
+  </div>
+  <p class="phone-cap">Example home screen — Bill sees every tile.</p>
+</div></section>
+
+<section id="role-faculty" class="specsection screen"><div class="wrap">
+  <div class="specbanner"><a class="backbtn" href="#home">← Back to summary</a><strong>Faculty (PI) · Home screen</strong></div>
+  <p>Faculty oversee their lab's research and can see across the whole farm.</p>
+  <div class="phone">
+    <div class="phone-top"><div class="phone-app">UT Turf Farm<span class="o">.</span></div><div class="phone-user">Dr. Brosnan · Faculty (PI)</div></div>
+    <div class="tiles">
+      <div class="tile"><span class="ic" style="background:#fff1e0">📋</span><span class="lbl">Tasks</span><small>assign in lab</small></div>
+      <div class="tile"><span class="ic" style="background:#eafaef">🔬</span><span class="lbl">Trials &amp; Plans</span><small>my studies</small></div>
+      <div class="tile"><span class="ic" style="background:#f3eefc">🗺️</span><span class="lbl">Map</span><small>view &amp; request</small></div>
+      <div class="tile"><span class="ic" style="background:#fdeaea">🧪</span><span class="lbl">Inventory</span><small>view &amp; log</small></div>
+      <div class="tile"><span class="ic" style="background:#eaf3ff">📝</span><span class="lbl">Field-Ops Log</span><small>my plots</small></div>
+      <div class="tile"><span class="ic" style="background:#e9f4fb">🌤️</span><span class="lbl">Weather</span><small>forecast</small></div>
+    </div>
+  </div>
+  <p class="phone-cap">Example home screen — Faculty (PI).</p>
+</div></section>
+
+<section id="role-grad" class="specsection screen"><div class="wrap">
+  <div class="specbanner"><a class="backbtn" href="#home">← Back to summary</a><strong>Grad student · Home screen</strong></div>
+  <p>Grad students run their own studies and pitch in on farm work.</p>
+  <div class="phone">
+    <div class="phone-top"><div class="phone-app">UT Turf Farm<span class="o">.</span></div><div class="phone-user">Logan Smith · Grad student</div></div>
+    <div class="tiles">
+      <div class="tile"><span class="ic" style="background:#fff1e0">📋</span><span class="lbl">Tasks</span><small>board &amp; pool</small></div>
+      <div class="tile"><span class="ic" style="background:#eafaef">🔬</span><span class="lbl">Trials &amp; Plans</span><small>my studies</small></div>
+      <div class="tile"><span class="ic" style="background:#f3eefc">🗺️</span><span class="lbl">Map</span><small>pins &amp; rules</small></div>
+      <div class="tile"><span class="ic" style="background:#fdeaea">🧪</span><span class="lbl">Inventory</span><small>log use</small></div>
+      <div class="tile"><span class="ic" style="background:#eaf3ff">📝</span><span class="lbl">Field-Ops Log</span><small>log work</small></div>
+      <div class="tile"><span class="ic" style="background:#fff1e0">🚜</span><span class="lbl">Equipment</span><small>report issues</small></div>
+      <div class="tile"><span class="ic" style="background:#e9f4fb">🌤️</span><span class="lbl">Weather</span><small>forecast</small></div>
+    </div>
+  </div>
+  <p class="phone-cap">Example home screen — Grad student.</p>
+</div></section>
+
+<section id="role-tech" class="specsection screen"><div class="wrap">
+  <div class="specbanner"><a class="backbtn" href="#home">← Back to summary</a><strong>Research technician · Home screen</strong></div>
+  <p>Technicians keep the day-to-day operations and records running.</p>
+  <div class="phone">
+    <div class="phone-top"><div class="phone-app">UT Turf Farm<span class="o">.</span></div><div class="phone-user">Dillon McCallum · Technician</div></div>
+    <div class="tiles">
+      <div class="tile"><span class="ic" style="background:#fff1e0">📋</span><span class="lbl">Tasks</span><small>board &amp; pool</small></div>
+      <div class="tile"><span class="ic" style="background:#eaf3ff">📝</span><span class="lbl">Field-Ops Log</span><small>log work</small></div>
+      <div class="tile"><span class="ic" style="background:#fdeaea">🧪</span><span class="lbl">Inventory</span><small>log use</small></div>
+      <div class="tile"><span class="ic" style="background:#f3eefc">🗺️</span><span class="lbl">Map</span><small>edit heights</small></div>
+      <div class="tile"><span class="ic" style="background:#fff1e0">🚜</span><span class="lbl">Equipment</span><small>report &amp; fix</small></div>
+      <div class="tile"><span class="ic" style="background:#eafaef">🔬</span><span class="lbl">Trials &amp; Plans</span><small>add protocols</small></div>
+      <div class="tile"><span class="ic" style="background:#e9f4fb">🌤️</span><span class="lbl">Weather</span><small>forecast</small></div>
+    </div>
+  </div>
+  <p class="phone-cap">Example home screen — Research technician.</p>
+</div></section>
+
+<section id="role-undergrad" class="specsection screen"><div class="wrap">
+  <div class="specbanner"><a class="backbtn" href="#home">← Back to summary</a><strong>Undergrad worker · Home screen</strong></div>
+  <p>Student workers get a clean, focused screen — just what they need for the day.</p>
+  <div class="phone">
+    <div class="phone-top"><div class="phone-app">UT Turf Farm<span class="o">.</span></div><div class="phone-user">Student worker · Undergrad</div></div>
+    <div class="tiles">
+      <div class="tile"><span class="ic" style="background:#fff1e0">📋</span><span class="lbl">My Tasks</span><small>today's jobs</small></div>
+      <div class="tile"><span class="ic" style="background:#eaf3ff">📅</span><span class="lbl">My Schedule</span><small>availability</small></div>
+      <div class="tile"><span class="ic" style="background:#eafaef">⏰</span><span class="lbl">Punch In / Out</span><small>clock in</small></div>
+      <div class="tile"><span class="ic" style="background:#f3eefc">🗺️</span><span class="lbl">Maps</span><small>plots &amp; rules</small></div>
+      <div class="tile"><span class="ic" style="background:#fff1e0">🚜</span><span class="lbl">Equipment</span><small>what's free</small></div>
+      <div class="tile"><span class="ic" style="background:#e9f4fb">🌤️</span><span class="lbl">Weather</span><small>forecast</small></div>
+    </div>
+  </div>
+  <p class="phone-cap">Example home screen — clean and focused for the crew. <br>(No inventory, trials, or records unless Bill grants access.)</p>
+</div></section>
+
+<script>
+(function(){
+  function route(){
+    var id = location.hash.slice(1);
+    var el = id ? document.getElementById(id) : null;
+    var screen=null, anchor=null;
+    if(el){ if(el.classList.contains('screen')){screen=el;} else {screen=el.closest('.screen'); anchor=el;} }
+    if(!screen) screen=document.getElementById('home');
+    var all=document.querySelectorAll('.screen');
+    for(var i=0;i<all.length;i++){ all[i].classList.toggle('active', all[i]===screen); }
+    if(anchor){ anchor.scrollIntoView(); } else { window.scrollTo(0,0); }
+  }
+  window.addEventListener('hashchange', route);
+  if(document.readyState!=='loading'){ route(); } else { document.addEventListener('DOMContentLoaded', route); }
+})();
+</script>
+
+</body>
+</html>

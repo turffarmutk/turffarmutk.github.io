@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>UT Turf Farm — Plot Tracer</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.16.0/dist/leaflet-geoman.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.16.0/dist/leaflet-geoman.min.js"></script>
+<style>
+  :root{ --ut-orange:#ff8200; --ut-smokey:#58595b; --ink:#1f2328; --line:#e6e8eb; --muted:#6b7280; }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink)}
+  #app{display:flex;flex-direction:column;height:100%}
+  header{background:linear-gradient(135deg,var(--ut-smokey) 0%,#3f4042 100%);color:#fff;padding:11px 16px;border-bottom:5px solid var(--ut-orange);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  header h1{margin:0;font-size:1.02rem;letter-spacing:-.3px}
+  header .tag{font-size:.68rem;text-transform:uppercase;letter-spacing:.6px;background:var(--ut-orange);padding:3px 9px;border-radius:20px;font-weight:700}
+  .bar{display:flex;gap:6px;padding:8px 12px;background:#fff;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center}
+  .bar b{font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;color:var(--ut-smokey);margin:0 2px}
+  .chip{font:600 12px/1 inherit;padding:7px 12px;border-radius:8px;background:#f1f2f4;color:#4b5563;border:1px solid transparent;cursor:pointer}
+  .chip.on{background:var(--ut-orange);color:#fff}
+  .chip.act{background:#2f7d3a;color:#fff}
+  .chip.danger{background:#fdecea;color:#c0392b;border-color:#f5c6c0}
+  .main{flex:1;display:flex;min-height:0}
+  #map{flex:1;min-height:0}
+  .side{width:240px;border-left:1px solid var(--line);background:#faf9f7;display:flex;flex-direction:column}
+  .side h2{margin:0;padding:10px 12px;font-size:.72rem;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-bottom:1px solid var(--line)}
+  .plist{flex:1;overflow:auto}
+  .pitem{padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px}
+  .pitem:hover{background:#fff6ec}
+  .pitem .num{font-weight:800;color:var(--ut-smokey)}
+  .pitem .dot{width:9px;height:9px;border-radius:50%;background:#2f7d3a}
+  .pitem .dot.r{background:#c0392b}
+  .side .empty{padding:14px 12px;color:var(--muted);font-size:12px;line-height:1.5}
+  .side .count{padding:8px 12px;font-size:12px;color:var(--muted);border-top:1px solid var(--line)}
+  .note{font-size:11px;color:#6b7280;padding:6px 12px;background:#fff6ec;border-top:1px solid #ffe0bd}
+  .pn{font:800 11px/1 'Archivo',sans-serif;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.85)}
+  /* attribute form popup */
+  .frm label{display:block;font-size:11px;color:var(--muted);margin:6px 0 2px;text-transform:uppercase;letter-spacing:.4px}
+  .frm input{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:13px}
+  .frm .btns{display:flex;gap:6px;margin-top:10px}
+  .frm button{flex:1;padding:7px;border:none;border-radius:6px;font:600 12px inherit;cursor:pointer}
+  .frm .save{background:var(--ut-orange);color:#fff}
+  .frm .del{background:#fdecea;color:#c0392b}
+  .leaflet-popup-content{margin:10px 12px;min-width:180px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>UT Turf Farm — Plot Tracer</h1>
+    <span class="tag">Trace &amp; Save · Prototype</span>
+  </header>
+
+  <div class="bar">
+    <b>Base</b>
+    <button class="chip on" data-base="sat">Satellite</button>
+    <button class="chip" data-base="usda">USDA NAIP</button>
+    <button class="chip" data-base="street">Street</button>
+    <span style="width:10px"></span>
+    <b>Draw</b>
+    <button class="chip" id="btnTrace">✎ Trace</button>
+    <button class="chip" id="btnRect">▭ Rectangle</button>
+    <button class="chip" id="btnCircle">○ Circle</button>
+    <button class="chip" id="btnOval">⬭ Oval</button>
+    <button class="chip" id="btnMove">✥ Move</button>
+    <button class="chip" id="btnRotate">⟳ Rotate</button>
+    <button class="chip" id="btnEdit">Edit</button>
+    <button class="chip" id="btnDup">⧉ Duplicate</button>
+    <span style="width:10px"></span>
+    <b>Data</b>
+    <button class="chip" id="btnExport">⬇ Export GeoJSON</button>
+    <button class="chip" id="btnImport">⬆ Import</button>
+    <button class="chip danger" id="btnClear">Clear all</button>
+    <input type="file" id="fileIn" accept=".json,.geojson" style="display:none"/>
+  </div>
+
+  <div class="main">
+    <div id="map"></div>
+    <div class="side">
+      <h2>Plots</h2>
+      <div class="plist" id="plist"></div>
+      <div class="count" id="count">0 plots</div>
+    </div>
+  </div>
+  <div class="note">Pick a shape (<b>Rectangle / Circle / Oval</b>) and drag it out, or <b>Trace</b> to click irregular corners (double-click to finish). Click a plot then <b>Duplicate</b> (or Ctrl/⌘+C, Ctrl/⌘+V) to copy it. Work autosaves; <b>Export GeoJSON</b> to carry plots into the main app.</div>
+</div>
+
+<script>
+// ---- Farm center --------------------------------------------------------
+const FARM = [35.90122, -83.96050];
+const STORE_KEY = 'ut-turf-plots-v1';
+
+const map = L.map('map', { center: FARM, zoom: 18, maxZoom: 21 });
+
+const bases = {
+  sat: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:21, maxNativeZoom:19, attribution:'Imagery © Esri, Maxar' }),
+  usda: L.tileLayer('https://gis.apfo.usda.gov/arcgis/rest/services/NAIP/USDA_CONUS_PRIME/ImageServer/tile/{z}/{y}/{x}', { maxZoom:21, maxNativeZoom:18, attribution:'USDA NAIP' }),
+  street: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'© OpenStreetMap' })
+};
+let currentBase = bases.sat.addTo(map);
+
+// ---- Plot styling -------------------------------------------------------
+function styleFor(props){
+  return { color:'#ffffff', weight:2, fillColor:'#ffffff', fillOpacity:0.10 };
+}
+
+const plotsGroup = L.geoJSON(null, {
+  style: f => styleFor(f.properties),
+  onEachFeature: (f, layer) => wirePlot(layer)
+}).addTo(map);
+
+// ---- Attribute editor popup ---------------------------------------------
+function formHtml(p){
+  p = p || {};
+  return `<div class="frm">
+    <label>Plot name / number</label><input data-k="number" value="${p.number||''}" placeholder="e.g. 12B" autofocus/>
+    <div class="btns"><button class="save">Save</button><button class="del">Delete</button></div>
+  </div>`;
+}
+
+function wirePlot(layer){
+  if(!layer.feature) layer.feature = { type:'Feature', properties:{}, geometry:null };
+  const props = layer.feature.properties;
+  layer.setStyle(styleFor(props));
+  bindLabel(layer);
+
+  layer.bindPopup(formHtml(props));
+  layer.on('popupopen', e => {
+    lastSelected = layer;
+    const root = e.popup.getElement();
+    const input = root.querySelector('input[data-k="number"]');
+    const save = () => {
+      props.number = input.value.trim();
+      bindLabel(layer);
+      layer.closePopup();
+      persist(); renderList();
+    };
+    root.querySelector('.save').onclick = save;
+    input.addEventListener('keydown', ev => { if(ev.key === 'Enter') save(); });
+    root.querySelector('.del').onclick = () => { plotsGroup.removeLayer(layer); persist(); renderList(); };
+  });
+  layer.on('pm:edit', () => persist());
+  layer.on('pm:dragend', () => persist());
+  layer.on('pm:markerdragend', () => persist());
+  layer.on('pm:rotateend', () => persist());
+}
+
+function bindLabel(layer){
+  const n = layer.feature.properties.number;
+  layer.unbindTooltip();
+  if(n) layer.bindTooltip(`<span class="pn">${n}</span>`, {permanent:true, direction:'center', className:'plabel', opacity:1});
+}
+
+// ---- Sidebar list -------------------------------------------------------
+function renderList(){
+  const el = document.getElementById('plist');
+  const items = [];
+  plotsGroup.eachLayer(l => items.push(l));
+  document.getElementById('count').textContent = items.length + (items.length===1?' plot':' plots');
+  if(!items.length){ el.innerHTML = '<div class="empty">No plots yet. Click <b>Trace plot</b>, then click the corners of a plot on the map.</div>'; return; }
+  el.innerHTML = '';
+  items.sort((a,b)=>(a.feature.properties.number||'').localeCompare(b.feature.properties.number||'', undefined, {numeric:true}));
+  items.forEach(l=>{
+    const p = l.feature.properties;
+    const d = document.createElement('div'); d.className='pitem';
+    d.innerHTML = `<span class="dot"></span><span class="num">${p.number||'(unnamed)'}</span>`;
+    d.onclick = ()=>{ map.fitBounds(l.getBounds(),{maxZoom:20,padding:[40,40]}); l.openPopup(); };
+    el.appendChild(d);
+  });
+}
+
+// ---- Persistence + import/export ----------------------------------------
+function currentGeoJSON(){ return plotsGroup.toGeoJSON(); }
+function persist(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(currentGeoJSON())); }catch(e){} }
+function load(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw){ plotsGroup.addData(JSON.parse(raw)); }
+  }catch(e){}
+  renderList();
+}
+
+document.getElementById('btnExport').onclick = ()=>{
+  const blob = new Blob([JSON.stringify(currentGeoJSON(),null,2)], {type:'application/geo+json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'ut-turf-plots.geojson'; a.click();
+};
+document.getElementById('btnImport').onclick = ()=> document.getElementById('fileIn').click();
+document.getElementById('fileIn').onchange = e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{ try{ plotsGroup.addData(JSON.parse(r.result)); persist(); renderList(); if(plotsGroup.getLayers().length) map.fitBounds(plotsGroup.getBounds(),{padding:[40,40]}); }catch(err){ alert('Could not read that file.'); } };
+  r.readAsText(f);
+};
+document.getElementById('btnClear').onclick = ()=>{
+  if(confirm('Remove all traced plots? Export first if you want to keep them.')){ plotsGroup.clearLayers(); persist(); renderList(); }
+};
+
+// ---- Drawing (Leaflet-Geoman) -------------------------------------------
+map.pm.setGlobalOptions({ snappable:true, snapDistance:15, pathOptions: styleFor({}) });
+
+let lastSelected = null, copyBuf = null, pendingConvert = null;
+const drawBtns = ['btnTrace','btnRect','btnCircle','btnOval'];
+function armBtn(id){ drawBtns.forEach(b=>document.getElementById(b).classList.toggle('on', b===id)); }
+function disarm(){ drawBtns.forEach(b=>document.getElementById(b).classList.remove('on')); }
+
+function stopModes(){
+  map.pm.disableDraw();
+  if(map.pm.globalEditModeEnabled()) map.pm.disableGlobalEditMode();
+  if(map.pm.globalDragModeEnabled()) map.pm.disableGlobalDragMode();
+  if(map.pm.globalRotateModeEnabled && map.pm.globalRotateModeEnabled()) map.pm.disableGlobalRotateMode();
+  ['btnEdit','btnMove','btnRotate'].forEach(id=>document.getElementById(id).classList.remove('on'));
+}
+function startDraw(shape, convert, btnId){
+  pendingConvert = convert;
+  stopModes();
+  if(shape === 'Polygon') map.pm.enableDraw('Polygon', { finishOn:'dblclick' });
+  else map.pm.enableDraw(shape);
+  armBtn(btnId);
+}
+document.getElementById('btnTrace').onclick  = ()=> startDraw('Polygon',  null,   'btnTrace');
+document.getElementById('btnRect').onclick   = ()=> startDraw('Rectangle',null,   'btnRect');
+document.getElementById('btnCircle').onclick = ()=> startDraw('Circle',   'circle','btnCircle');
+document.getElementById('btnOval').onclick   = ()=> startDraw('Rectangle','oval',  'btnOval');
+function toggleMode(kind){
+  const isOn = { edit:map.pm.globalEditModeEnabled(), move:map.pm.globalDragModeEnabled(),
+                 rotate:(map.pm.globalRotateModeEnabled && map.pm.globalRotateModeEnabled()) }[kind];
+  disarm(); stopModes();
+  if(!isOn){
+    if(kind==='edit'){   map.pm.enableGlobalEditMode();   document.getElementById('btnEdit').classList.add('on'); }
+    if(kind==='move'){   map.pm.enableGlobalDragMode();   document.getElementById('btnMove').classList.add('on'); }
+    if(kind==='rotate'){ map.pm.enableGlobalRotateMode(); document.getElementById('btnRotate').classList.add('on'); }
+  }
+}
+document.getElementById('btnEdit').onclick   = ()=> toggleMode('edit');
+document.getElementById('btnMove').onclick   = ()=> toggleMode('move');
+document.getElementById('btnRotate').onclick = ()=> toggleMode('rotate');
+
+// Convert circle / rectangle into a polygon so every plot saves identically
+function circleToPolygon(circle, N){
+  N = N || 48;
+  const c = circle.getLatLng(), r = circle.getRadius();
+  const dLat = r/111320, dLng = r/(111320*Math.cos(c.lat*Math.PI/180));
+  const pts = [];
+  for(let i=0;i<N;i++){ const t=2*Math.PI*i/N; pts.push([c.lat+dLat*Math.cos(t), c.lng+dLng*Math.sin(t)]); }
+  map.removeLayer(circle);
+  return L.polygon(pts);
+}
+function rectToEllipse(rect, N){
+  N = N || 48;
+  const b = rect.getBounds();
+  const cy=(b.getNorth()+b.getSouth())/2, cx=(b.getEast()+b.getWest())/2;
+  const ry=(b.getNorth()-b.getSouth())/2, rx=(b.getEast()-b.getWest())/2;
+  const pts = [];
+  for(let i=0;i<N;i++){ const t=2*Math.PI*i/N; pts.push([cy+ry*Math.cos(t), cx+rx*Math.sin(t)]); }
+  map.removeLayer(rect);
+  return L.polygon(pts);
+}
+
+function addPlotLayer(layer, props){
+  plotsGroup.addLayer(layer);
+  layer.feature = { type:'Feature', properties: props || {}, geometry:null };
+  wirePlot(layer);
+  lastSelected = layer;
+  persist(); renderList();
+  layer.openPopup();
+}
+
+map.on('pm:create', e=>{
+  let layer = e.layer;
+  if(pendingConvert === 'circle') layer = circleToPolygon(layer);
+  else if(pendingConvert === 'oval') layer = rectToEllipse(layer);
+  pendingConvert = null;
+  map.pm.disableDraw(); disarm();
+  addPlotLayer(layer);
+});
+
+// ---- Copy / paste / duplicate -------------------------------------------
+function duplicateLayer(src){
+  if(!src || !plotsGroup.hasLayer(src)){ alert('Click a plot to select it first, then Duplicate.'); return null; }
+  const gj = src.toGeoJSON();
+  if(!gj.geometry || gj.geometry.type !== 'Polygon') return null;
+  const b = src.getBounds();
+  const dx = (b.getEast()-b.getWest())*1.1 || 0.0003;               // offset east so the copy is visible
+  const rings = gj.geometry.coordinates.map(ring => ring.map(pt => [pt[1], pt[0]+dx])); // [lng,lat]->[lat,lng] +east
+  const nl = L.polygon(rings);
+  const props = Object.assign({}, src.feature.properties, { number:'' }); // clear number so copies get renumbered
+  addPlotLayer(nl, props);
+  return nl;
+}
+document.getElementById('btnDup').onclick = ()=> duplicateLayer(lastSelected);
+
+document.addEventListener('keydown', e=>{
+  const k = e.key.toLowerCase();
+  if((e.ctrlKey||e.metaKey) && k==='c'){ if(lastSelected){ copyBuf = lastSelected; } }
+  else if((e.ctrlKey||e.metaKey) && k==='v'){ if(copyBuf){ e.preventDefault(); const nl = duplicateLayer(copyBuf); if(nl) copyBuf = nl; } }
+});
+
+// ---- Base switcher ------------------------------------------------------
+document.querySelectorAll('.chip[data-base]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.chip[data-base]').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+    map.removeLayer(currentBase);
+    currentBase = bases[btn.dataset.base].addTo(map);
+    currentBase.bringToBack();
+  });
+});
+
+load();
+</script>
+</body>
+</html>

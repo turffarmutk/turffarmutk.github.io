@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UT Turf Farm App — Planning Doc</title>
+<style>
+  :root{
+    --ut-orange:#ff8200;
+    --ut-smokey:#58595b;
+    --ink:#1f2328;
+    --muted:#5b6470;
+    --line:#e6e8eb;
+    --bg:#ffffff;
+    --panel:#faf9f7;
+    --panel-2:#fff6ec;
+    --accent-soft:#fff1e0;
+    --good:#2f7d3a;
+    --warn:#b26a00;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);
+    background:var(--bg);
+    line-height:1.6;
+    font-size:16px;
+  }
+  .wrap{max-width:900px;margin:0 auto;padding:0 20px 80px;}
+  header.hero{
+    background:linear-gradient(135deg,var(--ut-smokey) 0%,#3f4042 100%);
+    color:#fff;
+    padding:44px 20px 36px;
+    margin-bottom:8px;
+    border-bottom:6px solid var(--ut-orange);
+  }
+  header.hero .inner{max-width:900px;margin:0 auto;}
+  header.hero h1{margin:0 0 8px;font-size:2rem;letter-spacing:-.5px;}
+  header.hero p{margin:0;color:#d7d8da;font-size:1rem;}
+  .badge{display:inline-block;background:var(--ut-orange);color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:14px;}
+  nav.toc{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:18px 22px;
+    margin:26px 0;
+  }
+  nav.toc h2{margin:0 0 10px;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+  nav.toc ol{margin:0;padding-left:20px;columns:2;column-gap:32px;}
+  nav.toc a{color:var(--ink);text-decoration:none;}
+  nav.toc a:hover{color:var(--ut-orange);text-decoration:underline;}
+  h2.section{
+    font-size:1.4rem;
+    margin:44px 0 14px;
+    padding-bottom:8px;
+    border-bottom:2px solid var(--ut-orange);
+    scroll-margin-top:20px;
+  }
+  h3{font-size:1.1rem;margin:26px 0 8px;color:var(--ut-smokey);}
+  p{margin:12px 0;}
+  .lead{font-size:1.05rem;}
+  strong{color:var(--ink);}
+  em{color:var(--muted);}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:.95rem;}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:var(--panel-2);color:var(--ut-smokey);font-size:.8rem;text-transform:uppercase;letter-spacing:.5px;}
+  tr:last-child td{border-bottom:none;}
+  .module{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-left:4px solid var(--ut-orange);
+    border-radius:0 10px 10px 0;
+    padding:16px 20px;
+    margin:16px 0;
+  }
+  .module h3{margin-top:4px;}
+  .mvp{border-left-color:var(--good);}
+  .tag{display:inline-block;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:2px 8px;border-radius:4px;margin-left:8px;vertical-align:middle;}
+  .tag.mvp-tag{background:var(--good);color:#fff;}
+  .tag.new-tag{background:var(--ut-orange);color:#fff;}
+  .callout{
+    background:var(--accent-soft);
+    border:1px solid #ffd9ac;
+    border-radius:10px;
+    padding:14px 18px;
+    margin:18px 0;
+  }
+  .callout.q{background:#eef4ff;border-color:#cfe0ff;}
+  .callout strong.label{color:var(--warn);}
+  ul,ol{margin:12px 0;padding-left:24px;}
+  li{margin:6px 0;}
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;}
+  .card h4{margin:0 0 8px;color:var(--ut-smokey);font-size:1rem;}
+  .verdict{font-weight:700;color:var(--good);}
+  .phase{display:flex;gap:14px;margin:14px 0;align-items:flex-start;}
+  .phase .num{flex:0 0 auto;width:40px;height:40px;border-radius:50%;background:var(--ut-orange);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;}
+  .phase .body{flex:1;}
+  .phase .body h4{margin:6px 0 4px;}
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem;}
+  @media (max-width:640px){
+    nav.toc ol{columns:1;}
+    .twocol{grid-template-columns:1fr;}
+    header.hero h1{font-size:1.5rem;}
+  }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="inner">
+    <span class="badge">Planning Draft · v0.2</span>
+    <h1>UT Turf Farm App</h1>
+    <p>A real-time hub for everything happening on the UT Turfgrass research farm. Nothing is built yet — this is for the team to mark up. Drafted July 11, 2026.</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <nav class="toc">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#goal">The one-line goal</a></li>
+      <li><a href="#roles">Who uses it (roles)</a></li>
+      <li><a href="#modules">Core modules</a></li>
+      <li><a href="#realtime">What "real time" means</a></li>
+      <li><a href="#pwa">Why a PWA, not native</a></li>
+      <li><a href="#security">Data security &amp; access</a></li>
+      <li><a href="#storage">Storage &amp; scale</a></li>
+      <li><a href="#phases">Build phases</a></li>
+      <li><a href="#decisions">Decisions still needed</a></li>
+      <li><a href="#parking">Parking lot</a></li>
+    </ol>
+  </nav>
+
+  <h2 class="section" id="goal">1. The one-line goal</h2>
+  <p class="lead">A mobile-first, real-time hub for everything happening on the UT Turfgrass research farm — so <strong>Bill (farm manager) always knows what work is happening, what's planned, what's in stock, and which plots are off-limits</strong>, and so the whole team logs and sees activity in one place instead of paper, spreadsheets, and group texts.</p>
+  <p>Bill is the primary user. If a feature doesn't make Bill's day easier or protect the research, it waits.</p>
+
+  <h2 class="section" id="roles">2. Who uses it (roles)</h2>
+  <table>
+    <thead><tr><th>Role</th><th>People</th><th>What they mainly do</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Farm Manager</strong></td><td>Bill Czekai</td><td>Sees everything, assigns tasks, manages inventory, approves/monitors, gets alerted to planned studies</td></tr>
+      <tr><td><strong>Faculty (PI)</strong></td><td>Drs. Brosnan, Horvath, Bowling, Stier, Sorochan</td><td>Oversee their group's trials, set plot restrictions, submit study plans</td></tr>
+      <tr><td><strong>Grad students</strong></td><td>Logan Smith, Siena Jobkar, Zoe Haub Hinton, Rose Gibbons</td><td>Manage their own trials, log data, flag plot restrictions, request work</td></tr>
+      <tr><td><strong>Research technicians</strong></td><td>Javi Vargas, Greg Breedan, David Shell, Dillon McCallum, Rhys Fielder, Taylor Williams, Kyley Dickson</td><td>Log field ops, update equipment/inventory, complete tasks</td></tr>
+      <tr><td><strong>Undergrad hourly</strong></td><td>4–8 seasonal</td><td>See assigned tasks, log completed work, check the schedule</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Permission model (starting proposal):</strong> everyone can <em>see</em> almost everything (transparency is the point). Editing is scoped — you can edit your own group's trials and any task assigned to you; only Bill + faculty can override plot restrictions or delete records. Undergrads are log-and-complete only.</p>
+  <div class="callout q"><strong>Open Q:</strong> Should faculty see other labs' full trial details, or just summary/restrictions? Turf research groups sometimes guard in-progress work.</div>
+
+  <h2 class="section" id="modules">3. Core modules</h2>
+  <p>Ordered roughly by priority. MVP = Module 1 + the read side of 2, 3, and 5.</p>
+
+  <div class="module mvp">
+    <h3>Module 1 — Daily Task Board <span class="tag mvp-tag">MVP core</span></h3>
+    <p>The heart of the app.</p>
+    <ul>
+      <li><strong>Task board:</strong> Bill (or a PI) creates tasks from the farm task catalog — "Rotary Mow → Alleys," "Spray Pesticide (Backpack) → Fungicide," "Fix reel on Toro 3." Assign to a person or post to the pool, set priority, attach plots/map. Assignee checks it off; map-backed jobs tap plots off live. See the Task Board spec.</li>
+    </ul>
+  </div>
+
+  <div class="module">
+    <h3>Module 2 — Field Operations Log</h3>
+    <p>Structured logging for recurring farm work, tied to a field/plot: mowing (height, direction), fertilization, <strong>pesticide/herbicide application</strong> (product, EPA reg #, rate, area, applicator, REI/PHI, weather), irrigation, cultivation, seeding/overseeding, topdressing. Getting chemical apps clean means audit-ready spray records fall out for free.</p>
+  </div>
+
+  <div class="module">
+    <h3>Module 3 — Research Trials + Plot Map</h3>
+    <ul>
+      <li><strong>Visual plot map</strong> of the farm — a grid/blocks you can tap to see what trial lives there.</li>
+      <li><strong>Trial records:</strong> PI, group, treatments, reps, start/end dates, objective.</li>
+      <li><strong>Plot restrictions</strong> (huge for Bill): flag a plot/trial "do not mow / spray / irrigate," with dates and a reason. Surfaces loudly to crew before they touch that area.</li>
+    </ul>
+  </div>
+
+  <div class="module">
+    <h3>Module 4 — Real-Time Inventory <span class="tag new-tag">You flagged this</span></h3>
+    <p>Live stock list so Bill isn't caught short. Categories to confirm: <strong>chemicals</strong> (link to spray log so applying a product auto-decrements stock), <strong>fertilizer, seed, fuel, sand/topdressing, parts/consumables,</strong> maybe <strong>PPE</strong>. Each item: quantity on hand, unit, location, reorder threshold → low-stock alert.</p>
+  </div>
+
+  <div class="module">
+    <h3>Module 5 — Study Planning / Upcoming Studies <span class="tag new-tag">You flagged this</span></h3>
+    <p>Faculty and grad students submit a <strong>planned study</strong> before it starts: proposed plots, timing, and what they'll need from the farm (mowing regime, irrigation, spray windows, equipment, materials). Bill gets <strong>alerted in advance</strong> and sees a forward calendar, can flag conflicts (two groups wanting the same plots), and prep. Turns surprises into a pipeline.</p>
+  </div>
+
+  <div class="module">
+    <h3>Module 6 — Equipment &amp; Maintenance</h3>
+    <p>Roster of mowers, sprayers, tractors, utility vehicles. Status (available / in use / down), who has it, maintenance log, and "report a problem" → auto-creates a task. Can start as a simple status board and grow.</p>
+  </div>
+
+  <div class="module">
+    <h3>Module 7 — Weather &amp; Conditions</h3>
+    <p>On-farm weather station feed if one exists, otherwise a weather API for the farm's location. Rainfall, growing degree days, and spray-window indicators (wind/temp). Feeds decisions in Modules 2 and 5.</p>
+  </div>
+
+  <div class="module">
+    <h3>Module 8 — Notifications <span class="tag new-tag">cross-cutting</span></h3>
+    <p>Push + in-app alerts: task assigned to you, activity on your trial's plots, a new/edited plot restriction, planned-study submitted, low inventory, equipment down, weather/frost. Everyone sets what they want to be pinged about. <em>Note: on iPhones, users must add the app to their home screen before web push works — we'll build a friendly "install me" prompt into onboarding.</em></p>
+  </div>
+
+  <h2 class="section" id="realtime">4. What "real time" means here</h2>
+  <ul>
+    <li>Live updates: when someone logs an event, it appears on everyone's board without refreshing.</li>
+    <li>Push notifications to phones for the alert types above.</li>
+    <li>Connectivity is decent at the farm, so we assume mostly-online for v1 (no heavy offline-sync engineering). Forms stay forgiving of a brief drop.</li>
+  </ul>
+
+  <h2 class="section" id="pwa">5. Why a PWA, not a native app</h2>
+  <p>Recommendation: <span class="verdict">build this as a Progressive Web App (PWA)</span> — an installable web app that lives at a URL and can be added to a phone's home screen. It satisfies every module above, including push notifications, without the cost of native.</p>
+
+  <div class="twocol">
+    <div class="card">
+      <h4>What a PWA gives us</h4>
+      <ul>
+        <li>Mobile-first, installs to the home screen, feels like an app</li>
+        <li>Real-time live updates</li>
+        <li>Camera / photo uploads</li>
+        <li><strong>Push notifications</strong> — including on iPhone (iOS 16.4+), once added to the home screen</li>
+        <li>One codebase, instant updates for everyone, no app-store review</li>
+        <li>No Apple/Google developer accounts or install friction for ~25 users</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Where native would be stronger — and whether it matters</h4>
+      <ul>
+        <li><strong>Offline-first:</strong> possible in a PWA but real work; signal is decent at the farm, so not needed for v1.</li>
+        <li><strong>Deep hardware</strong> (NFC tap, Bluetooth sensors, background GPS): not on the roadmap. QR-code scanning via the camera works fine in a PWA.</li>
+        <li><strong>App Store listing:</strong> unnecessary for an internal team tool — a URL is simpler.</li>
+      </ul>
+    </div>
+  </div>
+  <h3>Cost comparison</h3>
+  <table>
+    <thead><tr><th>Item</th><th>PWA</th><th>Native (iOS + Android)</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Codebase / build effort</strong></td><td>One codebase for all phones and desktop</td><td>Two native apps, or a React Native/Flutter rewrite — more build time</td></tr>
+      <tr><td><strong>App store fees</strong></td><td>None</td><td>Apple $99/yr + Google $25 one-time</td></tr>
+      <tr><td><strong>Hosting &amp; backend</strong></td><td colspan="2" style="text-align:center;">Same either way — a managed backend (Supabase/Firebase) free tier likely covers ~25 users, or roughly $0–25/mo as it grows; object storage for photos is pennies/GB</td></tr>
+      <tr><td><strong>Domain name</strong></td><td>~$12/yr (optional — could live on a UT subdomain for free)</td><td>~$12/yr</td></tr>
+      <tr><td><strong>Updates / maintenance</strong></td><td>Push a change, everyone has it instantly — no review</td><td>App-store review cycles; users must update the installed app</td></tr>
+    </tbody>
+  </table>
+  <p><em>The dominant cost in both cases is developer time, and native roughly multiplies it. Recurring cash cost for a PWA at this scale is close to zero — realistically just a domain, since the free tiers comfortably fit 25 users.</em></p>
+  <p><strong>Bottom line:</strong> going native would mostly buy an App Store listing, offline-first, and deep hardware access — none of which the current plan needs — at the cost of two codebases, store fees, and slower updates. A well-built PWA can be wrapped or migrated to native later if a real need appears; the backend and most of the UI carry over.</p>
+
+  <h2 class="section" id="security">6. Data security &amp; access</h2>
+  <p>Key reframe: a PWA is exactly as protectable as a native app, because nearly all real security lives in the <strong>backend, database, and login</strong> — not the app on the phone. Protection stacks from the outside in:</p>
+  <table>
+    <thead><tr><th>Layer</th><th>How we protect it</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Transport</strong></td><td>Everything runs over HTTPS (required for a PWA). Data in motion is encrypted — nobody on farm wifi can sniff a record.</td></tr>
+      <tr><td><strong>Login / identity</strong></td><td>v1: <strong>magic-link email sign-in</strong> (a one-time link to a UT inbox) with an <strong>invite-only roster</strong> — no passwords stored by us. Delivered via managed auth (Clerk, Supabase, Firebase, Auth0). Institutional single sign-on can be added later. We never roll our own password storage.</td></tr>
+      <tr><td><strong>Authorization</strong></td><td>Roles are enforced on the <em>server</em>, never trusting the app. Every request independently checks "is this person allowed to do this?" — this is what actually keeps someone from reaching another lab's private records.</td></tr>
+      <tr><td><strong>Data at rest</strong></td><td>Lives in a managed, encrypted database — not on anyone's phone. The app caches only recent screens, and sensitive fields are kept out of that cache.</td></tr>
+      <tr><td><strong>The device</strong></td><td>The realistic threat is a lost/borrowed phone, not a hacker. Mitigations: expiring sessions with re-login, a visible log-out, and a "sign out everywhere" for Bill. No unencrypted app bundle sits on the device.</td></tr>
+      <tr><td><strong>Audit trail</strong></td><td>Every action is already logged, so security auditing comes free — every edit is stamped with who and when, and is traceable/reversible.</td></tr>
+    </tbody>
+  </table>
+  <div class="callout"><strong class="label">Decisions this raises:</strong>
+    <ul style="margin-bottom:0;">
+      <li><strong>Auth (decided):</strong> magic-link email sign-in + invite-only roster for v1; institutional SSO can be added later as an extra sign-in method.</li>
+      <li><strong>Is anything sensitive?</strong> If a trial's details carry confidentiality terms, tighten per-lab visibility. Otherwise a standard managed cloud stack is plenty.</li>
+    </ul>
+  </div>
+
+  <h2 class="section" id="storage">7. Storage &amp; scale</h2>
+  <p>Two different "storages" hide in this question, and separating them is the whole answer.</p>
+  <div class="twocol">
+    <div class="card">
+      <h4>On-device (browser) storage</h4>
+      <p>Modest and browser-controlled. iOS/Safari is the tightest (~1&nbsp;GB per app, and it can evict cached data — though a home-screen-installed PWA is protected from automatic eviction). <strong>We never rely on it.</strong> It's just a cache for recent screens and maybe a queued entry during a brief signal drop. If wiped, nothing is lost.</p>
+    </div>
+    <div class="card">
+      <h4>Backend database (system of record)</h4>
+      <p>The real data lives on a server, not on any device — and this is what determines whether user count or volume is ever a problem. For this farm, it never is.</p>
+    </div>
+  </div>
+  <p><strong>Will we hit limits from users or data entered? No — by a wide margin.</strong> ~25 people, only a handful entering at once. Each record (a spray log, task, inventory change, turf rating) is well under a kilobyte. Even years of aggressive daily logging is tens of thousands of rows a year — a managed Postgres database handles <em>millions</em> without noticing, and these stacks serve thousands of simultaneous users. 25 is trivial.</p>
+  <p><strong>The one thing that consumes real storage is photos</strong> — so they don't go in the database. Images go to object storage (S3, Cloudflare R2, Supabase Storage, Firebase Storage), which is effectively unlimited at pennies per gigabyte; the database just stores a link. Do that, and years of equipment and turf photos are a non-issue.</p>
+  <p><strong>The only decision this surfaces is where the backend lives:</strong> a managed backend-as-a-service (Supabase or Firebase — database + auth + file storage + real-time in one bundle, fastest path, cheap tiers that fit easily), or self-hosting if the team prefers. Both handle the volume with room to spare; the choice is about maintenance, not capacity.</p>
+
+  <h2 class="section" id="phases">8. Build phases</h2>
+  <p>Foundation-first order, so each piece has what it needs. (Auth + roles come with Phase 1, since login gates everything.)</p>
+  <div class="phase"><div class="num">1</div><div class="body"><h4>Interactive map</h4><p>Upload the aerial, trace the plots + numbering, set each plot's mower and cut height, add the indoor map. Plus auth + roles. The foundation every other feature points to.</p></div></div>
+  <div class="phase"><div class="num">2</div><div class="body"><h4>Current trials + restrictions</h4><p>Load the active studies and their plot restrictions onto the map, so it protects the research from day one.</p></div></div>
+  <div class="phase"><div class="num">3</div><div class="body"><h4>Task board</h4><p>Catalog-based task assignment, the crew's check-off, and map-backed mowing jobs. The daily engine.</p></div></div>
+  <div class="phase"><div class="num">4</div><div class="body"><h4>Inventory + crew scheduling</h4><p>Real-time inventory with low-stock alerts and QR logging, plus the availability board and time clock.</p></div></div>
+  <div class="phase"><div class="num">5</div><div class="body"><h4>Round it out</h4><p>Equipment/maintenance, weather feed, and the fuller field-operations record.</p></div></div>
+
+  <h2 class="section" id="decisions">9. Decisions still needed</h2>
+  <ol>
+    <li><strong>Build order (decided):</strong> map → current trials/restrictions → task board → inventory + scheduling → equipment, weather, fuller ops record.</li>
+    <li><strong>Inventory categories:</strong> which of {chemicals, fertilizer, seed, fuel, sand/topdressing, parts, PPE} are in v1?</li>
+    <li><strong>Study-planning fields:</strong> what does a PI/student submit for Bill to act on it?</li>
+    <li><strong>Plot map source:</strong> is there an existing map/CAD/aerial and a plot numbering scheme to build from?</li>
+    <li><strong>Existing data to import:</strong> spray records, inventory counts, trial lists in spreadsheets?</li>
+    <li><strong>Photos on logs:</strong> yes/no for v1?</li>
+    <li><strong>Accounts/login (decided):</strong> magic-link email sign-in + invite-only roster for v1.</li>
+    <li><strong>Hosting &amp; maintenance:</strong> managed cloud vs. self-host; who maintains it after build?</li>
+    <li><strong>Faculty data visibility:</strong> full cross-group, or summary-only for other groups?</li>
+  </ol>
+
+  <h2 class="section" id="parking">10. Parking lot</h2>
+  <ul>
+    <li>QR codes on equipment and chemical shelves for scan-to-log / scan-to-decrement.</li>
+    <li>Crew schedule (shared undergrad schedules): usual work days + time-off calendar + same-day call-outs, feeding Bill's daily task assignment. <em>(Now specced — see Access &amp; Roles.)</em></li>
+    <li>Growing-degree-day driven reminders (e.g., PGR reapplication windows).</li>
+    <li>Field-day / visitor mode (read-only public view).</li>
+    <li>Reports &amp; exports (chemical application record, hours, task-completion summaries) — <em>deferred; the underlying data is captured in the logs, a formal report/export comes later.</em></li>
+  </ul>
+
+  <footer>
+    UT Turfgrass Research Team · Farm App planning draft v0.2 · July 11, 2026 · Nothing built yet — for team review.
+  </footer>
+
+</div>
+</body>
+</html>

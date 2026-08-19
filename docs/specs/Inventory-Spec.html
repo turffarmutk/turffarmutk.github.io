@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UT Turf Farm App — Inventory Spec (v1)</title>
+<style>
+  :root{
+    --ut-orange:#ff8200;--ut-smokey:#58595b;--ink:#1f2328;--muted:#5b6470;
+    --line:#e6e8eb;--bg:#ffffff;--panel:#faf9f7;--panel-2:#fff6ec;--accent-soft:#fff1e0;
+    --good:#2f7d3a;--warn:#b26a00;--blue:#2456b8;--low:#c0392b;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6;font-size:16px;}
+  .wrap{max-width:900px;margin:0 auto;padding:0 20px 80px;}
+  header.hero{background:linear-gradient(135deg,var(--ut-smokey) 0%,#3f4042 100%);color:#fff;padding:44px 20px 36px;border-bottom:6px solid var(--ut-orange);}
+  header.hero .inner{max-width:900px;margin:0 auto;}
+  header.hero h1{margin:0 0 8px;font-size:1.9rem;letter-spacing:-.5px;}
+  header.hero p{margin:0;color:#d7d8da;}
+  .badge{display:inline-block;background:var(--ut-orange);color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:14px;}
+  nav.toc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:26px 0;}
+  nav.toc h2{margin:0 0 10px;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+  nav.toc ol{margin:0;padding-left:20px;columns:2;column-gap:32px;}
+  nav.toc a{color:var(--ink);text-decoration:none;}
+  nav.toc a:hover{color:var(--ut-orange);text-decoration:underline;}
+  h2.section{font-size:1.35rem;margin:44px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--ut-orange);scroll-margin-top:20px;}
+  h3{font-size:1.05rem;margin:24px 0 8px;color:var(--ut-smokey);}
+  p{margin:12px 0;}
+  strong{color:var(--ink);}
+  em{color:var(--muted);}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:.93rem;}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:var(--panel-2);color:var(--ut-smokey);font-size:.76rem;text-transform:uppercase;letter-spacing:.4px;}
+  tr:last-child td{border-bottom:none;}
+  code{background:#f1f2f4;padding:1px 6px;border-radius:5px;font-size:.88em;}
+  .callout{background:var(--accent-soft);border:1px solid #ffd9ac;border-radius:10px;padding:14px 18px;margin:18px 0;}
+  .callout.q{background:#eef4ff;border-color:#cfe0ff;}
+  .callout.key{background:#eafaef;border-color:#bfe6c9;}
+  .callout.out{background:#f6f6f7;border-color:#e2e2e5;}
+  ul,ol{margin:12px 0;padding-left:24px;}
+  li{margin:6px 0;}
+  .rule{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--ut-orange);border-radius:0 10px 10px 0;padding:12px 18px;margin:12px 0;}
+  .rule h4{margin:0 0 6px;color:var(--ut-smokey);font-size:1rem;}
+  .low-chip{display:inline-block;background:var(--low);color:#fff;font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:20px;}
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem;}
+  @media (max-width:640px){nav.toc ol{columns:1;}header.hero h1{font-size:1.4rem;}}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="inner">
+    <span class="badge">Build Spec · Inventory · v1</span>
+    <h1>Inventory Module</h1>
+    <p>A live stock list so Bill isn't caught short — scan-to-log usage and restocks, quantities in containers or measured amount, low-stock alerts. Companion to the main plan, Task Board, and Access &amp; Roles specs.</p>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="toc">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#goal">What this module does</a></li>
+      <li><a href="#roles">Who can do what</a></li>
+      <li><a href="#categories">Categories &amp; item details</a></li>
+      <li><a href="#counting">Counting stock (both units)</a></li>
+      <li><a href="#logging">Logging usage &amp; restocks</a></li>
+      <li><a href="#lowstock">Low-stock alerts</a></li>
+      <li><a href="#screens">Screens</a></li>
+      <li><a href="#data">Data model</a></li>
+      <li><a href="#scope">Out of scope for v1</a></li>
+      <li><a href="#open">Open questions</a></li>
+    </ol>
+  </nav>
+
+  <h2 class="section" id="goal">1. What this module does</h2>
+  <p>A <strong>real-time stock list</strong> for the farm's inputs, so Bill always knows what's on hand and gets warned before anything runs out. The crew logs what they use and what comes in — quickly, via a <strong>shared QR</strong> that opens the logging form — and each item can be viewed as whole <strong>containers</strong> or a <strong>measured amount</strong>. Bill is alerted when an item drops to its reorder point.</p>
+
+  <h2 class="section" id="roles">2. Who can do what</h2>
+  <table>
+    <thead><tr><th>Role</th><th>In the inventory module</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Bill (manager)</strong></td><td>Full control — add/edit/retire items, set reorder thresholds and container sizes, post/manage the shared logging QR, correct counts, log usage/restocks; receives low-stock alerts</td></tr>
+      <tr><td><strong>Technicians / grad students / faculty</strong></td><td>View stock; <strong>log usage and restocks</strong> (scan QR, enter amount)</td></tr>
+      <tr><td><strong>Undergrad hourly</strong></td><td>No access by default; can log usage/restocks <strong>only if Bill grants</strong> that person the ability</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="section" id="categories">3. Categories &amp; item details</h2>
+  <p>v1 categories: <strong>Fungicides, Herbicides, Insecticides, Fertilizer (granular), Fertilizer (liquid), Paint (cans), Paint (liquid), Seed, Wetting agents.</strong></p>
+  <p>Each item tracks:</p>
+  <table>
+    <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Product name</strong></td><td>Brand/product (e.g. "Daconil Weatherstik")</td></tr>
+      <tr><td><strong>Active ingredient</strong></td><td>e.g. "Chlorothalonil"</td></tr>
+      <tr><td><strong>Resistance-group code</strong></td><td>mode-of-action group for pesticides — <strong>FRAC</strong> (fungicides), <strong>HRAC/WSSA</strong> (herbicides), <strong>IRAC</strong> (insecticides). Shows only for those three categories; the field label adapts to the category</td></tr>
+      <tr><td><strong>Category</strong></td><td>from the list above</td></tr>
+      <tr><td><strong>Formulation type</strong></td><td>dropdown — Liquid, Emulsifiable concentrate (EC), Suspension / flowable (SC), Wettable powder (WP), Water-dispersible granule (WDG/DG), Soluble powder / granule (SP/SG), Dry granular (G), Dry flowable (DF), Other</td></tr>
+      <tr><td><strong>Storage location</strong></td><td>where it's kept (chem room, shed, shelf)</td></tr>
+      <tr><td>Container options</td><td>one or more <strong>type + size</strong> pairs — a product can come in mixed sizes (e.g. 2.5 gal jug <em>and</em> 30 gal drum). Type = jug / bottle / bag / box / case / tote / drum / can; size = amount + unit. These power the units toggle (§4)</td></tr>
+      <tr><td>Quantity on hand</td><td>current stock (see §4)</td></tr>
+      <tr><td>Reorder threshold</td><td>the low-stock trigger (see §6)</td></tr>
+    </tbody>
+  </table>
+  <p><em>EPA reg #, lot #, and expiration tracking are noted for later (§9) — not in v1.</em></p>
+
+  <h3>Smart product entry — autofill from the brand name</h3>
+  <p>To make setup as fast as possible, the module keeps a <strong>product reference list</strong> (brand name → active ingredient, category, formulation type, and resistance-group code). As someone types a <strong>brand name</strong>, it <strong>suggests matches and autofills</strong> those fields. Everything stays <strong>editable</strong> — if a match is wrong or the product isn't listed yet, they just type over it.</p>
+  <p>How the reference gets populated:</p>
+  <ul>
+    <li><strong>Seeded</strong> with the farm's commonly used products up front, so the big ones autofill from day one.</li>
+    <li><strong>Self-learning</strong> — the first time a new product is entered by hand, it's saved to the reference so it autofills next time, for everyone.</li>
+    <li><strong>Optional import</strong> — a public pesticide-product list could be loaded later to broaden coverage.</li>
+  </ul>
+  <div class="callout"><strong>Build note:</strong> before launch we'll need to build a <strong>reference Excel sheet</strong> of the farm's products — brand name → active ingredient, category, formulation, and resistance-group code — to seed the <code>product_reference</code> table. This is the one real prep task behind autofill; the self-learning fills gaps from there.</div>
+
+  <h2 class="section" id="counting">4. Counting stock — containers or measured amount</h2>
+  <p>Stock can be viewed two ways, with a <strong>toggle</strong> to switch between them:</p>
+  <ul>
+    <li><strong>Containers</strong> — whole units on the shelf (e.g. 3 jugs, 5 bags, 8 cans). Fast to eyeball.</li>
+    <li><strong>Measured amount</strong> — volume/weight (e.g. 7.5 gal, 250 lb, 6 lb of seed). Precise for partial containers and applications.</li>
+  </ul>
+  <p>The item's <strong>container size</strong> converts between the two (1 jug = 2.5 gal → 3 jugs = 7.5 gal). Under the hood a single quantity is stored; the toggle just changes how it's shown, so the two never disagree. Containers can be <strong>fractional</strong> (a half-used jug = 0.5), since the measured amount is the source of truth. For products with <strong>multiple container sizes</strong>, the measured amount still rules and the containers view shows the breakdown by size (e.g. 2 × 2.5 gal jugs + 1 × 30 gal drum).</p>
+
+  <h2 class="section" id="logging">5. Logging usage &amp; restocks</h2>
+  <p>Because the farm carries too many items to label each one, there is <strong>no per-item QR</strong>. Instead a <strong>single shared QR</strong> — posted where it's handy (chem room wall, on the sprayer, at the mix station) — opens the logging screen. From there the user picks what they're doing and which product. The same screen is reachable in-app without scanning.</p>
+
+  <div class="rule"><h4>Step 1 — Open the logging screen (two ways in)</h4>
+    <p>So a lost, damaged, or unreachable QR never blocks logging, there are <strong>two entry points</strong>:</p>
+    <ul>
+      <li><strong>Scan the posted QR</strong> — fastest at the mix station.</li>
+      <li><strong>In the app</strong> — open the <strong>Inventory tile</strong> and tap <strong>Log</strong>. Always available to anyone signed in with inventory access.</li>
+    </ul>
+    <p>Either way you land on two big, glove-friendly buttons: <strong>Log a spray / usage</strong> or <strong>Restock</strong>.</p>
+  </div>
+
+  <div class="rule"><h4>Step 2a — Log a spray / usage</h4>
+    <p>A short form:</p>
+    <ul>
+      <li><strong>Product</strong> — a fast <strong>search / type-ahead picker</strong> over the inventory, with <strong>recent products</strong> and a <strong>category filter</strong> pinned up top since the list is long. This is what replaces scanning a specific item.</li>
+      <li><strong>Amount used (required)</strong> — number + unit, with the containers/measured toggle; decimals allowed. Mandatory, so stock always decrements by a real figure.</li>
+      <li><strong>Where</strong> — opens the <strong>interactive map</strong>; the person <strong>taps the plots they sprayed</strong> (a "plot" = a turf area of one grass type; trials and restrictions live inside plots). This records the exact plots and <strong>auto-sums the total area treated</strong> from the map's plot sizes. When logging from a task, the plots pre-fill from that task.</li>
+      <li><strong>Who / when</strong> — auto-filled from login and the current time (both editable).</li>
+    </ul>
+    <p>Save → stock is <strong>decremented</strong> by the amount, and the entry (product, amount, plots, area, who, when) also feeds the chemical-application record.</p>
+  </div>
+  <div class="callout"><strong>Depends on the interactive map:</strong> the "where" picker and the treated-area total both read from the interactive maps module — plots and their sizes come from there. Until that module is built, "where" falls back to picking plot numbers from a list, without the automatic area total.</div>
+
+  <div class="rule"><h4>Step 2b — Restock</h4>
+    <p>An even shorter form:</p>
+    <ul>
+      <li><strong>Product</strong> — same search picker; if it's brand-new, <strong>+ Add product</strong> opens item setup with brand-name autofill (§3).</li>
+      <li><strong>Container size + quantity received</strong> — pick which size came in (for mixed-size products), then the number of containers (usually whole); auto-converted to a measured amount.</li>
+      <li><strong>Who / when</strong> — auto-filled, editable.</li>
+    </ul>
+    <p>Save → stock is <strong>incremented</strong>. Every movement — usage or restock — is stamped with who, what, how much, and when.</p>
+  </div>
+
+  <h2 class="section" id="lowstock">6. Low-stock alerts</h2>
+  <p>Each item has a <strong>reorder threshold</strong>. When on-hand stock drops to or below it, the item shows a <span class="low-chip">LOW</span> flag on the inventory list — <strong>visible to everyone who can see inventory</strong> (techs, grads, faculty, Bill, and any granted undergrad), so anyone who spots it can give Bill a heads-up.</p>
+  <p><strong>No push.</strong> Instead, the next time <strong>Bill opens the app</strong> he sees an <strong>in-app alert</strong> — a banner / badge summarizing what's low — so it catches him without pinging his phone. He can dismiss it or jump straight to the low-stock list. The alert is <strong>Bill's</strong>, since he owns reordering.</p>
+
+  <h2 class="section" id="screens">7. Screens (v1)</h2>
+  <ol>
+    <li><strong>Inventory list</strong> — items by category, searchable, low items flagged, with the containers/amount toggle, and a <strong>Log button</strong> (usage/restock) so logging works entirely in-app without the QR. Default screen.</li>
+    <li><strong>Item detail</strong> — stock, location, active ingredient, movement history, and Log usage / Restock buttons.</li>
+    <li><strong>Log usage / restock</strong> — the scan-or-pick → amount flow (§5).</li>
+    <li><strong>Add / edit item</strong> — Bill sets product, category, container type/size, threshold, location. <em>Bill only.</em></li>
+    <li><strong>Low-stock view</strong> — Bill's list of everything at/below reorder point. <em>Bill only.</em></li>
+  </ol>
+
+  <h2 class="section" id="data">8. Data model</h2>
+  <table>
+    <thead><tr><th>inventory_items</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>name</td><td>product/brand, text</td></tr>
+      <tr><td>active_ingredient</td><td>text, nullable</td></tr>
+      <tr><td>moa_code</td><td>resistance-group code — FRAC / HRAC / IRAC by category; nullable (fungicides/herbicides/insecticides only)</td></tr>
+      <tr><td>category</td><td>fungicide / herbicide / insecticide / fert_granular / fert_liquid / paint_can / paint_liquid / seed / wetting_agent</td></tr>
+      <tr><td>formulation</td><td>liquid / EC / SC / WP / WDG / SP / granular / DF / other (dropdown)</td></tr>
+      <tr><td>storage_location</td><td>text</td></tr>
+      <tr><td>container_options</td><td>list of {type, size} pairs — a product may have several (mixed sizes)</td></tr>
+      <tr><td>measure_unit</td><td><code>gal</code> | <code>oz</code> | <code>lb</code> | … (the base unit stock is stored in)</td></tr>
+      <tr><td>qty_on_hand</td><td>current stock in the base measure unit (containers derived via container_size)</td></tr>
+      <tr><td>reorder_threshold</td><td>low-stock trigger, in the base unit</td></tr>
+      <tr><td>active</td><td>on / retired</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>inventory_log <span style="font-weight:400;text-transform:none;letter-spacing:0;">(movements)</span></th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>item_id</td><td>which item</td></tr>
+      <tr><td>type</td><td><code>usage</code> | <code>restock</code> | <code>adjustment</code></td></tr>
+      <tr><td>amount</td><td>quantity moved (base unit; sign per type) — required on usage</td></tr>
+      <tr><td>container_option</td><td>which container size a restock came in (mixed-size products), nullable</td></tr>
+      <tr><td>linked_task_id</td><td>task/field-ops record this usage came from, nullable</td></tr>
+      <tr><td>plot_ids</td><td>plots sprayed, selected on the interactive map, nullable</td></tr>
+      <tr><td>area_treated</td><td>total area, auto-summed from the selected plots' sizes, nullable</td></tr>
+      <tr><td>user_id / at</td><td>who + timestamp</td></tr>
+      <tr><td>note</td><td>optional</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>product_reference <span style="font-weight:400;text-transform:none;letter-spacing:0;">(autofill lookup)</span></th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>brand_name</td><td>text — the typed match key</td></tr>
+      <tr><td>active_ingredient</td><td>text</td></tr>
+      <tr><td>moa_code</td><td>FRAC / HRAC / IRAC, nullable</td></tr>
+      <tr><td>category</td><td>same set as items, nullable</td></tr>
+      <tr><td>formulation</td><td>same set as items, nullable</td></tr>
+      <tr><td>source</td><td><code>seeded</code> | <code>learned</code> | <code>imported</code></td></tr>
+    </tbody>
+  </table>
+  <p>Typing a brand name matches against <code>product_reference</code> to autofill an item; a hand-entered product with no match is written back as a <code>learned</code> row. <em>EPA reg #, lot #, and expiration would attach to <code>inventory_items</code> (or a per-lot table) when added later.</em></p>
+
+  <h2 class="section" id="scope">9. Out of scope for v1 <span style="font-weight:400;color:var(--muted);font-size:.9rem;">(comes later)</span></h2>
+  <div class="callout out">
+    <ul style="margin:0;">
+      <li>EPA reg # / lot # / expiration tracking and expired-product flags</li>
+      <li>Cost/pricing, purchase orders, vendor info</li>
+      <li>A formal inventory-usage report / export</li>
+      <li>Multiple storage locations with transfers between them</li>
+      <li>Scanning manufacturer barcodes (v1 uses the single shared logging QR)</li>
+    </ul>
+  </div>
+
+  <h2 class="section" id="open">10. Decisions</h2>
+  <ul>
+    <li><strong>Shared QR placement:</strong> posted in the <strong>chem room, mix station, and Bill's office</strong> — all pointing to the same logging screen (plus the in-app Log button as backup).</li>
+    <li><strong>Amount used — required:</strong> entering the amount is <strong>mandatory</strong> on every usage/spray log, so stock always decrements by a real figure.</li>
+    <li><strong>Mixed container sizes:</strong> a product can have <strong>more than one container size</strong> (e.g. a 2.5 gal jug <em>and</em> a 30 gal drum). Stock is tracked as the measured amount (single source of truth); on restock you pick which size came in, and the containers view shows the breakdown by size.</li>
+  </ul>
+
+  <footer>UT Turfgrass Research Team · Inventory build spec v1 · July 11, 2026 · Companion to UT-TurfFarm-Plan.html, TaskBoard-Spec.html &amp; Access-and-Roles.html</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UT Turf Farm App — Crew Schedule &amp; Time Clock Spec (v1)</title>
+<style>
+  :root{
+    --ut-orange:#ff8200;--ut-smokey:#58595b;--ink:#1f2328;--muted:#5b6470;
+    --line:#e6e8eb;--bg:#ffffff;--panel:#faf9f7;--panel-2:#fff6ec;--accent-soft:#fff1e0;
+    --good:#2f7d3a;--warn:#b26a00;--blue:#2456b8;--flag:#c0392b;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6;font-size:16px;}
+  .wrap{max-width:900px;margin:0 auto;padding:0 20px 80px;}
+  header.hero{background:linear-gradient(135deg,var(--ut-smokey) 0%,#3f4042 100%);color:#fff;padding:44px 20px 36px;border-bottom:6px solid var(--ut-orange);}
+  header.hero .inner{max-width:900px;margin:0 auto;}
+  header.hero h1{margin:0 0 8px;font-size:1.9rem;letter-spacing:-.5px;}
+  header.hero p{margin:0;color:#d7d8da;}
+  .badge{display:inline-block;background:var(--ut-orange);color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:14px;}
+  nav.toc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:26px 0;}
+  nav.toc h2{margin:0 0 10px;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
+  nav.toc ol{margin:0;padding-left:20px;columns:2;column-gap:32px;}
+  nav.toc a{color:var(--ink);text-decoration:none;}
+  nav.toc a:hover{color:var(--ut-orange);text-decoration:underline;}
+  h2.section{font-size:1.35rem;margin:44px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--ut-orange);scroll-margin-top:20px;}
+  h3{font-size:1.05rem;margin:24px 0 8px;color:var(--ut-smokey);}
+  p{margin:12px 0;}
+  strong{color:var(--ink);}
+  em{color:var(--muted);}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:.93rem;}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:var(--panel-2);color:var(--ut-smokey);font-size:.76rem;text-transform:uppercase;letter-spacing:.4px;}
+  tr:last-child td{border-bottom:none;}
+  code{background:#f1f2f4;padding:1px 6px;border-radius:5px;font-size:.88em;}
+  .callout{background:var(--accent-soft);border:1px solid #ffd9ac;border-radius:10px;padding:14px 18px;margin:18px 0;}
+  .callout.q{background:#eef4ff;border-color:#cfe0ff;}
+  .callout.key{background:#eafaef;border-color:#bfe6c9;}
+  .callout.out{background:#f6f6f7;border-color:#e2e2e5;}
+  ul,ol{margin:12px 0;padding-left:24px;}
+  li{margin:6px 0;}
+  .rule{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--ut-orange);border-radius:0 10px 10px 0;padding:12px 18px;margin:12px 0;}
+  .rule h4{margin:0 0 6px;color:var(--ut-smokey);font-size:1rem;}
+  .flag-chip{display:inline-block;background:var(--flag);color:#fff;font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:20px;}
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.85rem;}
+  @media (max-width:640px){nav.toc ol{columns:1;}header.hero h1{font-size:1.4rem;}}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="inner">
+    <span class="badge">Build Spec · Crew Schedule &amp; Time Clock · v1</span>
+    <h1>Crew Schedule &amp; Time Clock</h1>
+    <p>The digital whiteboard: who's available which days and times, plus punch in/out for a payroll cross-check — so Bill assigns each day's work to whoever's actually coming in. Companion to the main plan, Task Board, Access &amp; Roles, and Inventory specs.</p>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="toc">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#goal">What this module does</a></li>
+      <li><a href="#roles">Who can do what</a></li>
+      <li><a href="#availability">Availability schedule</a></li>
+      <li><a href="#timeoff">Time off &amp; call-outs</a></li>
+      <li><a href="#noshow">No-show tracking</a></li>
+      <li><a href="#clock">Time clock</a></li>
+      <li><a href="#planvsactual">Planned vs. actual</a></li>
+      <li><a href="#screens">Screens</a></li>
+      <li><a href="#notifs">Notifications</a></li>
+      <li><a href="#data">Data model</a></li>
+      <li><a href="#scope">Out of scope for v1</a></li>
+      <li><a href="#open">Open questions</a></li>
+    </ol>
+  </nav>
+
+  <h2 class="section" id="goal">1. What this module does</h2>
+  <p>Undergrads don't all work every day, so Bill needs to know <strong>who's coming in and when</strong> before he hands out the day's tasks. This module <strong>replaces the availability whiteboard</strong>: each hourly worker enters their available <strong>days and times</strong>, logs time off, and can flag a same-day absence. Separately, a <strong>time clock</strong> records actual punch in/out and totals weekly hours so Bill can cross-check payroll. Together they give Bill a live forward roster that feeds task assignment.</p>
+
+  <h2 class="section" id="roles">2. Who can do what</h2>
+  <table>
+    <thead><tr><th>Role</th><th>In this module</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Undergrad hourly</strong> (+ future hourly)</td><td>Set their own availability (days + times), log time off, send a same-day call-out, clock in/out, see their own schedule and hours</td></tr>
+      <tr><td><strong>Bill (manager)</strong></td><td>See everyone's schedule and edit it; see the punch log + weekly hours totals; edit/annotate punches; mark no-shows (Bill-only count)</td></tr>
+      <tr><td><strong>Technicians / grad students</strong></td><td>View the crew schedule / who's in each day to coordinate work. Do not clock in and do not enter availability (salaried); do not see individual hours</td></tr>
+      <tr><td><strong>Faculty</strong></td><td>Not shown — this tile is off their dashboard</td></tr>
+    </tbody>
+  </table>
+
+  <h2 class="section" id="availability">3. Availability schedule</h2>
+  <p>The core replacement for the whiteboard, in two layers:</p>
+  <div class="rule"><h4>Usual weekly pattern — set each semester</h4>
+    <p>Each worker sets their standing availability — for each weekday, available or not, with a <strong>time window</strong> (e.g. "Mon 7am–1pm, Wed 8am–12pm, Fri off"). This is what they'd normally write on the board.</p>
+    <p>Because class schedules change, patterns are tied to a <strong>semester — Fall, Winter, and Summer — and must be re-entered each term</strong>. At the start of a new term the app <strong>prompts each worker to enter their new pattern</strong>, and the prior term's pattern is archived rather than carried over.</p>
+  </div>
+  <div class="rule"><h4>Exceptions — vacations &amp; conflicts</h4>
+    <p>Any specific date can override the pattern — an extra day, different hours, or a day off. This is where workers enter <strong>vacations and one-off conflicts</strong> with their usual pattern (a class event, an appointment, a trip). Exceptions win over the standing pattern for that date.</p>
+  </div>
+  <p>Entry is <strong>self-service</strong>; every add or change posts an <strong>in-app notice to Bill</strong> (no push). Bill sees a combined <strong>week/day roster</strong> of who's available and when, and a "who's in today" summary that drives task assignment.</p>
+
+  <h2 class="section" id="timeoff">4. Time off &amp; same-day call-outs</h2>
+  <div class="rule"><h4>Time off / unavailability calendar</h4>
+    <p>Workers log planned absences over a date range (vacation, travel, exams). These show on a <strong>calendar</strong> so Bill sees gaps well ahead and can plan around them.</p>
+  </div>
+  <div class="rule"><h4>24-hour cutoff — short notice needs Bill's approval</h4>
+    <p>How a time-off request comes off the schedule depends on how close the shift is:</p>
+    <ul>
+      <li><strong>More than 24 hours out</strong> → self-service. The shift comes off <strong>automatically</strong> and Bill gets an in-app notice.</li>
+      <li><strong>Within 24 hours of the shift start</strong> → it becomes a <strong>request Bill must approve</strong>. The worker <strong>stays on the schedule until Bill approves</strong>; on approval the shift is removed. Bill sees pending requests to approve or deny.</li>
+    </ul>
+  </div>
+  <div class="rule"><h4>Same-day call-out</h4>
+    <p>A quick <strong>"I can't come in today"</strong> action for sickness or life events. Because it's within 24 hours, it follows the cutoff above — it posts an <strong>in-app notice to Bill</strong> (no push) and stays on the schedule as a <strong>pending request until Bill approves</strong> the removal. It's logged the instant it's sent, but it only <strong>excuses the day once Bill approves it</strong> — an unapproved absence with no clock-in that day becomes a no-show (§5). <em>Workers are still expected to contact Bill directly as well</em> — the call-out is the record, not a replacement for that heads-up.</p>
+  </div>
+
+  <h2 class="section" id="noshow">5. No-show tracking <span style="font-weight:400;color:var(--muted);font-size:.9rem;">(Bill only)</span></h2>
+  <p>A day is a <span class="flag-chip">NO-SHOW</span> when a scheduled worker <strong>never clocks in that day</strong> and has <strong>no approved absence</strong> for it. Bill's approval is the deciding switch:</p>
+  <ul>
+    <li><strong>Bill approves the absence</strong> → the day is excused and any no-show for it is <strong>wiped</strong>.</li>
+    <li><strong>Absence not approved</strong> (denied or never approved) <strong>and no clock-in at any point that day</strong> → it stands as a <strong>no-show</strong>.</li>
+  </ul>
+  <p>Each no-show increments a <strong>running count per worker</strong> that <strong>only Bill sees</strong> — a simple accountability tally. The clock-in data does the detecting; Bill's approve/deny decides whether it's excused, so he stays in control.</p>
+
+  <h2 class="section" id="clock">6. Time clock</h2>
+  <p><strong>Informal presence tracking</strong>, not the official payroll record — it gives Bill clean timestamps to <strong>cross-check when approving payroll</strong>.</p>
+  <ul>
+    <li><strong>Who:</strong> undergrad hourly + future hourly (role-based, so new hourly staff get it automatically).</li>
+    <li><strong>Clock in / out:</strong> one big button on arrival and departure. <strong>Location-gated</strong> to a <strong>0.5-mile geofence</strong> around the farm (35.90203° N, 83.95762° W). A worker can punch <strong>multiple times a day</strong> — out for lunch, back in — and every in/out pair counts toward the day's hours.</li>
+    <li><strong>Captures:</strong> clock-in, clock-out, date, person, and whether the location was verified.</li>
+    <li><strong>Bill's view:</strong> the punch log per person <strong>plus an auto-summed weekly (Mon–Fri) hours total</strong>, side-by-side-ready with the payroll timesheet. Location-unverified punches are flagged for him to confirm.</li>
+    <li><strong>Worker's view:</strong> each worker sees their <strong>own</strong> weekly hours total (not anyone else's).</li>
+    <li><strong>Corrections:</strong> Bill can <strong>edit or add a missed punch and annotate</strong> it.</li>
+    <li><strong>Not doing (v1):</strong> calculating pay, enforcing breaks, or acting as the legal timekeeping record.</li>
+  </ul>
+
+  <h2 class="section" id="planvsactual">7. Planned vs. actual</h2>
+  <p>Two different things that work together:</p>
+  <table>
+    <thead><tr><th></th><th>Schedule</th><th>Time clock</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Is</strong></td><td>planned availability (days + times)</td><td>actual presence (punches)</td></tr>
+      <tr><td><strong>Set by</strong></td><td>the worker, ahead of time</td><td>stamped when they clock in/out</td></tr>
+      <tr><td><strong>Bill uses for</strong></td><td>assigning the day's tasks</td><td>payroll cross-check</td></tr>
+    </tbody>
+  </table>
+  <p>A <strong>no-show</strong> is exactly the gap between the two: expected on the schedule, no clock-in all day, and no approved absence.</p>
+
+  <h2 class="section" id="screens">8. Screens (v1)</h2>
+  <ol>
+    <li><strong>My schedule</strong> (worker) — set weekly availability + times, add time off, and the same-day call-out button; see their own upcoming days and their own <strong>weekly hours total</strong>.</li>
+    <li><strong>Crew roster</strong> (Bill + techs/grads) — week/day grid of who's available and when, the time-off calendar, and "who's in today." Bill also sees and acts on <strong>pending short-notice (≤24h) requests</strong> to approve or deny. This is <strong>one shared calendar</strong> component with a <strong>toggle</strong> to overlay the <strong>Studies</strong> layer (see Trial Protocols &amp; Study Plans), so Bill can view crew availability and research together or separately.</li>
+    <li><strong>Clock in / out</strong> (worker) — the big location-gated button.</li>
+    <li><strong>Time &amp; hours</strong> (Bill) — punch log per person, weekly hours totals, edit/annotate, mark no-show, and the per-worker no-show count. <em>Bill only.</em></li>
+  </ol>
+
+  <h2 class="section" id="notifs">9. Notifications</h2>
+  <ul>
+    <li>Schedule add/change → <strong>in-app notice to Bill</strong>.</li>
+    <li>Short-notice (≤24h) request or same-day call-out → <strong>in-app notice to Bill</strong>, flagged as <strong>awaiting his approval</strong>.</li>
+  </ul>
+  <p><em>No push anywhere in this module — consistent with the app's minimal-push approach (the only push is "task assigned to you").</em></p>
+
+  <h2 class="section" id="data">10. Data model</h2>
+  <table>
+    <thead><tr><th>availability_pattern</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>user_id</td><td>the worker</td></tr>
+      <tr><td>term</td><td>which semester — e.g. "Fall 2026" (patterns are per-term, re-entered each semester)</td></tr>
+      <tr><td>weekday</td><td>Mon–Sun</td></tr>
+      <tr><td>available</td><td>boolean</td></tr>
+      <tr><td>start_time / end_time</td><td>the time window, nullable if unavailable</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>schedule_exception</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>user_id</td><td>the worker</td></tr>
+      <tr><td>date</td><td>the specific day (or range via start/end)</td></tr>
+      <tr><td>type</td><td><code>extra</code> | <code>changed_hours</code> | <code>time_off</code> | <code>callout</code></td></tr>
+      <tr><td>start_time / end_time</td><td>for extra/changed hours, nullable</td></tr>
+      <tr><td>reason</td><td>text, optional</td></tr>
+      <tr><td>status</td><td><code>auto</code> (&gt;24h, self-applied) | <code>pending</code> | <code>approved</code> | <code>denied</code> (≤24h needs Bill)</td></tr>
+      <tr><td>created_at</td><td>timestamp (used to check the 24-hour cutoff vs. the shift)</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>time_punch</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>user_id</td><td>the worker</td></tr>
+      <tr><td>date</td><td>work date</td></tr>
+      <tr><td>clock_in / clock_out</td><td>timestamps</td></tr>
+      <tr><td>location_ok</td><td>boolean — passed the at-farm check</td></tr>
+      <tr><td>edited_by / note</td><td>set if Bill corrected/annotated it, nullable</td></tr>
+    </tbody>
+  </table>
+  <table>
+    <thead><tr><th>no_show</th><th>Type / notes</th></tr></thead>
+    <tbody>
+      <tr><td>id</td><td>unique id</td></tr>
+      <tr><td>user_id</td><td>the worker</td></tr>
+      <tr><td>date</td><td>the missed day</td></tr>
+      <tr><td>source / note</td><td>rule-created (no clock-in + no approved absence); cleared if the absence is later approved. Bill can add a note</td></tr>
+    </tbody>
+  </table>
+  <p><em>Weekly hours totals are derived from <code>time_punch</code>. A no-show is rule-based — a scheduled day with no clock-in and no approved absence — so a <code>no_show</code> row is created when that holds at day's end and <strong>cleared if Bill later approves the absence</strong>. The count is the worker's standing <code>no_show</code> rows.</em></p>
+
+  <h2 class="section" id="scope">11. Out of scope for v1 <span style="font-weight:400;color:var(--muted);font-size:.9rem;">(comes later)</span></h2>
+  <div class="callout out">
+    <ul style="margin:0;">
+      <li>Payroll calculation or export to a payroll system (this only informs Bill's approval)</li>
+      <li>Break tracking and legal timekeeping compliance</li>
+      <li>Shift swapping / approval workflows</li>
+      <li>Techs, grads, and faculty entering their own availability (v1 is hourly-focused)</li>
+    </ul>
+  </div>
+
+  <h2 class="section" id="open">12. Decisions &amp; open items</h2>
+  <p><strong>Resolved:</strong></p>
+  <ul>
+    <li><strong>Clock-in geofence:</strong> centered on the farm at <strong>35.90203° N, 83.95762° W</strong> (3450 Maloney Rd, Knoxville, TN), <strong>0.5-mile radius</strong>. Inside → passes; outside → blocked.</li>
+    <li><strong>If location is unavailable</strong> (permission denied, location services off, airplane mode, or poor signal): the punch is <strong>allowed but flagged "location unverified"</strong> for Bill to confirm — no hard block over a phone glitch.</li>
+    <li><strong>Multiple punches per day:</strong> allowed — clock out and back in (lunch, leaving and returning); each in/out pair is its own punch and all count toward the day's hours.</li>
+    <li><strong>Payroll week:</strong> <strong>Monday–Friday</strong> for the weekly hours total.</li>
+    <li><strong>Semester start dates:</strong> Fall begins <strong>Aug 1</strong>, Winter <strong>Jan 1</strong>, Summer <strong>Jun 1</strong> — each triggers the availability re-entry prompt.</li>
+  </ul>
+  <div class="callout"><strong>When is location "unavailable"?</strong> The phone can fail to return a position if the worker <em>denies</em> the location permission, has <em>location services off</em>, is in <em>airplane mode</em>, or is somewhere with poor signal (inside a metal barn) so the fix times out or is too inaccurate. A 0.5-mile radius is generous, so genuine on-site punches almost always pass; the "unverified, flag for Bill" path is the safety valve for the rest.</div>
+
+  <footer>UT Turfgrass Research Team · Crew Schedule &amp; Time Clock build spec v1 · July 11, 2026 · Companion to UT-TurfFarm-Plan.html, TaskBoard-Spec.html, Access-and-Roles.html &amp; Inventory-Spec.html</footer>
+</div>
+</body>
+</html>

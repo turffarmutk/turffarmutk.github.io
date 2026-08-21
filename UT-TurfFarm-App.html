@@ -285,8 +285,23 @@
   .inv-sel{border:1px solid var(--line);background:#fff;border-radius:9px;font:700 13px 'Public Sans';color:var(--ink);outline:none;padding:8px 11px;text-align:right}
   /* Left-aligned and roomy: this one is prose typed with a thumb in a field,
      not a number typed at a desk, so it does not inherit .inv-in's right rail. */
+  .lg-reset{text-align:center;margin-top:14px;font:700 12.5px 'Public Sans';color:rgba(255,255,255,.72);text-decoration:underline;text-underline-offset:3px}
+  .lg-reset:active{opacity:.6}
   .bug-ta{width:100%;box-sizing:border-box;border:1px solid var(--line);background:#fff;border-radius:9px;font:600 13px/1.45 'Public Sans';color:var(--ink);outline:none;padding:9px 11px;resize:vertical;-webkit-appearance:none}
   .bug-ta:focus{border-color:var(--acc)}
+  /* Sign-in form. Lives on the dark panel, so it cannot borrow .inv-in. */
+  .lg-lab{font:800 11px 'Public Sans';letter-spacing:.4px;color:rgba(255,255,255,.62);margin-bottom:6px}
+  .lg-in{width:100%;box-sizing:border-box;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.06);
+         border-radius:10px;font:600 15px 'Public Sans';color:#fff;outline:none;padding:12px 13px;-webkit-appearance:none}
+  .lg-in:focus{border-color:#ff8200;background:rgba(255,255,255,.1)}
+  .lg-in::placeholder{color:rgba(255,255,255,.35)}
+  .lg-btn{width:100%;margin-top:16px;border:0;border-radius:11px;background:#ff8200;color:#fff;
+          font:800 15px 'Archivo';padding:13px 0;cursor:pointer;-webkit-appearance:none}
+  .lg-btn:active{opacity:.75}
+  .lg-btn[disabled]{opacity:.55;cursor:default}
+  .lg-msg{min-height:16px;margin-top:12px;font:700 12px 'Public Sans';line-height:1.45;color:#ff9c8a}
+  .lg-msg.ok{color:#7fd39b}
+  .lg-note{margin-top:18px;font:600 11.5px 'Public Sans';color:rgba(255,255,255,.45);line-height:1.5;text-align:center}
   .bug-ta::placeholder{color:#a8aeb6;font-weight:600}
   .stepper{display:flex;align-items:center;gap:12px}
   .stepbtn{width:34px;height:34px;border-radius:9px;background:#2f3133;color:#fff;font:800 18px 'Archivo';display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;flex:none}
@@ -593,6 +608,8 @@ body{background:#0f1011;display:flex;align-items:center;justify-content:center;f
 <script src="vendor/leaflet/leaflet.js"></script>
 <script src="vendor/geoman/leaflet-geoman.min.js"></script>
 <script src="vendor/turf/turf.min.js"></script>
+<script src="vendor/firebase/firebase-app-compat.js"></script>
+<script src="vendor/firebase/firebase-auth-compat.js"></script>
 <!-- The farm itself: plot outlines, alleys, alley zones, plot info and mowing
      assignments. Split out of this file so the app stays editable; must sit in
      the same folder. Loaded here, ahead of the app, so the globals exist before
@@ -1331,11 +1348,21 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
       <div style="font:800 22px 'Archivo';color:#fff">UT Turf Farm</div>
       <div style="font:700 12px 'Public Sans';color:rgba(255,255,255,.6);margin:6px 0 0">Sign in</div>
     </div>
-    <div style="padding:0 16px 10px;flex:0 0 auto">
-      <input id="lg-search" class="inv-search" placeholder="Search your name…" autocomplete="off"
-             style="margin:0;width:100%;box-sizing:border-box">
+    <div id="lg-body" style="flex:1;overflow-y:auto;padding:0 22px 24px;min-height:0">
+      <form id="lg-form" autocomplete="on" novalidate>
+        <div class="lg-lab">Email</div>
+        <input id="lg-email" class="lg-in" type="email" name="email" inputmode="email"
+               autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"
+               placeholder="you@utk.edu">
+        <div class="lg-lab" style="margin-top:14px">Password</div>
+        <input id="lg-pass" class="lg-in" type="password" name="password"
+               autocomplete="current-password" placeholder="Your password">
+        <div id="lg-msg" class="lg-msg" role="alert" aria-live="polite"></div>
+        <button id="lg-go" class="lg-btn" type="submit">Sign in</button>
+      </form>
+      <div id="lg-reset" class="lg-reset tap">First time here, or forgotten your password?</div>
+      <div id="lg-note" class="lg-note"></div>
     </div>
-    <div id="lg-body" style="flex:1;overflow-y:auto;padding:0 16px 24px;min-height:0"></div>
   </div>
 </div>
 </section>
@@ -1690,10 +1717,6 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
 </section>
 <section class="screen" id="s-roles"><div class="app field" style="background:#2f3133;min-height:0">
   <div class="hdr" style="background:#2f3133"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Switch user</div></div>
-  <div style="padding:10px 16px 8px;flex:0 0 auto">
-    <input id="sw-search" class="inv-search" placeholder="Search your name…" autocomplete="off"
-           style="margin:0;width:100%;box-sizing:border-box">
-  </div>
   <div id="sw-body" style="flex:1;overflow-y:auto;padding:0 16px 24px;min-height:0"></div>
 </div></section>
 <section class="screen" id="s-more"><div class="app field"><div class="hdr"><div class="title" style="flex:1">More</div></div><div style="flex:1;overflow-y:auto"><div class="list" style="margin-top:12px"><div class="row tap" data-go="roles"><span style="font-size:19px;width:26px">🔀</span><div style="flex:1"><div class="rt">Switch user</div><div class="rs" id="more-signedin"></div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" id="more-signout"><span style="font-size:19px;width:26px">🚪</span><div style="flex:1"><div class="rt">Sign out</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="taskboard"><span style="font-size:19px;width:26px">📋</span><div style="flex:1"><div class="rt">Tasks</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="map"><span style="font-size:19px;width:26px">🗺️</span><div style="flex:1"><div class="rt">Farm Map</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="calendar"><span style="font-size:19px;width:26px">📅</span><div style="flex:1"><div class="rt">Calendar</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="fieldlog"><span style="font-size:19px;width:26px">✏️</span><div style="flex:1"><div class="rt">Field Log</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="timeclock"><span style="font-size:19px;width:26px">⏱️</span><div style="flex:1"><div class="rt">Time clock</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="weather"><span style="font-size:19px;width:26px">🌤️</span><div style="flex:1"><div class="rt">Weather & conditions</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="inventory" id="more-inv"><span style="font-size:19px;width:26px">📦</span><div style="flex:1"><div class="rt">Inventory</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="trial" id="more-trials"><span style="font-size:19px;width:26px">🔬</span><div style="flex:1"><div class="rt">Trials</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="equipment"><span style="font-size:19px;width:26px">🚜</span><div style="flex:1"><div class="rt">Equipment</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="farmsettings" id="more-spray"><span style="font-size:19px;width:26px">🔧</span><div style="flex:1"><div class="rt">Farm settings</div><div class="rs">Sprayer, mowers and labs</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="bugreport"><span style="font-size:19px;width:26px">🐞</span><div style="flex:1"><div class="rt">Report a technical bug</div><div class="rs" id="more-bugsub">Something in the app is broken</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="login"><span style="font-size:19px;width:26px">⏻</span><div style="flex:1"><div class="rt">Log out</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div></div></div></div><div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab"><span class="te">📋</span>Tasks</div><div class="tab"><span class="te">🗺️</span>Map</div><div class="tab"><span class="te">📦</span>Inventory</div><div class="tab on"><span class="te">•••</span>More</div></div></section>
@@ -3440,8 +3463,8 @@ function show(id,push){ const el=document.getElementById('s-'+id); if(!el)return
      SESSION replaces — your role comes from who signed in, so a screen can no
      longer promote you by being opened. The attribute stays as a label, used
      below to pick which home layout to paint. */
-  if(id==='profile')fillProfile(); if(id==='profedit')renderProfEdit(); if(id==='roster')rstRender(); if(id==='rosteredit')rstEditRender(); if(id==='adminxfer')axfRender(); if(id==='spraysettings')sprRender(); if(id==='farmsettings')fstRender(); if(id==='bugreport')bugRender(); if(id==='bugsettings')bgsRender(); if(id==='mowersettings')mwsRender(); if(id==='labsettings')lbsRender(); if(id==='roles'){var _sw=document.getElementById('sw-search'); if(_sw)_sw.value=''; renderSignIn('sw-body','');}
-  if(id==='login'){var _lg=document.getElementById('lg-search'); if(_lg)_lg.value=''; renderSignIn('lg-body','');} if(id==='notifications'){setSeen(Date.now());setTimeout(updateBellBadges,0);} if(id==='home-manager')renderHomeNotif(); if(id==='weather')wxEnter(); if(id==='map')mapEnter(); if(id==='taskboard')boardEnter(); if(id==='templates')renderTemplates(); if(id==='assign')assignEnter(); if(id==='plotpick')renderPlotPick(); if(id==='taskwork')renderTaskWork(); if(id==='inventory')invEnter(); if(id==='lowstock')renderLowStock(); if(id==='additem')renderAddItem(); if(id==='invlog')renderInvLog(); if(id==='itemdetail')0; if(id==='equipment')equipEnter(); if(id==='eqreport')renderEqReport(); if(id==='eqmaint')renderEqMaint(); if(id==='eqedit')renderEqEdit(); if(id==='eqsched')renderEqSched(); if(id==='calendar')calEnter(); if(id==='caladd')renderCalAdd(); if(id==='timeclock')tcEnter(); if(id==='tcperson')tcRenderPerson(); if(id==='fieldlog')fieldlogEnter(); if(id==='flexport')renderFlExport(); if(id==='flnew')renderFlNew(); if(id==='fldetail')renderFlDetail(); if(id==='more')moreEnter(); if(id==='trial')trialsEnter(); if(id==='trialdetail')trRenderDetail(); if(id==='trialedit')trRenderEdit(); if(id==='trialres')trRenderRes(); if(id==='trialpin')trRenderPin(); if(id==='navsettings')renderPrefsHub(); if(id==='notifsettings')renderNotifSettings(); if(id==='powersettings')renderPowerSettings(); if(id==='navtabs')renderNavSettings(); if(id==='homescreen')renderHomeSettings(); if(id==='theme')renderTheme(); if(id.indexOf('home-')===0)hwApply(r||currentRole); renderTabs();
+  if(id==='profile')fillProfile(); if(id==='profedit')renderProfEdit(); if(id==='roster')rstRender(); if(id==='rosteredit')rstEditRender(); if(id==='adminxfer')axfRender(); if(id==='spraysettings')sprRender(); if(id==='farmsettings')fstRender(); if(id==='bugreport')bugRender(); if(id==='bugsettings')bgsRender(); if(id==='mowersettings')mwsRender(); if(id==='labsettings')lbsRender(); if(id==='roles')authRenderAccount();
+  if(id==='login')authRenderLogin(); if(id==='notifications'){setSeen(Date.now());setTimeout(updateBellBadges,0);} if(id==='home-manager')renderHomeNotif(); if(id==='weather')wxEnter(); if(id==='map')mapEnter(); if(id==='taskboard')boardEnter(); if(id==='templates')renderTemplates(); if(id==='assign')assignEnter(); if(id==='plotpick')renderPlotPick(); if(id==='taskwork')renderTaskWork(); if(id==='inventory')invEnter(); if(id==='lowstock')renderLowStock(); if(id==='additem')renderAddItem(); if(id==='invlog')renderInvLog(); if(id==='itemdetail')0; if(id==='equipment')equipEnter(); if(id==='eqreport')renderEqReport(); if(id==='eqmaint')renderEqMaint(); if(id==='eqedit')renderEqEdit(); if(id==='eqsched')renderEqSched(); if(id==='calendar')calEnter(); if(id==='caladd')renderCalAdd(); if(id==='timeclock')tcEnter(); if(id==='tcperson')tcRenderPerson(); if(id==='fieldlog')fieldlogEnter(); if(id==='flexport')renderFlExport(); if(id==='flnew')renderFlNew(); if(id==='fldetail')renderFlDetail(); if(id==='more')moreEnter(); if(id==='trial')trialsEnter(); if(id==='trialdetail')trRenderDetail(); if(id==='trialedit')trRenderEdit(); if(id==='trialres')trRenderRes(); if(id==='trialpin')trRenderPin(); if(id==='navsettings')renderPrefsHub(); if(id==='notifsettings')renderNotifSettings(); if(id==='powersettings')renderPowerSettings(); if(id==='navtabs')renderNavSettings(); if(id==='homescreen')renderHomeSettings(); if(id==='theme')renderTheme(); if(id.indexOf('home-')===0)hwApply(r||currentRole); renderTabs();
   try{updateBellBadges();}catch(e){}
   try{syncBack(el);}catch(e){}
   try{navSyncHistory();}catch(e){}
@@ -3517,7 +3540,7 @@ function toast(m){ let d=document.getElementById('toast'); if(!d){d=document.cre
 function btn(scope,sub,dest,tm){ document.querySelectorAll('#s-'+scope+' *').forEach(el=>{ if(el.children.length===0 && el.textContent.trim().includes(sub)){ el.classList.add('tap'); if(dest)el.setAttribute('data-go',dest); if(tm)el.setAttribute('data-toast',tm);} }); }
 function heroNth(scope,dest){ const h=document.querySelector('#s-'+scope+' .app.field > div:nth-of-type(2)'); if(h){h.classList.add('tap');h.setAttribute('data-go',dest);} }
 function rowsGo(scope,dest){ document.querySelectorAll('#s-'+scope+' .row').forEach(r=>{r.classList.add('tap');r.setAttribute('data-go',dest);}); }
-btn('login','Sign In','roles');
+/* The sign-in button is a real form submit now, not a nav link. */
 heroNth('home-grad','trial'); rowsGo('home-grad','trial');
 heroNth('home-faculty','trial'); rowsGo('home-faculty','trial');
 heroNth('home-tech','equipment');
@@ -4237,7 +4260,7 @@ function fmtDateTime(v){ var t=fmtTime(v); return fmtDay(v)+(t?(' · '+t):''); }
 function dueLabel(t){ return t&&t.dueAt?fmtDateTime(t.dueAt):(t&&t.due)||''; }
 
 /* Ids are the join key every other record hangs off, so a duplicate is not a
-   cosmetic problem — it is two things silently becoming one, and once Supabase
+   cosmetic problem — it is two things silently becoming one, and once the shared database
    is holding these it is a primary-key error instead of a quiet overwrite.
 
    The old version was Date.now() plus five characters of Math.random(), which
@@ -4512,7 +4535,7 @@ var USERS={};
    change is that they are now correct for all twenty-three people rather than
    for five.
 
-   This is also the shape Supabase Auth expects. `sessionSet(pid)` becomes
+   This is also the shape Firebase Auth expects. `sessionSet(pid)` becomes
    "resolve auth.uid() to a person row", and the RLS policies in
    Editable-Map-Backend-Plan.md key off SESSION.person.lab — a real column —
    rather than off a role string that guessed at it.
@@ -4574,7 +4597,7 @@ function sessionClear(){
 }
 /* Whoever was signed in last on this device. Not authentication — it is the
    "keep me signed in" box, and it is exactly the slot a real token goes in
-   once Supabase Auth lands. */
+   once the shared database Auth lands. */
 function sessionRestore(){
   var pid=null; try{ pid=localStorage.getItem(SESSION_KEY); }catch(e){}
   return pid?sessionSet(pid,{quiet:true}):false;
@@ -4634,91 +4657,22 @@ rstBuildAdminUser();
    The App Manager sits below a divider because it is a post rather than a farm
    job — it holds the faculty records and sits outside Bill's chain of command.
 
-   There is deliberately no password. Authentication is Phase 2 (Supabase
+   There is deliberately no password. Authentication is Stage 1 (Firebase
    Auth); this is the screen it slots behind, and sessionSet() is the one call
    that changes when it does.
    ============================================================ */
 function lgHome(){ return HOME_DEST[currentRole]||'home-undergrad'; }
 
 /* One row per person: initials, name, job, lab. */
-function lgRow(p,cur){
-  var k=roleSlug(p);
-  return '<div class="rolecard tap" data-signin="'+esc(p.id)+'" style="align-items:center">'
-    +'<div style="width:4px;align-self:stretch;background:'+(RST_COLOR[k]||'#58595b')+';border-radius:4px"></div>'
-    +'<div style="width:32px;height:32px;border-radius:50%;background:'+(RST_COLOR[k]||'#58595b')+';color:#fff;'
-      +'display:flex;align-items:center;justify-content:center;font:800 12px \'Public Sans\';flex:0 0 auto">'+esc(pInit(p))+'</div>'
-    +'<div style="flex:1;min-width:0">'
-      +'<div style="font:800 15px \'Archivo\';color:#1f2328">'+esc(pName(p))+(cur?' <span style="font:700 10px \'Public Sans\';color:#8a929c">· signed in</span>':'')+'</div>'
-      +'<div style="font:700 11.5px \'Public Sans\';color:#8a929c;margin-top:2px">'
-        +esc(RST_TITLE[p.role]||p.role)+(p.lab&&p.lab!=='—'?' · '+esc(p.lab)+' lab':'')+'</div>'
-    +'</div>'
-    +'<span style="color:#c2c7cd;font-size:20px">›</span></div>';
-}
-function lgDivider(t){
-  return '<div style="display:flex;align-items:center;gap:9px;margin:15px 2px 9px">'
-    +'<span style="flex:1;height:1px;background:rgba(255,255,255,.14)"></span>'
-    +'<span style="font:800 10px \'Public Sans\';color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.6px">'+esc(t)+'</span>'
-    +'<span style="flex:1;height:1px;background:rgba(255,255,255,.14)"></span></div>';
-}
-/* Grouped by job in the roster's own order — manager, faculty, grads, techs,
-   undergrads — so the list reads like the farm rather than like the alphabet. */
-function renderSignIn(bodyId,q){
-  var el=document.getElementById(bodyId); if(!el)return;
-  q=(q||'').trim().toLowerCase();
-  var list=rstSort(rstActive()).filter(function(p){
-    if(!q)return true;
-    return (pName(p)+' '+(p.role||'')+' '+(p.lab||'')+' '+(p.email||'')).toLowerCase().indexOf(q)>=0;
-  });
-  var h='',lastRole=null;
-  list.forEach(function(p){
-    if(p.role!==lastRole){ h+=lgDivider(RST_TITLE[p.role]||p.role); lastRole=p.role; }
-    h+=lgRow(p,p.id===SESSION.pid&&currentRole!=='admin');
-  });
-  if(!list.length) h+='<div style="font:700 12px \'Public Sans\';color:rgba(255,255,255,.5);text-align:center;padding:26px 0">Nobody on the roster matches that.</div>';
-  /* The App Manager is not a farm job, so it is not in the roster grouping. */
-  if(!q||'app manager administration'.indexOf(q)>=0||(APP_ADMIN.name||'').toLowerCase().indexOf(q)>=0){
-    h+=lgDivider('Administration')
-      +'<div class="rolecard tap" data-signin="__admin" style="align-items:center">'
-      +'<div style="width:4px;align-self:stretch;background:#58595b;border-radius:4px"></div>'
-      +'<div style="width:32px;height:32px;border-radius:50%;background:#58595b;color:#fff;display:flex;align-items:center;justify-content:center;font:800 12px \'Public Sans\';flex:0 0 auto">'+esc(rstAdminInit())+'</div>'
-      +'<div style="flex:1;min-width:0"><div style="font:800 15px \'Archivo\';color:#1f2328">App Manager</div>'
-      +'<div id="rolecard-admin-sub" style="font:700 11.5px \'Public Sans\';color:#8a929c;margin-top:2px">'+esc(APP_ADMIN.name)+' · accounts, roles &amp; faculty records</div></div>'
-      +'<span style="color:#c2c7cd;font-size:20px">›</span></div>';
-  }
-  el.innerHTML=h;
-}
-
-/* Signing in as the App Manager. It is a post held by a person, so it carries
-   that person's roster id for preferences while running under its own role. */
+/* The App Manager is a post, not a person, so it is a flag on a real account
+   rather than a login of its own. It arrives on the auth token as
+   app_metadata.is_app_admin and is applied on top of a normal sign-in. */
 function signInAdmin(){
   currentRole='admin';
-  SESSION.pid=APP_ADMIN.pid||null;
   rstBuildAdminUser();
-  try{ localStorage.setItem(SESSION_KEY,'__admin'); }catch(e){}
   if(typeof prefsSwitch==='function')prefsSwitch();
 }
-function doSignIn(pid){
-  if(pid==='__admin'){ signInAdmin(); goRoot('roster'); return; }
-  if(!sessionSet(pid)){ toast('That account is no longer active'); renderSignIn('lg-body',''); return; }
-  goRoot(lgHome());
-}
-function signOut(){
-  sessionClear(); currentRole='undergrad';
-  stack.length=0; renderSignIn('lg-body',''); 
-  var q=document.getElementById('lg-search'); if(q)q.value='';
-  show('login',false);
-}
-/* Both screens share one delegated handler and one search box each. */
-['login','roles'].forEach(function(scr){
-  var host=document.getElementById('s-'+scr); if(!host)return;
-  var body=(scr==='login')?'lg-body':'sw-body';
-  host.addEventListener('click',function(e){
-    var c=e.target.closest('[data-signin]'); if(!c)return;
-    doSignIn(c.getAttribute('data-signin'));
-  });
-  var inp=document.getElementById(scr==='login'?'lg-search':'sw-search');
-  if(inp)inp.addEventListener('input',function(){ renderSignIn(body,inp.value); });
-});
+function signOut(){ authSignOut(); }
 
 function rstPaintRolesCard(){
   var el=document.getElementById('rolecard-admin-sub');
@@ -11817,7 +11771,7 @@ function trPopHtml(name){
 
    CREW is prototyped over BroadcastChannel + localStorage, which syncs
    across tabs and windows on one machine. That is enough to demo the
-   behaviour, and the read/write/subscribe shape is the same one Supabase
+   behaviour, and the read/write/subscribe shape is the same one Firestore
    Realtime uses, so swapping the transport later touches only crewSend and
    crewLoad. Nothing syncs between *devices* until that backend lands.
    ============================================================ */
@@ -12389,7 +12343,7 @@ function crewLoad() {
 function crewSave(db) {
   try { localStorage.setItem(CREW_KEY, JSON.stringify(db)); } catch (e) {}
 }
-/* The one place the transport lives. Swapping to Supabase Realtime replaces
+/* The one place the transport lives. Swapping to Firestore listeners replaces
    this body with a channel.send and leaves every caller untouched. */
 function crewSend(db) {
   crewSave(db);
@@ -13196,7 +13150,7 @@ function _farmViewBounds(){
    Trace a new plot or drag the corners of an existing one. Edits are kept in
    localStorage as overrides layered on top of the shapes baked into this file,
    so nothing is lost on reload and "Reset all" always gets back to baseline.
-   When the Supabase backend in Editable-Map-Backend-Plan.md lands, PE_STORE is
+   When the shared database lands (see docs/BACKEND-STEPS.md), PE_STORE is
    the piece that swaps out for a table write.
    ============================================================ */
 var PE_KEY='ut_plot_shapes_v1';
@@ -13551,7 +13505,7 @@ peApply();
 
    2. ONE REGISTRY. STORE_DEFS is the list. Adding a collection means
       adding a line here — persistence, export, CSV and restore all
-      follow from it. This is also the seam the Supabase port swaps:
+      follow from it. This is also the seam the database port swaps:
       storeWrite/storeRead become network calls and nothing else in
       the file has to know.
 
@@ -13564,7 +13518,7 @@ peApply();
       defeated by a mutation site nobody remembered. A flush on
       pagehide closes the 2-second window.
 
-      When the Supabase port lands, explicit writes replace the scan.
+      When the database port lands, explicit writes replace the scan.
       By then there will be tests around these mutations; today there
       are not, which is the whole reason for the light touch.
    ============================================================ */
@@ -14092,7 +14046,7 @@ function pwaUpdateBar(onReload){
 
    1. NO BACKEND. Delivery is a POST to a form relay (Web3Forms), which is the
       only way a page with no server of its own can actually put mail in an
-      inbox. bugDeliver() is the entire network surface — when the Supabase port
+      inbox. bugDeliver() is the entire network surface — when the database port
       lands, that one function becomes the call that also fires a real push, and
       nothing else here changes.
 
@@ -14413,6 +14367,347 @@ function bgsRender(){
   if(fl)fl.addEventListener('click',function(){ if(navigator.onLine===false){toast('No signal right now');return;} toast('Sending…'); bugFlush(true); setTimeout(bgsRender,1200); });
 }
 
+/* ============================ SIGN IN ============================
+   Real accounts, via Firebase Auth. Replaces the person picker, which asked
+   "who are you?" and believed the answer.
+
+   Four things shape this code, and all four are worth knowing before changing
+   any of it.
+
+   1. `sessionSet(pid)` IS THE SEAM, and it does not change. Phase 0 built the
+      whole app to read `SESSION.pid` — 48 role checks, taskIsFor(), myLab(),
+      isMe(). Auth's only job is to decide, trustworthily, which pid to pass in.
+
+   2. THE ROSTER ID TRAVELS ON THE TOKEN, as a custom claim. It cannot come
+      from an email lookup, because the crew's addresses were deliberately taken
+      out of this file (see DECISIONS.md) and are not coming back. A claim is
+      set by an admin script, cannot be edited by the account holder, and is
+      cached with the token — so it is readable with no signal.
+
+   3. OFFLINE MUST NEVER BE THE REASON SOMEBODY CANNOT RECORD A MOW. This is a
+      field app on a farm with dead spots. Boot paints from the local record
+      without waiting for the network; a token that cannot be refreshed offline
+      does NOT sign anyone out. Only the first sign-in on a device needs signal,
+      because there is nothing stored yet to trust.
+
+   4. THIS GATES THE APP, NOT THE FILE. Anyone can still download this page from
+      GitHub Pages and read the roster names out of it. What a login buys is
+      that nobody can *be* somebody else, and — once the records move to the
+      database — that the records are what require the credentials. The login is
+      not the lock; the lock is server-side and arrives with the data.
+   ================================================================ */
+
+/* Public by design. These identify the project; they are not secrets, and
+   Firebase expects them in the page. The thing that must NEVER appear here is
+   a service-account key — that is the one that bypasses every rule.
+
+   Empty until the farm's Firebase project exists. While it is empty the app
+   still runs and says so, rather than breaking. */
+var FB_CONFIG = {
+  apiKey: 'AIzaSyDHTkIUONVfT87CXvfTqnd4jAQ4i0nBSt4',
+  authDomain: 'utk-turf-farm-app.firebaseapp.com',
+  projectId: 'utk-turf-farm-app',
+  storageBucket: 'utk-turf-farm-app.firebasestorage.app',
+  messagingSenderId: '619659467819',
+  appId: '1:619659467819:web:74aabad9f2187d4cb15e6e'
+};
+
+var AUTH_KEY = 'ut_auth_v1';
+var _fbAuth = null, _fbTried = false;
+
+/* One auth handle, made on first use. If the vendored library did not load, or
+   the project is not configured yet, this returns null and every caller
+   degrades rather than throwing. */
+function fbAuth(){
+  if(_fbTried) return _fbAuth;
+  _fbTried = true;
+  try{
+    if(typeof firebase !== 'undefined' && firebase && firebase.initializeApp && FB_CONFIG.apiKey){
+      if(!firebase.apps || !firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+      _fbAuth = firebase.auth();
+    }
+  }catch(e){ _fbAuth = null; }
+  return _fbAuth;
+}
+function authConfigured(){ return !!fbAuth(); }
+
+/* What this device last knew about who is signed in. */
+function authLocal(){
+  try{ var r = JSON.parse(localStorage.getItem(AUTH_KEY)||'null'); return (r&&r.pid)?r:null; }
+  catch(e){ return null; }
+}
+function authSaveLocal(rec){
+  try{ localStorage.setItem(AUTH_KEY, JSON.stringify(rec)); }catch(e){}
+}
+function authClearLocal(){
+  try{ localStorage.removeItem(AUTH_KEY); }catch(e){}
+}
+
+/* The roster id and admin flag live in the token's custom claims, set by
+   tools/create-accounts.js. `false` means "do not force a refresh" — forcing
+   one would hit the network, which is exactly what must not happen in a field
+   with no signal. The cached token is the right answer there. */
+function authClaims(user){
+  if(!user || !user.getIdTokenResult) return Promise.resolve({});
+  return user.getIdTokenResult(false).then(function(t){ return (t && t.claims) || {}; })
+                                     .catch(function(){ return {}; });
+}
+function authPidOfClaims(c){ return (c && c.pid) || null; }
+function authIsAdminClaims(c){ return !!(c && c.app_admin === true); }
+
+/* Put a person into the app. Shared by boot and by a fresh sign-in so the two
+   paths cannot drift. Returns false if the id is not a live roster person. */
+function authEnter(pid, isAdmin){
+  if(!sessionSet(pid)) return false;
+  if(isAdmin) signInAdmin();
+  return true;
+}
+
+/* Boot. Synchronous on purpose: it must not wait on the network, so it trusts
+   the local record to paint, then checks with the server in the background. */
+function authBoot(){
+  var rec = authLocal();
+  if(!rec) return false;
+  if(!authEnter(rec.pid, rec.admin)){
+    /* On the roster last time, gone now — a stale record must not sign in
+       somebody who has left. */
+    authClearLocal();
+    return false;
+  }
+  goRoot(rec.admin ? 'roster' : lgHome());
+  setTimeout(authVerify, 1200);   /* after the first paint, never before it */
+  return true;
+}
+
+/* Confirm the local record against Firebase, when there is a server to ask.
+   Offline is not a failure and must never sign anyone out.
+
+   onAuthStateChanged does not fire until Firebase has finished restoring the
+   persisted session, so its first callback is the real answer rather than a
+   transient null — but the online check stays as a second guard, because
+   signing a crew member out mid-field would be the worst bug in this file. */
+function authVerify(){
+  if(navigator.onLine === false) return;
+  var auth = fbAuth(); if(!auth) return;
+  var unsub;
+  try{
+    unsub = auth.onAuthStateChanged(function(user){
+      try{ if(unsub) unsub(); }catch(e){}
+      if(user){
+        authClaims(user).then(function(c){
+          var pid = authPidOfClaims(c);
+          if(pid) authSaveLocal({ pid:pid, email:user.email||'', admin:authIsAdminClaims(c), at:isoLocal(new Date()) });
+        });
+        return;
+      }
+      /* Genuinely no session, and we can reach the server to know it. */
+      if(navigator.onLine === false) return;
+      authClearLocal();
+      try{ sessionClear(); }catch(e){}
+      currentRole='undergrad';
+      stack.length=0;
+      show('login',false);
+      authRenderLogin('Your session ended. Please sign in again.');
+    }, function(){ /* a failed check is not a sign-out */ });
+  }catch(e){}
+}
+
+function authMsg(text, ok){
+  var el=document.getElementById('lg-msg'); if(!el) return;
+  el.textContent = text||'';
+  el.className = 'lg-msg' + (ok?' ok':'');
+}
+function authRenderLogin(msg){
+  var e=document.getElementById('lg-email'), p=document.getElementById('lg-pass');
+  if(p) p.value='';
+  if(e && !e.value){ var rec=null; try{ rec=JSON.parse(localStorage.getItem(AUTH_KEY+'_last')||'null'); }catch(_e){} if(rec&&rec.email) e.value=rec.email; }
+  authMsg(msg||'');
+  var note=document.getElementById('lg-note');
+  if(note){
+    note.textContent = authConfigured()
+      ? 'Signing in for the first time? Use the link above to choose your own password.'
+      : 'Sign-in is not set up on this copy of the app yet.';
+  }
+}
+
+/* The account screen, where the person picker used to be. You cannot switch
+   user without credentials, so this is "who am I, and how do I leave". */
+function authRenderAccount(){
+  var body=document.getElementById('sw-body'); if(!body) return;
+  var m=me(), rec=authLocal();
+  body.innerHTML =
+     '<div style="padding:22px 4px 8px;text-align:center">'
+    +'<div style="width:64px;height:64px;border-radius:50%;background:#ff8200;color:#fff;font:800 22px \'Archivo\';display:inline-flex;align-items:center;justify-content:center">'+esc(m.i||'')+'</div>'
+    +'<div style="font:800 19px \'Archivo\';color:#fff;margin-top:12px">'+esc(m.n||'')+'</div>'
+    +'<div style="font:700 12px \'Public Sans\';color:rgba(255,255,255,.6);margin-top:3px">'+esc(m.t||'')+'</div>'
+    +(rec&&rec.email?('<div style="font:600 11.5px \'Public Sans\';color:rgba(255,255,255,.42);margin-top:6px">'+esc(rec.email)+'</div>'):'')
+    +'</div>'
+    +'<div style="margin-top:18px"><div class="lg-lab">Change your password</div>'
+    +'<input id="sw-pw1" class="lg-in" type="password" autocomplete="new-password" placeholder="New password">'
+    +'<input id="sw-pw2" class="lg-in" type="password" autocomplete="new-password" placeholder="Repeat it" style="margin-top:8px">'
+    +'<div id="sw-msg" class="lg-msg"></div>'
+    +'<div class="lg-btn" id="sw-pwgo" style="background:rgba(255,255,255,.14)">Update password</div></div>'
+    +'<div class="lg-btn" id="sw-out" style="margin-top:26px;background:#c0392b">Sign out</div>'
+    +'<div class="lg-note">Signing out clears this device. Signing back in needs a connection, so do not sign out before heading to a dead spot.</div>';
+
+  var go=document.getElementById('sw-pwgo');
+  if(go) go.addEventListener('click', authChangePassword);
+  var out=document.getElementById('sw-out');
+  if(out) out.addEventListener('click', authSignOut);
+}
+
+function authSwMsg(t, ok){
+  var el=document.getElementById('sw-msg'); if(!el)return;
+  el.textContent=t||''; el.className='lg-msg'+(ok?' ok':'');
+}
+function authChangePassword(){
+  var a=document.getElementById('sw-pw1'), b=document.getElementById('sw-pw2');
+  var p1=a?a.value:'', p2=b?b.value:'';
+  if(p1.length<8){ authSwMsg('Use at least 8 characters.'); return; }
+  if(p1!==p2){ authSwMsg('Those two do not match.'); return; }
+  var auth=fbAuth();
+  if(!auth || !auth.currentUser){ authSwMsg('Cannot reach the sign-in service.'); return; }
+  if(navigator.onLine===false){ authSwMsg('No signal — a password change needs a connection.'); return; }
+  authSwMsg('Working…');
+  auth.currentUser.updatePassword(p1).then(function(){
+    if(a)a.value=''; if(b)b.value='';
+    authSwMsg('Password updated ✓', true);
+  }).catch(function(err){
+    var code = (err && err.code) || '';
+    /* Firebase refuses to change a password on a session that has been alive a
+       long time, which for a farm phone signed in since spring is the normal
+       case rather than the exception. Say what to do about it. */
+    if(code === 'auth/requires-recent-login'){
+      authSwMsg('For safety this needs a fresh sign-in. Sign out, sign back in, then try again.');
+    } else if(code === 'auth/weak-password'){
+      authSwMsg('That password is too easy to guess. Try a longer one.');
+    } else if(code === 'auth/network-request-failed'){
+      authSwMsg('Could not reach the sign-in service. Check your connection.');
+    } else {
+      authSwMsg('That did not work.');
+    }
+  });
+}
+
+/* First password, and every forgotten one after it, in one flow.
+
+   WHY AN EMAILED LINK RATHER THAN "just let them pick a password":
+   the crew's addresses are institutional and easy to guess. If setting a
+   password only needed an email address, anyone who guessed wczekai@utk.edu
+   could claim the Farm Manager's account. Clicking a link sent to the mailbox
+   is what proves the person owns it. That is the whole security of this flow,
+   so it does not get shortcut. */
+function authSendReset(){
+  var auth=fbAuth();
+  if(!auth){ authMsg('Sign-in is not set up on this copy of the app.'); return; }
+  var el=document.getElementById('lg-email');
+  var email=(el?el.value:'').trim();
+  if(!email){ authMsg('Enter your farm email address first, then tap this again.'); if(el)el.focus(); return; }
+  if(navigator.onLine===false){ authMsg('No signal. Setting a password needs a connection.'); return; }
+
+  var link=document.getElementById('lg-reset');
+  if(link) link.textContent='Sending…';
+  var finish=function(){
+    if(link) link.textContent='First time here, or forgotten your password?';
+    /* Deliberately the SAME words whether or not that address has an account.
+       Anything else would let a stranger with the URL test addresses until one
+       came back different, and so learn who works at the farm. */
+    authMsg('If that address is on the farm roster, a link is on its way. Open it on this device, choose a password, then come back here and sign in.', true);
+  };
+  auth.sendPasswordResetEmail(email).then(finish).catch(function(err){
+    var code=(err&&err.code)||'';
+    if(code==='auth/network-request-failed'){
+      if(link) link.textContent='First time here, or forgotten your password?';
+      authMsg('Could not reach the sign-in service. Check your connection.');
+    } else if(code==='auth/too-many-requests'){
+      if(link) link.textContent='First time here, or forgotten your password?';
+      authMsg('Too many tries. Wait a few minutes and try again.');
+    } else if(code==='auth/invalid-email'){
+      if(link) link.textContent='First time here, or forgotten your password?';
+      authMsg('That does not look like an email address.');
+    } else {
+      /* Includes auth/user-not-found — swallowed on purpose, see above. */
+      finish();
+    }
+  });
+}
+
+function authSignIn(email, pass){
+  var auth=fbAuth();
+  if(!auth){ authMsg('Sign-in is not set up on this copy of the app.'); return; }
+  email=(email||'').trim();
+  if(!email || !pass){ authMsg('Enter your email and password.'); return; }
+  if(navigator.onLine===false){ authMsg('No signal. The first sign-in on a device needs a connection.'); return; }
+
+  var btn=document.getElementById('lg-go');
+  if(btn){ btn.setAttribute('disabled','disabled'); btn.textContent='Signing in…'; }
+  var done=function(){ if(btn){ btn.removeAttribute('disabled'); btn.textContent='Sign in'; } };
+
+  auth.signInWithEmailAndPassword(email, pass).then(function(cred){
+    var user = cred && cred.user;
+    return authClaims(user).then(function(c){
+      done();
+      var pid = authPidOfClaims(c);
+      if(!pid){
+        authMsg('This account is not linked to anyone on the roster yet. Ask the app manager.');
+        return;
+      }
+      var admin = authIsAdminClaims(c);
+      if(!authEnter(pid, admin)){
+        authMsg('That account is no longer active on the roster.');
+        return;
+      }
+      authSaveLocal({ pid:pid, email:(user&&user.email)||email, admin:admin, at:isoLocal(new Date()) });
+      try{ localStorage.setItem(AUTH_KEY+'_last', JSON.stringify({email:(user&&user.email)||email})); }catch(e){}
+      var pw=document.getElementById('lg-pass'); if(pw) pw.value='';
+      authMsg('');
+      stack.length=0;
+      goRoot(admin ? 'roster' : lgHome());
+    });
+  }).catch(function(err){
+    done();
+    var code = (err && err.code) || '';
+    if(code === 'auth/network-request-failed'){
+      authMsg('Could not reach the sign-in service. Check your connection.');
+    } else if(code === 'auth/too-many-requests'){
+      authMsg('Too many tries. Wait a few minutes and try again.');
+    } else if(code === 'auth/user-disabled'){
+      authMsg('That account has been turned off. Ask the app manager.');
+    } else {
+      /* Every other failure gets the SAME wording on purpose. Distinguishing
+         "no such account" from "wrong password" would let anyone with the URL
+         work out who does and does not work here. */
+      authMsg('That email and password do not match.');
+    }
+  });
+}
+
+function authSignOut(){
+  var auth=fbAuth();
+  /* Local state goes first: a failed network call must not leave somebody
+     half-signed-out, still looking at another person's screens. */
+  authClearLocal();
+  try{ sessionClear(); }catch(e){}
+  currentRole='undergrad';
+  stack.length=0;
+  if(auth){ try{ auth.signOut().catch(function(){}); }catch(e){} }
+  show('login',false);
+  authRenderLogin('Signed out.');
+}
+
+(function(){
+  var r=document.getElementById('lg-reset');
+  if(r) r.addEventListener('click', authSendReset);
+  var f=document.getElementById('lg-form');
+  if(f) f.addEventListener('submit', function(e){
+    e.preventDefault();
+    authSignIn(document.getElementById('lg-email').value, document.getElementById('lg-pass').value);
+  });
+  /* Coming back online is the moment to reconcile a session we could not check
+     while the crew were out in the field. */
+  window.addEventListener('online', function(){ if(authLocal()) authVerify(); });
+})();
+
 function pwaVersionLine(){
   if(!UT_SW_VERSION) return '';
   return '<div style="font:600 11px \'Public Sans\';color:var(--muted);margin:12px 20px 0">'
@@ -14425,16 +14720,12 @@ function pwaVersionLine(){
   try{ ppRegister(); }catch(e){}
   /* Load saved records over the seed arrays before a single screen paints. */
   try{ storeHydrate(); }catch(e){}
-  var saved=null; try{ saved=localStorage.getItem(SESSION_KEY); }catch(e){}
-  var landed=false;
-  if(saved==='__admin'){ signInAdmin(); landed=true; goRoot('roster'); }
-  else if(saved&&sessionRestore()){ landed=true; goRoot(lgHome()); }
-  if(!landed){
+  if(!authBoot()){
     /* Nobody signed in. currentRole still has to hold *something* for the
        renderers that read it, and undergrad is the least-privileged option —
        if anything paints before sign-in it paints the smallest view. */
     currentRole='undergrad';
-    renderSignIn('lg-body','');
+    authRenderLogin();
     show('login',false);
   }
 })();

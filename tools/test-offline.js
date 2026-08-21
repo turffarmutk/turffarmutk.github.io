@@ -55,7 +55,17 @@ section('1. nothing loads from the internet');
 section('2. every vendored path exists');
 {
   const refs = [...HTML.matchAll(/(?:src|href)="(vendor\/[^"]+)"/g)].map(m => m[1]);
-  ok('the app names vendored files', refs.length === 6, String(refs.length) + ': ' + refs.join(' '));
+  /* Named rather than counted. A count says nothing about WHICH library went
+     missing, and it has to be edited every time one is added — which is how a
+     stale assertion ends up looking like a regression. */
+  ['vendor/leaflet/leaflet.js', 'vendor/leaflet/leaflet.css',
+   'vendor/geoman/leaflet-geoman.min.js', 'vendor/geoman/leaflet-geoman.css',
+   'vendor/turf/turf.min.js', 'vendor/fonts/fonts.css',
+   'vendor/firebase/firebase-app-compat.js',
+   'vendor/firebase/firebase-auth-compat.js'].forEach(function (want) {
+    ok('the app loads ' + want, refs.indexOf(want) >= 0, refs.join(' '));
+  });
+  ok('and nothing else is pulled from vendor/', refs.length === 8, String(refs.length) + ': ' + refs.join(' '));
   refs.forEach(r => {
     ok('exists: ' + r, fs.existsSync(path.join(ROOT, r)));
   });

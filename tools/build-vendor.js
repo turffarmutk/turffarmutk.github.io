@@ -7,7 +7,8 @@
  * so none of it is hand-maintained.
  *
  *   npm install leaflet@1.9.4 @geoman-io/leaflet-geoman-free@2.16.0 @turf/turf@7 \
- *               @fontsource/archivo @fontsource/public-sans
+ *               @fontsource/archivo @fontsource/public-sans \
+ *               firebase@12.18.0
  *   node tools/build-vendor.js
  *
  * Pin the versions when you re-run it: an unpinned upgrade is exactly the kind
@@ -47,6 +48,14 @@ fs.readdirSync(need(path.join(NM, 'leaflet/dist/images'))).forEach(f => {
 n += copy(need(path.join(NM, '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css')), path.join(OUT, 'geoman/leaflet-geoman.css'));
 n += copy(need(path.join(NM, '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.min.js')), path.join(OUT, 'geoman/leaflet-geoman.min.js'));
 n += copy(need(path.join(NM, '@turf/turf/turf.min.js')), path.join(OUT, 'turf/turf.min.js'));
+
+/* Firebase's compat builds, which are the ones that work without a bundler:
+   they are UMD, so the bare require() inside only runs in the Node branch that
+   a browser never takes, and they set the `firebase` global the app reads.
+   Only app and auth are vendored — firestore-compat is another 547 KB and is
+   not needed until the records themselves move. */
+n += copy(need(path.join(NM, 'firebase/firebase-app-compat.js')), path.join(OUT, 'firebase/firebase-app-compat.js'));
+n += copy(need(path.join(NM, 'firebase/firebase-auth-compat.js')), path.join(OUT, 'firebase/firebase-auth-compat.js'));
 
 /* One stylesheet out of the per-weight ones @fontsource ships: .woff dropped,
    ./files/x flattened to ./x so the whole family sits in one folder. */

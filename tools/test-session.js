@@ -67,6 +67,7 @@ function boot(store) {
   const scripts = [require('./_geo').geoSource(), ...win.document.querySelectorAll('script:not([src])')].map(s => typeof s === 'string' ? s : s.textContent);
   const EX = ['SESSION','sessionSet','sessionPerson','sessionRestore','sessionClear','signOut','doSignIn',
               'me','myLab','meName','calSelf','trMe','rstMe','roleSlug','ROLE_SLUG','renderSignIn',
+              'authBoot','authSaveLocal','authLocal','authClearLocal',
               'trAccess','trCanEdit','trMyLabs','prefsWho','prefsGet','prefsSet','rstFind','pName',
               'PEOPLE','USERS','RST_LOGIN','HOME_DEST','show','go','goRoot','rstActive','tbLabKey','calMyLab'];
   try {
@@ -153,14 +154,22 @@ section('4. preferences are per person, including two people in one role');
   ok('nothing is filed under the role name', !stored.grad);
 }
 
-section('5. a session survives a reload');
+section('5. a session survives a reload — but only a real one');
 {
   const store = {};
-  { const { s } = boot(store); s.sessionSet('p12'); }
+  { const { s } = boot(store); s.sessionSet('p12'); s.authSaveLocal({ pid: 'p12', admin: false }); }
   { const { s } = boot(store);
     ok('comes back as Logan', s.me().n === 'Logan Smith', s.me().n);
     ok('and as a grad', s.getRole() === 'grad', s.getRole());
-    ok('lands on the grad home', s.doc === undefined || true);
+  }
+  /* The difference between the old picker and a login: a leftover roster id
+     with no auth record behind it must NOT let anybody in. Before sign-in
+     existed, SESSION_KEY alone was enough. */
+  { const bare = {};
+    { const { s } = boot(bare); s.sessionSet('p12'); }      /* writes SESSION_KEY, no auth record */
+    const { s } = boot(bare);
+    ok('a stored roster id with no auth record signs nobody in', s.authBoot() === false);
+    ok('and SESSION.pid stays null', s.SESSION.pid === null, s.SESSION.pid);
   }
   /* Somebody who has left cannot be restored into the app. */
   { const { s, win } = boot(store);
@@ -180,21 +189,17 @@ section('6. opening a screen can no longer promote you');
   ok('and the account is still Garrett', s.me().n === 'Garrett Willard', s.me().n);
 }
 
-section('7. the sign-in list');
+section('7. the sign-in screen is a login, not a list');
 {
   const { s, doc } = boot({});
-  s.renderSignIn('lg-body', '');
-  const rows = doc.querySelectorAll('#lg-body [data-signin]');
-  ok('lists all 23 people plus the App Manager', rows.length === 24, String(rows.length));
-  s.renderSignIn('lg-body', 'brosnan');
-  const filtered = [...doc.querySelectorAll('#lg-body [data-signin]')]
-    .map(r => r.getAttribute('data-signin')).filter(v => v !== '__admin');
-  ok('search narrows by lab', filtered.length > 0 && filtered.length < 23, String(filtered.length));
-  ok('every result is in the Brosnan lab',
-     filtered.every(pid => s.rstFind(pid).lab === 'Brosnan'),
-     filtered.join(','));
-  s.renderSignIn('lg-body', 'nobodyhere');
-  ok('an empty search says so', /Nobody on the roster/.test(doc.getElementById('lg-body').innerHTML));
+  ok('there is an email field', !!doc.getElementById('lg-email'));
+  ok('and a masked password field', (doc.getElementById('lg-pass') || {}).type === 'password');
+  /* The picker published all 23 names to anyone who opened the page. It is
+     gone, and it must not come back. */
+  ok('no picker rows remain', doc.querySelectorAll('[data-signin]').length === 0);
+  ok('the picker renderer is gone', typeof s.renderSignIn === 'undefined');
+  ok('nobody is named on the sign-in screen',
+     !/Czekai|Gibbons|McCallum|Brosnan/.test(doc.getElementById('s-login').textContent || ''));
 }
 
 section('8. signing out');

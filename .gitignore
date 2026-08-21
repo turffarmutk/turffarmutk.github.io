@@ -14,6 +14,9 @@ _to_delete/
 # is a reference copy of what the seed used to hold.
 roster-emails.local.json
 
+# Written by tools/create-accounts.js. Hand the passwords out, then delete it.
+initial-passwords.local.txt
+
 # A clone of the published repo made INSIDE this folder. It has bitten twice: a
 # nested .git makes `git add -A` abort with "does not have a commit checked out"
 # and take the whole commit down with it. Ignored so it cannot do that again.

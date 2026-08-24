@@ -68,27 +68,93 @@ account and become the Farm Manager. Clicking a link sent to the mailbox is what
 proves the person owns it.
 
 Firebase's own email service sends **2 messages an hour** and is explicitly not
-for real use — 23 people signing up would take a day and a half. So use Brevo,
-which is free forever for 300 a day and lets you send from a single address
-without owning a domain.
+for real use — 23 people signing up would take a day and a half. So the app
+sends through the farm's own Gmail account instead.
 
-1. Sign up at <https://www.brevo.com> — use a **farm-owned** address, not your
-   student one
-2. In Brevo: **Senders, Domains & Dedicated IPs → Senders → Add a sender**.
-   Use the farm address. Brevo emails it a confirmation link — click it
-3. In Brevo: **SMTP & API** → note the **SMTP login** (looks like
-   `7abcde@smtp-brevo.com`) and the **master password**
-4. In Firebase console → **Authentication → Templates** → **SMTP settings**
-   (sometimes under a "Customize" or pencil icon), enter:
-   - Host `smtp-relay.brevo.com`
+**Why Gmail and not an email service.** The obvious move is a service like
+Brevo, and that was what this step used to say. It does not work here. Those
+services have to *prove* an email really came from you, and they do that by
+adding records to the settings of the domain it is sent from — the part after
+the @. Send from `turffarmutk@gmail.com` and that domain is `gmail.com`, which
+belongs to Google, not to the farm. Nothing you can do makes that box go green,
+and Gmail and Outlook increasingly bin mail that fails the check. Sending
+through Google itself sidesteps the whole thing: the mail genuinely is from that
+account, so it passes every check with nothing to configure.
+
+The limit is **500 emails a day**, against a crew of 23. Not a concern.
+
+**A. Turn on 2-Step Verification** on the farm Google account — Google will not
+issue the password below without it.
+
+1. Sign in as **turffarmutk@gmail.com** (not your student account)
+2. Go to <https://myaccount.google.com/security> → **2-Step Verification** →
+   follow it through. A phone number is fine
+3. Save the backup codes it offers somewhere the farm keeps things. If the
+   farm ever loses access to this account, nobody can log into the app
+
+**B. Make an app password.** This is a one-off 16-letter password that lets the
+app send mail as this account, and nothing else. It cannot read the mailbox and
+you can revoke it any time without touching the real password.
+
+1. Go to <https://myaccount.google.com/apppasswords>
+2. Name it `Turf Farm app` and click **Create**
+3. Google shows 16 letters in four blocks. **Copy them now** — it never shows
+   them again. Type them into Firebase below **without the spaces**
+4. Treat it like a key to the mailbox: don't email it, don't paste it into a
+   chat, don't put it in the project folder
+
+**C. Tell Firebase to use it.**
+
+1. Firebase console → **Authentication → Templates** → **SMTP settings**
+   (sometimes behind a "Customize" or pencil icon), enter:
+   - Host `smtp.gmail.com`
    - Port `587`
-   - Username: the Brevo SMTP login from step 3
-   - Password: the Brevo master password
-   - Sender address: the farm address you verified
-5. Save
+   - Username `turffarmutk@gmail.com`
+   - Password: the 16 letters from B, no spaces
+   - Sender address: `turffarmutk@gmail.com`
+2. Save
+
+**The sender address must be exactly the same account as the username.** Google
+will not send mail claiming to be from anyone else, and the failure is silent —
+the app says the link is on its way and nothing arrives.
 
 *Check:* Firebase → Authentication → Templates → **Password reset** → send
-yourself a test if offered. Otherwise you'll confirm it for real in Step 6.
+yourself a test if offered. Otherwise you'll confirm it for real in Step 7.
+
+**If you already set up Brevo:** nothing to undo. Replacing the SMTP settings
+above is enough, and the Brevo account can simply be left alone or closed.
+
+### When the farm gets a university address
+
+Changing where the app sends from is five boxes in the Firebase console and
+takes about two minutes. No code, no rebuild, nobody signs out. So this is not a
+decision you are locked into.
+
+**But do not plan on the app sending through a UT Outlook account.** Microsoft
+is switching off the old username-and-password way of letting a program send
+mail — off by default at the end of 2026, gone during 2027 — and Firebase only
+knows that old way. Many universities have already turned it off. It may look
+like it works for a while and then stop, which is the worst way for a login
+system to fail.
+
+Keep the two things separate in your head:
+
+- **The farm's mailbox** — where people write to the farm, who owns the account.
+  That should absolutely become a university address.
+- **The machine that sends automated password links.** That is a different job,
+  and it is fine, permanently, for it to stay the Gmail account. It costs
+  nothing and nothing about it expires.
+
+**So what to ask OIT for.** A mailbox on its own does not help the app. The
+thing worth asking for is **a web address the farm controls — say
+`turffarm.utk.edu` — or a willingness to add two or three DNS records for the
+farm.** That is what would let the app send as a genuine UT address through a
+proper email service. If OIT can only offer a mailbox, that is still worth
+having; just leave this step exactly as it is.
+
+The rule underneath all of this, if you want one sentence: **the address on the
+"from" line has to belong to whoever actually sends the mail.** Every dead end
+in this step has been a version of breaking that rule.
 
 ---
 
@@ -166,7 +232,8 @@ Do this yourself before anyone else sees it. Open
 2. Type your farm email, then tap **"First time here, or forgotten your
    password?"**
 3. You should get an email within a minute. **If nothing arrives, the problem is
-   Step 3** — check junk first, then the Brevo sender confirmation
+   Step 3** — check junk first, then that the sender address in Firebase is
+   exactly `turffarmutk@gmail.com` and the app password was typed without spaces
 4. Open the link, choose a password, come back and sign in
 5. You land on the right screens for your role
 6. **More → Account** shows your name and email
@@ -279,6 +346,15 @@ Recording these so they aren't rediscovered the hard way:
 
 **"Unauthorized domain"** → Step 2.
 
+**The password link never arrives** → in order: junk folder; does Firebase →
+Authentication → **Users** actually list the person (no account, no email);
+is the sender address in Step 3 exactly the same Gmail account as the username;
+was the app password typed without its spaces. If the app now shows a message
+naming a reason, send me that wording — it is the fastest way in.
+
+**"App passwords" isn't there on the Google account** → 2-Step Verification is
+not on yet. Step 3A.
+
 **The map is blank after a push** → a file called `.nojekyll` went missing from
 the project. Tell me; it's a one-line fix and there's a note in
 `docs/LAUNCH.md`.
@@ -297,7 +373,7 @@ Manager → Roster → Hand off the app → Data & backup.
 |---|---|---|
 | 1 | Turn on Email/Password in Firebase | YOU |
 | 2 | Add `turffarmutk.github.io` to authorized domains | YOU |
-| 3 | Set up Brevo email so password links can be sent | YOU |
+| 3 | Point Firebase at the farm Gmail so password links can be sent | YOU |
 | 4 | Download the service-account key, keep it OUT of the project folder | YOU |
 | 5 | Run the account script — dry run first | YOU |
 | 6 | Commit and push in GitHub Desktop | YOU |

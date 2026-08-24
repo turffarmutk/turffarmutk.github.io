@@ -556,31 +556,6 @@
   [data-corner="sharp"] .card,[data-corner="sharp"] .list,[data-corner="sharp"] .hub,[data-corner="sharp"] .action,[data-corner="sharp"] .seg,[data-corner="sharp"] .wx,[data-corner="sharp"] .kpi,[data-corner="sharp"] .plot,[data-corner="sharp"] .zbtn{border-radius:3px!important}
 
 
-/* ---------- preview size toggle ----------
-   Prototype furniture, not part of the product: it pins the shell to one
-   layout band so a phone view can be shown on a laptop. Sits bottom-right,
-   dimmed until hovered, and collapses to a nub. Hidden on genuinely small
-   windows — there's nothing to preview and it would land on the tab bar —
-   unless a lock is active, in which case it must stay reachable or there's
-   no way back to Auto. */
-#szt{position:fixed;right:14px;bottom:14px;z-index:9999;display:none;align-items:center;gap:2px;
-  padding:4px;border-radius:12px;background:rgba(18,20,22,.86);
-  -webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px);
-  border:1px solid rgba(255,255,255,.17);box-shadow:0 6px 24px rgba(0,0,0,.45);
-  font-family:'Public Sans',system-ui,sans-serif;opacity:.5;transition:opacity .15s}
-#szt:hover{opacity:1}
-#szt.show{display:flex}
-#szt .szt-lbl{font:800 8.5px 'Public Sans';color:rgba(255,255,255,.45);text-transform:uppercase;
-  letter-spacing:.7px;padding:0 6px 0 5px;user-select:none;white-space:nowrap}
-#szt span[data-sz]{font:700 11px 'Public Sans';color:rgba(255,255,255,.72);padding:5px 9px;
-  border-radius:8px;cursor:pointer;white-space:nowrap;user-select:none}
-#szt span[data-sz]:hover{background:rgba(255,255,255,.13);color:#fff}
-#szt span[data-sz].on{background:var(--acc,#ff8200);color:#fff}
-#szt .szt-x{font:700 13px 'Public Sans';color:rgba(255,255,255,.42);padding:4px 7px;
-  border-radius:8px;cursor:pointer;user-select:none}
-#szt .szt-x:hover{background:rgba(255,255,255,.13);color:#fff}
-#szt.min{opacity:.32}
-#szt.min .szt-lbl,#szt.min span[data-sz]{display:none}
 
 html,body{height:100%;margin:0}
 body{background:#0f1011;display:flex;align-items:center;justify-content:center;font-family:'Public Sans',system-ui,sans-serif}
@@ -833,7 +808,19 @@ html[data-size="tablet"] .locbtn{top:14px;right:16px;width:40px;height:40px}
      and maintaining it alongside the tablet one meant every change had to be
      made and checked twice. The tablet layout now covers everything from a
      tablet up to a monitor. */
-  function pick(w){ return w<820?'phone':'tablet'; }
+  /* Width alone was the whole test, and it got a phone on its side wrong: an
+     iPhone turned landscape is ~850-930px across and ~400px tall, which read as
+     a monitor and swapped the bottom tab bar for a rail mid-shift. Shape alone
+     cannot separate that from a short laptop window, and a touch screen alone
+     cannot separate it from an iPad, so it takes both. An iPad on its side is
+     740px+ tall and stays on the roomy layout; a laptop reports a fine pointer
+     and stays there however short the window. */
+  function pick(w, h){
+    if(w<820) return 'phone';
+    var coarse=false;
+    try{ coarse=window.matchMedia('(pointer:coarse)').matches; }catch(e){}
+    return (coarse && h<560) ? 'phone' : 'tablet';
+  }
   window.APP_SIZE=function(){ return document.documentElement.getAttribute('data-size')||'phone'; };
   /* ---- preview lock ----
      Normally the shell picks its layout from the window, which is what ships.
@@ -851,7 +838,7 @@ html[data-size="tablet"] .locbtn{top:14px;right:16px;width:40px;height:40px}
     try{ LOCK?localStorage.setItem('ut_sizelock',LOCK):localStorage.removeItem('ut_sizelock'); }catch(e){}
   };
   window.APP_SIZE_APPLY=function(){
-    var s=LOCK||pick(window.innerWidth||820), root=document.documentElement;
+    var s=LOCK||pick(window.innerWidth||820, window.innerHeight||800), root=document.documentElement;
     if(root.getAttribute('data-size')===s) return false;
     root.setAttribute('data-size',s);
     return true;
@@ -13440,55 +13427,12 @@ peApply();
 /* boot the saved theme last, once every screen's markup exists */
 (function(){ applyBanner(); applyTextSize(); if(THEME.cb)cbApply(); cbWatch(); })();
 
-/* ---- preview size toggle ----
-   Builds its own element rather than living in the markup: it's prototype
-   furniture, so keeping the whole thing in one block makes it a single delete
-   when the app ships. Flipping the band is the same work a window resize does,
-   so it reuses adaptiveResize() instead of duplicating the rail/split/Leaflet
-   fixups. */
-(function(){
-  var el=document.createElement('div');
-  el.id='szt';
-  /* "Desktop" pins the tablet band on purpose — since the two large-screen
-     layouts merged there is only one, and viewers think in terms of the device
-     in front of them, not the band name in the stylesheet. */
-  el.innerHTML='<span class="szt-lbl">View</span>'
-    +'<span data-sz="">Auto</span><span data-sz="phone">Phone</span>'
-    +'<span data-sz="tablet">Desktop</span>'
-    +'<span class="szt-x">›</span>';
-  document.body.appendChild(el);
-  var min=false; try{ min=localStorage.getItem('ut_sizelock_min')==='1'; }catch(e){}
-
-  function paint(){
-    var lock=SIZE_LOCK();
-    el.querySelectorAll('[data-sz]').forEach(function(s){
-      s.classList.toggle('on',(s.getAttribute('data-sz')||null)===lock);
-    });
-    el.classList.toggle('min',min);
-    el.querySelector('.szt-x').textContent=min?'‹':'›';
-    /* a lock keeps the toggle on screen at any width — otherwise narrowing the
-       window while locked to desktop would strand the viewer there */
-    el.classList.toggle('show',(window.innerWidth>=900)||!!lock);
-  }
-
-  el.addEventListener('click',function(e){
-    if(e.target.closest('.szt-x')){
-      min=!min;
-      try{ localStorage.setItem('ut_sizelock_min',min?'1':'0'); }catch(err){}
-      paint(); return;
-    }
-    var s=e.target.closest('[data-sz]'); if(!s)return;
-    SIZE_LOCK_SET(s.getAttribute('data-sz'));
-    try{ adaptiveResize(); }catch(err){}
-    try{ renderTabs(); }catch(err){}
-    paint();
-  });
-
-  window.addEventListener('resize',function(){
-    clearTimeout(window._sztT); window._sztT=setTimeout(paint,120);
-  });
-  paint();
-})();
+/* The on-screen View toggle (Auto / Phone / Desktop) that used to sit in the
+   bottom-right was prototype furniture and has been removed — the shell picks
+   its band from the window, which is the only thing a browser can be trusted
+   about. SIZE_LOCK_SET('phone'|'tablet'|null) is deliberately kept on window
+   so the band can still be pinned from a browser console for troubleshooting;
+   nothing in the UI calls it. */
 
 /* ============================================================
    BOOT · decide who is looking at this

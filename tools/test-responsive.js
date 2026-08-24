@@ -78,10 +78,25 @@ const active = () => { const a = doc.querySelector('.screen.active'); return a ?
 
 /* innerWidth is read-only-ish in jsdom but configurable, so redefine it and then
    drive the app's own detector rather than setting data-size by hand. */
-function setWidth(w) {
+function setWidth(w, h) {
   Object.defineProperty(win, 'innerWidth', { value: w, configurable: true, writable: true });
+  Object.defineProperty(win, 'innerHeight', { value: h == null ? 900 : h,
+                                              configurable: true, writable: true });
   win.APP_SIZE_APPLY();
   win.renderRail();
+}
+
+/* pick() also asks whether the pointer is coarse — that is how a phone on its
+   side is told apart from a short laptop window. jsdom answers false to every
+   media query, so the harness has to fake it. Reset to false when done: false
+   is jsdom's own answer, so leaving it set is a no-op for everything else. */
+function setPointer(coarse) {
+  win.matchMedia = q => ({
+    matches: /pointer\s*:\s*coarse/.test(q) ? !!coarse : false,
+    media: q, onchange: null,
+    addListener() {}, removeListener() {},
+    addEventListener() {}, removeEventListener() {}, dispatchEvent() { return false; }
+  });
 }
 function rail() { return doc.getElementById('rail'); }
 function railLabels() {
@@ -104,6 +119,39 @@ section('1. breakpoints');
   ok('data-size lands on <html>', root.getAttribute('data-size') === 'tablet',
      'got ' + root.getAttribute('data-size'));
   ok('there is no desktop band left', !cases.some(c => c[1] === 'desktop'));
+}
+
+section('1b. a phone on its side is still a phone');
+{
+  /* Regression: width was the only test, so an iPhone turned landscape (~850-930
+     across, ~400 tall) read as a monitor and swapped the bottom tab bar for a
+     rail mid-shift. It takes shape AND pointer type to separate the three cases
+     below — either signal alone gets one of them wrong. */
+  setPointer(true);
+  [[852, 393, 'iPhone on its side'],
+   [932, 430, 'a big phone on its side'],
+   [915, 412, 'an Android on its side']].forEach(([w, h, what]) => {
+    setWidth(w, h);
+    ok(what + ' stays on the phone shell', win.APP_SIZE() === 'phone', 'got ' + win.APP_SIZE());
+  });
+
+  /* A tablet on its side is short and wide too, but nowhere near this short. */
+  [[1180, 820, 'an iPad on its side'],
+   [1133, 744, 'a small iPad on its side']].forEach(([w, h, what]) => {
+    setWidth(w, h);
+    ok(what + ' gets the roomy shell', win.APP_SIZE() === 'tablet', 'got ' + win.APP_SIZE());
+  });
+
+  /* And a laptop reports a fine pointer, so a squashed window stays a laptop. */
+  setPointer(false);
+  setWidth(1440, 380);
+  ok('a squashed laptop window is not a phone', win.APP_SIZE() === 'tablet', 'got ' + win.APP_SIZE());
+  setWidth(390, 400);
+  ok('a genuinely narrow window is, whatever the pointer',
+     win.APP_SIZE() === 'phone', 'got ' + win.APP_SIZE());
+
+  setPointer(false);
+  setWidth(1440);
 }
 
 section('2. phone is untouched');
@@ -375,8 +423,16 @@ section('12b. the sign-in stack is centred on a big screen');
      !/html\[data-size="phone"\][^{]*#s-login/.test(CSS));
 }
 
-section('13. the preview lock pins a band');
+section('13. the preview lock pins a band, but has no on-screen control');
 {
+  /* The View toggle (Auto / Phone / Desktop) that sat bottom-right was
+     prototype furniture and is gone. The plumbing behind it stays, callable
+     from a browser console, so a band can still be pinned when troubleshooting
+     — but nothing in the UI offers it to the crew. */
+  ok('the toggle is not in the page', !doc.getElementById('szt'));
+  ok('and none of its styling is left',
+     !fs.readFileSync(APP, 'utf8').includes('#szt'));
+
   ok('a lock getter is exposed', typeof win.SIZE_LOCK === 'function');
   ok('nothing is locked by default', win.SIZE_LOCK() === null, String(win.SIZE_LOCK()));
 

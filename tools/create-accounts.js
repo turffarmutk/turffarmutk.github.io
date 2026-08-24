@@ -110,9 +110,13 @@ if (DRY) {
 
 /* --- do it -------------------------------------------------------------- */
 
-const admin = require('firebase-admin');
-admin.initializeApp({ credential: admin.credential.applicationDefault() });
-const auth = admin.auth();
+/* firebase-admin v13+ dropped the old `admin.credential` / `admin.auth()`
+ * namespace. Import from the subpaths instead — this is the current API and
+ * the one the Firebase docs show. Do not "simplify" it back. */
+const { initializeApp, applicationDefault } = require('firebase-admin/app');
+const { getAuth } = require('firebase-admin/auth');
+initializeApp({ credential: applicationDefault() });
+const auth = getAuth();
 
 (async function () {
   const handout = [];

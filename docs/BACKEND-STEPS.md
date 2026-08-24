@@ -1,11 +1,14 @@
-# Building the shared database — what happens, in plain terms
+# Part Two — the shared database, start to finish
 
-Written 2026-08-20, after the login went in.
+Written 2026-08-20. Rewritten 2026-08-24 after the move to Firebase.
 
 This document is for **you**, not for a programmer. It explains what we are
 about to build, what you will have to decide, and what you will actually see
 happen. The code and the database language are my job — you should never have to
 read them.
+
+It picks up where `docs/GO-LIVE-MANUAL.md` ends. Finish that first: everyone
+signing in as themselves is the foundation this whole thing sits on.
 
 ---
 
@@ -32,69 +35,83 @@ This is the single biggest improvement left, and it is also the most work.
 
 ---
 
-## The one decision that matters most
+## What is already decided
 
-**When someone is out in a dead spot with no signal, what should the app do?**
+You settled these. They are not open questions any more — I am listing them so
+you know you do not have to think about them again.
 
-Two possible answers:
+**1. The app keeps working with no signal.** The phone stays the working copy.
+You tap "done", it saves on the phone straight away, and it quietly sends it up
+the next time there is signal. The alternative — an app that needs bars to work
+— is useless at the far end of the farm, which is exactly where the crew are
+when they need to record a mow.
 
-**Option A — the app needs signal to work.** Simple to build. Also useless at
-the far end of the farm, which is exactly where the crew are when they need to
-record a mow.
-
-**Option B — the phone keeps working, and catches up later.** The phone stays
-the working copy. You tap "done", it saves on the phone straight away, and it
-quietly sends it to the shared copy the next time there is signal. This is how
-the bug reporter already works, and the crew already rely on it.
-
-**I strongly recommend B.** It is more work for me and invisible to you when it
-works — but the alternative is an app that stops working in a field.
-
-I need you to confirm B before I start, because it changes almost everything
-about how I build it.
+**2. The database is Firebase.** Same company as the logins you are setting up
+now, which means one account, one bill, one place to look when something is
+wrong. It also does the no-signal catching-up above for free, which is the
+hardest part of this whole job.
 
 ---
 
-## Three more things only you can decide
+## The money question, honestly
 
-**1. The free plan goes to sleep.** A free database shuts itself down after a
-week with nobody using it. Today that would just mean nobody can sign in.
-Once the farm's records live there, it means **the records are unreachable**
-until someone wakes it up. The paid plan is $25 a month and does not sleep.
+**An earlier version of this document said the database costs $25 a month and
+goes to sleep if nobody uses it. That was about Supabase, which we moved away
+from. Please ignore it — it is wrong now.** This section replaces it.
 
-My honest view: fine on free while we build and test, but the farm should be
-paying for it before the crew depend on it. It is worth raising with Bill now
-rather than the week it happens.
+Firebase's free plan does not sleep and does not expire. What it gives you per
+day:
 
-**2. There are no backups on the free plan.** Once the shared copy is the real
-one, the Export button in the app becomes the farm's only safety net. Somebody
-needs to actually press it on a schedule. Worth deciding who.
+- **50,000 records read**
+- **20,000 records written**
+- **1 GB stored**
 
-**3. Who is allowed to see and change what?** The app already has ideas about
-this — undergrads can't edit the sprayer settings, trials belong to a lab. Right
-now those are just *hidden buttons*: anyone who knew how could get around them.
-In the shared copy I can make them **real rules the database enforces**, which
-nobody can get around.
+To put that in farm terms: 23 people using the app hard all day is a few
+thousand reads. You are not close. Text records — tasks, logs, stock counts —
+are tiny; 1 GB is more than this farm will generate in your time here and the
+next person's.
 
-I need you to confirm the rules are still right. In particular: **should people
-see trials from labs other than their own?** Today the app says no. Tell me if
-that's wrong.
+**So the realistic answer is that this costs nothing.** If it ever did outgrow
+free, it becomes pay-as-you-go pennies rather than a flat monthly fee, and
+Firebase will email you before that happens.
+
+**The thing that does matter: there are no automatic backups on the free plan.**
+Once the shared copy is the real one, the Export button in the app is the farm's
+only safety net. Somebody has to actually press it on a schedule.
+
+**Your job here:** decide with Bill *who* presses Export and *how often*, and
+put it in a calendar. Monthly is fine in winter; weekly in season. This is worth
+five minutes now and is miserable to sort out after something goes wrong.
 
 ---
 
-## How it will go — one drawer at a time
+## The drawers, and the order
 
 Think of the shared copy as a filing cabinet with a drawer for each kind of
-thing: tasks, equipment, field logs, inventory, the calendar, and so on.
+thing. **I do one drawer at a time, start to finish, and the farm uses it for a
+week before I start the next.**
 
-**I will do one drawer at a time, start to finish, and we will use it for a week
-before starting the next.** Tasks first, because it is the busiest.
+Doing all of them at once would be a single enormous change where, if something
+is wrong, it is wrong everywhere and hard to undo. One at a time means each
+change is small and the crew barely notice.
 
-Doing all of them at once would mean a single enormous change where, if
-something is wrong, it is wrong everywhere and hard to undo. One at a time means
-each change is small, and the crew barely notice.
+| # | Drawer | What changes for the farm | Why here in the order |
+|---|--------|---------------------------|-----------------------|
+| 1 | **Tasks** | Bill assigns; it lands on the right phone. Marked done; Bill sees it done. | Busiest drawer, so it proves the pattern. Slowest one — everything after copies it. |
+| 2 | **Calendar** | One shared schedule instead of five versions. | Simple, and immediately obvious to everyone that it worked. |
+| 3 | **Equipment** | Somebody marks a mower down and nobody else drives out to it. | Small drawer, high daily value. |
+| 4 | **Field log** | Every mow, spray and application in one place, readable by whoever writes the reports. | The record that matters most long-term, so it goes after the pattern is proven. |
+| 5 | **Inventory** | Real stock counts that two people can update at once without losing one. | The fiddliest of the text drawers — see below. |
+| 6 | **The map** | Plot shapes and edits shared instead of living on one phone. | A project of its own. Least urgent; the map already works offline. |
 
-For each drawer, the same four things happen:
+**After drawer 1, the farm has real shared tasks.** That alone is most of the
+day-to-day value. Everything after it is steady improvement rather than a leap.
+
+---
+
+## What happens for each drawer
+
+The same four things, every time:
 
 **1. I build it.** I write the shape of the drawer and the rules about who can
 open it. You see nothing yet; the app carries on as normal.
@@ -102,30 +119,53 @@ open it. You see nothing yet; the app carries on as normal.
 **2. Everyone opens the app once, on wifi.** This is the step that needs you.
 Whatever is on each person's phone gets copied up into the shared drawer. Until
 that happens, their records exist only on their phone — so **anyone who skips
-this loses what they entered.** It is a five-minute job per person and it has to
-happen before I flip the switch.
+this loses what they entered.** Five minutes per person, and it has to happen
+before I flip the switch.
 
 **3. I flip the switch.** The shared copy becomes the real one. From here,
 everyone sees the same thing.
 
 **4. We watch it for a week.** Then the next drawer.
 
-Roughly: tasks, then the calendar, then equipment, then the field log, then
-inventory, and the map last — the map is the fiddliest and the least urgent.
+Step 2 is the only one that can actually lose data. I will make it as obvious as
+I can inside the app — a banner, a nudge — but I cannot make somebody open their
+phone. A message from Bill the week before each switch-over is worth more than
+anything I can build.
 
 ---
 
-## What you will have to do
+## Questions I will need you to answer
 
-Not much, but the bits that need you really do need you:
+I can guess at these. You actually know. None of them block the start — I will
+ask each one when its drawer comes up — but they are worth turning over in your
+head now, and some are worth asking Bill.
 
-- **Confirm Option B** above, and the three decisions.
-- **Get everyone to open the app on wifi** before each switch-over. This is the
-  one that can actually lose data if it is skipped.
-- **Tell Bill about the $25/month** before the farm depends on it.
-- **Answer questions about the farm** when I hit them — things like "should a
-  technician be able to delete somebody else's field log?" I can guess, but you
-  know.
+**About who can see what** (this comes up in drawer 1 and affects all of them):
+
+- Should people see **trials from labs other than their own**? Today the app
+  says no. Is that right, or is it just cautious?
+- Can a Technician edit or delete **somebody else's** field log entry — a
+  correction the next morning, say?
+- Who can **assign** a task? Bill only, or can faculty and grad students assign
+  within their own lab?
+
+**About the awkward moments:**
+
+- Two people mark the same job done. First one wins and the second is told —
+  but told *what*? "Rose already logged this" is friendlier than an error.
+- Somebody logs a mow on the wrong plot and notices a week later. Should they be
+  able to fix it themselves, or does that need Bill?
+
+**About inventory, when we get there:**
+
+- Who is allowed to record a delivery coming in?
+- Should a stock count going negative stop somebody, or just warn them?
+
+Right now these rules exist in the app as **hidden buttons** — anyone who knew
+how could get around them. In the shared copy they become **real rules the
+database enforces**, which nobody can get around. That is a genuine upgrade in
+safety, and it is also why getting the answers right matters more than it did
+before.
 
 ---
 
@@ -133,52 +173,68 @@ Not much, but the bits that need you really do need you:
 
 **Someone's phone records don't get uploaded.** The main risk, and the reason
 for the wifi step. If someone has been logging work for weeks and never opens
-the app before we switch over, that work is gone. I will make the upload step
-as obvious as I can, but I cannot make somebody open the app.
+the app before we switch over, that work is gone.
 
-**Two people change the same thing at once.** Two crew both mark the same task
-done, or Bill edits a task while it is open on someone's screen. Today this
-cannot happen because the phones never talk. I will handle each case
-deliberately — first one wins, second one gets told — rather than letting the
-last person to press a button silently overwrite the other.
+**Two people change the same thing at once.** Today this cannot happen because
+the phones never talk. I will handle each case deliberately — first one wins,
+second one gets told — rather than letting the last person to press a button
+silently overwrite the other.
 
 **Counting stock is the one I am most careful about.** If two people restock the
 same item at the same time, the naive approach loses one of them, quietly and
 permanently. So inventory will record *movements* — "50 bags in", "3 bags out" —
-and add them up, rather than storing one number that people overwrite. Slightly
-more work, and it cannot lose a delivery.
+and add them up, rather than storing one number people overwrite. Slightly more
+work, and it cannot lose a delivery.
 
-**We break something that works.** The app has 846 automatic checks that run
-before anything ships. I will add more around the parts I am changing, written
-*before* I change them, so they prove the behaviour did not shift.
+**We break something that works.** The app has hundreds of automatic checks that
+run before anything ships, including a set I wrote *before* starting this work
+specifically to prove that changing where records live did not change what the
+app does with them.
+
+**Google lock-in.** Worth saying plainly: once the records are in Firebase,
+getting them out to somewhere else is real work. That is the price of the free
+plan and the no-signal handling. The Export button is also the escape hatch —
+another reason it matters that somebody presses it.
 
 ---
 
 ## How long
 
-I am not going to give you a date I cannot keep. What I can say honestly:
+I am not going to give you a date I cannot keep. Honestly:
 
-- The first drawer (tasks) is the slow one — it establishes the pattern
-  everything else follows.
+- Drawer 1 (tasks) is the slow one. It establishes the pattern.
 - Each drawer after that is faster.
-- The map is a project of its own.
+- The map is a project of its own and should not be judged against the others.
 
-The useful measure is that after the **first** drawer is done, the farm has real
-shared tasks. That alone is most of the day-to-day value, and everything after
-it is steady improvement rather than a leap.
+The useful measure is drawer 1. Once it lands, the farm has shared tasks, and
+the rest is steady progress you can watch happen.
+
+---
+
+## Your part, in one list
+
+1. Finish `docs/GO-LIVE-MANUAL.md` — everyone signed in.
+2. Agree with Bill **who presses Export and how often**, and put it in a
+   calendar.
+3. Think about the questions above; ask Bill the ones that are his call.
+4. Before **each** switch-over: get everybody to open the app once on wifi.
+5. Answer my farm questions as they come up. That is the part only you can do.
+
+Everything else on this page is mine.
 
 ---
 
 ## Where the technical detail lives
 
-I have kept the database design, the exact rules, and the migration order in my
-own working notes and in the project memory, so a future maintainer can pick it
-up. Two things I found while planning that are worth recording in plain terms:
+The database design, the exact rules and the migration order live in my working
+notes and in the project memory, so a future maintainer can pick it up.
 
-- **The old backend plan has a mistake in it.** The permission check it
-  describes would not actually work — it asks the database a question the
+Two things worth recording in plain terms:
+
+- **The old backend plan in the repo has a mistake in it.** The permission check
+  it describes would not actually work — it asks the database a question the
   database cannot answer about farm roles. I know the fix; noting it so nobody
   follows that document blindly later.
-- **The old plan only covers the map.** The map is about a third of the job. The
+- **The old plan only covers the map**, which is about a third of the job. The
   rest — tasks, equipment, inventory, logs, the calendar — was never scoped.
   That is why this document exists.

@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang xml:lang>
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Part Two ��� the shared database</title>
+  <style>
+html {
+color: #1a1a1a;
+background-color: #fdfdfd;
+}
+body {
+margin: 0 auto;
+max-width: 36em;
+padding-left: 50px;
+padding-right: 50px;
+padding-top: 50px;
+padding-bottom: 50px;
+hyphens: auto;
+overflow-wrap: break-word;
+text-rendering: optimizeLegibility;
+font-kerning: normal;
+}
+@media (max-width: 600px) {
+body {
+font-size: 0.9em;
+padding: 12px;
+}
+h1 {
+font-size: 1.8em;
+}
+}
+@media print {
+html {
+background-color: white;
+}
+body {
+background-color: transparent;
+color: black;
+font-size: 12pt;
+}
+p, h2, h3 {
+orphans: 3;
+widows: 3;
+}
+h2, h3, h4 {
+page-break-after: avoid;
+}
+}
+p {
+margin: 1em 0;
+}
+a {
+color: #1a1a1a;
+}
+a:visited {
+color: #1a1a1a;
+}
+img {
+max-width: 100%;
+}
+h1, h2, h3, h4, h5, h6 {
+margin-top: 1.4em;
+}
+h5, h6 {
+font-size: 1em;
+font-style: italic;
+}
+h6 {
+font-weight: normal;
+}
+ol, ul {
+padding-left: 1.7em;
+margin-top: 1em;
+}
+li > ol, li > ul {
+margin-top: 0;
+}
+blockquote {
+margin: 1em 0 1em 1.7em;
+padding-left: 1em;
+border-left: 2px solid #e6e6e6;
+color: #606060;
+}
+code {
+font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+font-size: 85%;
+margin: 0;
+hyphens: manual;
+}
+pre {
+margin: 1em 0;
+overflow: auto;
+}
+pre code {
+padding: 0;
+overflow: visible;
+overflow-wrap: normal;
+}
+.sourceCode {
+background-color: transparent;
+overflow: visible;
+}
+hr {
+background-color: #1a1a1a;
+border: none;
+height: 1px;
+margin: 1em 0;
+}
+table {
+margin: 1em 0;
+border-collapse: collapse;
+width: 100%;
+overflow-x: auto;
+display: block;
+font-variant-numeric: lining-nums tabular-nums;
+}
+table caption {
+margin-bottom: 0.75em;
+}
+tbody {
+margin-top: 0.5em;
+border-top: 1px solid #1a1a1a;
+border-bottom: 1px solid #1a1a1a;
+}
+th {
+border-top: 1px solid #1a1a1a;
+padding: 0.25em 0.5em 0.25em 0.5em;
+}
+td {
+padding: 0.125em 0.5em 0.25em 0.5em;
+}
+header {
+margin-bottom: 4em;
+text-align: center;
+}
+#TOC li {
+list-style: none;
+}
+#TOC ul {
+padding-left: 1.3em;
+}
+#TOC > ul {
+padding-left: 0;
+}
+#TOC a:not(:hover) {
+text-decoration: none;
+}
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+.display.math{display: block; text-align: center; margin: 0.5rem auto;}
+</style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Part Two ��� the shared database</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#part-two-the-shared-database-start-to-finish" id="toc-part-two-the-shared-database-start-to-finish">Part Two — the
+shared database, start to finish</a>
+<ul>
+<li><a href="#what-we-are-fixing" id="toc-what-we-are-fixing">What we
+are fixing</a></li>
+<li><a href="#what-is-already-decided" id="toc-what-is-already-decided">What is already decided</a></li>
+<li><a href="#the-money-question-honestly" id="toc-the-money-question-honestly">The money question,
+honestly</a></li>
+<li><a href="#the-drawers-and-the-order" id="toc-the-drawers-and-the-order">The drawers, and the order</a></li>
+<li><a href="#what-happens-for-each-drawer" id="toc-what-happens-for-each-drawer">What happens for each
+drawer</a></li>
+<li><a href="#questions-i-will-need-you-to-answer" id="toc-questions-i-will-need-you-to-answer">Questions I will need you
+to answer</a></li>
+<li><a href="#what-could-go-wrong-honestly" id="toc-what-could-go-wrong-honestly">What could go wrong,
+honestly</a></li>
+<li><a href="#how-long" id="toc-how-long">How long</a></li>
+<li><a href="#your-part-in-one-list" id="toc-your-part-in-one-list">Your
+part, in one list</a></li>
+<li><a href="#where-the-technical-detail-lives" id="toc-where-the-technical-detail-lives">Where the technical detail
+lives</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="part-two-the-shared-database-start-to-finish">Part Two — the
+shared database, start to finish</h1>
+<p>Written 2026-08-20. Rewritten 2026-08-24 after the move to
+Firebase.</p>
+<p>This document is for <strong>you</strong>, not for a programmer. It
+explains what we are about to build, what you will have to decide, and
+what you will actually see happen. The code and the database language
+are my job — you should never have to read them.</p>
+<p>It picks up where <code>docs/GO-LIVE-MANUAL.md</code> ends. Finish
+that first: everyone signing in as themselves is the foundation this
+whole thing sits on.</p>
+<hr />
+<h2 id="what-we-are-fixing">What we are fixing</h2>
+<p>Right now every phone keeps its <strong>own private copy</strong> of
+the farm’s records.</p>
+<p>If Rose marks a task done on her phone, it is done <em>on her
+phone</em>. Bill’s phone never hears about it. If Rose drops her phone
+in the pond, everything she entered is gone — there is no other copy
+anywhere.</p>
+<p>That is not a bug I forgot to fix. The app was built before there was
+anywhere shared to put things. What we are doing now is giving the farm
+<strong>one shared copy</strong> that every phone reads from and writes
+to.</p>
+<p>After this:</p>
+<ul>
+<li>Bill assigns a task; it appears on the crew member’s phone.</li>
+<li>Someone marks it done; Bill sees it done.</li>
+<li>A lost or broken phone loses nothing.</li>
+<li>Somebody new gets the whole picture the moment they sign in.</li>
+</ul>
+<p>This is the single biggest improvement left, and it is also the most
+work.</p>
+<hr />
+<h2 id="what-is-already-decided">What is already decided</h2>
+<p>You settled these. They are not open questions any more — I am
+listing them so you know you do not have to think about them again.</p>
+<p><strong>1. The app keeps working with no signal.</strong> The phone
+stays the working copy. You tap “done”, it saves on the phone straight
+away, and it quietly sends it up the next time there is signal. The
+alternative — an app that needs bars to work — is useless at the far end
+of the farm, which is exactly where the crew are when they need to
+record a mow.</p>
+<p><strong>2. The database is Firebase.</strong> Same company as the
+logins you are setting up now, which means one account, one bill, one
+place to look when something is wrong. It also does the no-signal
+catching-up above for free, which is the hardest part of this whole
+job.</p>
+<hr />
+<h2 id="the-money-question-honestly">The money question, honestly</h2>
+<p><strong>An earlier version of this document said the database costs
+$25 a month and goes to sleep if nobody uses it. That was about
+Supabase, which we moved away from. Please ignore it — it is wrong
+now.</strong> This section replaces it.</p>
+<p>Firebase’s free plan does not sleep and does not expire. What it
+gives you per day:</p>
+<ul>
+<li><strong>50,000 records read</strong></li>
+<li><strong>20,000 records written</strong></li>
+<li><strong>1 GB stored</strong></li>
+</ul>
+<p>To put that in farm terms: 23 people using the app hard all day is a
+few thousand reads. You are not close. Text records — tasks, logs, stock
+counts — are tiny; 1 GB is more than this farm will generate in your
+time here and the next person’s.</p>
+<p><strong>So the realistic answer is that this costs nothing.</strong>
+If it ever did outgrow free, it becomes pay-as-you-go pennies rather
+than a flat monthly fee, and Firebase will email you before that
+happens.</p>
+<p><strong>The thing that does matter: there are no automatic backups on
+the free plan.</strong> Once the shared copy is the real one, the Export
+button in the app is the farm’s only safety net. Somebody has to
+actually press it on a schedule.</p>
+<p><strong>Your job here:</strong> decide with Bill <em>who</em> presses
+Export and <em>how often</em>, and put it in a calendar. Monthly is fine
+in winter; weekly in season. This is worth five minutes now and is
+miserable to sort out after something goes wrong.</p>
+<hr />
+<h2 id="the-drawers-and-the-order">The drawers, and the order</h2>
+<p>Think of the shared copy as a filing cabinet with a drawer for each
+kind of thing. <strong>I do one drawer at a time, start to finish, and
+the farm uses it for a week before I start the next.</strong></p>
+<p>Doing all of them at once would be a single enormous change where, if
+something is wrong, it is wrong everywhere and hard to undo. One at a
+time means each change is small and the crew barely notice.</p>
+<table>
+<colgroup>
+<col style="width: 4%" />
+<col style="width: 13%" />
+<col style="width: 44%" />
+<col style="width: 37%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Drawer</th>
+<th>What changes for the farm</th>
+<th>Why here in the order</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td><strong>Tasks</strong></td>
+<td>Bill assigns; it lands on the right phone. Marked done; Bill sees it
+done.</td>
+<td>Busiest drawer, so it proves the pattern. Slowest one — everything
+after copies it.</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td><strong>Calendar</strong></td>
+<td>One shared schedule instead of five versions.</td>
+<td>Simple, and immediately obvious to everyone that it worked.</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td><strong>Equipment</strong></td>
+<td>Somebody marks a mower down and nobody else drives out to it.</td>
+<td>Small drawer, high daily value.</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td><strong>Field log</strong></td>
+<td>Every mow, spray and application in one place, readable by whoever
+writes the reports.</td>
+<td>The record that matters most long-term, so it goes after the pattern
+is proven.</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td><strong>Inventory</strong></td>
+<td>Real stock counts that two people can update at once without losing
+one.</td>
+<td>The fiddliest of the text drawers — see below.</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td><strong>The map</strong></td>
+<td>Plot shapes and edits shared instead of living on one phone.</td>
+<td>A project of its own. Least urgent; the map already works
+offline.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>After drawer 1, the farm has real shared tasks.</strong> That
+alone is most of the day-to-day value. Everything after it is steady
+improvement rather than a leap.</p>
+<hr />
+<h2 id="what-happens-for-each-drawer">What happens for each drawer</h2>
+<p>The same four things, every time:</p>
+<p><strong>1. I build it.</strong> I write the shape of the drawer and
+the rules about who can open it. You see nothing yet; the app carries on
+as normal.</p>
+<p><strong>2. Everyone opens the app once, on wifi.</strong> This is the
+step that needs you. Whatever is on each person’s phone gets copied up
+into the shared drawer. Until that happens, their records exist only on
+their phone — so <strong>anyone who skips this loses what they
+entered.</strong> Five minutes per person, and it has to happen before I
+flip the switch.</p>
+<p><strong>3. I flip the switch.</strong> The shared copy becomes the
+real one. From here, everyone sees the same thing.</p>
+<p><strong>4. We watch it for a week.</strong> Then the next drawer.</p>
+<p>Step 2 is the only one that can actually lose data. I will make it as
+obvious as I can inside the app — a banner, a nudge — but I cannot make
+somebody open their phone. A message from Bill the week before each
+switch-over is worth more than anything I can build.</p>
+<hr />
+<h2 id="questions-i-will-need-you-to-answer">Questions I will need you
+to answer</h2>
+<p>I can guess at these. You actually know. None of them block the start
+— I will ask each one when its drawer comes up — but they are worth
+turning over in your head now, and some are worth asking Bill.</p>
+<p><strong>About who can see what</strong> (this comes up in drawer 1
+and affects all of them):</p>
+<ul>
+<li>Should people see <strong>trials from labs other than their
+own</strong>? Today the app says no. Is that right, or is it just
+cautious?</li>
+<li>Can a Technician edit or delete <strong>somebody else’s</strong>
+field log entry — a correction the next morning, say?</li>
+<li>Who can <strong>assign</strong> a task? Bill only, or can faculty
+and grad students assign within their own lab?</li>
+</ul>
+<p><strong>About the awkward moments:</strong></p>
+<ul>
+<li>Two people mark the same job done. First one wins and the second is
+told — but told <em>what</em>? “Rose already logged this” is friendlier
+than an error.</li>
+<li>Somebody logs a mow on the wrong plot and notices a week later.
+Should they be able to fix it themselves, or does that need Bill?</li>
+</ul>
+<p><strong>About inventory, when we get there:</strong></p>
+<ul>
+<li>Who is allowed to record a delivery coming in?</li>
+<li>Should a stock count going negative stop somebody, or just warn
+them?</li>
+</ul>
+<p>Right now these rules exist in the app as <strong>hidden
+buttons</strong> — anyone who knew how could get around them. In the
+shared copy they become <strong>real rules the database
+enforces</strong>, which nobody can get around. That is a genuine
+upgrade in safety, and it is also why getting the answers right matters
+more than it did before.</p>
+<hr />
+<h2 id="what-could-go-wrong-honestly">What could go wrong, honestly</h2>
+<p><strong>Someone’s phone records don’t get uploaded.</strong> The main
+risk, and the reason for the wifi step. If someone has been logging work
+for weeks and never opens the app before we switch over, that work is
+gone.</p>
+<p><strong>Two people change the same thing at once.</strong> Today this
+cannot happen because the phones never talk. I will handle each case
+deliberately — first one wins, second one gets told — rather than
+letting the last person to press a button silently overwrite the
+other.</p>
+<p><strong>Counting stock is the one I am most careful about.</strong>
+If two people restock the same item at the same time, the naive approach
+loses one of them, quietly and permanently. So inventory will record
+<em>movements</em> — “50 bags in”, “3 bags out” — and add them up,
+rather than storing one number people overwrite. Slightly more work, and
+it cannot lose a delivery.</p>
+<p><strong>We break something that works.</strong> The app has hundreds
+of automatic checks that run before anything ships, including a set I
+wrote <em>before</em> starting this work specifically to prove that
+changing where records live did not change what the app does with
+them.</p>
+<p><strong>Google lock-in.</strong> Worth saying plainly: once the
+records are in Firebase, getting them out to somewhere else is real
+work. That is the price of the free plan and the no-signal handling. The
+Export button is also the escape hatch — another reason it matters that
+somebody presses it.</p>
+<hr />
+<h2 id="how-long">How long</h2>
+<p>I am not going to give you a date I cannot keep. Honestly:</p>
+<ul>
+<li>Drawer 1 (tasks) is the slow one. It establishes the pattern.</li>
+<li>Each drawer after that is faster.</li>
+<li>The map is a project of its own and should not be judged against the
+others.</li>
+</ul>
+<p>The useful measure is drawer 1. Once it lands, the farm has shared
+tasks, and the rest is steady progress you can watch happen.</p>
+<hr />
+<h2 id="your-part-in-one-list">Your part, in one list</h2>
+<ol type="1">
+<li>Finish <code>docs/GO-LIVE-MANUAL.md</code> — everyone signed
+in.</li>
+<li>Agree with Bill <strong>who presses Export and how often</strong>,
+and put it in a calendar.</li>
+<li>Think about the questions above; ask Bill the ones that are his
+call.</li>
+<li>Before <strong>each</strong> switch-over: get everybody to open the
+app once on wifi.</li>
+<li>Answer my farm questions as they come up. That is the part only you
+can do.</li>
+</ol>
+<p>Everything else on this page is mine.</p>
+<hr />
+<h2 id="where-the-technical-detail-lives">Where the technical detail
+lives</h2>
+<p>The database design, the exact rules and the migration order live in
+my working notes and in the project memory, so a future maintainer can
+pick it up.</p>
+<p>Two things worth recording in plain terms:</p>
+<ul>
+<li><strong>The old backend plan in the repo has a mistake in
+it.</strong> The permission check it describes would not actually work —
+it asks the database a question the database cannot answer about farm
+roles. I know the fix; noting it so nobody follows that document blindly
+later.</li>
+<li><strong>The old plan only covers the map</strong>, which is about a
+third of the job. The rest — tasks, equipment, inventory, logs, the
+calendar — was never scoped. That is why this document exists.</li>
+</ul>
+</body>
+</html>

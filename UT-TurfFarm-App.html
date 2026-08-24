@@ -900,8 +900,26 @@ html[data-size="tablet"] #app{
    27-inch monitor puts the email field a foot away from the password one. */
 html[data-size="tablet"] #s-login > .app.field,
 html[data-size="tablet"] #s-roles > .app.field{padding-left:0}
+/* The cap above was written but never actually centred — max-width alone pins
+   a 360px form to the top-left corner of a monitor. align-items centres the
+   column across; the auto margins on the first and last child centre it down.
+   Auto margins, NOT justify-content:center, because when the window is shorter
+   than the form an auto margin collapses to 0 and the top stays reachable,
+   whereas centring would push the logo off the top edge with no way to scroll
+   back to it. .lg-wrap owns the scrolling now, so #lg-body must not also
+   scroll or it fights the centring.
+
+   The !important on the two #lg-body declarations is not laziness: #lg-body
+   carries `flex:1;overflow-y:auto` as an INLINE style, which beats any
+   stylesheet rule no matter how specific. Those inline values are what the
+   phone shell needs, and the phone path is deliberately left untouched, so the
+   tablet band has to override them here rather than by editing the markup. */
+html[data-size="tablet"] #s-login .lg-wrap{align-items:center;overflow-y:auto}
 html[data-size="tablet"] #s-login .lg-wrap > *{max-width:360px;width:100%;box-sizing:border-box}
-html[data-size="tablet"] #s-login .lg-wrap > img{width:auto}
+html[data-size="tablet"] #s-login .lg-wrap > :first-child{margin-top:auto}
+html[data-size="tablet"] #s-login .lg-wrap > :last-child{margin-bottom:auto}
+html[data-size="tablet"] #s-login #lg-body{flex:0 0 auto!important;overflow:visible!important}
+html[data-size="tablet"] #s-login .lg-wrap img{width:auto;max-width:100%}
 html[data-size="tablet"] #s-roles .rolecard{max-width:520px;width:100%;margin:0 auto;box-sizing:border-box}
 
 /* Absolutely-positioned overlays inside a screen still have to clear the rail. */

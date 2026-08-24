@@ -333,6 +333,48 @@ section('12. the account rows live behind Profile, not on the rail');
   ok('Switch reaches the role picker', active() === 'roles', 'got ' + active());
 }
 
+section('12b. the sign-in stack is centred on a big screen');
+{
+  /* Regression: the tablet band capped the sign-in form at 360px but never
+     centred it, so on a monitor it rendered jammed in the top-left corner.
+     jsdom does no layout, so this reads the stylesheet text rather than
+     measuring pixels — enough to stop the rules being deleted again. The real
+     pixel check is a browser job. */
+  const CSS = fs.readFileSync(APP, 'utf8');
+  const rule = sel => {
+    const i = CSS.indexOf(sel);
+    if (i < 0) return '';
+    const open = CSS.indexOf('{', i), close = CSS.indexOf('}', open);
+    return open < 0 || close < 0 ? '' : CSS.slice(open + 1, close);
+  };
+
+  const wrap = rule('html[data-size="tablet"] #s-login .lg-wrap{');
+  ok('the wrap centres its column across', /align-items\s*:\s*center/.test(wrap), wrap);
+  ok('and owns the scrolling', /overflow-y\s*:\s*auto/.test(wrap), wrap);
+
+  ok('the first child pushes off the top',
+     /margin-top\s*:\s*auto/.test(rule('#s-login .lg-wrap > :first-child{')));
+  ok('the last child pushes off the bottom',
+     /margin-bottom\s*:\s*auto/.test(rule('#s-login .lg-wrap > :last-child{')));
+
+  /* Auto margins, not justify-content:center — a short window must keep the
+     top of the form reachable rather than pushing the logo off-screen. */
+  ok('it does not centre with justify-content',
+     !/justify-content\s*:\s*center/.test(wrap), wrap);
+
+  /* #lg-body carries flex:1;overflow-y:auto INLINE for the phone shell, which
+     beats any stylesheet rule. The tablet band has to shout over it. */
+  const body = rule('html[data-size="tablet"] #s-login #lg-body{');
+  ok('#lg-body stops stretching on tablet', /flex\s*:\s*0 0 auto\s*!important/.test(body), body);
+  ok('#lg-body stops scrolling on tablet', /overflow\s*:\s*visible\s*!important/.test(body), body);
+
+  ok('the cap is still 360px', /max-width\s*:\s*360px/.test(rule('#s-login .lg-wrap > *{')));
+
+  /* The phone path is deliberately byte-for-byte unchanged. */
+  ok('none of it leaks to the phone band',
+     !/html\[data-size="phone"\][^{]*#s-login/.test(CSS));
+}
+
 section('13. the preview lock pins a band');
 {
   ok('a lock getter is exposed', typeof win.SIZE_LOCK === 'function');

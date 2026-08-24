@@ -119,6 +119,9 @@ function boot(store, fake) {
     signOut: () => { seen.signOut++; return fake.throws ? rej() : Promise.resolve(); },
     sendPasswordResetEmail: (email) => {
       seen.reset++; seen.resetTo = email;
+      /* Lets a test pin any Firebase code it likes — the console-misconfigured
+         cases below are the ones that used to hide behind a green tick. */
+      if (fake.resetCode) return rej(fake.resetCode);
       if (fake.throws) return rej();
       /* Firebase really does reject for an address with no account. The app
          must not let that difference reach the screen. */
@@ -365,6 +368,50 @@ section('14. the reset flow cannot be used to discover who works here');
      JSON.stringify({ known: known.slice(0, 40), unknown: unknown.slice(0, 40) }));
   ok('neither message says whether an account exists',
      !/no account|not found|unknown|does not exist/i.test(known + unknown), known);
+}
+
+section('14b. a broken project says so instead of showing a green tick');
+{
+  /* The bug this pins: every failure except three fell through to the
+     "a link is on its way" message, so a project with sign-in switched off
+     looked exactly like a working one. Only auth/user-not-found may hide —
+     it is the only code that differs between a real address and an invented
+     one. The rest describe the PROJECT, are the same whoever asks, and are
+     what someone needs in order to fix it. */
+  const msg = b => (b.doc.getElementById('lg-msg') || {}).textContent || '';
+  const send = async code => {
+    const b = boot({}, { resetCode: code });
+    b.doc.getElementById('lg-email').value = 'rose@example.edu';
+    b.p.authSendReset();
+    await settle();
+    return msg(b);
+  };
+
+  const pretendsToWork = t => /on its way/i.test(t);
+
+  const off = await send('auth/operation-not-allowed');
+  ok('sign-in switched off is reported', !pretendsToWork(off), off);
+  ok('and it names the step that fixes it', /step 1/i.test(off), off);
+
+  const dom = await send('auth/unauthorized-domain');
+  ok('an unlisted web address is reported', !pretendsToWork(dom), dom);
+  ok('and it names the step that fixes it', /step 2/i.test(dom), dom);
+
+  const key = await send('auth/invalid-api-key');
+  ok('wrong Firebase details are reported', !pretendsToWork(key), key);
+
+  const odd = await send('auth/some-code-nobody-has-seen');
+  ok('an unrecognised failure is still reported', !pretendsToWork(odd), odd);
+  ok('and it hands over the code to pass on', /some-code-nobody-has-seen/.test(odd), odd);
+  ok('while making clear the address is not the problem',
+     /nothing is wrong with your email/i.test(odd), odd);
+
+  /* The one that must still hide, re-checked here beside its exceptions so the
+     reason the others changed cannot be misread as "surface everything". */
+  const hidden = await send('auth/user-not-found');
+  ok('but a missing account still shows the ordinary message', pretendsToWork(hidden), hidden);
+  ok('and never says the account is missing',
+     !/no account|not found|unknown|does not exist/i.test(hidden), hidden);
 }
 
 section('15. offline, it says so rather than pretending to send');

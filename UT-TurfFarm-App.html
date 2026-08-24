@@ -14578,19 +14578,36 @@ function authSendReset(){
   };
   auth.sendPasswordResetEmail(email).then(finish).catch(function(err){
     var code=(err&&err.code)||'';
-    if(code==='auth/network-request-failed'){
+    var say=function(t){
       if(link) link.textContent='First time here, or forgotten your password?';
-      authMsg('Could not reach the sign-in service. Check your connection.');
-    } else if(code==='auth/too-many-requests'){
-      if(link) link.textContent='First time here, or forgotten your password?';
-      authMsg('Too many tries. Wait a few minutes and try again.');
-    } else if(code==='auth/invalid-email'){
-      if(link) link.textContent='First time here, or forgotten your password?';
-      authMsg('That does not look like an email address.');
-    } else {
-      /* Includes auth/user-not-found — swallowed on purpose, see above. */
-      finish();
-    }
+      authMsg(t);
+    };
+    /* ONLY auth/user-not-found is swallowed, and that is deliberate: it is the
+       one code whose answer differs between a real farm address and an invented
+       one, so hiding it is the entire reason this screen is safe to expose
+       publicly. Every OTHER code says something about the project, not about
+       who typed it, and is identical whoever asks — so hiding those bought no
+       privacy at all and cost real time: a project with sign-in switched off
+       cheerfully reported "a link is on its way" and sent nothing, which is
+       exactly the wrong place to send somebody hunting. */
+    if(code==='auth/user-not-found'){ finish(); return; }
+    if(code==='auth/network-request-failed')
+      return say('Could not reach the sign-in service. Check your connection.');
+    if(code==='auth/too-many-requests')
+      return say('Too many tries. Wait a few minutes and try again.');
+    if(code==='auth/invalid-email')
+      return say('That does not look like an email address.');
+    if(code==='auth/operation-not-allowed')
+      return say('Email sign-in is switched off for this project. It has to be turned on in the Firebase console — Step 1 of the go-live manual.');
+    if(code==='auth/unauthorized-domain')
+      return say('This web address is not on the project’s allowed list. It has to be added in the Firebase console — Step 2 of the go-live manual.');
+    if(code==='auth/invalid-api-key' || code==='auth/api-key-not-valid')
+      return say('This copy of the app carries the wrong Firebase details. Tell whoever looks after the app.');
+    if(code==='auth/quota-exceeded')
+      return say('The project has sent all the email it is allowed to for now. Try again later.');
+    say('The link could not be sent, and nothing is wrong with your email address. '
+        + 'The sign-in service said: ' + (code || (err && err.message) || 'no reason given')
+        + '. Pass that along to whoever looks after the app.');
   });
 }
 

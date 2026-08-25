@@ -5242,7 +5242,7 @@ function boardEnter(){ tbTab=(currentRole==='manager'||currentRole==='faculty')?
 function simpleTaskRow(t){var note=t.desc?'<div class="rs" style="margin-top:4px;color:#7b828d;line-height:1.4">'+esc(t.desc)+'</div>':'';return '<div class="row tap" data-task="'+t.id+'" style="align-items:flex-start"><div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+areaWithDue(t)+'</div>'+note+'</div><span style="color:#c2c7cd;font-size:17px;flex:none;align-self:center">›</span></div>';}
 function gradReqRow(t){var done=t.status==='done';var pending=(t.kind==='request'&&!t.assignee);var pill=done?'<span class="pill" style="background:#eaf3ea;color:#2f9e4f;flex:none">✓ Done</span>':(pending?'<span class="pill" style="background:#fff4e0;color:#9a5b00;flex:none">Pending</span>':'<span class="pill" style="background:#489FDF;color:#fff;flex:none">→ '+t.assignee+'</span>');return '<div class="row"><div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+(t.area||'')+'</div></div>'+pill+'</div>';}
 function openGradReq(){var a=document.getElementById('gr-name');if(a)a.value='';var b=document.getElementById('gr-area');if(b)b.value='';var c=document.getElementById('gr-note');if(c)c.value='';go('gradreq');}
-function submitGradReq(){var name=document.getElementById('gr-name').value.trim();if(!name){toast('Enter what you need');return;}var area=document.getElementById('gr-area').value.trim();var note=document.getElementById('gr-note').value.trim();TASKS.push({id:newId('r'),title:name,area:area||'—',assignee:null,status:'todo',kind:'request',badge:null,type:'Miscellaneous',dueAt:atToday(null),repeat:'None',requestedBy:SESSION.pid,desc:note});toast('Request submitted ✓');back();tbTab='requests';renderBoard();}
+function submitGradReq(){var name=document.getElementById('gr-name').value.trim();if(!name){toast('Enter what you need');return;}var area=document.getElementById('gr-area').value.trim();var note=document.getElementById('gr-note').value.trim();TASKS.push({createdBy:SESSION.pid,id:newId('r'),title:name,area:area||'—',assignee:null,status:'todo',kind:'request',badge:null,type:'Miscellaneous',dueAt:atToday(null),repeat:'None',requestedBy:SESSION.pid,desc:note});toast('Request submitted ✓');back();tbTab='requests';renderBoard();}
 function moveTask(id,dir){
  var t=TASKS.find(function(x){return x.id===id;}); if(!t)return;
  var grp=TASKS.filter(function(x){return x.assignee&&x.assignee===t.assignee&&x.status==='todo'&&x.kind==='task';});
@@ -7771,7 +7771,7 @@ document.getElementById('eqr-save').addEventListener('click',function(){
  var d=(document.getElementById('eqr-desc').value||'').trim(); if(!d){toast('Describe the problem');return;}
  m.flagged=true;
  var tid=newId('t');
- TASKS.unshift({id:tid,title:'Repair '+m.name,area:'Shop',assignee:'p07',status:'todo',kind:'task',badge:{t:'Repair',bg:'#fdeceb',fg:'#c0392b'},type:'Equipment repair',dueAt:atToday(null),repeat:'None',desc:d+' (reported by '+meName()+')'});
+ TASKS.unshift({createdBy:SESSION.pid,id:tid,title:'Repair '+m.name,area:'Shop',assignee:'p07',status:'todo',kind:'task',badge:{t:'Repair',bg:'#fdeceb',fg:'#c0392b'},type:'Equipment repair',dueAt:atToday(null),repeat:'None',desc:d+' (reported by '+meName()+')'});
  EQPROBLEMS.unshift({id:newId('p'),eq:m.id,by:SESSION.pid,desc:d,repairTask:tid,downBy:null,status:'open',at:isoLocal(new Date())});
  if(window.eqReportSetDown){m.status='down';m.holder=null;m.task=null;EQPROBLEMS[0].downBy=SESSION.pid;}
  var wasDown=window.eqReportSetDown; window.eqReportSetDown=false;
@@ -8165,7 +8165,7 @@ function saveForm(){
    var who=(FORM.scope==='self')?SESSION.pid:FORM.target;
    if(FORM.scope==='lab'&&!who){toast('Pick a lab member to assign');return;}
    var _ws=document.getElementById('tn-when'); var _do=(_ws&&parseInt(_ws.value,10))||FORM.dueOrd||asTodayOrd();
-   TASKS.push({id:newId('a'),title:FORM.name,area:FORM.plots.length?areaLabel(FORM.plots):'—',plots:FORM.plots.slice(),assignee:who,status:'todo',kind:'task',badge:null,mowDir:FORM.mowDir||null,dblMow:!!FORM.dblMow,dblPass:FORM.dblMow?(FORM.dblPass||MOW_PASSES[0]):null,type:FORM.category,machine:FORM.machine||null,dueAt:isoFromOrd(_do),dueOrd:_do,repeat:'None',freq:null,months:[],assignedBy:SESSION.pid,desc:''});
+   TASKS.push({createdBy:SESSION.pid,id:newId('a'),title:FORM.name,area:FORM.plots.length?areaLabel(FORM.plots):'—',plots:FORM.plots.slice(),assignee:who,status:'todo',kind:'task',badge:null,mowDir:FORM.mowDir||null,dblMow:!!FORM.dblMow,dblPass:FORM.dblMow?(FORM.dblPass||MOW_PASSES[0]):null,type:FORM.category,machine:FORM.machine||null,dueAt:isoFromOrd(_do),dueOrd:_do,repeat:'None',freq:null,months:[],assignedBy:SESSION.pid,desc:''});
    toast(FORM.scope==='self'?'Added to your tasks ✓':'Assigned to '+who+' ✓');
    back();
    tbTab=(FORM.scope==='self')?'mine':'board';
@@ -8176,10 +8176,10 @@ function saveForm(){
    if(!FORM.name){toast(FORM.reqType==='toCrew'?'Enter the task':'Enter what you need');return;}
    if(FORM.reqType==='toCrew'){
      if(!FORM.target){toast('Pick who to request');return;}
-     TASKS.push({id:newId('r'),title:FORM.name,area:FORM.plots.length?areaLabel(FORM.plots):'—',plots:FORM.plots.slice(),assignee:null,status:'todo',kind:'request',origin:'manager',target:FORM.target,badge:null,mowDir:FORM.mowDir||null,dblMow:!!FORM.dblMow,dblPass:FORM.dblMow?(FORM.dblPass||MOW_PASSES[0]):null,type:FORM.category,machine:FORM.machine||null,dueAt:atToday(null),repeat:'None',freq:null,months:[],requestedBy:SESSION.pid,desc:''});
+     TASKS.push({createdBy:SESSION.pid,id:newId('r'),title:FORM.name,area:FORM.plots.length?areaLabel(FORM.plots):'—',plots:FORM.plots.slice(),assignee:null,status:'todo',kind:'request',origin:'manager',target:FORM.target,badge:null,mowDir:FORM.mowDir||null,dblMow:!!FORM.dblMow,dblPass:FORM.dblMow?(FORM.dblPass||MOW_PASSES[0]):null,type:FORM.category,machine:FORM.machine||null,dueAt:atToday(null),repeat:'None',freq:null,months:[],requestedBy:SESSION.pid,desc:''});
      toast('Request sent to '+nameOf(FORM.target)+' ✓'); back(); tbTab='requests'; renderBoard(); return;
    }
-   TASKS.push({id:newId('r'),title:FORM.name,area:FORM.plots.length?areaLabel(FORM.plots):'—',plots:FORM.plots.slice(),assignee:null,status:'todo',kind:'request',origin:'crew',badge:null,mowDir:FORM.mowDir||null,dblMow:!!FORM.dblMow,dblPass:FORM.dblMow?(FORM.dblPass||MOW_PASSES[0]):null,type:FORM.category,machine:FORM.machine||null,dueAt:atToday(null),repeat:'None',freq:null,months:[],students:FORM.showStudents?(+FORM.students||1):1,requestedBy:SESSION.pid,desc:''});
+   TASKS.push({createdBy:SESSION.pid,id:newId('r'),title:FORM.name,area:FORM.plots.length?areaLabel(FORM.plots):'—',plots:FORM.plots.slice(),assignee:null,status:'todo',kind:'request',origin:'crew',badge:null,mowDir:FORM.mowDir||null,dblMow:!!FORM.dblMow,dblPass:FORM.dblMow?(FORM.dblPass||MOW_PASSES[0]):null,type:FORM.category,machine:FORM.machine||null,dueAt:atToday(null),repeat:'None',freq:null,months:[],students:FORM.showStudents?(+FORM.students||1):1,requestedBy:SESSION.pid,desc:''});
    toast('Request submitted ✓'); back(); tbTab='requests'; renderBoard(); return;
  }
  if(!FORM.name){toast('Enter a task name');return;}
@@ -8550,7 +8550,7 @@ function togglePick(kind,id){
 }
 function pushAssign(o){
  var dueOrd=o.dueOrd||asTodayOrd();
- var base={id:newId('t'),title:o.title,area:o.area,plots:o.plots,badge:o.badge||null,type:o.type,dueAt:isoFromOrd(dueOrd),dueOrd:dueOrd,repeat:o.repeat||'None',status:'todo',desc:o.note||''};
+ var base={createdBy:SESSION.pid,id:newId('t'),title:o.title,area:o.area,plots:o.plots,badge:o.badge||null,type:o.type,dueAt:isoFromOrd(dueOrd),dueOrd:dueOrd,repeat:o.repeat||'None',status:'todo',desc:o.note||''};
  if(o.mow&&o.mow.mowDir){ base.mowDir=o.mow.mowDir; base.dblMow=!!o.mow.dblMow; base.dblPass=base.dblMow?(o.mow.dblPass||MOW_PASSES[0]):null; }
  if(o.mow&&o.mow.machine) base.machine=o.mow.machine;
  /* Whatever Bill wrote into the tank rides out on the job. The nozzle and the

@@ -1,0 +1,257 @@
+rules_version = '2';
+
+/* ============================================================================
+   UT TURF FARM — database rules
+   ----------------------------------------------------------------------------
+   THIS FILE IS A TRANSCRIPTION OF ONE FUNCTION.
+
+   `taskCan(actor, action, task)` in UT-TurfFarm-App.html is the farm's
+   organisation chart written as code. It decides which buttons the app offers.
+   THIS FILE decides what the database will actually accept — and the database
+   is the one nobody can get around by knowing where to tap.
+
+   The two must read identically. If they drift, the copy that drifted is the
+   one that lets somebody put work on a person who does not answer to them.
+   `tools/test-rules.js` runs both against every person-to-person pair on the
+   roster and fails if they ever disagree. Change one, change the other, run
+   `npm test`.
+
+   Nothing in this file is enforced until it is published in the Firebase
+   console — see docs/PUBLISH-THE-RULES.md.
+
+   Anything not explicitly allowed below is denied. That is Firestore's
+   default and it is deliberate: a drawer that has not been built yet is
+   closed, not open.
+   ========================================================================== */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ------------------------------------------------------------------
+       WHO IS ASKING
+
+       The roster id ("p09") travels on the sign-in token as a custom claim,
+       stamped there by tools/create-accounts.js. The account holder cannot
+       edit it, and it is readable with no signal because it is cached with
+       the token. The crew's email addresses are deliberately not in the app,
+       so the id is the only thing that identifies a person here.
+       ------------------------------------------------------------------ */
+    function me() {
+      return request.auth != null && request.auth.token.pid is string
+        ? request.auth.token.pid : '';
+    }
+    function signedIn() {
+      return me() != '';
+    }
+
+    /* ------------------------------------------------------------------
+       THE ROSTER — one document, refdata/roster
+
+       Read as ONE document rather than one per person, on purpose: a rule
+       may only fetch a handful of documents per request, and the whole
+       roster is 23 short entries. Repeated lookups inside one request are
+       fetched once and reused, so this costs a single read no matter how
+       many times the rules below ask a question about somebody.
+
+       Shape:
+         { people: { p01: {role, lab, active, grants[]}, ... } }
+       ------------------------------------------------------------------ */
+    function rec(id) {
+      return get(/databases/$(database)/documents/refdata/roster).data.people.get(id, {});
+    }
+    function str(v) {
+      return v == null ? '' : v;
+    }
+    function roleOf(id)   { return str(rec(id).get('role', '')); }
+    function grantsOf(id) { return rec(id).get('grants', []); }
+
+    /* On the roster at all. A blank role means the person is not in it. */
+    function known(id) {
+      return id != '' && roleOf(id) != '';
+    }
+    /* App: `p.active !== false` — present and not switched off. */
+    function activeOf(id) {
+      return known(id) && rec(id).get('active', true) == true;
+    }
+
+    /* Two people share a lab only if they actually have one. A blank lab
+       (or the em dash the app writes for "none") is the shared undergrad
+       pool, not a lab everybody is in together. */
+    function labOf(id) {
+      return str(rec(id).get('lab', '')) == '—' ? '' : str(rec(id).get('lab', ''));
+    }
+    function sameLab(a, b) {
+      return labOf(a) != '' && labOf(a) == labOf(b);
+    }
+
+    /* Handing out undergrad labour is a GRANT on a person, not a test for
+       the words "Farm Manager", because it moves: Bill needs to be able to
+       hand the job to somebody while he is away, and Dillon holds it today. */
+    function assignsUndergrads(id) {
+      return roleOf(id) == 'Farm Manager' || grantsOf(id).hasAny(['assign_undergrads']);
+    }
+
+    /* The gate every rule below starts with: signed in, on the roster, not
+       switched off. Matches the first two lines of taskCan(). */
+    function actor() {
+      return signedIn() && activeOf(me());
+    }
+
+    /* ------------------------------------------------------------------
+       THE FOUR BRANCHES OF taskCan()
+       ------------------------------------------------------------------ */
+
+    /* create / request — undergrads do the work they are given; they do
+       not raise it. */
+    function canCreate() {
+      return roleOf(me()) != 'Undergraduate Student';
+    }
+
+    /* assign — putting a NAMED person on a job. Everything turns on this.
+       Read it against the switch in taskCan(): same order, same answers. */
+    function canAssignTo(target) {
+      return target == '' ? false
+        : target == me() ? roleOf(me()) != 'Undergraduate Student'
+        : roleOf(target) == 'Undergraduate Student' ? assignsUndergrads(me())
+        : roleOf(me()) == 'Faculty'
+          ? ((roleOf(target) == 'Graduate Student' || roleOf(target) == 'Technician')
+             && sameLab(me(), target))
+        : false;
+    }
+
+    /* claim — picking up something nobody is on. Undergrads never see the
+       pool, so they can never take from it. */
+    function canClaim(d) {
+      return str(d.get('assignee', '')) == ''
+        && (roleOf(me()) == 'Graduate Student'
+            || roleOf(me()) == 'Technician'
+            || assignsUndergrads(me()));
+    }
+
+    /* complete — the worker closes their own; whoever holds the undergrad
+       job may close on their behalf. A job can carry more than one person:
+       `assignee` is the primary and `helpers` is everyone else on it. */
+    function onTask(d, id) {
+      return id != '' && (str(d.get('assignee', '')) == id || d.get('helpers', []).hasAny([id]));
+    }
+    function canComplete(d) {
+      return onTask(d, me()) || assignsUndergrads(me());
+    }
+
+    /* edit / delete — Bill, the person who raised it, or faculty over work
+       sitting on their own lab's person. */
+    function canEdit(d) {
+      return roleOf(me()) == 'Farm Manager'
+        || str(d.get('createdBy', '')) == me()
+        || (roleOf(me()) == 'Faculty'
+            && str(d.get('assignee', '')) != ''
+            && sameLab(me(), str(d.get('assignee', ''))));
+    }
+
+    /* ------------------------------------------------------------------
+       THE ROSTER DOCUMENT ITSELF
+
+       Everyone signed in may read it — the app needs names and roles on
+       every screen. Only the person holding the undergrad-assignment job
+       may rewrite it, which is the same grant that governs task assignment.
+
+       The two ids below are the bootstrap: the roster has to be written
+       once before any rule above can read it, and until it exists there is
+       nothing to check a grant against. p07 is Bill, p01 is Dillon. This is
+       the ONLY place in the whole file where a person is named, and if both
+       ever leave the farm it is the one line a successor has to change.
+       ------------------------------------------------------------------ */
+    match /refdata/roster {
+      allow read: if signedIn();
+      allow write: if signedIn() && (
+           me() in ['p01', 'p07']
+        || (exists(/databases/$(database)/documents/refdata/roster) && assignsUndergrads(me()))
+      );
+    }
+
+    /* ------------------------------------------------------------------
+       TASKS — drawer 1
+
+       Reading is open to everyone signed in. The task board is the shared
+       picture of the farm's day; hiding other people's jobs would break
+       the pool, the "who else is out here" row, and Bill's overview.
+       (Trials are lab-scoped; tasks are not. That is deliberate and it is
+       flagged in docs/BACKEND-STEPS.md as a question for Dillon.)
+       ------------------------------------------------------------------ */
+    match /tasks/{taskId} {
+
+      /* --- claim: nobody was on it, now I am --- */
+      function isClaim() {
+        return changed().hasOnly(['assignee', 'status', 'kind', 'origin', 'claimedAt', 'updatedAt'])
+          && str(request.resource.data.get('assignee', '')) == me()
+          && canClaim(resource.data);
+      }
+
+      /* --- completion: credit goes to the WORKER, not to whoever closed
+             it. completedBy must be somebody who was actually on the job,
+             or the person pressing the button. --- */
+      function isCompletion() {
+        return changed().hasOnly(['status', 'completedBy', 'completedAt', 'closedBy',
+                                  'done', 'units', 'updatedAt'])
+          && canComplete(resource.data)
+          && str(request.resource.data.get('completedBy', '')) != ''
+          && (onTask(resource.data, str(request.resource.data.get('completedBy', '')))
+              || str(request.resource.data.get('completedBy', '')) == me());
+      }
+
+      /* --- assignment: the person on the job changes --- */
+      function isAssignment() {
+        return changed().hasOnly(['assignee', 'helpers', 'kind', 'origin', 'target',
+                                  'assignedBy', 'requestedBy', 'students', 'status', 'updatedAt'])
+          && canAssignTo(str(request.resource.data.get('assignee', '')));
+      }
+
+      /* --- ordinary edit: anything else about the job. If it also moves
+             the job to a different person, that move has to pass the
+             assign rule on its own. --- */
+      function isEdit() {
+        return canEdit(resource.data)
+          && (str(request.resource.data.get('assignee', '')) == str(resource.data.get('assignee', ''))
+              || canAssignTo(str(request.resource.data.get('assignee', ''))));
+      }
+
+      function changed() {
+        return request.resource.data.diff(resource.data).affectedKeys();
+      }
+
+      allow read: if actor();
+
+      /* The id in the record must match the id of the document, so a task
+         cannot be filed under one name and claim to be another. createdBy
+         is stamped here and can never be rewritten (see update below), so
+         "I raised this" stays true forever. */
+      allow create: if actor()
+        && canCreate()
+        && request.resource.data.id == taskId
+        && str(request.resource.data.get('createdBy', '')) == me()
+        && (str(request.resource.data.get('assignee', '')) == ''
+            || canAssignTo(str(request.resource.data.get('assignee', ''))));
+
+      /* An update is one of four moves. Each is checked against the branch
+         of taskCan() that governs it, and the narrow moves may only touch
+         the fields that move actually changes — so "I am claiming this"
+         cannot quietly also rewrite the job. */
+      allow update: if actor()
+        && request.resource.data.id == resource.data.id
+        && str(request.resource.data.get('createdBy', '')) == str(resource.data.get('createdBy', ''))
+        && (isClaim() || isCompletion() || isAssignment() || isEdit());
+
+      allow delete: if actor() && canEdit(resource.data);
+
+    }
+
+    /* ------------------------------------------------------------------
+       EVERYTHING ELSE IS CLOSED.
+
+       Calendar, equipment, the field log, inventory and the map get their
+       own blocks here as each drawer is built. Until then the database
+       refuses them, which is what we want: an empty drawer nobody can
+       write into beats an open one nobody is watching.
+       ------------------------------------------------------------------ */
+  }
+}

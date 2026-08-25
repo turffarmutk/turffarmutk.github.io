@@ -169,8 +169,19 @@ ok('zone work estimates are sane (3-70 min)',
    zf.map(f => f.properties.est_min).join(','));
 
 section('Alley job resolves to zones');
+/* A fixture, not a seed row. Demo tasks were removed from the app on
+   2026-08-24 — only equipment, the roster and the task catalog ship
+   pre-loaded now — so this test brings the two-person alley job it needs.
+   Same shape the assign screen writes: a second person rides in `helpers`. */
+if (!win.TASKS.some(t => t.id === 't21')) win.TASKS.push({
+  id:'t21', title:'Rotary Mow \u00b7 Alleys', area:'Alleys & borders', machine:'e3',
+  mowDir:'12\u20136', dblMow:false, assignee:'p18', helpers:['p20'],
+  status:'todo', kind:'task', type:'Mow', repeat:'Daily',
+  badge:{t:'2 crew', bg:'#e8eff5', fg:'#42688a'},
+  dueAt: win.atToday('06:30'), desc:'Fixture alley job.'
+});
 const alleyTask = win.TASKS.find(t => t.id === 't21');
-ok('seeded two-person alley job exists', !!alleyTask);
+ok('the two-person alley job is on the board', !!alleyTask);
 ok('job carries two people', win.taskCrew(alleyTask).length === 2, win.taskCrew(alleyTask).join('/'));
 /* Read the crew off the task rather than hard-coding names - the seed data
    carries real people and those change. */
@@ -257,6 +268,32 @@ ok('deck width comes off the machine, not a guess',
    win.covDeckFt({ title: 'Rotary Mow · Alleys' }) === 6);
 
 section('Restriction proximity');
+/* Fixtures, not seed rows — the demo tasks and the sample trials that carried
+   restrictions were both removed from the app on 2026-08-24. This section is
+   about whether a MOW job sees mow holds and a SPRAY job sees fungicide holds,
+   so it needs one plot carrying one of each. */
+if (!win.TASKS.some(t => t.id === 't1')) win.TASKS.push({
+  id:'t1', title:'Fairway Mow', area:'Fairway-mown plots', machine:'e1',
+  mowDir:'12\u20136', dblMow:false, assignee:'p18', status:'todo', kind:'task',
+  type:'Mow', repeat:'Daily', dueAt:win.atToday('06:00'), plots:['B14']
+});
+if (!win.TASKS.some(t => t.id === 't2')) win.TASKS.push({
+  id:'t2', title:'Spray Pesticide (John Deere) \u00b7 Fungicide', area:'B12\u2013B14',
+  plots:['B12','B13','B14'], machine:'e2', assignee:'p18', status:'todo',
+  kind:'task', type:'Spray', repeat:'None', dueAt:win.atToday('06:30')
+});
+if (!win.TRIALS.some(t => t.id === 's-fixture')) win.TRIALS.push({
+  id:'s-fixture', title:'Fixture \u2014 holds on B14', lab:'Sorochan', pi:'p13', owner:'p01',
+  stage:'active', multiPlot:false, coverage:'full', pin:null,
+  start:'2020-01-01', end:'2099-12-31',
+  locations:[{plot:'B14', sqft:7500}],
+  restrictions:[
+    {id:'r-mow',  type:'mow',       scope:'B14', note:'Fixture mow hold',
+     start:'2020-01-01', end:'2099-12-31', by:'p01'},
+    {id:'r-fung', type:'fungicide', scope:'B14', note:'Fixture fungicide hold',
+     start:'2020-01-01', end:'2099-12-31', by:'p01'}
+  ]
+});
 const mowTask = win.TASKS.find(t => t.id === 't1');     /* Fairway Mow */
 const sprayTask = win.TASKS.find(t => t.id === 't2');   /* Fungicide spray */
 const mowHits = win.proxTargets(mowTask).map(h => h.plot + ':' + h.r.type);

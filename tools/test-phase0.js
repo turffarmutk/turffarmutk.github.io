@@ -80,6 +80,17 @@ p.sessionSet('p07');
 /* ---------------------------------------------------------------- */
 section('1. a due date is a timestamp');
 {
+  /* Fixtures, not seed rows. The demo tasks were removed from the app on
+     2026-08-24 (only equipment, roster and the task catalog ship pre-loaded),
+     so anything asserting on a seeded task has to bring its own. Same shape as
+     the rows the app creates. */
+  p.TASKS.push(
+    {id:'t1', title:'Fairway Mow', area:'Fairway-mown plots', plots:[], machine:'e1',
+     assignee:'p18', status:'todo', kind:'task', dueAt:p.atToday('06:00')},
+    {id:'t12', title:'Take Trash Out', area:'Shop', plots:[],
+     assignee:'p18', status:'todo', kind:'task', dueAt:p.atToday(null)}
+  );
+
   const withTime = p.TASKS.find(t => t.id === 't1');
   ok('the seed carries dueAt, not a sentence', /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(withTime.dueAt), withTime.dueAt);
   ok('and it still prints the same words', p.dueLabel(withTime) === 'Today · 6:00a', p.dueLabel(withTime));

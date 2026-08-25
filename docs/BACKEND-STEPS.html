@@ -245,21 +245,98 @@ job.</p>
 $25 a month and goes to sleep if nobody uses it. That was about
 Supabase, which we moved away from. Please ignore it — it is wrong
 now.</strong> This section replaces it.</p>
-<p>Firebase’s free plan does not sleep and does not expire. What it
-gives you per day:</p>
+<p>Firebase’s free plan does not sleep and does not expire. Here is
+every limit that applies, and what the farm would actually have to do to
+reach it.</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>What’s counted</th>
+<th>Free every day</th>
+<th>What a busy farm day looks like</th>
+<th>Used</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Records <strong>read</strong></td>
+<td>50,000</td>
+<td>see below</td>
+<td>5–10%</td>
+</tr>
+<tr class="even">
+<td>Records <strong>written</strong></td>
+<td>20,000</td>
+<td>~500–1,500</td>
+<td>under 10%</td>
+</tr>
+<tr class="odd">
+<td>Records <strong>deleted</strong></td>
+<td>20,000</td>
+<td>a handful</td>
+<td>~0%</td>
+</tr>
+<tr class="even">
+<td>Total <strong>stored</strong></td>
+<td>1 GB</td>
+<td>grows a few MB a year</td>
+<td>under 1%</td>
+</tr>
+<tr class="odd">
+<td>People signing in</td>
+<td>50,000 a month</td>
+<td>23</td>
+<td>0.05%</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Storing things is not the constraint.</strong> Everything the
+farm records is text — a task, a stock count, a line in the field log.
+One field-log record is about half a kilobyte, so 1 GB is roughly two
+million of them. Even logging every mow on every plot all season, the
+farm produces a few thousand a year. That is decades of headroom, not
+years.</p>
+<p><strong>Writing is not the constraint either.</strong> The heaviest
+realistic day — everyone logging their work, plus a full-farm mow that
+creates one record per plot — is somewhere around a thousand writes. The
+allowance is twenty thousand.</p>
+<p><strong>Reading is the only number worth watching, and it is my
+problem, not yours.</strong> A “read” is the app fetching one record. If
+I build it so that opening the app re-fetches the whole farm every time,
+one person opening it costs several hundred reads, and fifteen people
+opening it six times a day gets close to the line. Built the way we
+planned — the phone keeps its own copy and only asks for what has
+<em>changed</em> — the same day costs a few thousand.</p>
+<p>So whether this stays free depends on how carefully it is built, not
+on how big the farm gets. Hiring five more people would barely move it.
+That is my job to get right, and it is worth knowing so you can hold me
+to it.</p>
+<p><strong>If it were ever exceeded</strong>, two things are true and
+both are reassuring:</p>
 <ul>
-<li><strong>50,000 records read</strong></li>
-<li><strong>20,000 records written</strong></li>
-<li><strong>1 GB stored</strong></li>
+<li>The overflow price is trivial. Reads are <strong>3 cents per hundred
+thousand</strong>; writes <strong>9 cents per hundred thousand</strong>.
+A farm somehow using double the free allowance every single day would
+owe about <strong>a dollar a month</strong>.</li>
+<li><strong>You would only ever be charged if somebody put a card on the
+account.</strong></li>
 </ul>
-<p>To put that in farm terms: 23 people using the app hard all day is a
-few thousand reads. You are not close. Text records — tasks, logs, stock
-counts — are tiny; 1 GB is more than this farm will generate in your
-time here and the next person’s.</p>
-<p><strong>So the realistic answer is that this costs nothing.</strong>
-If it ever did outgrow free, it becomes pay-as-you-go pennies rather
-than a flat monthly fee, and Firebase will email you before that
-happens.</p>
+<p><strong>My recommendation: never put a card on it.</strong> On the
+free plan there is no payment method and no possible bill. If the farm
+ever did hit a daily limit, the app does not break — the phones keep
+working on their own copies, they just cannot sync until the count
+resets after midnight. Then it carries on.</p>
+<p>For a farm with no software budget and a non-technical person holding
+this in 2030, a hard stop that fixes itself overnight is <em>better</em>
+than a surprise invoice nobody is watching for. Take the cutoff.</p>
+<p>You can see the numbers any time: Firebase console →
+<strong>Usage</strong>.</p>
 <p><strong>The thing that does matter: there are no automatic backups on
 the free plan.</strong> Once the shared copy is the real one, the Export
 button in the app is the farm’s only safety net. Somebody has to

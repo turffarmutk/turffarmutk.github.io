@@ -296,6 +296,11 @@ section('9. Bill\'s own tasks carry a Start button');
   const other = b.p.STUDENTS.find(s => s !== 'p07');
   b.p.TASKS.push({ id: b.p.newId('t'), title: 'ZZ Bill one', area: 'A', assignee: 'p07', status: 'todo', kind: 'task', type: 'Mowing', dueAt: today, repeat: 'None' });
   b.p.TASKS.push({ id: b.p.newId('t'), title: 'ZZ Bill two', area: 'B', assignee: 'p07', status: 'todo', kind: 'task', type: 'Mowing', dueAt: today, repeat: 'None' });
+  /* The crew section used to be populated by seeded tasks. Those were removed
+     from the app on 2026-08-24, so this test now creates the other person's
+     rows as well as Bill's. */
+  b.p.TASKS.push({ id: b.p.newId('t'), title: 'ZZ Crew one', area: 'C', assignee: other, status: 'todo', kind: 'task', type: 'Mowing', dueAt: today, repeat: 'None' });
+  b.p.TASKS.push({ id: b.p.newId('t'), title: 'ZZ Crew two', area: 'D', assignee: other, status: 'todo', kind: 'task', type: 'Mowing', dueAt: today, repeat: 'None' });
   b.win.__set('tbTab', 'board');
   b.win.__set('boardDay', new Date().getDay());
   b.win.__get('renderBoard')();

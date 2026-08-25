@@ -148,6 +148,11 @@ ok('the plot now reads as fairway ground', win.mowerLabel(P) === 'Fairway Mower'
 ok('the toast names the job it joined', /Fairway/.test(saved), saved);
 
 section('It shows up when assigning the task');
+/* A fixture, not a seed row — the demo tasks were removed from the app on
+   2026-08-24, so this brings the fairway job it needs. */
+if (!win.TASKS.some(t => t.id === 't1')) win.TASKS.push(
+  {id:'t1', title:'Fairway Mow', area:'Fairway-mown plots', plots:[], machine:'e1',
+   assignee:'p07', status:'todo', kind:'task'});
 const fairway = win.jobPlots('Mow', 'Fairway Mow', []);
 const rotary = win.jobPlots('Mow', 'Rotary Mow · Plots', []);
 ok('selectable on the fairway job', fairway.indexOf(P) >= 0, fairway.length + ' fairway plots');
@@ -206,6 +211,19 @@ typeHeight(P, 0);
 ok('zero is refused too', /cut height in inches/.test(save(P)));
 
 section('Restrictions still apply to the plot in its new job');
+/* A fixture, not a seed row. The sample trials (and the restrictions that hung
+   off them) were removed from the app on 2026-08-24, so this test brings the
+   no-mow hold it is asserting about. Same shape the trial editor writes:
+   restrictions live on an active trial and are scoped to a plot. Dates are
+   deliberately wide so this never starts failing on a calendar boundary. */
+win.TRIALS.push({
+  id:'s-fixture', title:'Fixture — no-mow hold', lab:'Sorochan', pi:'p13', owner:'p01',
+  stage:'active', multiPlot:false, coverage:'full', pin:null,
+  start:'2020-01-01', end:'2099-12-31',
+  locations:[{plot:'B14', sqft:7500}],
+  restrictions:[{id:'r-fixture', type:'mow', scope:'B14',
+                 note:'Fixture hold', start:'2020-01-01', end:'2099-12-31', by:'p01'}]
+});
 openForm('B14');
 typeHeight('B14', 0.5);
 pickMower('Fairway Mower');

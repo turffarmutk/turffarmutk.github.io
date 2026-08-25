@@ -59,21 +59,55 @@ hardest part of this whole job.
 goes to sleep if nobody uses it. That was about Supabase, which we moved away
 from. Please ignore it — it is wrong now.** This section replaces it.
 
-Firebase's free plan does not sleep and does not expire. What it gives you per
-day:
+Firebase's free plan does not sleep and does not expire. Here is every limit
+that applies, and what the farm would actually have to do to reach it.
 
-- **50,000 records read**
-- **20,000 records written**
-- **1 GB stored**
+| What's counted | Free every day | What a busy farm day looks like | Used |
+|---|---|---|---|
+| Records **read** | 50,000 | see below | 5–10% |
+| Records **written** | 20,000 | ~500–1,500 | under 10% |
+| Records **deleted** | 20,000 | a handful | ~0% |
+| Total **stored** | 1 GB | grows a few MB a year | under 1% |
+| People signing in | 50,000 a month | 23 | 0.05% |
 
-To put that in farm terms: 23 people using the app hard all day is a few
-thousand reads. You are not close. Text records — tasks, logs, stock counts —
-are tiny; 1 GB is more than this farm will generate in your time here and the
-next person's.
+**Storing things is not the constraint.** Everything the farm records is text —
+a task, a stock count, a line in the field log. One field-log record is about
+half a kilobyte, so 1 GB is roughly two million of them. Even logging every mow
+on every plot all season, the farm produces a few thousand a year. That is
+decades of headroom, not years.
 
-**So the realistic answer is that this costs nothing.** If it ever did outgrow
-free, it becomes pay-as-you-go pennies rather than a flat monthly fee, and
-Firebase will email you before that happens.
+**Writing is not the constraint either.** The heaviest realistic day — everyone
+logging their work, plus a full-farm mow that creates one record per plot — is
+somewhere around a thousand writes. The allowance is twenty thousand.
+
+**Reading is the only number worth watching, and it is my problem, not yours.**
+A "read" is the app fetching one record. If I build it so that opening the app
+re-fetches the whole farm every time, one person opening it costs several
+hundred reads, and fifteen people opening it six times a day gets close to the
+line. Built the way we planned — the phone keeps its own copy and only asks for
+what has *changed* — the same day costs a few thousand.
+
+So whether this stays free depends on how carefully it is built, not on how big
+the farm gets. Hiring five more people would barely move it. That is my job to
+get right, and it is worth knowing so you can hold me to it.
+
+**If it were ever exceeded**, two things are true and both are reassuring:
+
+- The overflow price is trivial. Reads are **3 cents per hundred thousand**;
+  writes **9 cents per hundred thousand**. A farm somehow using double the free
+  allowance every single day would owe about **a dollar a month**.
+- **You would only ever be charged if somebody put a card on the account.**
+
+**My recommendation: never put a card on it.** On the free plan there is no
+payment method and no possible bill. If the farm ever did hit a daily limit, the
+app does not break — the phones keep working on their own copies, they just
+cannot sync until the count resets after midnight. Then it carries on.
+
+For a farm with no software budget and a non-technical person holding this in
+2030, a hard stop that fixes itself overnight is *better* than a surprise
+invoice nobody is watching for. Take the cutoff.
+
+You can see the numbers any time: Firebase console → **Usage**.
 
 **The thing that does matter: there are no automatic backups on the free plan.**
 Once the shared copy is the real one, the Export button in the app is the farm's

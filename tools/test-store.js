@@ -108,9 +108,14 @@ section('1. seeds become the baseline on first run');
   const keys = first.p.STORE_DEFS.map(d => d.key);
   ok('every collection wrote a key', keys.every(k => typeof store[k] === 'string'),
      keys.filter(k => typeof store[k] !== 'string').join(','));
-  ok('tasks were seeded, not blanked', JSON.parse(store['ut_tasks_v1']).length > 0,
-     String(JSON.parse(store['ut_tasks_v1'] || '[]').length));
-  ok('equipment was seeded', JSON.parse(store['ut_equip_v1']).length > 0);
+  /* Tasks ship EMPTY since 2026-08-24 — only equipment, the roster and the task
+     catalog are pre-loaded now, so an empty tasks key is correct, not a bug.
+     What still has to be true is that the collection was written at all, and
+     that a collection which DOES carry a seed keeps it. */
+  ok('tasks were written, even though empty', Array.isArray(JSON.parse(store['ut_tasks_v1'])),
+     store['ut_tasks_v1']);
+  ok('equipment was seeded', JSON.parse(store['ut_equip_v1']).length > 0,
+     String(JSON.parse(store['ut_equip_v1'] || '[]').length));
 }
 
 section('2. a change survives a reload — the whole point');
@@ -133,9 +138,12 @@ section('2. a change survives a reload — the whole point');
 
 section('3. bad data must never wipe good data');
 {
-  const corrupt = Object.assign({}, store, { ut_tasks_v1: '{not json at all' });
+  /* Asserted against EQUIP, not TASKS: tasks now ship empty, so an empty array
+     could not tell "seed survived" from "seed was wiped". Equipment still
+     carries 87 rows, which makes the difference visible. */
+  const corrupt = Object.assign({}, store, { ut_equip_v1: '{not json at all' });
   const b = boot(corrupt);
-  ok('corrupt JSON leaves the seed standing', b.p.TASKS.length > 0, String(b.p.TASKS.length));
+  ok('corrupt JSON leaves the seed standing', b.p.EQUIP.length > 0, String(b.p.EQUIP.length));
 
   const wrongShape = Object.assign({}, store, { ut_equip_v1: '{"a":1}' });
   const c = boot(wrongShape);
@@ -183,7 +191,8 @@ section('6. export → restore round trip');
 
   const targetStore = {};
   const target = boot(targetStore);
-  ok('the target starts from its own seed', target.p.TASKS.length > 1);
+  ok('the target starts from its own seed', target.p.EQUIP.length > 1,
+     String(target.p.EQUIP.length));
   target.win.eval('_bkPending=' + JSON.stringify(payload) + ';');
   try { target.p.bkRestore(); } catch (e) { /* location.reload is not implemented in jsdom */ }
   ok('storage now holds the backup\'s tasks',
@@ -198,7 +207,8 @@ section('6. export → restore round trip');
   const guard = boot({});
   guard.win.eval('_bkPending=null;');
   guard.p.bkRestore();
-  ok('restoring nothing does nothing', guard.p.TASKS.length > 0);
+  ok('restoring nothing does nothing', guard.p.EQUIP.length > 0,
+     String(guard.p.EQUIP.length));
 }
 
 section('7. a value somebody typed cannot break the spreadsheet');

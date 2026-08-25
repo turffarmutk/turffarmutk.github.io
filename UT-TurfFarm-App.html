@@ -3576,26 +3576,7 @@ function flOrdAgo(n){ var d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate
 function flDateAgo(n){ var d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()-n);
   return d.toLocaleString('en-US',{month:'short'})+' '+d.getDate(); }
 let FIELDLOG=[
- {plot:'14',type:'spray',title:'Daconil Weatherstik',detail:'Chlorothalonil · 3.6 fl oz/M · Javi V.',date:flDateAgo(0),ord:flOrdAgo(0)},
- {plot:'16',type:'spray',title:'Daconil Weatherstik',detail:'Chlorothalonil · 3.6 fl oz/M · Javi V.',date:flDateAgo(0),ord:flOrdAgo(0)},
- {plot:'11',type:'mow',title:'Reel mow',detail:'0.125 in HOC · Toro 3 · Garrett Willard',date:flDateAgo(1),ord:flOrdAgo(1)},
- {plot:'12',type:'fert',title:'Lesco 24-0-11',detail:'0.75 lb N/M · broadcast · Taryn Breeden',date:flDateAgo(2),ord:flOrdAgo(2)},
- {plot:'13',type:'mow',title:'Rotary mow',detail:'1.5 in · rough · Jed Bates',date:flDateAgo(3),ord:flOrdAgo(3)},
- {plot:'15',type:'cult',title:'Core aeration',detail:'5/8" tines · 2" spacing · Garrett Willard',date:flDateAgo(4),ord:flOrdAgo(4)},
- {plot:'11',type:'spray',title:'Primo Maxx',detail:'PGR · 0.25 fl oz/M · Javi V.',date:flDateAgo(5),ord:flOrdAgo(5)},
- {plot:'16',type:'irrig',title:'Irrigation cycle',detail:'0.35 in · 22 min · auto zone 4',date:flDateAgo(6),ord:flOrdAgo(6)},
- {plot:'14',type:'fert',title:'Milorganite 6-4-0',detail:'0.9 lb N/M · Taryn Breeden',date:flDateAgo(7),ord:flOrdAgo(7)},
- {plot:'17',type:'cult',title:'Verticut',detail:'2 mm depth · N–S pass · Garrett Willard',date:flDateAgo(8),ord:flOrdAgo(8)},
- {plot:'17',type:'irrig',title:'Handwater dry spots',detail:'hose · SE corner · Taryn Breeden',date:flDateAgo(9),ord:flOrdAgo(9)},
- {plot:'13',type:'spray',title:'Heritage G',detail:'Azoxystrobin · granular · Javi V.',date:flDateAgo(10),ord:flOrdAgo(10)},
- {plot:'16',type:'fert',title:'Lesco 24-0-11',detail:'0.75 lb N/M · Taryn Breeden',date:flDateAgo(11),ord:flOrdAgo(11)},
- {plot:'18',type:'cult',title:'Topdress sand',detail:'0.15 in · drag mat · crew',date:flDateAgo(12),ord:flOrdAgo(12)},
- {plot:'GH',type:'misc',title:'Trial dots painted',detail:'plot markers · Priya',date:flDateAgo(13),ord:flOrdAgo(13)},
- {plot:'12',type:'spray',title:'Dimension 2EW',detail:'Pre-emergent · 0.25 fl oz/M · Javi V.',date:flDateAgo(14),ord:flOrdAgo(14)},
- {plot:'GH',type:'fert',title:'Peters 20-20-20',detail:'Soluble · fertigation · Priya',date:flDateAgo(15),ord:flOrdAgo(15)},
- {plot:'18',type:'misc',title:'Debris cleanup',detail:'storm limbs cleared · crew',date:flDateAgo(16),ord:flOrdAgo(16)},
- {plot:'15',type:'spray',title:'Daconil Weatherstik',detail:'Chlorothalonil · 3.6 fl oz/M · Javi V.',date:flDateAgo(17),ord:flOrdAgo(17)},
- {plot:'11',type:'cult',title:'Core aeration',detail:'5/8" tines · Garrett Willard',date:flDateAgo(18),ord:flOrdAgo(18)}
+ /* Empty on purpose — see TASKS. Held 20 sample log entries. */
 ];
 function flLoad(){try{var r=JSON.parse(localStorage.getItem(FL_KEY)||'null');if(r&&r.length)return r;}catch(e){}return null;}
 /* Every entry needs a stable handle so a home-screen row, the feed and the
@@ -4407,7 +4388,7 @@ function labsUnlisted(){
 var RST_LABS=labNamesSorted();
 var RST_KEY='ut_people_v1';
 var RST_SEED=[
- {id:'p01',first:'Dillon',last:'McCallum',pron:'he/him/his',role:'Technician',lab:'Sorochan',email:'',active:true},
+ {id:'p01',first:'Dillon',last:'McCallum',pron:'he/him/his',role:'Technician',lab:'Sorochan',email:'',active:true,grants:['assign_undergrads']},
  {id:'p02',first:'Rhys',last:'Fielder',pron:'he/him/his',role:'Technician',lab:'Sorochan',email:'',active:true},
  {id:'p03',first:'Kyley',last:'Dickson',pron:'he/him/his',role:'Technician',lab:'Sorochan',email:'',active:true},
  {id:'p04',first:'Taylor',last:'Williams',pron:'he/him/his',role:'Technician',lab:'Sorochan',email:'',active:true},
@@ -5035,7 +5016,9 @@ function attachSchedule(){
    that sniff missed it and the circle went dead. Match the class first and
    keep the style probe for the headers that still spell it out inline. */
 document.querySelectorAll('.hdr').forEach(h=>{h.querySelectorAll('span').forEach(s=>{if(s.textContent.trim()==='🔔'){s.classList.add('tap','bellwrap');s.setAttribute('data-go','notifications');}});const av=h.querySelector('span.hh-av, span[style*="border-radius:50%"]');if(av){av.classList.add('tap');av.setAttribute('data-go','profile');}});
-const NOTIFS=[{t:'Toro 3 marked down',s:'Greg Breeden · reel damage · blocking 2 tasks',time:'2h',h:2,c:'#c0392b'},{t:'Daconil low stock',s:'2.5 gal left · below reorder point',time:'3h',h:3,c:'#c0392b'},{t:'Spray window is good',s:'Wind 4 mph · clear',time:'7:02a',h:7,c:'#2f9e4f'},{t:'Rose submitted a protocol draft',s:'Spring green-up · needs review',time:'Mon',h:48,c:'#489FDF'},{t:'Restriction set · Plot 14',s:'No fungicide · N section',time:'Mon',h:50,c:'#9a5b00'},{t:'Garrett clocked in',s:'7:02a · barn crew',time:'Mon',h:51,c:'#58595b'}];
+const NOTIFS=[
+ /* Empty on purpose — see TASKS. Held 6 sample notifications. */
+];
 function getSeen(){try{return +localStorage.getItem('ut_seen')||0;}catch(e){return 0;}}
 function setSeen(v){try{localStorage.setItem('ut_seen',v);}catch(e){}}
 /* Unread count sits on the bell instead of a banner down the page. */
@@ -5083,38 +5066,10 @@ const STUDENTS=rstUndergradIds();   /* live view of the roster's undergrads, as 
    herbicide, insecticide, fertilizer, wetting, irrigate and cultivate — so the
    restriction handling is visible without hunting for a plot. */
 let TASKS=[
- /* --- Garrett's day: one job per restriction type ------------------------- */
- {id:'t1',mowDir:'12–6',dblMow:false,machine:'e1',title:'Fairway Mow',area:'Fairway-mown plots',assignee:'p18',status:'todo',kind:'task',badge:{t:'↻ Daily',bg:'#eef1f4',fg:'#7b828d'},type:'Mow',dueAt:atToday('06:00'),repeat:'Daily',desc:'Fairway units only. B14 is under a no-mow hold for the dollar-spot ratings — mow around it.'},
- {id:'t2',machine:'e2',title:'Spray Pesticide (John Deere) · Fungicide',area:'B12–B14',plots:['B12','B13','B14'],assignee:'p18',status:'todo',kind:'task',badge:{t:'Res',bg:'#fef1dc',fg:'#9a5b00'},type:'Spray',dueAt:atToday('06:30'),repeat:'None',desc:'Boom sprayer. B14 carries an untreated check block — skip the N section and log the application when you finish.'},
- {id:'t3',machine:'e43',title:'Spray Pesticide (Backpack) · Herbicide',area:'NTEP & C-block',plots:['NTEP','C2','C3'],assignee:'p18',status:'todo',kind:'task',badge:{t:'Res',bg:'#fef1dc',fg:'#9a5b00'},type:'Spray',dueAt:atToday('08:00'),repeat:'None',desc:'Spot treat only on the NTEP block — no broadcast herbicide while the cultivar trial is rated.'},
- {id:'t4',machine:'e2',title:'Spray Pesticide (John Deere) · Insecticide',area:'NTEP & E-block',plots:['NTEP','E15','E16'],assignee:'p18',status:'todo',kind:'task',badge:{t:'Res',bg:'#fef1dc',fg:'#9a5b00'},type:'Spray',dueAt:atToday('09:00'),repeat:'None',desc:'Armyworm pressure in the E block. The NTEP plots are rated on their own pest tolerance — leave them alone.'},
- {id:'t5',machine:'e28',title:'Fertilize (granular)',area:'NTEP & B-block',plots:['NTEP','B12','B13'],assignee:'p18',status:'todo',kind:'task',badge:{t:'Res',bg:'#fef1dc',fg:'#9a5b00'},type:'Fertilize',dueAt:atToday('10:00'),repeat:'None',desc:'0.5 lb N/M. The NTEP block runs its own fertility program — do not overlap it.'},
- {id:'t6',title:'Handwater',area:'C-block',plots:['C1','C2'],assignee:'p18',status:'todo',kind:'task',badge:{t:'Res',bg:'#fef1dc',fg:'#9a5b00'},type:'Irrigation',dueAt:atToday('11:00'),repeat:'None',desc:'Hose and breaker on the dry corners. C1 is the deficit-irrigation study — no supplemental water on those plots.'},
- {id:'t7',machine:'e44',title:'Spray Wetting Agent (Backpack)',area:'C-block',plots:['C1','C2','C3'],assignee:'p18',status:'todo',kind:'task',badge:{t:'Res',bg:'#fef1dc',fg:'#9a5b00'},type:'Spray',dueAt:atToday('13:00'),repeat:'None',desc:'Localized dry spot on the C block. Wetting agent would mask the drought response on C1 — work around it.'},
- {id:'t8',machine:'e23',title:'Aeration (John Deere)',area:'E-block',plots:['E15','E16','E17'],assignee:'p18',status:'todo',kind:'task',badge:{t:'Res',bg:'#fef1dc',fg:'#9a5b00'},type:'Aeration',dueAt:atToday('14:00'),repeat:'None',desc:'Hollow tines, 2 in spacing. E17 is the traffic study — cultivation resets the wear treatment, so stay off it.'},
- {id:'t9',title:'Paint Trial Dots',area:'All active trials',assignee:'p18',status:'todo',kind:'task',badge:{t:'↻ Weekly',bg:'#eef1f4',fg:'#7b828d'},type:'Paint',dueAt:atToday('15:00'),repeat:'Weekly',desc:'Refresh the corner dots on every active study. Check each one off on the map as you go.'},
- /* --- The rest of the crew --------------------------------------------- */
- {id:'t10',mowDir:'3–9',dblMow:false,machine:'e10',title:'2653 Mow',area:'2653-mown plots',assignee:'p20',status:'todo',kind:'task',badge:{t:'↻ Daily',bg:'#eef1f4',fg:'#7b828d'},type:'Mow',dueAt:atToday('06:00'),repeat:'Daily',desc:'E17 is closed for the traffic ratings this month — mow around it.'},
- {id:'t11',mowDir:'12–6',dblMow:false,machine:'e57',title:'Weedeat',area:'Alleys & borders',assignee:'p21',status:'todo',kind:'task',badge:null,type:'Mow',dueAt:atToday('09:00'),repeat:'Weekly',desc:'Trim alley edges and around the irrigation heads. Watch the trial dots.'},
- /* Two people, one job, ten acres. They split it on the shared map: taking a
-    zone locks the rest of the crew out of it, and the mower paints its own
-    coverage as it goes. */
- {id:'t21',mowDir:'12–6',dblMow:false,machine:'e3',title:'Rotary Mow · Alleys',area:'Alleys & borders',assignee:'p18',helpers:['p20'],status:'todo',kind:'task',badge:{t:'2 crew',bg:'#e8eff5',fg:'#42688a'},type:'Mow',dueAt:atToday('06:30'),repeat:'Daily',desc:'Ten acres of alleys and borders at 4″, split between the two of you. Take a zone before you start it so you are not both on the same ground. The map paints what you cover.'},
- {id:'t12',title:'Take Trash Out',area:'Shop & chemical building',assignee:'p22',status:'todo',kind:'task',badge:null,type:'Miscellaneous',dueAt:atToday(null),repeat:'Daily',desc:'Shop, break room and chemical building cans. Rinse containers go in the triple-rinse bin, not the trash.'},
- {id:'t13',title:'Irrigation Fix · Head',area:'B-block',plots:['B9'],assignee:'p05',status:'todo',kind:'task',badge:null,type:'Irrigation',dueAt:atToday('07:00'),repeat:'None',desc:'Head 7 on the B block is stuck open. Shut the zone down before you pull it.'},
- {id:'t14',machine:'e35',title:'Grind Reels',area:'Shop',assignee:'p05',status:'todo',kind:'task',badge:null,type:'Maintenance',dueAt:atToday(null),repeat:'None',desc:'Greens triplex reels 1–3. Backlap after grinding and note the hours.'},
- /* --- Up for grabs ------------------------------------------------------ */
- {id:'t15',machine:'e31',title:'Traffic Plots',area:'E-block',plots:['E15','E16'],assignee:null,status:'todo',kind:'task',badge:null,type:'Miscellaneous',dueAt:atToday('13:00'),repeat:'Weekly',desc:'Two passes with the traffic simulator per the study plan. E17 gets its passes from Sorochan lab, not us.'},
- {id:'t16',title:'Backlap Reels',area:'Shop',assignee:null,status:'todo',kind:'task',badge:null,type:'Maintenance',dueAt:atToday(null),repeat:'None',desc:'Walk mowers 1 and 2. Check bedknife contact after.'},
- {id:'t17',title:'Oil Change',area:'Shop',assignee:null,status:'todo',kind:'task',badge:null,type:'Maintenance',dueAt:atToday(null),repeat:'None',desc:'JD 2653 at 250 h. Filter is on the shelf above the bench — log the hours when you close it out.'},
- /* --- Done today -------------------------------------------------------- */
- {id:'t18',mowDir:'1:30–7:30',dblMow:false,machine:'e3',title:'Rotary Mow · Plots',area:'Rotary-mown plots',assignee:'p18',status:'done',kind:'task',badge:null,type:'Mow',dueAt:atToday('05:30'),repeat:'Daily',completedBy:'p18',completedAt:atToday('06:12'),desc:'Finished at 6:12a. Clippings dispersed, no wet spots.'},
- {id:'t19',machine:'e49',title:'Topdress · Rotary',area:'B-block',plots:['B12','B13'],assignee:'p20',status:'done',kind:'task',badge:null,type:'Cultivation',dueAt:atToday('07:00'),repeat:'None',completedBy:'p20',completedAt:atToday('08:40'),desc:'Light rate, brushed in. Held off E17 per the traffic study.'},
- {id:'t20',mowDir:'12–6',dblMow:true,dblPass:'90°',title:'Greens Walk Mow',area:'Greens',assignee:'p21',status:'done',kind:'task',badge:null,type:'Mow',dueAt:atToday('05:30'),repeat:'Daily',completedBy:'p21',completedAt:atToday('07:05'),desc:'0.125 in. Cleaned and put the walkers up.'},
- /* --- Requests from the labs -------------------------------------------- */
- {id:'r1',title:'Move irrigation pump',area:'Pump house',assignee:null,status:'todo',kind:'request',badge:null,type:'Labor assist',dueAt:atToday('13:00'),repeat:'None',requestedBy:'p05',desc:'Need one undergrad to help move the backup pump out of the pump house. Two-person lift.'},
- {id:'r2',title:'Collect soil samples',area:'B-block',plots:['B12','B13','B14'],assignee:null,status:'todo',kind:'request',badge:null,type:'Field sampling',dueAt:atToday('11:00'),repeat:'None',requestedBy:'p09',desc:'Twelve cores per plot at 4 in, bagged and labeled by plot. Bags are in the lab fridge.'},
- {id:'r3',title:'Set up trial flags',area:'NTEP block',plots:['NTEP'],assignee:null,status:'todo',kind:'request',badge:null,type:'Trial setup',dueAt:atToday(null),repeat:'None',requestedBy:'p09',desc:'Numbered flags on the NTEP entries ahead of Thursday ratings. Map is pinned in the headhouse.'}
+ /* Empty on purpose. The demo jobs were removed 2026-08-24 — Dillon asked
+    that nothing but the equipment list, the roster and the task catalog ship
+    pre-loaded. Seeded rows would also multiply at migration: 23 phones each
+    uploading the same fake task into the shared copy. */
 ];
 let tbTab='board';
 var WEEKDAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -5154,6 +5109,88 @@ function meName(){ return me().n; }
 /* The people on a job, as roster ids. Callers that want names run it through
    namesOf(); callers that want to know whether it is yours use isMe(). */
 function taskCrew(t){ return t?[t.assignee].concat(t.helpers||[]).filter(Boolean):[]; }
+/* ---- who may do what with a task ----
+   ONE function, deliberately. This rule is the farm's organisation chart, not
+   a interface preference, and it has to read identically in both places it is
+   enforced: the buttons the app offers, and the rules the database applies.
+   Two copies of it would drift, and the copy that drifts is the one that lets
+   somebody put work on a person who does not answer to them.
+
+   The shape of it, in Dillon's words (2026-08-24):
+
+     - Grad students and technicians answer to their FACULTY ADVISOR, not to
+       the Farm Manager. So Bill may direct an undergrad, but he may only ASK
+       a tech or a grad student — a request they pick up, or leave.
+     - Faculty may direct their own lab's techs and grad students, and only
+       their own lab's.
+     - Undergrad labour is pooled. Nobody hands out an undergrad except
+       whoever is holding that job, which is normally Bill.
+
+   That last one is a GRANT on a person rather than a test for the words "Farm
+   Manager", because it moves: Dillon holds it today, and Bill needs to be able
+   to hand it to someone while he is away. */
+var GRANT_ASSIGN_UNDERGRADS='assign_undergrads';
+
+function personOf(x){ var id=pidOf(x); return id?rstFind(id):null; }
+function personRole(x){ var p=personOf(x); return p?p.role:null; }
+function personLab(x){ var p=personOf(x); var l=p&&p.lab; return (l&&l!=='—')?l:null; }
+function personActive(x){ var p=personOf(x); return !!(p&&p.active!==false); }
+function personHas(x,grant){
+  var p=personOf(x);
+  return !!(p&&p.grants&&p.grants.indexOf(grant)>=0);
+}
+function assignsUndergrads(x){
+  return personRole(x)==='Farm Manager' || personHas(x,GRANT_ASSIGN_UNDERGRADS);
+}
+/* Two people share a lab only if they actually have one. A blank lab is the
+   shared undergrad pool, not a lab everyone is in together. */
+function sameLab(a,b){ var la=personLab(a); return !!la && la===personLab(b); }
+
+function taskCan(actor,action,task){
+  var me=pidOf(actor);
+  if(!me || !personActive(me)) return false;
+  var role=personRole(me); if(!role) return false;
+  var t=task||{};
+  var target=pidOf(t.assignee);
+  var UG='Undergraduate Student';
+
+  switch(action){
+    /* Undergrads do the work they are given; they do not raise it. */
+    case 'create':
+    case 'request':
+      return role!==UG;
+
+    /* Putting a NAMED person on a job. Everything above turns on this. */
+    case 'assign':
+      if(!target) return false;
+      if(target===me) return role!==UG;                     /* taking it yourself */
+      if(personRole(target)===UG) return assignsUndergrads(me);
+      if(role==='Faculty'){
+        var tr=personRole(target);
+        return (tr==='Graduate Student'||tr==='Technician') && sameLab(me,target);
+      }
+      return false;                                          /* Bill included: he asks */
+
+    /* Picking up something nobody is on. Undergrads never see the pool. */
+    case 'claim':
+      if(t.assignee) return false;
+      return role==='Graduate Student' || role==='Technician' || assignsUndergrads(me);
+
+    /* The worker closes their own; Bill can close on their behalf, and the
+       credit still goes to the worker (completedBy) not the closer. */
+    case 'complete':
+      return taskIsFor(t,me) || assignsUndergrads(me);
+
+    case 'edit':
+    case 'delete':
+      if(role==='Farm Manager') return true;
+      if(pidOf(t.createdBy)===me) return true;
+      if(role==='Faculty' && target && sameLab(me,target)) return true;
+      return false;
+  }
+  return false;
+}
+
 function taskIsFor(t,who){ var id=pidOf(who); return !!t&&!!id&&taskCrew(t).indexOf(id)>=0; }
 function taskCrewLabel(t){
   var c=namesOf(taskCrew(t));
@@ -6493,25 +6530,615 @@ var CAT=[
 ];
 function catMeta(k){return CAT.find(function(c){return c.k===k;})||{k:k,label:k,emoji:'📦',res:null};}
 var INVENTORY=[
- {id:'i1', name:'Daconil Weatherstik', ai:'Chlorothalonil', moa:'M05', cat:'fungicide', form:'SC', loc:'Chem room', ctype:'jug', csize:2.5, unit:'gal', qty:1.25, thr:2.5},
- {id:'i2', name:'Heritage TL', ai:'Azoxystrobin', moa:'11', cat:'fungicide', form:'SC', loc:'Chem room', ctype:'jug', csize:2, unit:'gal', qty:4, thr:2},
- {id:'i3', name:'Banner Maxx II', ai:'Propiconazole', moa:'3', cat:'fungicide', form:'EC', loc:'Chem room', ctype:'jug', csize:1, unit:'gal', qty:3, thr:1},
- {id:'i4', name:'Prodiamine 65 WDG', ai:'Prodiamine', moa:'3', cat:'herbicide', form:'WDG', loc:'Chem room', ctype:'bag', csize:5, unit:'lb', qty:8, thr:5},
- {id:'i5', name:'Tenacity', ai:'Mesotrione', moa:'27', cat:'herbicide', form:'SC', loc:'Chem room', ctype:'bottle', csize:8, unit:'oz', qty:20, thr:8},
- {id:'i6', name:'Roundup PowerMax', ai:'Glyphosate', moa:'9', cat:'herbicide', form:'liquid', loc:'Shed', ctype:'jug', csize:2.5, unit:'gal', qty:5, thr:2.5},
- {id:'i7', name:'Acelepryn', ai:'Chlorantraniliprole', moa:'28', cat:'insecticide', form:'SC', loc:'Chem room', ctype:'jug', csize:1, unit:'gal', qty:0.75, thr:1},
- {id:'i8', name:'Merit 0.5 G', ai:'Imidacloprid', moa:'4A', cat:'insecticide', form:'granular', loc:'Shed', ctype:'bag', csize:30, unit:'lb', qty:60, thr:30},
- {id:'i9', name:'Primo Maxx', ai:'Trinexapac-ethyl', moa:null, cat:'pgr', form:'EC', loc:'Chem room', ctype:'jug', csize:1, unit:'gal', qty:1.2, thr:1},
- {id:'i10', name:'Urea 46-0-0', ai:null, moa:null, cat:'fert_gran', form:'granular', loc:'Barn', ctype:'bag', csize:50, unit:'lb', qty:100, thr:150},
- {id:'i11', name:'18-24-12 Starter', ai:null, moa:null, cat:'fert_gran', form:'granular', loc:'Barn', ctype:'bag', csize:50, unit:'lb', qty:400, thr:100},
- {id:'i12', name:'Ferromec AC', ai:'Iron + N', moa:null, cat:'fert_liq', form:'liquid', loc:'Chem room', ctype:'jug', csize:2.5, unit:'gal', qty:7.5, thr:2.5},
- {id:'i13', name:'28-0-0 UAN', ai:null, moa:null, cat:'fert_liq', form:'liquid', loc:'Tank yard', ctype:'drum', csize:30, unit:'gal', qty:60, thr:30},
- {id:'i14', name:'Revolution', ai:'Alkyl polyglucoside', moa:null, cat:'wetting', form:'liquid', loc:'Chem room', ctype:'jug', csize:2.5, unit:'gal', qty:5, thr:2.5},
- {id:'i15', name:'Riviera Bermuda seed', ai:null, moa:null, cat:'seed', form:'other', loc:'Barn', ctype:'bag', csize:25, unit:'lb', qty:75, thr:50},
- {id:'i16', name:'007 Bentgrass seed', ai:null, moa:null, cat:'seed', form:'other', loc:'Barn', ctype:'bag', csize:25, unit:'lb', qty:10, thr:25},
- {id:'i17', name:'Field paint · white', ai:null, moa:null, cat:'paint_can', form:'other', loc:'Shed', ctype:'can', csize:1, unit:'can', qty:18, thr:12},
- {id:'i18', name:'Field paint · blue', ai:null, moa:null, cat:'paint_can', form:'other', loc:'Shed', ctype:'can', csize:1, unit:'can', qty:4, thr:6},
- {id:'i19', name:'Bulk white paint', ai:null, moa:null, cat:'paint_liq', form:'liquid', loc:'Shed', ctype:'drum', csize:5, unit:'gal', qty:15, thr:5}
+ /* Built by tools/build-inventory.py from
+    reference/Inventory of Cages_Bulk Materials.xlsx (the April count).
+    Re-run that script after editing the sheet; do not hand-edit this block.
+
+    One entry per PRODUCT. `containers` holds each physical size the farm has
+    of it — a 2018 2.5-gallon jug is not the same thing as a 2025 1-gallon one,
+    so they stay separate lines with their own year and cage.
+
+    `qty` counts CONTAINERS, not volume: 1 = a full jug, 0.5 = a half one.
+    The sheet's own wording is kept in `src` so a recount can be checked
+    against what April actually said. Quantities are April's and are expected
+    to be wrong by now — they are a starting point to correct, not a truth. */
+ {id:'i1', name:'0-0-22/ Mayo Fert', ai:'', cat:'fert_gran', form:'', thr:0, csize:50, unit:'lb', ctype:'bag', qty:200,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:4, year:null, loc:'Barn', cage:'', src:'4 bags'}]},
+ {id:'i2', name:'17-17-17', ai:'', cat:'fert_gran', form:'', thr:0, csize:50, unit:'lb', ctype:'bag', qty:300,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:6, year:null, loc:'Barn', cage:'', src:'6 Bags'}]},
+ {id:'i3', name:'26GT', ai:'Iprodione', cat:'fungicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:1.25,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.5, year:'2018', loc:'Cage', cage:'2', src:'Half'}]},
+ {id:'i4', name:'Accord XRT', ai:'glyphosate', cat:'herbicide', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:2,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:2, year:null, loc:'Cage', cage:'3', src:'2 Full'}]},
+ {id:'i5', name:'Acelepryn', ai:'Chloramtraniliprole', cat:'insecticide', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:3,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:3, year:'2020', loc:'Cage', cage:'3', src:'3 Full'}]},
+ {id:'i6', name:'Advion', ai:'Indoxacarb', cat:'insecticide', form:'Granular', thr:0, csize:1, unit:'lb', ctype:'bag', qty:1,
+  containers:[
+   {csize:1, unit:'lb', ctype:'bag', qty:1, year:'2019', loc:'Cage', cage:'3', src:'1 Full'}]},
+ {id:'i7', name:'Akron', ai:'Purimisulfan', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:3.75,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1.5, year:null, loc:'Cage', cage:'3', src:'1 Full 1 partial'}]},
+ {id:'i8', name:'Aliette', ai:'Aluminum tris', cat:'fungicide', form:'Liquid', thr:0, csize:5, unit:'lb', ctype:'bag', qty:10,
+  containers:[
+   {csize:5, unit:'lb', ctype:'bag', qty:2, year:'2026', loc:'Cage', cage:'2', src:'2 Full'}]},
+ {id:'i9', name:'Aloft LCSC', ai:'clothianidin + bifenthrin', cat:'insecticide', form:'Liquid', thr:0, csize:64, unit:'oz', ctype:'bottle', qty:64,
+  containers:[
+   {csize:64, unit:'oz', ctype:'bottle', qty:1, year:null, loc:'Cage', cage:'3', src:'Full'}]},
+ {id:'i10', name:'Anderson\'s Crab/Goose', ai:'Bensulide + Oxadiazon', cat:'herbicide', form:'Granular', thr:0, csize:28.7, unit:'lb', ctype:'bag', qty:229.6,
+  containers:[
+   {csize:28.7, unit:'lb', ctype:'bag', qty:8, year:null, loc:'Cage', cage:'', src:'8 Full'}]},
+ {id:'i11', name:'Appear II', ai:'Potassium Phosphite', cat:'fungicide', form:'Liquid', thr:0, csize:7, unit:'gal', ctype:'jug', qty:23,
+  containers:[
+   {csize:7, unit:'gal', ctype:'jug', qty:1, year:'<2017', loc:'Cage', cage:'2', src:'7 gal'},
+   {csize:2, unit:'gal', ctype:'jug', qty:8, year:'<2018', loc:'Cage', cage:'2', src:'8 Full'}]},
+ {id:'i12', name:'Armada', ai:'Trifloxistrobin', cat:'fungicide', form:'WG', thr:0, csize:8, unit:'lb', ctype:'bag', qty:8,
+  containers:[
+   {csize:8, unit:'lb', ctype:'bag', qty:1, year:'<2017', loc:'Cage', cage:'2', src:'8 lbs'}]},
+ {id:'i13', name:'Avenue South', ai:'24D+Dicamba+Penoxsulam+Sulfentrazone', cat:'herbicide', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:2,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:2, year:'2022', loc:'Cage', cage:'3', src:'2 Full'}]},
+ {id:'i14', name:'Barricade 4FL', ai:'Prodiamine', cat:'herbicide', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:4,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:4, year:'<2017', loc:'Cage', cage:'3', src:'4 full'}]},
+ {id:'i15', name:'Basamid G', ai:'Dazomet', cat:'herbicide', form:'Granular', thr:0, csize:50, unit:'lb', ctype:'bag', qty:25,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:0.5, year:null, loc:'Cage', cage:'', src:'1 Half'}]},
+ {id:'i16', name:'Bayleton', ai:'Triadimefon', cat:'fungicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:10,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:4, year:'2018', loc:'Cage', cage:'2', src:'4 Full'}]},
+ {id:'i17', name:'Bensumec 4', ai:'Bensulfide', cat:'herbicide', form:'LF', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:1.25,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.5, year:'<2017', loc:'Cage', cage:'', src:'Half'}]},
+ {id:'i18', name:'Bulk Fert', ai:'', cat:'fert_gran', form:'', thr:0, csize:2, unit:'ton', ctype:'bag', qty:2,
+  containers:[
+   {csize:2, unit:'ton', ctype:'bag', qty:1, year:null, loc:'Barn', cage:'', src:'2 tons'}]},
+ {id:'i19', name:'Caravel', ai:'clomazone', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:2, year:'2022', loc:'Cage', cage:'3', src:'2 Full'}]},
+ {id:'i20', name:'Celsilus', ai:'dicamba-sodium', cat:'herbicide', form:'WG', thr:0, csize:10, unit:'lb', ctype:'bag', qty:20,
+  containers:[
+   {csize:10, unit:'lb', ctype:'bag', qty:2, year:null, loc:'Cage', cage:'3', src:'2 full'}]},
+ {id:'i21', name:'Chipco 26019', ai:'Iprodione', cat:'fungicide', form:'Flow', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:2, year:'2024', loc:'Cage', cage:'2', src:'2 Full'}]},
+ {id:'i22', name:'Coastal', ai:'Prodiamine, Imazaquin, Simazine', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:3.75,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1.5, year:'2022', loc:'Cage', cage:'', src:'1 Full 1 partial'}]},
+ {id:'i23', name:'Confront', ai:'Triclopyr', cat:'herbicide', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:1,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:1, year:'<2017', loc:'Cage', cage:'3', src:'1 full'}]},
+ {id:'i24', name:'Daconil Ultrex', ai:'Chlorothalonil', cat:'fungicide', form:'WSG', thr:0, csize:5, unit:'lb', ctype:'bag', qty:25,
+  containers:[
+   {csize:5, unit:'lb', ctype:'bag', qty:5, year:'<2017', loc:'Cage', cage:'2', src:'5 Full'}]},
+ {id:'i25', name:'Daconil Weatherstik', ai:'Chlorothalonil', cat:'fungicide', form:'Flow', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:1.25,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.5, year:'2018', loc:'Cage', cage:'2', src:'Half'},
+   {csize:1, unit:'L', ctype:'bottle', qty:0.5, year:'<2017', loc:'Cage', cage:'2', src:'Half'}]},
+ {id:'i26', name:'Daconil Action', ai:'Chlorothalonil', cat:'fungicide', form:'Flow', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:13.75,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:5.5, year:'2023', loc:'Cage', cage:'2', src:'5 Full 1 Half'}]},
+ {id:'i27', name:'DI AQUA NIS', ai:'Nonionnic Surfactant', cat:'wetting', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:2,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:2, year:null, loc:'Cage', cage:'', src:'2 Full'}]},
+ {id:'i28', name:'DI AQUA MSO', ai:'Methylated Seed Oil', cat:'wetting', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:0.5,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:0.5, year:null, loc:'Cage', cage:'', src:'Half'}]},
+ {id:'i29', name:'Dimension', ai:'Dithiopyr', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:0.62,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.25, year:'2020', loc:'Cage', cage:'3', src:'Low (Empty)'}]},
+ {id:'i30', name:'Drive XLR8', ai:'Dimethylamine', cat:'herbicide', form:'Liquid', thr:0, csize:0.5, unit:'gal', ctype:'jug', qty:0.38,
+  containers:[
+   {csize:0.5, unit:'gal', ctype:'jug', qty:0.75, year:null, loc:'Cage', cage:'3', src:'3/4 gal'}]},
+ {id:'i31', name:'Drive 75', ai:'3, 7-dichloro-8-quinolinecarboxylicacid', cat:'herbicide', form:'Granular', thr:0, csize:1, unit:'lb', ctype:'bag', qty:0,
+  containers:[
+   {csize:1, unit:'lb', ctype:'bag', qty:0, year:null, loc:'Cage', cage:'3', src:'0.0'}]},
+ {id:'i32', name:'Eagle', ai:'Myclobutanil', cat:'fungicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:2.5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1, year:'<2017', loc:'Cage', cage:'2', src:'1 Full'}]},
+ {id:'i33', name:'Echelon 4SC', ai:'sulfentrazone', cat:'herbicide', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:2,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:2, year:null, loc:'Cage', cage:'', src:'2 Full'}]},
+ {id:'i34', name:'Emerald', ai:'BoscalidjasIk', cat:'fungicide', form:'WDG', thr:0, csize:0.49, unit:'lb', ctype:'bag', qty:2.94,
+  containers:[
+   {csize:0.49, unit:'lb', ctype:'bag', qty:6, year:null, loc:'Cage', cage:'2', src:'6 Full'}]},
+ {id:'i35', name:'Exteris Stressgard', ai:'', cat:'fungicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:17.5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:4, year:'2026', loc:'Cage', cage:'2', src:'4 Full'},
+   {csize:2.5, unit:'gal', ctype:'jug', qty:3, year:'2019', loc:'Cage', cage:'2', src:'3 Full'}]},
+ {id:'i36', name:'Ferromec AC', ai:'Liquid Iron', cat:'fert_liq', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:20,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:8, year:'2025', loc:'Fertilizers', cage:'', src:'8 Full'}]},
+ {id:'i37', name:'Finale XL', ai:'glufosinate-ammonium', cat:'fert_liq', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:1.25,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.5, year:'2022', loc:'Cage', cage:'', src:'Half'}]},
+ {id:'i38', name:'Fleet', ai:'Polyoxyethylene Polymers', cat:'wetting', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:3.75,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.5, year:'2021', loc:'Cage', cage:'', src:'Half'},
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1, year:null, loc:'Cage', cage:'', src:'2.5gal'}]},
+ {id:'i39', name:'Freehand', ai:'Dimethenamid', cat:'herbicide', form:'Granular', thr:0, csize:50, unit:'lb', ctype:'bag', qty:175,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:3.5, year:null, loc:'Cage', cage:'', src:'3.5 Full'}]},
+ {id:'i40', name:'Fusilade 2', ai:'Fluazifop-P-butyl', cat:'herbicide', form:'Liquid', thr:0, csize:1.5, unit:'gal', ctype:'jug', qty:1.5,
+  containers:[
+   {csize:1.5, unit:'gal', ctype:'jug', qty:1, year:null, loc:'Cage', cage:'3', src:'Full'}]},
+ {id:'i41', name:'Gallery', ai:'isoxaben', cat:'herbicide', form:'Granular', thr:0, csize:1, unit:'lb', ctype:'bag', qty:0.5,
+  containers:[
+   {csize:1, unit:'lb', ctype:'bag', qty:0.5, year:'<2017', loc:'Cage', cage:'', src:'1 Half'}]},
+ {id:'i42', name:'Garlon 3A', ai:'Triclopyr', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:3.75,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1.5, year:'<2017', loc:'Cage', cage:'3', src:'1 full 1 half'}]},
+ {id:'i43', name:'Goosegrass Crabgrass Control', ai:'Bensulide', cat:'herbicide', form:'Granular', thr:0, csize:28.87, unit:'lb', ctype:'bag', qty:7.22,
+  containers:[
+   {csize:28.87, unit:'lb', ctype:'bag', qty:0.25, year:null, loc:'Cage', cage:'1', src:'Low'}]},
+ {id:'i44', name:'Gramoxone', ai:'Paraquat', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:2.5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1, year:null, loc:'Cage', cage:'3', src:'1 Full'}]},
+ {id:'i45', name:'Harells 21-0-0', ai:'', cat:'fert_gran', form:'', thr:0, csize:50, unit:'lb', ctype:'bag', qty:700,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:14, year:null, loc:'Barn', cage:'', src:'14 bags'}]},
+ {id:'i46', name:'Harells Ronstar 1.5%', ai:'Oxadiazon', cat:'herbicide', form:'', thr:0, csize:50, unit:'lb', ctype:'bag', qty:75,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:1.5, year:null, loc:'Cage', cage:'', src:'1 Bag Partial 30lbs'}]},
+ {id:'i47', name:'Harrell\'s Profertilizer', ai:'5% Nitrogen', cat:'fert_gran', form:'Granular', thr:0, csize:50, unit:'lb', ctype:'bag', qty:50,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:1, year:'2024', loc:'Barn', cage:'', src:'Full'}]},
+ {id:'i48', name:'Headway', ai:'Azoxystrobin', cat:'fungicide', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:3,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:1, year:'<2017', loc:'Cage', cage:'2', src:'1 Full'},
+   {csize:1, unit:'gal', ctype:'jug', qty:2, year:'2025', loc:'Cage', cage:'2', src:'2 Full'}]},
+ {id:'i49', name:'Heritage Action', ai:'Azoxystrobin', cat:'fungicide', form:'WG', thr:0, csize:1, unit:'lb', ctype:'bag', qty:1.5,
+  containers:[
+   {csize:1, unit:'lb', ctype:'bag', qty:1.5, year:'<2017', loc:'Cage', cage:'', src:'1.5 lbs'},
+   {csize:500, unit:'g', ctype:'bag', qty:0.5, year:'<2017', loc:'Cage', cage:'2', src:'Half'}]},
+ {id:'i50', name:'Heritage TL', ai:'Azoxystrobin', cat:'fungicide', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:1.25,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:1, year:null, loc:'Cage', cage:'2', src:'1.0'},
+   {csize:1, unit:'gal', ctype:'jug', qty:0.25, year:null, loc:'Cage', cage:'', src:'Low'}]},
+ {id:'i51', name:'Insignia', ai:'Pyraclostrobin', cat:'fungicide', form:'Granular', thr:0, csize:2.5, unit:'lb', ctype:'bag', qty:0.91,
+  containers:[
+   {csize:2.5, unit:'lb', ctype:'bag', qty:0.2, year:null, loc:'Cage', cage:'2', src:'.5 lb'},
+   {csize:2.4, unit:'lb', ctype:'bag', qty:0.17, year:null, loc:'Cage', cage:'', src:'0.4lbs Low'}]},
+ {id:'i52', name:'Insignia SC', ai:'Pyraclostrobin', cat:'fungicide', form:'Liquid', thr:0, csize:500, unit:'mL', ctype:'bottle', qty:500,
+  containers:[
+   {csize:500, unit:'mL', ctype:'bottle', qty:1, year:'<2017', loc:'Cage', cage:'2', src:'Full'},
+   {csize:30.5, unit:'oz', ctype:'bottle', qty:0.5, year:null, loc:'Cage', cage:'2', src:'1 Half'},
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1.5, year:'2018', loc:'Cage', cage:'2', src:'1 Full 1 Partial'}]},
+ {id:'i53', name:'Instrata', ai:'Chlorothalonil, Propiconazole', cat:'fungicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:2, year:'<2017', loc:'Cage', cage:'2', src:'2 Full'}]},
+ {id:'i54', name:'Interface', ai:'Iprodione', cat:'fungicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:1.68,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.67, year:'<2017', loc:'Cage', cage:'2', src:'2/3 Full'}]},
+ {id:'i55', name:'Interface Stressguard', ai:'Iprodione', cat:'fungicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:2, year:'<2017', loc:'Cage', cage:'2', src:'2 Full'}]},
+ {id:'i56', name:'Junction', ai:'Mancozeb', cat:'fungicide', form:'DF', thr:0, csize:6, unit:'lb', ctype:'bag', qty:9,
+  containers:[
+   {csize:6, unit:'lb', ctype:'bag', qty:1.5, year:'<2017', loc:'Cage', cage:'2', src:'1 Full 1 partial'}]},
+ {id:'i57', name:'Kabuto', ai:'Isofetamid', cat:'fungicide', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:6,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:2, year:'2019/2022', loc:'Cage', cage:'2', src:'2 Full'},
+   {csize:21.8, unit:'oz', ctype:'bottle', qty:1, year:'2019', loc:'', cage:'', src:'Full'},
+   {csize:1, unit:'gal', ctype:'jug', qty:4, year:'2025', loc:'Cage', cage:'2', src:'4 Full'}]},
+ {id:'i58', name:'Katana', ai:'flazasulfuron', cat:'herbicide', form:'Granular', thr:0, csize:5, unit:'lb', ctype:'bag', qty:25,
+  containers:[
+   {csize:5, unit:'lb', ctype:'bag', qty:5, year:null, loc:'Cage', cage:'3', src:'5.0'}]},
+ {id:'i59', name:'Lexicon', ai:'Fluxapyroxad', cat:'fungicide', form:'Liquid', thr:0, csize:21, unit:'oz', ctype:'bottle', qty:55.02,
+  containers:[
+   {csize:21, unit:'oz', ctype:'bottle', qty:2.62, year:'2018', loc:'Cage', cage:'2', src:'55 oz'}]},
+ {id:'i60', name:'Liberty Ultra', ai:'Glufosinate', cat:'herbicide', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:1,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:1, year:null, loc:'Cage', cage:'3', src:'Full'}]},
+ {id:'i61', name:'Matrix', ai:'Rimsulfuron', cat:'herbicide', form:'WG', thr:0, csize:1.25, unit:'lb', ctype:'bag', qty:1.25,
+  containers:[
+   {csize:1.25, unit:'lb', ctype:'bag', qty:1, year:'<2017', loc:'Cage', cage:'', src:'1 Full'}]},
+ {id:'i62', name:'Maxtima', ai:'Mefentrifluconazole', cat:'fungicide', form:'Liquid', thr:0, csize:26, unit:'oz', ctype:'bottle', qty:112,
+  containers:[
+   {csize:26, unit:'oz', ctype:'bottle', qty:4, year:'2024', loc:'Cage', cage:'2', src:'4 Full'},
+   {csize:8, unit:'oz', ctype:'bottle', qty:1, year:null, loc:'Cage', cage:'2', src:'Full'}]},
+ {id:'i63', name:'Merit', ai:'Imidacloprid', cat:'insecticide', form:'Granular', thr:0, csize:30, unit:'lb', ctype:'bag', qty:60,
+  containers:[
+   {csize:30, unit:'lb', ctype:'bag', qty:2, year:'2024', loc:'Cage', cage:'3', src:'2 Full'}]},
+ {id:'i64', name:'Millennium', ai:'Dimethylamine Salt', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:2.5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1, year:null, loc:'Cage', cage:'3', src:'Full'}]},
+ {id:'i65', name:'Nano Charge', ai:'Nitrogen', cat:'fert_liq', form:'Liquid', thr:0, csize:8.5, unit:'lb', ctype:'bag', qty:0,
+  containers:[
+   {csize:8.5, unit:'lb', ctype:'bag', qty:0, year:null, loc:'Cage', cage:'3', src:'1 qt'}]},
+ {id:'i66', name:'NutraWash Tank Cleaner', ai:'', cat:'misc', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:4,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:4, year:'2026', loc:'Cage', cage:'2', src:'4 Full'}]},
+ {id:'i67', name:'Nutrite 24-6-12/ Gal Xe One', ai:'Nitrogen', cat:'fert_gran', form:'', thr:0, csize:50, unit:'lb', ctype:'bag', qty:150,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:3, year:null, loc:'Barn', cage:'', src:'3 bags'}]},
+ {id:'i68', name:'Outlook', ai:'dimethenamid-p', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:1.25,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.5, year:null, loc:'Cage', cage:'3', src:'1/2 gal'}]},
+ {id:'i69', name:'Pendulum', ai:'Pendimethalin', cat:'herbicide', form:'Liquid', thr:0, csize:15, unit:'gal', ctype:'drum', qty:17.5,
+  containers:[
+   {csize:15, unit:'gal', ctype:'drum', qty:0.5, year:null, loc:'Cage', cage:'', src:'1 Half'},
+   {csize:2.5, unit:'gal', ctype:'jug', qty:4, year:'2020', loc:'Cage', cage:'3', src:'4 Full'}]},
+ {id:'i70', name:'Pennant Magnum', ai:'S- metolachlor', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:1.25,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.5, year:'<2017', loc:'Cage', cage:'3', src:'1 partial'}]},
+ {id:'i71', name:'Pillar G', ai:'Pyraclostrobin', cat:'fungicide', form:'Granular', thr:0, csize:30, unit:'lb', ctype:'bag', qty:45,
+  containers:[
+   {csize:30, unit:'lb', ctype:'bag', qty:1.5, year:null, loc:'Cage', cage:'2', src:'1.5 Full'}]},
+ {id:'i72', name:'Posterity XT', ai:'pydiflumetofen, azoxystrobin, propiconazole', cat:'fungicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:8.12,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1.25, year:null, loc:'Cage', cage:'2', src:'1 Full 1 Low'},
+   {csize:2.5, unit:'gal', ctype:'jug', qty:2, year:null, loc:'Cage', cage:'', src:'2 Full'}]},
+ {id:'i73', name:'Primo Maxx PGR', ai:'Triexapac-ethyl', cat:'pgr', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:6,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:6, year:'<2017', loc:'Cage', cage:'3', src:'6 Full'}]},
+ {id:'i74', name:'Princep', ai:'Simazine', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:7.5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:3, year:'<2017', loc:'Cage', cage:'3', src:'3 Full'}]},
+ {id:'i75', name:'Professional Choice 00-20-20', ai:'', cat:'fert_gran', form:'', thr:0, csize:50, unit:'lb', ctype:'bag', qty:2200,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:44, year:null, loc:'Barn', cage:'', src:'44 bags'}]},
+ {id:'i76', name:'Professional Choice 21-0-0/ Ammonium Sulfate', ai:'', cat:'fert_gran', form:'', thr:0, csize:50, unit:'lb', ctype:'bag', qty:200,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:4, year:null, loc:'Barn', cage:'', src:'4 bags'}]},
+ {id:'i77', name:'Professional Choice 46-0-0/ W/Nutrisphere-N', ai:'', cat:'fert_gran', form:'', thr:0, csize:50, unit:'lb', ctype:'bag', qty:1600,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:32, year:null, loc:'Barn', cage:'', src:'32 bags'}]},
+ {id:'i78', name:'Pylex', ai:'Topramezone', cat:'herbicide', form:'Liquid', thr:0, csize:4, unit:'oz', ctype:'bottle', qty:16,
+  containers:[
+   {csize:4, unit:'oz', ctype:'bottle', qty:4, year:'2024', loc:'Cage', cage:'3', src:'4 Full'}]},
+ {id:'i79', name:'Quicksilver', ai:'carfentrazone-ethyl', cat:'herbicide', form:'Liquid', thr:0, csize:12, unit:'oz', ctype:'bottle', qty:6,
+  containers:[
+   {csize:12, unit:'oz', ctype:'bottle', qty:0.5, year:null, loc:'Cage', cage:'', src:'1/2'}]},
+ {id:'i80', name:'Quinclorac', ai:'dimetrylamine', cat:'herbicide', form:'Liquid', thr:0, csize:30, unit:'oz', ctype:'bottle', qty:30,
+  containers:[
+   {csize:30, unit:'oz', ctype:'bottle', qty:1, year:null, loc:'Cage', cage:'', src:'1.0'}]},
+ {id:'i81', name:'Recognition', ai:'Trifloxysulfuron-sodium', cat:'herbicide', form:'Granular', thr:0, csize:14, unit:'g', ctype:'bag', qty:14,
+  containers:[
+   {csize:14, unit:'g', ctype:'bag', qty:1, year:null, loc:'Cage', cage:'3', src:'Full'}]},
+ {id:'i82', name:'Regalite', ai:'Nitrogen', cat:'fert_gran', form:'Granular', thr:0, csize:50, unit:'lb', ctype:'bag', qty:50,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:1, year:null, loc:'Cage', cage:'1', src:'1 Bag'}]},
+ {id:'i83', name:'Regal Ronstar 100% XCU 38-0-0', ai:'Oxadiazon', cat:'herbicide', form:'Granular', thr:0, csize:50, unit:'lb', ctype:'bag', qty:50,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:1, year:'2019', loc:'Cage', cage:'', src:'1 Full'}]},
+ {id:'i84', name:'Regal Ronstar 1% 38-0-0', ai:'Oxadiazon', cat:'herbicide', form:'Granular', thr:0, csize:50, unit:'lb', ctype:'bag', qty:200,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:4, year:'2019', loc:'Cage', cage:'', src:'4 Full'}]},
+ {id:'i85', name:'RegalStar II', ai:'Oxadiazon', cat:'herbicide', form:'Granular', thr:0, csize:50, unit:'lb', ctype:'bag', qty:200,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:4, year:'2019', loc:'Cage', cage:'1', src:'3 Full 2 Half'}]},
+ {id:'i86', name:'Regal Ronstar AC 2%', ai:'Oxadiazon', cat:'herbicide', form:'', thr:0, csize:50, unit:'lb', ctype:'bag', qty:50,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:1, year:null, loc:'Chem Room', cage:'', src:'1 Bag'}]},
+ {id:'i87', name:'RegalKade G', ai:'Prodiamine', cat:'herbicide', form:'', thr:0, csize:50, unit:'lb', ctype:'bag', qty:150,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:3, year:null, loc:'Chem Room', cage:'', src:'3 full'}]},
+ {id:'i88', name:'Rely III Soil Surfactant', ai:'Oxirane', cat:'wetting', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:10,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:4, year:'2026', loc:'Cage', cage:'2', src:'4 full'}]},
+ {id:'i89', name:'Rely III', ai:'Oxirane', cat:'wetting', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:2.5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1, year:'2021', loc:'Cage', cage:'', src:'1 Full'}]},
+ {id:'i90', name:'Revolution', ai:'Modified Alkylated Polyol', cat:'wetting', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:7.25,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1.5, year:'2021', loc:'Cage', cage:'', src:'1.5 Full'},
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1.4, year:null, loc:'Cage', cage:'', src:'3.5 gal'}]},
+ {id:'i91', name:'Ronstar', ai:'Oxadiazon', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:2.5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1, year:null, loc:'Cage', cage:'3', src:'1 Full'}]},
+ {id:'i92', name:'Round Up Quick Pro', ai:'glyphosate, indaziflam, disquat', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:0.5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.2, year:null, loc:'Cage', cage:'3', src:'0.5 gal'}]},
+ {id:'i93', name:'Round Up Ranger Pro', ai:'glyphosate', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:2, year:null, loc:'Cage', cage:'', src:'2 Full'}]},
+ {id:'i94', name:'Roundup G', ai:'Glyphosate', cat:'herbicide', form:'Liquid', thr:0, csize:10, unit:'lb', ctype:'bag', qty:10,
+  containers:[
+   {csize:10, unit:'lb', ctype:'bag', qty:1, year:null, loc:'Cage', cage:'3', src:'Full'}]},
+ {id:'i95', name:'SAF 816 Field Conditioner', ai:'', cat:'misc', form:'', thr:0, csize:50, unit:'lb', ctype:'bag', qty:350,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:4, year:null, loc:'Barn', cage:'', src:'4 bags'},
+   {csize:150, unit:'lb', ctype:'bag', qty:1, year:null, loc:'', cage:'', src:'150lbs'}]},
+ {id:'i96', name:'Safety Guard 0.125%', ai:'Flumioxazin', cat:'herbicide', form:'Granular', thr:0, csize:50, unit:'lb', ctype:'bag', qty:50,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:1, year:'2024', loc:'Barn', cage:'', src:'Full'}]},
+ {id:'i97', name:'Secure', ai:'Fluazinam', cat:'fungicide', form:'Liquid', thr:0, csize:0.5, unit:'gal', ctype:'jug', qty:1,
+  containers:[
+   {csize:0.5, unit:'gal', ctype:'jug', qty:2, year:null, loc:'Cage', cage:'2', src:'2 Full'}]},
+ {id:'i98', name:'Segway', ai:'Cyazofamid', cat:'fungicide', form:'Liquid', thr:0, csize:1, unit:'qt', ctype:'bottle', qty:8.5,
+  containers:[
+   {csize:1, unit:'qt', ctype:'bottle', qty:8.5, year:'2022', loc:'Cage', cage:'2', src:'8 Full, 1 Half'},
+   {csize:39.2, unit:'oz', ctype:'bottle', qty:12, year:'2025', loc:'Cage', cage:'2', src:'12 Full'}]},
+ {id:'i99', name:'Signature Chipco', ai:'Aluminum tris', cat:'fungicide', form:'WG', thr:0, csize:5.5, unit:'lb', ctype:'bag', qty:104.5,
+  containers:[
+   {csize:5.5, unit:'lb', ctype:'bag', qty:11, year:'2019', loc:'Cage', cage:'', src:'11 Full'},
+   {csize:5.5, unit:'lb', ctype:'bag', qty:8, year:null, loc:'Cage', cage:'2', src:'8 Full'}]},
+ {id:'i100', name:'Signature XTRA', ai:'Aluminum tris', cat:'fungicide', form:'WG', thr:0, csize:5.5, unit:'lb', ctype:'bag', qty:8.25,
+  containers:[
+   {csize:5.5, unit:'lb', ctype:'bag', qty:1.5, year:'2024', loc:'Cage', cage:'2', src:'1 Full 1 partial'},
+   {csize:null, unit:'', ctype:'bag', qty:0.25, year:'2022', loc:'Cage', cage:'', src:'Low'}]},
+ {id:'i101', name:'Simplot 10-18-22/Greens Grade', ai:'Soluble Potash', cat:'fert_gran', form:'Granular', thr:0, csize:50, unit:'lb', ctype:'bag', qty:900,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:18, year:null, loc:'Barn', cage:'', src:'18 bags'}]},
+ {id:'i102', name:'Simplot 18-3-6/Greens Grade', ai:'Nitrogen', cat:'fert_gran', form:'Granular', thr:0, csize:50, unit:'lb', ctype:'bag', qty:400,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:8, year:null, loc:'Barn', cage:'', src:'8 bags'}]},
+ {id:'i103', name:'Simplot 18-3-6 UMaxx', ai:'Urea', cat:'fert_liq', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:60,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:20, year:'2026', loc:'Cage', cage:'', src:'20 Full'},
+   {csize:2.5, unit:'gal', ctype:'jug', qty:4, year:'2022', loc:'Cage', cage:'', src:'4 Full'}]},
+ {id:'i104', name:'Simplot 30-0-0 UMaxx', ai:'Urea', cat:'fert_liq', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:10,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:4, year:'2026', loc:'Cage', cage:'', src:'4 Full'}]},
+ {id:'i105', name:'Simplot 30-0-0', ai:'nitrogen', cat:'fert_liq', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:22.5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:9, year:null, loc:'', cage:'', src:'22.5 gal'}]},
+ {id:'i106', name:'SpeedZone EW', ai:'24D+MCPP+Dicamba+ Carfentrazone', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:2, year:'2022', loc:'Cage', cage:'3', src:'2  Full'}]},
+ {id:'i107', name:'Spotlight', ai:'Fluroxypyr', cat:'herbicide', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:1,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:1, year:'<2017', loc:'Cage', cage:'3', src:'1 Full'}]},
+ {id:'i108', name:'Stellar', ai:'Fluopicolide', cat:'fungicide', form:'Liquid', thr:0, csize:104, unit:'oz', ctype:'bottle', qty:52,
+  containers:[
+   {csize:104, unit:'oz', ctype:'bottle', qty:0.5, year:'<2017', loc:'Cage', cage:'2', src:'1 Half'}]},
+ {id:'i109', name:'Subdue Maxx', ai:'Mefenoxam', cat:'fungicide', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:4.5,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:4.5, year:'<2017', loc:'Cage', cage:'2', src:'4 Full 1 Half'}]},
+ {id:'i110', name:'SURGE', ai:'24D+Mecoprop-p+Dicamba+Sulfentrazone', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:3.75,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1.5, year:'2022', loc:'Cage', cage:'3', src:'1 Full 1 half'}]},
+ {id:'i111', name:'Target 6', ai:'msma', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:1.25,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.5, year:null, loc:'Cage', cage:'', src:'Half'}]},
+ {id:'i112', name:'Target 6.6', ai:'msma', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:2.5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1, year:null, loc:'Cage', cage:'', src:'Full'}]},
+ {id:'i113', name:'Tartan', ai:'Trifloxystrobin', cat:'fungicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:3.75,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1.5, year:null, loc:'Cage', cage:'2', src:'1 Full 1 Half'}]},
+ {id:'i114', name:'Tebuconazole', ai:'Tebuconazole', cat:'fungicide', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:1,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:1, year:'2018', loc:'Cage', cage:'2', src:'1 Full'}]},
+ {id:'i115', name:'Tenacity', ai:'Mesotrione', cat:'herbicide', form:'Liquid', thr:0, csize:96, unit:'oz', ctype:'bottle', qty:96,
+  containers:[
+   {csize:96, unit:'oz', ctype:'bottle', qty:1, year:null, loc:'Cage', cage:'3', src:'Full'}]},
+ {id:'i116', name:'Terminator II Defoamer', ai:'', cat:'misc', form:'Liquid', thr:0, csize:1, unit:'qt', ctype:'bottle', qty:13,
+  containers:[
+   {csize:1, unit:'qt', ctype:'bottle', qty:13, year:'2022', loc:'Cage', cage:'', src:'13.0'}]},
+ {id:'i117', name:'Touchdown Total', ai:'Glyphosate', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:2, year:'<2017', loc:'Cage', cage:'3', src:'2 Full'}]},
+ {id:'i118', name:'Track-IT Foam Marker', ai:'', cat:'misc', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:3.5,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:3.5, year:'2022', loc:'Cage', cage:'', src:'3.5 gal'}]},
+ {id:'i119', name:'Tru-Prill 15-2-15/ Greens Grade', ai:'', cat:'fert_gran', form:'', thr:0, csize:50, unit:'lb', ctype:'bag', qty:150,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:3, year:null, loc:'Barn', cage:'', src:'3 Bags'}]},
+ {id:'i120', name:'Tupersan', ai:'Siduron', cat:'herbicide', form:'WP', thr:0, csize:5, unit:'lb', ctype:'bag', qty:20,
+  containers:[
+   {csize:5, unit:'lb', ctype:'bag', qty:4, year:null, loc:'Cage', cage:'', src:'4 Full'}]},
+ {id:'i121', name:'32-0-4', ai:'', cat:'fert_gran', form:'Granular', thr:0, csize:2, unit:'ton', ctype:'bag', qty:2,
+  containers:[
+   {csize:2, unit:'ton', ctype:'bag', qty:1, year:'2026', loc:'', cage:'', src:'Full'}]},
+ {id:'i122', name:'46-0-0 (U-Flexx?)', ai:'Nitrogen', cat:'fert_gran', form:'Granular', thr:0, csize:50, unit:'lb', ctype:'bag', qty:300,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:6, year:null, loc:'Cage Barn?', cage:'', src:'6 bags'}]},
+ {id:'i123', name:'Union', ai:'cyazofamid, azoxystrobin', cat:'fungicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:15,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:4, year:'2025', loc:'Cage', cage:'2', src:'4 Full'},
+   {csize:2.5, unit:'gal', ctype:'jug', qty:2, year:null, loc:'Cage', cage:'2', src:'2 Full'}]},
+ {id:'i124', name:'Velista', ai:'Penthiopyrad', cat:'fungicide', form:'Liquid', thr:0, csize:22, unit:'oz', ctype:'bottle', qty:44,
+  containers:[
+   {csize:22, unit:'oz', ctype:'bottle', qty:2, year:'2019', loc:'Cage', cage:'2', src:'2 Full'},
+   {csize:500, unit:'g', ctype:'bottle', qty:0.5, year:'2018', loc:'Cage', cage:'2', src:'1 Half'}]},
+ {id:'i125', name:'Verdi-Cal G', ai:'Calcium Sulfate Dihydrate', cat:'fert_gran', form:'', thr:0, csize:50, unit:'lb', ctype:'bag', qty:200,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:4, year:null, loc:'Barn', cage:'', src:'4 bags'}]},
+ {id:'i126', name:'Xzemplar', ai:'Fluxapyroxad', cat:'fungicide', form:'Liquid', thr:0, csize:114, unit:'oz', ctype:'bottle', qty:114,
+  containers:[
+   {csize:114, unit:'oz', ctype:'bottle', qty:1, year:'2019', loc:'Cage', cage:'2', src:'1 Full'}]},
+ {id:'i127', name:'Zylam', ai:'Dinotefuran', cat:'insecticide', form:'Liquid', thr:0, csize:64, unit:'oz', ctype:'bottle', qty:64,
+  containers:[
+   {csize:64, unit:'oz', ctype:'bottle', qty:1, year:'2018', loc:'Cage', cage:'2', src:'1 Full'}]},
+ {id:'i128', name:'Briskway', ai:'Prototype?', cat:'fungicide', form:'Liquid', thr:0, csize:1, unit:'L', ctype:'bottle', qty:4,
+  containers:[
+   {csize:1, unit:'L', ctype:'bottle', qty:4, year:'2014', loc:'Cage', cage:'2', src:'4 Full'}]},
+ {id:'i129', name:'Musketeer', ai:'Flurprimidol; Paclobutrazol', cat:'pgr', form:'Liquid', thr:0, csize:1, unit:'qt', ctype:'bottle', qty:3,
+  containers:[
+   {csize:1, unit:'qt', ctype:'bottle', qty:2, year:'<2017', loc:'Cage', cage:'3', src:'2 Full'},
+   {csize:1, unit:'qt', ctype:'bottle', qty:1, year:'<2017', loc:'Chem Room', cage:'', src:'Full'}]},
+ {id:'i130', name:'Monument 75 WG (8 packets)', ai:'', cat:'herbicide', form:'Granular', thr:0, csize:5, unit:'g', ctype:'bag', qty:5,
+  containers:[
+   {csize:5, unit:'g', ctype:'bag', qty:1, year:'2020', loc:'Chem Room', cage:'', src:'Full'}]},
+ {id:'i131', name:'Destiny', ai:'Methylated Soybean Oil, soybean oil, Alkylphenol ethoxylate', cat:'wetting', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:2.5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1, year:'<2017', loc:'Chem Room', cage:'', src:'Full'}]},
+ {id:'i132', name:'Touche', ai:'Vinclozolin', cat:'fungicide', form:'EG', thr:0, csize:2.75, unit:'lb', ctype:'bag', qty:2.5,
+  containers:[
+   {csize:2.75, unit:'lb', ctype:'bag', qty:0.91, year:'<2017', loc:'Cage', cage:'2', src:'2.5 lbs'}]},
+ {id:'i133', name:'Surf 80', ai:'Alkyl Polyoxythylene', cat:'wetting', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:1,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:1, year:'2018', loc:'Chem Room', cage:'', src:'Full'}]},
+ {id:'i134', name:'Lesco Stonewall-0.43%', ai:'', cat:'herbicide', form:'Granular', thr:0, csize:40, unit:'lb', ctype:'bag', qty:40,
+  containers:[
+   {csize:40, unit:'lb', ctype:'bag', qty:1, year:null, loc:'Cage', cage:'', src:'40lbs'}]},
+ {id:'i135', name:'3800 - ronstar + fertilizer', ai:'', cat:'herbicide', form:'Granular', thr:0, csize:290, unit:'lb', ctype:'bag', qty:290,
+  containers:[
+   {csize:290, unit:'lb', ctype:'bag', qty:1, year:null, loc:'Cage', cage:'', src:'290lbs'}]},
+ {id:'i136', name:'harrells 0-0-51', ai:'', cat:'fert_gran', form:'Granular', thr:0, csize:25, unit:'lb', ctype:'bag', qty:25,
+  containers:[
+   {csize:25, unit:'lb', ctype:'bag', qty:1, year:null, loc:'Cage', cage:'', src:'25lbs'}]},
+ {id:'i137', name:'harrells 43-0-0', ai:'', cat:'fert_gran', form:'Granular', thr:0, csize:50, unit:'lb', ctype:'bag', qty:50,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:1, year:null, loc:'Cage', cage:'', src:'50lbs'}]},
+ {id:'i138', name:'roots 3-3-3', ai:'nitrogen', cat:'fert_gran', form:'Granular', thr:0, csize:20, unit:'lb', ctype:'bag', qty:20,
+  containers:[
+   {csize:20, unit:'lb', ctype:'bag', qty:1, year:null, loc:'Cage', cage:'', src:'20lbs'}]},
+ {id:'i139', name:'spray 007', ai:'Alcohol Ethoxylate', cat:'wetting', form:'Liquid', thr:0, csize:3.5, unit:'gal', ctype:'jug', qty:3.5,
+  containers:[
+   {csize:3.5, unit:'gal', ctype:'jug', qty:1, year:null, loc:'Cage', cage:'', src:'3.5 gal'}]},
+ {id:'i140', name:'ambient plus', ai:'', cat:'misc', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:1,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:1, year:null, loc:'Cage', cage:'', src:'1gal'}]},
+ {id:'i141', name:'farmworks spray tank cleaner', ai:'', cat:'misc', form:'Liquid', thr:0, csize:1.5, unit:'lb', ctype:'bag', qty:1.5,
+  containers:[
+   {csize:1.5, unit:'lb', ctype:'bag', qty:1, year:null, loc:'Cage', cage:'', src:'1.5 lb'}]},
+ {id:'i142', name:'foam concentrate', ai:'', cat:'misc', form:'Liquid', thr:0, csize:1, unit:'pt', ctype:'bottle', qty:1,
+  containers:[
+   {csize:1, unit:'pt', ctype:'bottle', qty:1, year:null, loc:'Cage', cage:'', src:'1 pint'}]},
+ {id:'i143', name:'harrells 0-0-10', ai:'Oxadiazon', cat:'fert_gran', form:'Granular', thr:0, csize:50, unit:'lb', ctype:'bag', qty:100,
+  containers:[
+   {csize:50, unit:'lb', ctype:'bag', qty:2, year:null, loc:'Cage', cage:'', src:'2 Half Bags'}]},
+ {id:'i144', name:'Foliar Pak 2-0-0', ai:'Nitrogen', cat:'fert_liq', form:'Liquid', thr:0, csize:1.5, unit:'gal', ctype:'jug', qty:1.5,
+  containers:[
+   {csize:1.5, unit:'gal', ctype:'jug', qty:1, year:null, loc:'Cage', cage:'', src:'1.5gal'}]},
+ {id:'i145', name:'brandt', ai:'', cat:'fert_liq', form:'Liquid', thr:0, csize:3.5, unit:'gal', ctype:'jug', qty:3.5,
+  containers:[
+   {csize:3.5, unit:'gal', ctype:'jug', qty:1, year:null, loc:'Cage', cage:'', src:'3.5 gal'}]},
+ {id:'i146', name:'armament concentrate', ai:'', cat:'fert_liq', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:2.5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1, year:null, loc:'Cage', cage:'', src:'2.5gal'}]},
+ {id:'i147', name:'foliar pak csi 2-0-0', ai:'', cat:'fert_liq', form:'Liquid', thr:0, csize:4.5, unit:'gal', ctype:'jug', qty:4.5,
+  containers:[
+   {csize:4.5, unit:'gal', ctype:'jug', qty:1, year:null, loc:'', cage:'', src:'4.5 gal'}]},
+ {id:'i148', name:'floratine', ai:'', cat:'fert_liq', form:'Liquid', thr:0, csize:10, unit:'gal', ctype:'jug', qty:10,
+  containers:[
+   {csize:10, unit:'gal', ctype:'jug', qty:1, year:null, loc:'', cage:'', src:'10gal'}]},
+ {id:'i149', name:'Curalan EG', ai:'Vinclozolin, 4-oxazolidinedionej', cat:'fungicide', form:'Granular', thr:0, csize:2.75, unit:'lb', ctype:'bag', qty:2.75,
+  containers:[
+   {csize:2.75, unit:'lb', ctype:'bag', qty:1, year:null, loc:'Cage', cage:'2', src:'Full'}]},
+ {id:'i150', name:'Honor', ai:'Pyraclostrobin, Boscalid', cat:'fungicide', form:'Granular', thr:0, csize:3, unit:'lb', ctype:'bag', qty:0.75,
+  containers:[
+   {csize:3, unit:'lb', ctype:'bag', qty:0.25, year:null, loc:'Cage', cage:'2', src:'Low'}]},
+ {id:'i151', name:'Fame', ai:'Fluoxastrobin, Chlorothalonil', cat:'fungicide', form:'Liquid', thr:0, csize:2.5, unit:'lb', ctype:'bag', qty:2.5,
+  containers:[
+   {csize:2.5, unit:'lb', ctype:'bag', qty:1, year:null, loc:'Cage', cage:'2', src:'Full'}]},
+ {id:'i152', name:'Prostar', ai:'Flutolanil', cat:'fungicide', form:'Granular', thr:0, csize:3, unit:'lb', ctype:'bag', qty:1.5,
+  containers:[
+   {csize:3, unit:'lb', ctype:'bag', qty:0.5, year:null, loc:'Cage', cage:'2', src:'2 Low'}]},
+ {id:'i153', name:'Mirage Stressguard', ai:'Triazole-1-ethanol', cat:'fungicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:2.5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1, year:'2019', loc:'Cage', cage:'2', src:'1 Full'}]},
+ {id:'i154', name:'Rayora', ai:'Fluteiafol', cat:'fungicide', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:0.75,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:0.75, year:'2020', loc:'Cage', cage:'2', src:'3/4'}]},
+ {id:'i155', name:'3336.0', ai:'Thiophanate-methyl', cat:'fungicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:1.25,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.5, year:'<2017', loc:'Cage', cage:'2', src:'1 partial'}]},
+ {id:'i156', name:'Nutrol', ai:'', cat:'fungicide', form:'Granular', thr:0, csize:40, unit:'lb', ctype:'bag', qty:40,
+  containers:[
+   {csize:40, unit:'lb', ctype:'bag', qty:1, year:null, loc:'Cage', cage:'', src:'Full'}]},
+ {id:'i157', name:'Fore 80WP', ai:'Mancozeb', cat:'fungicide', form:'Granular', thr:0, csize:1.5, unit:'lb', ctype:'bag', qty:20,
+  containers:[
+   {csize:1.5, unit:'lb', ctype:'bag', qty:13.33, year:null, loc:'Cage', cage:'2', src:'20 lbs'}]},
+ {id:'i158', name:'simplot rely III', ai:'oxirain', cat:'wetting', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:19,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:7.6, year:null, loc:'Cage', cage:'', src:'19gal'}]},
+ {id:'i159', name:'9-3-6', ai:'', cat:'fert_liq', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:2.5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1, year:null, loc:'Cage', cage:'', src:'2.5 gal'}]},
+ {id:'i160', name:'foliar pak 4-0-6', ai:'', cat:'fert_liq', form:'Liquid', thr:0, csize:2, unit:'gal', ctype:'jug', qty:2,
+  containers:[
+   {csize:2, unit:'gal', ctype:'jug', qty:1, year:null, loc:'Cage', cage:'', src:'2gal'}]},
+ {id:'i161', name:'Avalon', ai:'bifenthrin', cat:'insecticide', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:0.5,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:0.5, year:null, loc:'Cage', cage:'3', src:'0.5gal'}]},
+ {id:'i162', name:'talestar', ai:',zeta-cypermethrine, bifenthrin', cat:'insecticide', form:'Granular', thr:0, csize:25, unit:'lb', ctype:'bag', qty:6.25,
+  containers:[
+   {csize:25, unit:'lb', ctype:'bag', qty:0.25, year:null, loc:'Cage', cage:'', src:'Low'}]},
+ {id:'i163', name:'Speed XT', ai:'isooctyl', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:1,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.4, year:null, loc:'Cage', cage:'3', src:'1 gal'}]},
+ {id:'i164', name:'KOCH-U Flexible u6-0-0', ai:'', cat:'fert_gran', form:'Granular', thr:0, csize:325, unit:'lb', ctype:'bag', qty:325,
+  containers:[
+   {csize:325, unit:'lb', ctype:'bag', qty:1, year:null, loc:'', cage:'', src:'325lbs'}]},
+ {id:'i165', name:'simplot 10-18-22', ai:'', cat:'fert_gran', form:'Granular', thr:0, csize:550, unit:'lb', ctype:'bag', qty:550,
+  containers:[
+   {csize:550, unit:'lb', ctype:'bag', qty:1, year:null, loc:'', cage:'', src:'550lbs'}]},
+ {id:'i166', name:'Simply 18-3-16', ai:'', cat:'fert_gran', form:'', thr:0, csize:null, unit:'', ctype:'bottle', qty:0,
+  containers:[
+   {csize:null, unit:'', ctype:'bottle', qty:8, year:null, loc:'', cage:'', src:'8- 50 lbs'}]},
+ {id:'i167', name:'Extreme Green 16', ai:'', cat:'fert_gran', form:'', thr:0, csize:125, unit:'lb', ctype:'bag', qty:125,
+  containers:[
+   {csize:125, unit:'lb', ctype:'bag', qty:1, year:null, loc:'', cage:'', src:'125 lbs'}]},
+ {id:'i168', name:'Milorganite', ai:'', cat:'fert_gran', form:'Granular', thr:0, csize:106, unit:'lb', ctype:'bag', qty:106,
+  containers:[
+   {csize:106, unit:'lb', ctype:'bag', qty:1, year:null, loc:'', cage:'', src:'106 lbs'}]},
+ {id:'i169', name:'Ascernity', ai:'Benzovindiflupyr, Difenoconazole', cat:'fungicide', form:'Liquid', thr:0, csize:2, unit:'gal', ctype:'jug', qty:5.5,
+  containers:[
+   {csize:2, unit:'gal', ctype:'jug', qty:2.75, year:'2021', loc:'Cage', cage:'2', src:'5.5 gal'}]},
+ {id:'i170', name:'Turflawn Ester', ai:'triclopyr, pyridinyloxyacetic acid, butoxyethyl', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:1,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.4, year:null, loc:'', cage:'', src:'1 Gal'}]},
+ {id:'i171', name:'Lesco 12-0-0', ai:'urea nitrogen', cat:'fert_liq', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:1,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.4, year:'2016', loc:'', cage:'', src:'1 gal'}]},
+ {id:'i172', name:'Biophase SBE', ai:'humic acid', cat:'fert_liq', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:7,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:2.8, year:'2009', loc:'', cage:'', src:'7 gal'}]},
+ {id:'i173', name:'Nutrigrow Magnum', ai:'ammoniacil nitrogen,', cat:'fert_liq', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:2, year:null, loc:'', cage:'', src:'5 gal'}]},
+ {id:'i174', name:'Simplot Spray Slick', ai:'methylated seed oil, polyether modified polysiloxane, alkophenol ethoxylate', cat:'wetting', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:1,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:1, year:'2021', loc:'', cage:'', src:'1 gal'}]},
+ {id:'i175', name:'Foundation Forty', ai:'nitrogen, potash', cat:'fert_liq', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:2.5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1, year:null, loc:'', cage:'', src:'2.5 gal'}]},
+ {id:'i176', name:'RhizoMate', ai:'humic acid', cat:'fert_liq', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:4,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1.6, year:null, loc:'', cage:'', src:'4 gal'}]},
+ {id:'i177', name:'Fight\'s On', ai:'potash', cat:'fert_liq', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:2,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.8, year:'2017', loc:'', cage:'', src:'2 gal'}]},
+ {id:'i178', name:'Glycofuse', ai:'urea', cat:'fert_liq', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:1.5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.6, year:'2021', loc:'', cage:'', src:'1.5 gal'}]},
+ {id:'i179', name:'Maxiplex', ai:'humic acid', cat:'fert_liq', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:1.5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.6, year:'2019', loc:'', cage:'', src:'1.5 gal'}]},
+ {id:'i180', name:'Pervade', ai:'disulfosuccinate', cat:'wetting', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:1,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.4, year:null, loc:'', cage:'', src:'1 gal'}]},
+ {id:'i181', name:'Spray wet', ai:'Alkylphenol ethoxylate, propylene glycol, tall oil fatty acids', cat:'wetting', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:0.75,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:0.75, year:null, loc:'', cage:'', src:'3/4 gal'}]},
+ {id:'i182', name:'Schaben\'s Foam', ai:'', cat:'misc', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:0.75,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:0.75, year:null, loc:'', cage:'', src:'3/4 gal'}]},
+ {id:'i183', name:'Managnese 2-0-0', ai:'', cat:'fert_gran', form:'', thr:0, csize:2, unit:'gal', ctype:'jug', qty:2,
+  containers:[
+   {csize:2, unit:'gal', ctype:'jug', qty:1, year:null, loc:'', cage:'', src:'2 gal'}]},
+ {id:'i184', name:'Oxifloor', ai:'', cat:'misc', form:'', thr:0, csize:2, unit:'gal', ctype:'jug', qty:2,
+  containers:[
+   {csize:2, unit:'gal', ctype:'jug', qty:1, year:null, loc:'', cage:'', src:'2 gal'}]},
+ {id:'i185', name:'Harrol\'s HydroMax', ai:'polyoxialkylene polymer', cat:'wetting', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:2.5,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1, year:null, loc:'', cage:'', src:'2.5 gal'}]},
+ {id:'i186', name:'Spray Rite', ai:'Ammonium Sulfat', cat:'fert_gran', form:'WSP', thr:0, csize:4, unit:'lb', ctype:'bag', qty:16,
+  containers:[
+   {csize:4, unit:'lb', ctype:'bag', qty:4, year:null, loc:'', cage:'', src:'16 lbs'}]},
+ {id:'i187', name:'NonIonic Surfactant MS-9', ai:'ethylene oxide', cat:'wetting', form:'Liquid', thr:0, csize:1, unit:'gal', ctype:'jug', qty:0.5,
+  containers:[
+   {csize:1, unit:'gal', ctype:'jug', qty:0.5, year:null, loc:'', cage:'', src:'1/2 gal'}]},
+ {id:'i188', name:'Lesco Spar Tech 0-8-5', ai:'phosphate', cat:'fert_liq', form:'lliquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:4,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1.6, year:null, loc:'', cage:'', src:'4 gal'}]},
+ {id:'i189', name:'Anew EZ', ai:'prohexadione calcium', cat:'fert_liq', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:4,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:1.6, year:'2024', loc:'', cage:'', src:'4 gal'}]},
+ {id:'i190', name:'4-Speed XT', ai:'isooctyl ester of 2, 4-dichlorophenoxyacetic acid', cat:'herbicide', form:'Liquid', thr:0, csize:2.5, unit:'gal', ctype:'jug', qty:1,
+  containers:[
+   {csize:2.5, unit:'gal', ctype:'jug', qty:0.4, year:null, loc:'', cage:'', src:'1 gal'}]},
+ {id:'i191', name:'Tal Star Extra', ai:'zeta-cypermethrin', cat:'insecticide', form:'Granular', thr:0, csize:25, unit:'lb', ctype:'bag', qty:10,
+  containers:[
+   {csize:25, unit:'lb', ctype:'bag', qty:0.4, year:null, loc:'', cage:'', src:'10 lbs'}]}
 ];
 var invUnit='cont', invFilter='all', invSearch='';
 var PRODREF=[
@@ -6905,12 +7532,7 @@ function dueMeta(d){
  return {lbl:'Due in '+d+'d',color:'#7b828d',bg:'#eef1f4',fg:'#5b6470'};
 }
 let EQSCHED=[
- {id:'s1',eq:'e1',type:'reel_grind',intervalDays:30,lastDone:daysAgo(34),note:""},
- {id:'s2',eq:'e6',type:'backlap',intervalDays:14,lastDone:daysAgo(12),note:""},
- {id:'s3',eq:'e3',type:'oil_change',intervalDays:100,lastDone:daysAgo(96),note:"50-hr / 100-day"},
- {id:'s4',eq:'e2',type:'other',intervalDays:30,lastDone:daysAgo(30),note:"Calibrate nozzles"},
- {id:'s5',eq:'e7',type:'reel_grind',intervalDays:30,lastDone:daysAgo(10),note:""},
- {id:'s6',eq:'e4',type:'oil_change',intervalDays:100,lastDone:daysAgo(20),note:""}
+ /* Empty on purpose — see TASKS. Held 6 sample service schedules. */
 ];
 /* ---- roles ---- */
 function eqCanReport(){return currentRole==='manager'||currentRole==='tech'||currentRole==='grad';}
@@ -8029,34 +8651,7 @@ function calMins(t){ if(!t)return 100000; t=(''+t).toLowerCase(); if(t.indexOf('
 var CTYPES2={crew:{label:'Crew',c:'#2f9e4f'},task:{label:'Tasks',c:'#58595b'},spray:{label:'Sprays',c:'#d17a00'},trial:{label:'Trials',c:'#489FDF'},event:{label:'Events',c:'#7c5cbf'},other:{label:'Other',c:'#8a94a0'}};
 var CTYPE_ORDER=['crew','task','spray','trial','event'];
 var EVENTS=[
- {id:'e1', d:20, type:'crew', title:'Garrett Willard', sub:'Barn crew', time:'7:00a–3:30p', person:'p18'},
- {id:'e2', d:20, type:'task', title:'Rotary mow → Alleys', sub:'Alleys A–D', time:'3:00p'},
- {id:'e3', d:21, type:'crew', title:'Garrett Willard', sub:'Barn crew', time:'7:00a–3:30p', person:'p18'},
- {id:'e4', d:21, type:'crew', title:'Taryn Breeden', sub:'Barn crew', time:'8:00a–12:00p', person:'p20'},
- {id:'e6', d:21, type:'spray', title:'Fungicide → Plots 14–16', sub:'Daconil · Taryn Breeden', time:'6:00a', person:'p20', lab:'Brosnan'},
- {id:'e7', d:21, type:'event', title:'Dr. Sorochan · field walk', sub:'Visitor', time:'1:00p', lab:'Sorochan'},
- {id:'e8', d:22, type:'crew', title:'Garrett Willard', sub:'Barn crew', time:'7:00a–3:30p', person:'p18'},
- {id:'e9', d:22, type:'crew', title:'Jordan P.', sub:'Greens crew', time:'9:00a–1:00p', person:'Jordan P.'},
- {id:'e10', d:22, type:'task', title:'Topdress nursery green', sub:'Nursery', time:'9:00a'},
- {id:'e11', d:22, type:'trial', title:'Spring green-up · soil sampling', sub:'Plots 20–24', time:'11:00a', person:'p09', lab:'Brosnan'},
- {id:'e12', d:23, type:'crew', title:'Taryn Breeden', sub:'Barn crew', time:'8:00a–2:00p', person:'p20'},
- {id:'e13', d:23, type:'event', title:'Site One rep · delivery + demo', sub:'Delivery', time:'10:00a'},
- {id:'e14', d:23, type:'trial', title:'Dollar-spot trial · rating', sub:'Plots 14–16', time:'2:00p', person:'p09', lab:'Brosnan'},
- {id:'e15', d:23, type:'task', title:'Irrigate Bermuda block', sub:'Bermuda block', time:'5:00a'},
- {id:'e16', d:24, type:'crew', title:'Garrett Willard', sub:'Barn crew', time:'7:00a–12:00p', person:'p18'},
- {id:'e17', d:24, type:'crew', title:'Devon K.', sub:'Barn crew', time:'8:00a–3:30p', person:'Devon K.'},
- {id:'e18', d:24, type:'spray', title:'Primo Maxx PGR → Greens', sub:'Growth regulator', time:'6:30a'},
- {id:'e19', d:25, type:'event', title:'Field day prep', sub:'Setup crew', time:'All day'},
- {id:'e20', d:28, type:'trial', title:'Green-up data collection', sub:'Plots 20–24', time:'11:00a', person:'p09', lab:'Brosnan'},
- {id:'e21', d:30, type:'event', title:'Fertilizer delivery', sub:'Site One', time:'9:00a'},
- {id:'e22', d:21, type:'trial', title:'Drought stress trial · rating', sub:'Plots 11–13', time:'10:00a', person:'p14', lab:'Horvath'},
- {id:'e23', d:23, type:'spray', title:'Wetting agent → Plots 17–18', sub:'Revolution', time:'7:00a', person:'p14', lab:'Horvath'},
- {id:'e24', d:22, type:'trial', title:'Traffic simulator run', sub:'Wear plots', time:'9:30a', person:'Dr. Sorochan', lab:'Sorochan'},
- {id:'e25', d:24, type:'trial', title:'Wear tolerance rating', sub:'Plots 14–16', time:'1:00p', person:'Dr. Sorochan', lab:'Sorochan'},
- {id:'e26', d:21, type:'trial', title:'Shade study · light readings', sub:'Greenhouse', time:'2:30p', person:'Dr. Bowling', lab:'Bowling'},
- {id:'e27', d:23, type:'event', title:'Bowling lab · greenhouse tour', sub:'Visitors', time:'3:00p', person:'Dr. Bowling', lab:'Bowling'},
- {id:'e28', d:22, type:'crew', title:'Taryn Breeden · time off', sub:'Approved absence', time:'All day', person:'p20', status:'out', lab:'Bill'},
- {id:'e29', d:24, type:'crew', title:'Devon K. · called out', sub:'Same-day absence', time:'Out', person:'Devon K.', status:'out', lab:'Bill'}
+ /* Empty on purpose — see TASKS. Held 28 sample calendar entries. */
 ];
 var NOSHOW={'Devon K.':1};   /* demo names with no roster record; nameOf() passes them through */
 var CAL_MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -10528,108 +11123,7 @@ var TR_STAGE_ORDER=['planned','active','completed'];
 
 /* ---- seed studies: realistic UT turf research across the four labs ---- */
 var TRIALS_SEED=[
- {id:'s1',title:'Dollar-spot fungicide timing',lab:'Brosnan',pi:'p13',owner:'p09',stage:'active',
-  multiPlot:false,coverage:'part',pin:{lat:35.900232,lng:-83.961573},rot:76,
-  area:900,layout:{rows:4,cols:4},
-  objective:'Compare curative vs. preventive fungicide timing for dollar spot suppression on creeping bentgrass.',
-  start:'2026-06-01',end:'2026-09-30',
-  locations:[{plot:'B14',sqft:7500}],
-  treatments:'4 treatments · Daconil Weatherstik, Secure Action, Emerald, untreated control · 14-day interval · 4 reps',
-  pdf:'dollar-spot-timing-2026.pdf',
-  restrictions:[
-   {id:'r1',type:'fungicide',scope:'B14',note:'N section — untreated check block',start:'2026-06-01',end:'2026-09-30',by:'p09'},
-   {id:'r2',type:'mow',scope:'B14',note:'Hold mowing 48 h ahead of each rating date',start:'2026-07-20',end:'2026-08-24',by:'p09'}],
-  createdBy:'Rose Gibbons',createdAt:'2026-05-18'},
-
- {id:'s2',title:'Deficit irrigation & drought stress',lab:'Horvath',pi:'p14',owner:'p12',stage:'active',
-  multiPlot:false,coverage:'part',pin:{lat:35.900154,lng:-83.960867},rot:55,
-  area:1200,layout:{rows:4,cols:3},
-  objective:'Quantify tall fescue performance under three irrigation regimes through summer stress.',
-  start:'2026-05-15',end:'2026-10-15',
-  locations:[{plot:'C1',sqft:7500}],
-  treatments:'3 regimes · 100 %, 60 %, 30 % ET₀ replacement · 4 reps · weekly NDVI + digital image analysis',
-  pdf:'deficit-irrigation-2026.pdf',
-  restrictions:[
-   {id:'r3',type:'irrigate',scope:'C1',note:'60 % ET₀ plots — no supplemental water',start:'2026-06-15',end:'2026-09-15',by:'p12'},
-   {id:'r4',type:'irrigate',scope:'C1',note:'30 % ET₀ plots — no supplemental water',start:'2026-06-15',end:'2026-09-15',by:'p12'},
-   {id:'r12',type:'wetting',scope:'C1',note:'No wetting agent — it would mask the drought response',start:'2026-06-15',end:'2026-09-15',by:'p12'}],
-  createdBy:'Logan Smith',createdAt:'2026-04-30'},
-
- {id:'s3',title:'Traffic tolerance of hybrid bermudagrass',lab:'Sorochan',pi:'p16',owner:'p16',stage:'active',
-  multiPlot:false,coverage:'part',pin:{lat:35.901407,lng:-83.958986},rot:100,
-  area:1500,layout:{rows:5,cols:3},
-  objective:'Evaluate wear and divot recovery of five hybrid bermudagrass cultivars under simulated athletic traffic.',
-  start:'2026-06-10',end:'2026-11-01',
-  locations:[{plot:'E17',sqft:3600}],
-  treatments:'Cady traffic simulator · 0, 2, 4 passes wk⁻¹ · 5 cultivars · 3 reps',
-  pdf:'',
-  restrictions:[
-   {id:'r5',type:'mow',scope:'E17',note:'Recovery block — no mowing during rating window',start:'2026-08-01',end:'2026-08-31',by:'p16'},
-   {id:'r13',type:'cultivate',scope:'E17',note:'No aeration or topdressing — cultivation resets the wear treatment',start:'2026-05-01',end:'2026-10-15',by:'p16'}],
-  createdBy:'Dr. Sorochan',createdAt:'2026-05-02'},
-
- {id:'s4',title:'Shade adaptation of zoysiagrass',lab:'Bowling',pi:'p15',owner:'p15',stage:'active',
-  multiPlot:false,coverage:'part',pin:{lat:35.902711,lng:-83.958147},rot:151,
-  area:256,layout:{rows:2,cols:2},
-  objective:'Determine minimum light requirement for four zoysiagrass cultivars under controlled shade.',
-  start:'2026-03-01',end:'2026-12-15',
-  locations:[{plot:'LH',sqft:0}],
-  treatments:'4 shade levels · 0, 30, 60, 80 % · shade cloth frames · monthly clipping yield + quality',
-  pdf:'shade-zoysia-lighthouse.pdf',
-  restrictions:[
-   {id:'r6',type:'fertilizer',scope:'LH',note:'Nutrient-limited treatment — no farm fertility program',start:'2026-03-01',end:'2026-12-15',by:'p15'},
-   {id:'r7',type:'fertilizer',scope:'LH',note:'Nutrient-limited treatment — no farm fertility program',start:'2026-03-01',end:'2026-12-15',by:'p15'}],
-  createdBy:'Dr. Bowling',createdAt:'2026-02-10'},
-
- {id:'s5',title:'NTEP bermudagrass cultivar evaluation',lab:'Sorochan',pi:'p16',owner:'p09',stage:'active',
-  multiPlot:false,coverage:'part',pin:{lat:35.901952,lng:-83.959445},rot:20,
-  area:6400,layout:{rows:12,cols:8},
-  objective:'National Turfgrass Evaluation Program standard trial — monthly quality, color and density ratings.',
-  start:'2025-05-01',end:'2029-10-31',
-  locations:[{plot:'NTEP',sqft:10000}],
-  treatments:'32 entries · 3 reps · standard NTEP management, no experimental treatments',
-  pdf:'ntep-bermuda-2025-2029.pdf',
-  restrictions:[
-   {id:'r8',type:'herbicide',scope:'NTEP',note:'No broadcast herbicide — spot treat only, log first',start:'2026-04-01',end:'2026-10-31',by:'p09'},
-   {id:'r14',type:'insecticide',scope:'NTEP',note:'No insecticide — cultivars are rated on their own pest tolerance',start:'2026-04-01',end:'2026-10-31',by:'p09'},
-   {id:'r15',type:'fertilizer',scope:'NTEP',note:'NTEP fertility program only — no farm applications',start:'2026-04-01',end:'2026-10-31',by:'p09'}],
-  createdBy:'Rose G.',createdAt:'2025-04-14'},
-
- {id:'s6',title:'Wetting agent & localized dry spot',lab:'Horvath',pi:'p14',owner:'p12',stage:'planned',
-  multiPlot:false,coverage:'part',pin:{lat:35.901037,lng:-83.962239},rot:5,
-  area:720,layout:{rows:4,cols:3},
-  objective:'Compare three wetting-agent programs on volumetric water content uniformity in sand rootzones.',
-  start:'2026-09-01',end:'2026-11-15',
-  locations:[{plot:'B9',sqft:3000}],
-  treatments:'Revolution, Aquatrols Dispatch, untreated · 28-day interval · TDR grid sampling',
-  pdf:'',
-  restrictions:[
-   {id:'r9',type:'wetting',scope:'B9',note:'Untreated check — exclude from farm wetting-agent program',start:'2026-08-20',end:'2026-11-15',by:'p12'}],
-  createdBy:'Logan Smith',createdAt:'2026-07-22'},
-
- {id:'s7',title:'Spring green-up PGR program',lab:'Brosnan',pi:'p13',owner:'p09',stage:'planned',
-  multiPlot:false,coverage:'part',pin:{lat:35.902024,lng:-83.961571},rot:152,
-  area:1000,layout:{rows:5,cols:2},
-  objective:'Test plant growth regulator programs for accelerated spring green-up and reduced clipping yield.',
-  start:'2027-03-01',end:'2027-06-30',
-  locations:[{plot:'O1',sqft:5100}],
-  treatments:'Primo Maxx, Anuew, Cutless · 3 rates each · GDD-based reapplication',
-  pdf:'',
-  restrictions:[
-   {id:'r10',type:'fertilizer',scope:'O1',note:'No spring fertility ahead of first application',start:'2027-02-15',end:'2027-04-15',by:'p09'}],
-  createdBy:'Rose Gibbons',createdAt:'2026-07-28'},
-
- {id:'s8',title:'Pre-emergent crabgrass control',lab:'Brosnan',pi:'p13',owner:'p09',stage:'completed',
-  multiPlot:false,coverage:'part',pin:{lat:35.902358,lng:-83.960391},rot:59,
-  area:960,layout:{rows:4,cols:3},
-  objective:'Compare pre-emergent herbicide efficacy and residual on smooth crabgrass in tall fescue.',
-  start:'2026-02-15',end:'2026-06-30',
-  locations:[{plot:'SF4',sqft:3400}],
-  treatments:'Dimension 2EW, Barricade 4FL, Specticle FLO, untreated · single + split applications',
-  pdf:'preemerge-crabgrass-2026.pdf',
-  restrictions:[
-   {id:'r11',type:'herbicide',scope:'SF4',note:'Untreated check block',start:'2026-02-15',end:'2026-05-30',by:'p09',lifted:'2026-06-02',liftedBy:'Rose Gibbons'}],
-  createdBy:'Rose Gibbons',createdAt:'2026-01-20'}
+ /* Empty on purpose — see TASKS. Held 23 sample trials and 8 restrictions. */
 ];
 
 var TRIALS=[];
@@ -13584,7 +14078,54 @@ try{
 
    In MGMT_DATA: m is the mower, c the cut height in inches, h the irrigation
    head count. */
+/* ---- what kind of place is this? ----
+   PLACES (farm-geo.js) is the one table that says what every named piece of
+   ground actually IS. Everything that takes a place name should ask here
+   rather than pattern-matching the string, because the strings do not tell
+   you: "CAFS9" is a research plot, "Shop" is a building, "Alleys" is a total
+   with no shape, and "CAFS6" is only a label for CAFS6a/6b/6c.
+
+   These read PLACES live, so a saved correction (below) is already applied. */
+function placeOf(id){
+  if(typeof PLACES==='undefined' || !id) return null;
+  return PLACES[id] || null;
+}
+function placeKind(id){ var p=placeOf(id); return p?p.kind:null; }
+
+/* Ground somebody can actually be sent to. Facilities, the two alley totals
+   and the split-plot labels are none of them workable: you cannot mow the
+   Chemical Building, and "CAFS6" is a heading, not a place. */
+function placeIsWorkable(id){
+  var k=placeKind(id);
+  return k==='plot' || k==='alley_zone';
+}
+
+/* Square feet, and ONLY from the recorded figure. The CAFS polygons are a
+   synthetic grid drawn to sit roughly in the right place, so measuring them
+   gives a confident wrong answer — which is worse than no answer, because it
+   would feed the spray-mix calculator. areaFromShape says which polygons can
+   be trusted; nothing should measure a shape without checking it first. */
+function placeArea(id){ var p=placeOf(id); return (p&&p.areaSqft!=null)?p.areaSqft:null; }
+function placeAreaFromShape(id){ var p=placeOf(id); return !!(p&&p.areaFromShape); }
+
+/* AZ06, the CAFS surrounds, is grass and gets cut. AZ11, the CAFS alleyways,
+   is gravel — sprayed, never mowed, and still in the rotation because the
+   rotation is about covering ground rather than cutting it. */
+function placeMowable(id){ var p=placeOf(id); return !!(p&&p.mowable); }
+
+/* Every workable place, optionally in one block. */
+function placesWorkable(block){
+  if(typeof PLACES==='undefined') return [];
+  return Object.keys(PLACES).filter(function(id){
+    var p=PLACES[id];
+    return p && p.active!==false && (p.kind==='plot'||p.kind==='alley_zone')
+        && (!block || p.block===block);
+  });
+}
+
 var MAP_DEFS=[
+  {name:'places',   key:'ut_places_v1',    label:'What each place is',
+   get:function(){ return (typeof PLACES!=='undefined')?PLACES:null; }},
   {name:'plotinfo', key:'ut_plot_info_v1', label:'Plot information',
    get:function(){ return (typeof PLOT_INFO!=='undefined')?PLOT_INFO:null; }},
   {name:'mgmt', key:'ut_mgmt_data_v1', label:'Mowing & irrigation',

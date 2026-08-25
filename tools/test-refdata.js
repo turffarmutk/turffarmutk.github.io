@@ -115,6 +115,9 @@ section('2. a name in use but not listed is reported');
   ok('nothing is adrift to start with', b.p.labsUnlisted().length === 0,
      JSON.stringify(b.p.labsUnlisted()));
 
+  /* A fixture, not a seed row — the sample trials were removed from the app on
+     2026-08-24, so this test brings its own to rename. */
+  if (!b.p.TRIALS.length) b.p.TRIALS.push({id:'s1', title:'Fixture trial', lab:'Brosnan'});
   b.p.PEOPLE[0].lab = 'Fenwick';
   b.p.TRIALS[0].lab = 'Fenwick';
   const un = b.p.labsUnlisted();

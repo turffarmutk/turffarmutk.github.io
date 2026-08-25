@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang xml:lang>
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Inventory review ��� April count</title>
+  <style>
+html {
+color: #1a1a1a;
+background-color: #fdfdfd;
+}
+body {
+margin: 0 auto;
+max-width: 36em;
+padding-left: 50px;
+padding-right: 50px;
+padding-top: 50px;
+padding-bottom: 50px;
+hyphens: auto;
+overflow-wrap: break-word;
+text-rendering: optimizeLegibility;
+font-kerning: normal;
+}
+@media (max-width: 600px) {
+body {
+font-size: 0.9em;
+padding: 12px;
+}
+h1 {
+font-size: 1.8em;
+}
+}
+@media print {
+html {
+background-color: white;
+}
+body {
+background-color: transparent;
+color: black;
+font-size: 12pt;
+}
+p, h2, h3 {
+orphans: 3;
+widows: 3;
+}
+h2, h3, h4 {
+page-break-after: avoid;
+}
+}
+p {
+margin: 1em 0;
+}
+a {
+color: #1a1a1a;
+}
+a:visited {
+color: #1a1a1a;
+}
+img {
+max-width: 100%;
+}
+h1, h2, h3, h4, h5, h6 {
+margin-top: 1.4em;
+}
+h5, h6 {
+font-size: 1em;
+font-style: italic;
+}
+h6 {
+font-weight: normal;
+}
+ol, ul {
+padding-left: 1.7em;
+margin-top: 1em;
+}
+li > ol, li > ul {
+margin-top: 0;
+}
+blockquote {
+margin: 1em 0 1em 1.7em;
+padding-left: 1em;
+border-left: 2px solid #e6e6e6;
+color: #606060;
+}
+code {
+font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+font-size: 85%;
+margin: 0;
+hyphens: manual;
+}
+pre {
+margin: 1em 0;
+overflow: auto;
+}
+pre code {
+padding: 0;
+overflow: visible;
+overflow-wrap: normal;
+}
+.sourceCode {
+background-color: transparent;
+overflow: visible;
+}
+hr {
+background-color: #1a1a1a;
+border: none;
+height: 1px;
+margin: 1em 0;
+}
+table {
+margin: 1em 0;
+border-collapse: collapse;
+width: 100%;
+overflow-x: auto;
+display: block;
+font-variant-numeric: lining-nums tabular-nums;
+}
+table caption {
+margin-bottom: 0.75em;
+}
+tbody {
+margin-top: 0.5em;
+border-top: 1px solid #1a1a1a;
+border-bottom: 1px solid #1a1a1a;
+}
+th {
+border-top: 1px solid #1a1a1a;
+padding: 0.25em 0.5em 0.25em 0.5em;
+}
+td {
+padding: 0.125em 0.5em 0.25em 0.5em;
+}
+header {
+margin-bottom: 4em;
+text-align: center;
+}
+#TOC li {
+list-style: none;
+}
+#TOC ul {
+padding-left: 1.3em;
+}
+#TOC > ul {
+padding-left: 0;
+}
+#TOC a:not(:hover) {
+text-decoration: none;
+}
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+.display.math{display: block; text-align: center; margin: 0.5rem auto;}
+</style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Inventory review ��� April count</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#inventory-what-i-read-off-the-april-sheet" id="toc-inventory-what-i-read-off-the-april-sheet">Inventory — what I
+read off the April sheet</a>
+<ul>
+<li><a href="#please-check-these" id="toc-please-check-these">Please
+check these</a></li>
+<li><a href="#the-list" id="toc-the-list">The list</a>
+<ul>
+<li><a href="#fungicide-49" id="toc-fungicide-49">Fungicide ·
+49</a></li>
+<li><a href="#herbicide-58" id="toc-herbicide-58">Herbicide ·
+58</a></li>
+<li><a href="#insecticide-8" id="toc-insecticide-8">Insecticide ·
+8</a></li>
+<li><a href="#growth-regulator-2" id="toc-growth-regulator-2">Growth
+regulator · 2</a></li>
+<li><a href="#fertilizer-granular-27" id="toc-fertilizer-granular-27">Fertilizer · granular · 27</a></li>
+<li><a href="#fertilizer-liquid-23" id="toc-fertilizer-liquid-23">Fertilizer · liquid · 23</a></li>
+<li><a href="#wetting-agent-15" id="toc-wetting-agent-15">Wetting agent
+· 15</a></li>
+<li><a href="#other-9" id="toc-other-9">Other · 9</a></li>
+</ul></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="inventory-what-i-read-off-the-april-sheet">Inventory — what I
+read off the April sheet</h1>
+<p>Built from
+<code>reference/Inventory of Cages_Bulk Materials.xlsx</code> by
+<code>tools/build-inventory.py</code>. <strong>215 lines on the sheet
+became 191 products</strong>, because the same product often appears
+more than once at different sizes or years.</p>
+<ul>
+<li><strong>Quantities count containers.</strong> <code>1</code> is a
+full jug, <code>0.5</code> a half one. The sheet’s own wording is kept
+beside each line so you can check what it said.</li>
+<li><strong>Quantities are April’s and will be wrong.</strong> A
+starting point to correct, not a claim about what is on the shelf
+today.</li>
+</ul>
+<h2 id="please-check-these">Please check these</h2>
+<p><strong>Two I could not classify</strong> — no active ingredient on
+the sheet and I don’t know the product well enough to guess:</p>
+<ul>
+<li><strong>ambient plus</strong> — filed under Other</li>
+<li><strong>Oxifloor</strong> — filed under Other</li>
+</ul>
+<p><strong>One quantity I could not read:</strong> Nano Charge says
+<em>1 qt</em> but the container is listed as <em>8.5 lbs</em> — I can’t
+turn one into the other, so it reads as zero.</p>
+<p><strong>Two spellings I merged deliberately:</strong> <em>Exteriss
+Stressguard</em> into <em>Exteris Stressgard</em>; <em>816 field
+conditioner</em> into <em>SAF 816 Field Conditioner</em>.</p>
+<p><strong>Pairs I left separate</strong> that look similar but aren’t:
+<em>Insignia</em> (granular) vs <em>Insignia SC</em> (liquid);
+<em>Target 6</em> vs <em>Target 6.6</em>. And <em>Speed XT</em> vs
+<em>4-Speed XT</em> — those may well be the same thing; your call.</p>
+<h2 id="the-list">The list</h2>
+<p>A product with more than one size is expanded underneath.</p>
+<h3 id="fungicide-49">Fungicide · 49</h3>
+<ul>
+<li><strong>26GT</strong> — Iprodione — 0.5 x 2.5 gal, 2018 · <em>sheet:
+Half</em></li>
+<li><strong>3336.0</strong> — Thiophanate-methyl — 0.5 x 2.5 gal,
+&lt;2017 · <em>sheet: 1 partial</em></li>
+<li><strong>Aliette</strong> — Aluminum tris — 2.0 x 5.0 lb, 2026 ·
+<em>sheet: 2 Full</em></li>
+<li><strong>Appear II</strong> — Potassium Phosphite
+<ul>
+<li>1.0 x 7.0 gal, &lt;2017 · <em>sheet: 7 gal</em></li>
+<li>8.0 x 2.0 gal, &lt;2018 · <em>sheet: 8 Full</em></li>
+</ul></li>
+<li><strong>Armada</strong> — Trifloxistrobin — 1.0 x 8.0 lb, &lt;2017 ·
+<em>sheet: 8 lbs</em></li>
+<li><strong>Ascernity</strong> — Benzovindiflupyr, Difenoconazole — 2.75
+x 2.0 gal, 2021 · <em>sheet: 5.5 gal</em></li>
+<li><strong>Bayleton</strong> — Triadimefon — 4.0 x 2.5 gal, 2018 ·
+<em>sheet: 4 Full</em></li>
+<li><strong>Briskway</strong> — Prototype? — 4.0 x 1.0 L, 2014 ·
+<em>sheet: 4 Full</em></li>
+<li><strong>Chipco 26019</strong> — Iprodione — 2.0 x 2.5 gal, 2024 ·
+<em>sheet: 2 Full</em></li>
+<li><strong>Curalan EG</strong> — Vinclozolin, 4-oxazolidinedionej — 1.0
+x 2.75 lb · <em>sheet: Full</em></li>
+<li><strong>Daconil Action</strong> — Chlorothalonil — 5.5 x 2.5 gal,
+2023 · <em>sheet: 5 Full 1 Half</em></li>
+<li><strong>Daconil Ultrex</strong> — Chlorothalonil — 5.0 x 5.0 lb,
+&lt;2017 · <em>sheet: 5 Full</em></li>
+<li><strong>Daconil Weatherstik</strong> — Chlorothalonil
+<ul>
+<li>0.5 x 2.5 gal, 2018 · <em>sheet: Half</em></li>
+<li>0.5 x 1.0 L, &lt;2017 · <em>sheet: Half</em></li>
+</ul></li>
+<li><strong>Eagle</strong> — Myclobutanil — 1.0 x 2.5 gal, &lt;2017 ·
+<em>sheet: 1 Full</em></li>
+<li><strong>Emerald</strong> — BoscalidjasIk — 6.0 x 0.49 lb ·
+<em>sheet: 6 Full</em></li>
+<li><strong>Exteris Stressgard</strong>
+<ul>
+<li>4.0 x 2.5 gal, 2026 · <em>sheet: 4 Full</em></li>
+<li>3.0 x 2.5 gal, 2019 · <em>sheet: 3 Full</em></li>
+</ul></li>
+<li><strong>Fame</strong> — Fluoxastrobin, Chlorothalonil — 1.0 x 2.5 lb
+· <em>sheet: Full</em></li>
+<li><strong>Fore 80WP</strong> — Mancozeb — 13.33 x 1.5 lb · <em>sheet:
+20 lbs</em></li>
+<li><strong>Headway</strong> — Azoxystrobin
+<ul>
+<li>1.0 x 1.0 gal, &lt;2017 · <em>sheet: 1 Full</em></li>
+<li>2.0 x 1.0 gal, 2025 · <em>sheet: 2 Full</em></li>
+</ul></li>
+<li><strong>Heritage Action</strong> — Azoxystrobin
+<ul>
+<li>1.5 x 1.0 lb, &lt;2017 · <em>sheet: 1.5 lbs</em></li>
+<li>0.5 x 500.0 g, &lt;2017 · <em>sheet: Half</em></li>
+</ul></li>
+<li><strong>Heritage TL</strong> — Azoxystrobin
+<ul>
+<li>1.0 x 1.0 gal · <em>sheet: 1.0</em></li>
+<li>0.25 x 1.0 gal · <em>sheet: Low</em></li>
+</ul></li>
+<li><strong>Honor</strong> — Pyraclostrobin, Boscalid — 0.25 x 3.0 lb ·
+<em>sheet: Low</em></li>
+<li><strong>Insignia</strong> — Pyraclostrobin
+<ul>
+<li>0.2 x 2.5 lb · <em>sheet: .5 lb</em></li>
+<li>0.17 x 2.4 lb · <em>sheet: 0.4lbs Low</em></li>
+</ul></li>
+<li><strong>Insignia SC</strong> — Pyraclostrobin
+<ul>
+<li>1.0 x 500.0 mL, &lt;2017 · <em>sheet: Full</em></li>
+<li>0.5 x 30.5 oz · <em>sheet: 1 Half</em></li>
+<li>1.5 x 2.5 gal, 2018 · <em>sheet: 1 Full 1 Partial</em></li>
+</ul></li>
+<li><strong>Instrata</strong> — Chlorothalonil, Propiconazole — 2.0 x
+2.5 gal, &lt;2017 · <em>sheet: 2 Full</em></li>
+<li><strong>Interface</strong> — Iprodione — 0.67 x 2.5 gal, &lt;2017 ·
+<em>sheet: 2/3 Full</em></li>
+<li><strong>Interface Stressguard</strong> — Iprodione — 2.0 x 2.5 gal,
+&lt;2017 · <em>sheet: 2 Full</em></li>
+<li><strong>Junction</strong> — Mancozeb — 1.5 x 6.0 lb, &lt;2017 ·
+<em>sheet: 1 Full 1 partial</em></li>
+<li><strong>Kabuto</strong> — Isofetamid
+<ul>
+<li>2.0 x 1.0 gal, 2019/2022 · <em>sheet: 2 Full</em></li>
+<li>1.0 x 21.8 oz, 2019 · <em>sheet: Full</em></li>
+<li>4.0 x 1.0 gal, 2025 · <em>sheet: 4 Full</em></li>
+</ul></li>
+<li><strong>Lexicon</strong> — Fluxapyroxad — 2.62 x 21.0 oz, 2018 ·
+<em>sheet: 55 oz</em></li>
+<li><strong>Maxtima</strong> — Mefentrifluconazole
+<ul>
+<li>4.0 x 26.0 oz, 2024 · <em>sheet: 4 Full</em></li>
+<li>1.0 x 8.0 oz · <em>sheet: Full</em></li>
+</ul></li>
+<li><strong>Mirage Stressguard</strong> — Triazole-1-ethanol — 1.0 x 2.5
+gal, 2019 · <em>sheet: 1 Full</em></li>
+<li><strong>Nutrol</strong> — 1.0 x 40.0 lb · <em>sheet: Full</em></li>
+<li><strong>Pillar G</strong> — Pyraclostrobin — 1.5 x 30.0 lb ·
+<em>sheet: 1.5 Full</em></li>
+<li><strong>Posterity XT</strong> — pydiflumetofen, azoxystrobin,
+propiconazole
+<ul>
+<li>1.25 x 2.5 gal · <em>sheet: 1 Full 1 Low</em></li>
+<li>2.0 x 2.5 gal · <em>sheet: 2 Full</em></li>
+</ul></li>
+<li><strong>Prostar</strong> — Flutolanil — 0.5 x 3.0 lb · <em>sheet: 2
+Low</em></li>
+<li><strong>Rayora</strong> — Fluteiafol — 0.75 x 1.0 gal, 2020 ·
+<em>sheet: 3/4</em></li>
+<li><strong>Secure</strong> — Fluazinam — 2.0 x 0.5 gal · <em>sheet: 2
+Full</em></li>
+<li><strong>Segway</strong> — Cyazofamid
+<ul>
+<li>8.5 x 1.0 qt, 2022 · <em>sheet: 8 Full, 1 Half</em></li>
+<li>12.0 x 39.2 oz, 2025 · <em>sheet: 12 Full</em></li>
+</ul></li>
+<li><strong>Signature Chipco</strong> — Aluminum tris
+<ul>
+<li>11.0 x 5.5 lb, 2019 · <em>sheet: 11 Full</em></li>
+<li>8.0 x 5.5 lb · <em>sheet: 8 Full</em></li>
+</ul></li>
+<li><strong>Signature XTRA</strong> — Aluminum tris
+<ul>
+<li>1.5 x 5.5 lb, 2024 · <em>sheet: 1 Full 1 partial</em></li>
+<li>0.25 x ? , 2022 · <em>sheet: Low</em></li>
+</ul></li>
+<li><strong>Stellar</strong> — Fluopicolide — 0.5 x 104.0 oz, &lt;2017 ·
+<em>sheet: 1 Half</em></li>
+<li><strong>Subdue Maxx</strong> — Mefenoxam — 4.5 x 1.0 gal, &lt;2017 ·
+<em>sheet: 4 Full 1 Half</em></li>
+<li><strong>Tartan</strong> — Trifloxystrobin — 1.5 x 2.5 gal ·
+<em>sheet: 1 Full 1 Half</em></li>
+<li><strong>Tebuconazole</strong> — Tebuconazole — 1.0 x 1.0 gal, 2018 ·
+<em>sheet: 1 Full</em></li>
+<li><strong>Touche</strong> — Vinclozolin — 0.91 x 2.75 lb, &lt;2017 ·
+<em>sheet: 2.5 lbs</em></li>
+<li><strong>Union</strong> — cyazofamid, azoxystrobin
+<ul>
+<li>4.0 x 2.5 gal, 2025 · <em>sheet: 4 Full</em></li>
+<li>2.0 x 2.5 gal · <em>sheet: 2 Full</em></li>
+</ul></li>
+<li><strong>Velista</strong> — Penthiopyrad
+<ul>
+<li>2.0 x 22.0 oz, 2019 · <em>sheet: 2 Full</em></li>
+<li>0.5 x 500.0 g, 2018 · <em>sheet: 1 Half</em></li>
+</ul></li>
+<li><strong>Xzemplar</strong> — Fluxapyroxad — 1.0 x 114.0 oz, 2019 ·
+<em>sheet: 1 Full</em></li>
+</ul>
+<h3 id="herbicide-58">Herbicide · 58</h3>
+<ul>
+<li><strong>3800 - ronstar + fertilizer</strong> — 1.0 x 290.0 lb ·
+<em>sheet: 290lbs</em></li>
+<li><strong>4-Speed XT</strong> — isooctyl ester of 2,
+4-dichlorophenoxyacetic acid — 0.4 x 2.5 gal · <em>sheet: 1
+gal</em></li>
+<li><strong>Accord XRT</strong> — glyphosate — 2.0 x 1.0 gal ·
+<em>sheet: 2 Full</em></li>
+<li><strong>Akron</strong> — Purimisulfan — 1.5 x 2.5 gal · <em>sheet: 1
+Full 1 partial</em></li>
+<li><strong>Anderson’s Crab/Goose</strong> — Bensulide + Oxadiazon — 8.0
+x 28.7 lb · <em>sheet: 8 Full</em></li>
+<li><strong>Avenue South</strong> — 24D+Dicamba+Penoxsulam+Sulfentrazone
+— 2.0 x 1.0 gal, 2022 · <em>sheet: 2 Full</em></li>
+<li><strong>Barricade 4FL</strong> — Prodiamine — 4.0 x 1.0 gal,
+&lt;2017 · <em>sheet: 4 full</em></li>
+<li><strong>Basamid G</strong> — Dazomet — 0.5 x 50.0 lb · <em>sheet: 1
+Half</em></li>
+<li><strong>Bensumec 4</strong> — Bensulfide — 0.5 x 2.5 gal, &lt;2017 ·
+<em>sheet: Half</em></li>
+<li><strong>Caravel</strong> — clomazone — 2.0 x 2.5 gal, 2022 ·
+<em>sheet: 2 Full</em></li>
+<li><strong>Celsilus</strong> — dicamba-sodium — 2.0 x 10.0 lb ·
+<em>sheet: 2 full</em></li>
+<li><strong>Coastal</strong> — Prodiamine, Imazaquin, Simazine — 1.5 x
+2.5 gal, 2022 · <em>sheet: 1 Full 1 partial</em></li>
+<li><strong>Confront</strong> — Triclopyr — 1.0 x 1.0 gal, &lt;2017 ·
+<em>sheet: 1 full</em></li>
+<li><strong>Dimension</strong> — Dithiopyr — 0.25 x 2.5 gal, 2020 ·
+<em>sheet: Low (Empty)</em></li>
+<li><strong>Drive 75</strong> — 3, 7-dichloro-8-quinolinecarboxylicacid
+— 0.0 x 1.0 lb · <em>sheet: 0.0</em></li>
+<li><strong>Drive XLR8</strong> — Dimethylamine — 0.75 x 0.5 gal ·
+<em>sheet: 3/4 gal</em></li>
+<li><strong>Echelon 4SC</strong> — sulfentrazone — 2.0 x 1.0 gal ·
+<em>sheet: 2 Full</em></li>
+<li><strong>Freehand</strong> — Dimethenamid — 3.5 x 50.0 lb ·
+<em>sheet: 3.5 Full</em></li>
+<li><strong>Fusilade 2</strong> — Fluazifop-P-butyl — 1.0 x 1.5 gal ·
+<em>sheet: Full</em></li>
+<li><strong>Gallery</strong> — isoxaben — 0.5 x 1.0 lb, &lt;2017 ·
+<em>sheet: 1 Half</em></li>
+<li><strong>Garlon 3A</strong> — Triclopyr — 1.5 x 2.5 gal, &lt;2017 ·
+<em>sheet: 1 full 1 half</em></li>
+<li><strong>Goosegrass Crabgrass Control</strong> — Bensulide — 0.25 x
+28.87 lb · <em>sheet: Low</em></li>
+<li><strong>Gramoxone</strong> — Paraquat — 1.0 x 2.5 gal · <em>sheet: 1
+Full</em></li>
+<li><strong>Harells Ronstar 1.5%</strong> — Oxadiazon — 1.5 x 50.0 lb ·
+<em>sheet: 1 Bag Partial 30lbs</em></li>
+<li><strong>Katana</strong> — flazasulfuron — 5.0 x 5.0 lb · <em>sheet:
+5.0</em></li>
+<li><strong>Lesco Stonewall-0.43%</strong> — 1.0 x 40.0 lb · <em>sheet:
+40lbs</em></li>
+<li><strong>Liberty Ultra</strong> — Glufosinate — 1.0 x 1.0 gal ·
+<em>sheet: Full</em></li>
+<li><strong>Matrix</strong> — Rimsulfuron — 1.0 x 1.25 lb, &lt;2017 ·
+<em>sheet: 1 Full</em></li>
+<li><strong>Millennium</strong> — Dimethylamine Salt — 1.0 x 2.5 gal ·
+<em>sheet: Full</em></li>
+<li><strong>Monument 75 WG (8 packets)</strong> — 1.0 x 5.0 g, 2020 ·
+<em>sheet: Full</em></li>
+<li><strong>Outlook</strong> — dimethenamid-p — 0.5 x 2.5 gal ·
+<em>sheet: 1/2 gal</em></li>
+<li><strong>Pendulum</strong> — Pendimethalin
+<ul>
+<li>0.5 x 15.0 gal · <em>sheet: 1 Half</em></li>
+<li>4.0 x 2.5 gal, 2020 · <em>sheet: 4 Full</em></li>
+</ul></li>
+<li><strong>Pennant Magnum</strong> — S- metolachlor — 0.5 x 2.5 gal,
+&lt;2017 · <em>sheet: 1 partial</em></li>
+<li><strong>Princep</strong> — Simazine — 3.0 x 2.5 gal, &lt;2017 ·
+<em>sheet: 3 Full</em></li>
+<li><strong>Pylex</strong> — Topramezone — 4.0 x 4.0 oz, 2024 ·
+<em>sheet: 4 Full</em></li>
+<li><strong>Quicksilver</strong> — carfentrazone-ethyl — 0.5 x 12.0 oz ·
+<em>sheet: 1/2</em></li>
+<li><strong>Quinclorac</strong> — dimetrylamine — 1.0 x 30.0 oz ·
+<em>sheet: 1.0</em></li>
+<li><strong>Recognition</strong> — Trifloxysulfuron-sodium — 1.0 x 14.0
+g · <em>sheet: Full</em></li>
+<li><strong>Regal Ronstar 1% 38-0-0</strong> — Oxadiazon — 4.0 x 50.0
+lb, 2019 · <em>sheet: 4 Full</em></li>
+<li><strong>Regal Ronstar 100% XCU 38-0-0</strong> — Oxadiazon — 1.0 x
+50.0 lb, 2019 · <em>sheet: 1 Full</em></li>
+<li><strong>Regal Ronstar AC 2%</strong> — Oxadiazon — 1.0 x 50.0 lb ·
+<em>sheet: 1 Bag</em></li>
+<li><strong>RegalKade G</strong> — Prodiamine — 3.0 x 50.0 lb ·
+<em>sheet: 3 full</em></li>
+<li><strong>RegalStar II</strong> — Oxadiazon — 4.0 x 50.0 lb, 2019 ·
+<em>sheet: 3 Full 2 Half</em></li>
+<li><strong>Ronstar</strong> — Oxadiazon — 1.0 x 2.5 gal · <em>sheet: 1
+Full</em></li>
+<li><strong>Round Up Quick Pro</strong> — glyphosate, indaziflam,
+disquat — 0.2 x 2.5 gal · <em>sheet: 0.5 gal</em></li>
+<li><strong>Round Up Ranger Pro</strong> — glyphosate — 2.0 x 2.5 gal ·
+<em>sheet: 2 Full</em></li>
+<li><strong>Roundup G</strong> — Glyphosate — 1.0 x 10.0 lb · <em>sheet:
+Full</em></li>
+<li><strong>Safety Guard 0.125%</strong> — Flumioxazin — 1.0 x 50.0 lb,
+2024 · <em>sheet: Full</em></li>
+<li><strong>Speed XT</strong> — isooctyl — 0.4 x 2.5 gal · <em>sheet: 1
+gal</em></li>
+<li><strong>SpeedZone EW</strong> — 24D+MCPP+Dicamba+ Carfentrazone —
+2.0 x 2.5 gal, 2022 · <em>sheet: 2 Full</em></li>
+<li><strong>Spotlight</strong> — Fluroxypyr — 1.0 x 1.0 gal, &lt;2017 ·
+<em>sheet: 1 Full</em></li>
+<li><strong>SURGE</strong> — 24D+Mecoprop-p+Dicamba+Sulfentrazone — 1.5
+x 2.5 gal, 2022 · <em>sheet: 1 Full 1 half</em></li>
+<li><strong>Target 6</strong> — msma — 0.5 x 2.5 gal · <em>sheet:
+Half</em></li>
+<li><strong>Target 6.6</strong> — msma — 1.0 x 2.5 gal · <em>sheet:
+Full</em></li>
+<li><strong>Tenacity</strong> — Mesotrione — 1.0 x 96.0 oz · <em>sheet:
+Full</em></li>
+<li><strong>Touchdown Total</strong> — Glyphosate — 2.0 x 2.5 gal,
+&lt;2017 · <em>sheet: 2 Full</em></li>
+<li><strong>Tupersan</strong> — Siduron — 4.0 x 5.0 lb · <em>sheet: 4
+Full</em></li>
+<li><strong>Turflawn Ester</strong> — triclopyr, pyridinyloxyacetic
+acid, butoxyethyl — 0.4 x 2.5 gal · <em>sheet: 1 Gal</em></li>
+</ul>
+<h3 id="insecticide-8">Insecticide · 8</h3>
+<ul>
+<li><strong>Acelepryn</strong> — Chloramtraniliprole — 3.0 x 1.0 gal,
+2020 · <em>sheet: 3 Full</em></li>
+<li><strong>Advion</strong> — Indoxacarb — 1.0 x 1.0 lb, 2019 ·
+<em>sheet: 1 Full</em></li>
+<li><strong>Aloft LCSC</strong> — clothianidin + bifenthrin — 1.0 x 64.0
+oz · <em>sheet: Full</em></li>
+<li><strong>Avalon</strong> — bifenthrin — 0.5 x 1.0 gal · <em>sheet:
+0.5gal</em></li>
+<li><strong>Merit</strong> — Imidacloprid — 2.0 x 30.0 lb, 2024 ·
+<em>sheet: 2 Full</em></li>
+<li><strong>Tal Star Extra</strong> — zeta-cypermethrin — 0.4 x 25.0 lb
+· <em>sheet: 10 lbs</em></li>
+<li><strong>talestar</strong> — ,zeta-cypermethrine, bifenthrin — 0.25 x
+25.0 lb · <em>sheet: Low</em></li>
+<li><strong>Zylam</strong> — Dinotefuran — 1.0 x 64.0 oz, 2018 ·
+<em>sheet: 1 Full</em></li>
+</ul>
+<h3 id="growth-regulator-2">Growth regulator · 2</h3>
+<ul>
+<li><strong>Musketeer</strong> — Flurprimidol; Paclobutrazol
+<ul>
+<li>2.0 x 1.0 qt, &lt;2017 · <em>sheet: 2 Full</em></li>
+<li>1.0 x 1.0 qt, &lt;2017 · <em>sheet: Full</em></li>
+</ul></li>
+<li><strong>Primo Maxx PGR</strong> — Triexapac-ethyl — 6.0 x 1.0 gal,
+&lt;2017 · <em>sheet: 6 Full</em></li>
+</ul>
+<h3 id="fertilizer-granular-27">Fertilizer · granular · 27</h3>
+<ul>
+<li><strong>0-0-22/ Mayo Fert</strong> — 4.0 x 50.0 lb · <em>sheet: 4
+bags</em></li>
+<li><strong>17-17-17</strong> — 6.0 x 50.0 lb · <em>sheet: 6
+Bags</em></li>
+<li><strong>32-0-4</strong> — 1.0 x 2.0 ton, 2026 · <em>sheet:
+Full</em></li>
+<li><strong>46-0-0 (U-Flexx?)</strong> — Nitrogen — 6.0 x 50.0 lb ·
+<em>sheet: 6 bags</em></li>
+<li><strong>Bulk Fert</strong> — 1.0 x 2.0 ton · <em>sheet: 2
+tons</em></li>
+<li><strong>Extreme Green 16</strong> — 1.0 x 125.0 lb · <em>sheet: 125
+lbs</em></li>
+<li><strong>Harells 21-0-0</strong> — 14.0 x 50.0 lb · <em>sheet: 14
+bags</em></li>
+<li><strong>Harrell’s Profertilizer</strong> — 5% Nitrogen — 1.0 x 50.0
+lb, 2024 · <em>sheet: Full</em></li>
+<li><strong>harrells 0-0-10</strong> — Oxadiazon — 2.0 x 50.0 lb ·
+<em>sheet: 2 Half Bags</em></li>
+<li><strong>harrells 0-0-51</strong> — 1.0 x 25.0 lb · <em>sheet:
+25lbs</em></li>
+<li><strong>harrells 43-0-0</strong> — 1.0 x 50.0 lb · <em>sheet:
+50lbs</em></li>
+<li><strong>KOCH-U Flexible u6-0-0</strong> — 1.0 x 325.0 lb ·
+<em>sheet: 325lbs</em></li>
+<li><strong>Managnese 2-0-0</strong> — 1.0 x 2.0 gal · <em>sheet: 2
+gal</em></li>
+<li><strong>Milorganite</strong> — 1.0 x 106.0 lb · <em>sheet: 106
+lbs</em></li>
+<li><strong>Nutrite 24-6-12/ Gal Xe One</strong> — Nitrogen — 3.0 x 50.0
+lb · <em>sheet: 3 bags</em></li>
+<li><strong>Professional Choice 00-20-20</strong> — 44.0 x 50.0 lb ·
+<em>sheet: 44 bags</em></li>
+<li><strong>Professional Choice 21-0-0/ Ammonium Sulfate</strong> — 4.0
+x 50.0 lb · <em>sheet: 4 bags</em></li>
+<li><strong>Professional Choice 46-0-0/ W/Nutrisphere-N</strong> — 32.0
+x 50.0 lb · <em>sheet: 32 bags</em></li>
+<li><strong>Regalite</strong> — Nitrogen — 1.0 x 50.0 lb · <em>sheet: 1
+Bag</em></li>
+<li><strong>roots 3-3-3</strong> — nitrogen — 1.0 x 20.0 lb · <em>sheet:
+20lbs</em></li>
+<li><strong>simplot 10-18-22</strong> — 1.0 x 550.0 lb · <em>sheet:
+550lbs</em></li>
+<li><strong>Simplot 10-18-22/Greens Grade</strong> — Soluble Potash —
+18.0 x 50.0 lb · <em>sheet: 18 bags</em></li>
+<li><strong>Simplot 18-3-6/Greens Grade</strong> — Nitrogen — 8.0 x 50.0
+lb · <em>sheet: 8 bags</em></li>
+<li><strong>Simply 18-3-16</strong> — 8.0 x ? · <em>sheet: 8- 50
+lbs</em></li>
+<li><strong>Spray Rite</strong> — Ammonium Sulfat — 4.0 x 4.0 lb ·
+<em>sheet: 16 lbs</em></li>
+<li><strong>Tru-Prill 15-2-15/ Greens Grade</strong> — 3.0 x 50.0 lb ·
+<em>sheet: 3 Bags</em></li>
+<li><strong>Verdi-Cal G</strong> — Calcium Sulfate Dihydrate — 4.0 x
+50.0 lb · <em>sheet: 4 bags</em></li>
+</ul>
+<h3 id="fertilizer-liquid-23">Fertilizer · liquid · 23</h3>
+<ul>
+<li><strong>9-3-6</strong> — 1.0 x 2.5 gal · <em>sheet: 2.5
+gal</em></li>
+<li><strong>Anew EZ</strong> — prohexadione calcium — 1.6 x 2.5 gal,
+2024 · <em>sheet: 4 gal</em></li>
+<li><strong>armament concentrate</strong> — 1.0 x 2.5 gal · <em>sheet:
+2.5gal</em></li>
+<li><strong>Biophase SBE</strong> — humic acid — 2.8 x 2.5 gal, 2009 ·
+<em>sheet: 7 gal</em></li>
+<li><strong>brandt</strong> — 1.0 x 3.5 gal · <em>sheet: 3.5
+gal</em></li>
+<li><strong>Ferromec AC</strong> — Liquid Iron — 8.0 x 2.5 gal, 2025 ·
+<em>sheet: 8 Full</em></li>
+<li><strong>Fight’s On</strong> — potash — 0.8 x 2.5 gal, 2017 ·
+<em>sheet: 2 gal</em></li>
+<li><strong>Finale XL</strong> — glufosinate-ammonium — 0.5 x 2.5 gal,
+2022 · <em>sheet: Half</em></li>
+<li><strong>floratine</strong> — 1.0 x 10.0 gal · <em>sheet:
+10gal</em></li>
+<li><strong>Foliar Pak 2-0-0</strong> — Nitrogen — 1.0 x 1.5 gal ·
+<em>sheet: 1.5gal</em></li>
+<li><strong>foliar pak 4-0-6</strong> — 1.0 x 2.0 gal · <em>sheet:
+2gal</em></li>
+<li><strong>foliar pak csi 2-0-0</strong> — 1.0 x 4.5 gal · <em>sheet:
+4.5 gal</em></li>
+<li><strong>Foundation Forty</strong> — nitrogen, potash — 1.0 x 2.5 gal
+· <em>sheet: 2.5 gal</em></li>
+<li><strong>Glycofuse</strong> — urea — 0.6 x 2.5 gal, 2021 · <em>sheet:
+1.5 gal</em></li>
+<li><strong>Lesco 12-0-0</strong> — urea nitrogen — 0.4 x 2.5 gal, 2016
+· <em>sheet: 1 gal</em></li>
+<li><strong>Lesco Spar Tech 0-8-5</strong> — phosphate — 1.6 x 2.5 gal ·
+<em>sheet: 4 gal</em></li>
+<li><strong>Maxiplex</strong> — humic acid — 0.6 x 2.5 gal, 2019 ·
+<em>sheet: 1.5 gal</em></li>
+<li><strong>Nano Charge</strong> — Nitrogen — 0.0 x 8.5 lb · <em>sheet:
+1 qt</em></li>
+<li><strong>Nutrigrow Magnum</strong> — ammoniacil nitrogen, — 2.0 x 2.5
+gal · <em>sheet: 5 gal</em></li>
+<li><strong>RhizoMate</strong> — humic acid — 1.6 x 2.5 gal · <em>sheet:
+4 gal</em></li>
+<li><strong>Simplot 18-3-6 UMaxx</strong> — Urea
+<ul>
+<li>20.0 x 2.5 gal, 2026 · <em>sheet: 20 Full</em></li>
+<li>4.0 x 2.5 gal, 2022 · <em>sheet: 4 Full</em></li>
+</ul></li>
+<li><strong>Simplot 30-0-0</strong> — nitrogen — 9.0 x 2.5 gal ·
+<em>sheet: 22.5 gal</em></li>
+<li><strong>Simplot 30-0-0 UMaxx</strong> — Urea — 4.0 x 2.5 gal, 2026 ·
+<em>sheet: 4 Full</em></li>
+</ul>
+<h3 id="wetting-agent-15">Wetting agent · 15</h3>
+<ul>
+<li><strong>Destiny</strong> — Methylated Soybean Oil, soybean oil,
+Alkylphenol ethoxylate — 1.0 x 2.5 gal, &lt;2017 · <em>sheet:
+Full</em></li>
+<li><strong>DI AQUA MSO</strong> — Methylated Seed Oil — 0.5 x 1.0 gal ·
+<em>sheet: Half</em></li>
+<li><strong>DI AQUA NIS</strong> — Nonionnic Surfactant — 2.0 x 1.0 gal
+· <em>sheet: 2 Full</em></li>
+<li><strong>Fleet</strong> — Polyoxyethylene Polymers
+<ul>
+<li>0.5 x 2.5 gal, 2021 · <em>sheet: Half</em></li>
+<li>1.0 x 2.5 gal · <em>sheet: 2.5gal</em></li>
+</ul></li>
+<li><strong>Harrol’s HydroMax</strong> — polyoxialkylene polymer — 1.0 x
+2.5 gal · <em>sheet: 2.5 gal</em></li>
+<li><strong>NonIonic Surfactant MS-9</strong> — ethylene oxide — 0.5 x
+1.0 gal · <em>sheet: 1/2 gal</em></li>
+<li><strong>Pervade</strong> — disulfosuccinate — 0.4 x 2.5 gal ·
+<em>sheet: 1 gal</em></li>
+<li><strong>Rely III</strong> — Oxirane — 1.0 x 2.5 gal, 2021 ·
+<em>sheet: 1 Full</em></li>
+<li><strong>Rely III Soil Surfactant</strong> — Oxirane — 4.0 x 2.5 gal,
+2026 · <em>sheet: 4 full</em></li>
+<li><strong>Revolution</strong> — Modified Alkylated Polyol
+<ul>
+<li>1.5 x 2.5 gal, 2021 · <em>sheet: 1.5 Full</em></li>
+<li>1.4 x 2.5 gal · <em>sheet: 3.5 gal</em></li>
+</ul></li>
+<li><strong>simplot rely III</strong> — oxirain — 7.6 x 2.5 gal ·
+<em>sheet: 19gal</em></li>
+<li><strong>Simplot Spray Slick</strong> — methylated seed oil,
+polyether modified polysiloxane, alkophenol ethoxylate — 1.0 x 1.0 gal,
+2021 · <em>sheet: 1 gal</em></li>
+<li><strong>spray 007</strong> — Alcohol Ethoxylate — 1.0 x 3.5 gal ·
+<em>sheet: 3.5 gal</em></li>
+<li><strong>Spray wet</strong> — Alkylphenol ethoxylate, propylene
+glycol, tall oil fatty acids — 0.75 x 1.0 gal · <em>sheet: 3/4
+gal</em></li>
+<li><strong>Surf 80</strong> — Alkyl Polyoxythylene — 1.0 x 1.0 gal,
+2018 · <em>sheet: Full</em></li>
+</ul>
+<h3 id="other-9">Other · 9</h3>
+<ul>
+<li><strong>ambient plus</strong> — 1.0 x 1.0 gal · <em>sheet:
+1gal</em></li>
+<li><strong>farmworks spray tank cleaner</strong> — 1.0 x 1.5 lb ·
+<em>sheet: 1.5 lb</em></li>
+<li><strong>foam concentrate</strong> — 1.0 x 1.0 pt · <em>sheet: 1
+pint</em></li>
+<li><strong>NutraWash Tank Cleaner</strong> — 4.0 x 1.0 gal, 2026 ·
+<em>sheet: 4 Full</em></li>
+<li><strong>Oxifloor</strong> — 1.0 x 2.0 gal · <em>sheet: 2
+gal</em></li>
+<li><strong>SAF 816 Field Conditioner</strong>
+<ul>
+<li>4.0 x 50.0 lb · <em>sheet: 4 bags</em></li>
+<li>1.0 x 150.0 lb · <em>sheet: 150lbs</em></li>
+</ul></li>
+<li><strong>Schaben’s Foam</strong> — 0.75 x 1.0 gal · <em>sheet: 3/4
+gal</em></li>
+<li><strong>Terminator II Defoamer</strong> — 13.0 x 1.0 qt, 2022 ·
+<em>sheet: 13.0</em></li>
+<li><strong>Track-IT Foam Marker</strong> — 3.5 x 1.0 gal, 2022 ·
+<em>sheet: 3.5 gal</em></li>
+</ul>
+</body>
+</html>

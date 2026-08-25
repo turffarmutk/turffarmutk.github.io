@@ -376,10 +376,66 @@ service cloud.firestore {
     }
 
     /* ------------------------------------------------------------------
+       INVENTORY — drawer 4, two collections
+
+       invmoves is the LEDGER and it is APPEND ONLY. Stock is not stored as a
+       number anywhere; it is stored as what moved, and every phone adds the
+       movements up itself. That is what makes two people booking a delivery
+       at the same moment safe: two documents, both counted, nothing
+       overwritten. It is also why there is no update rule below — a movement
+       records something that happened, and a mistake is corrected by ANOTHER
+       movement, never by rewriting the first. Same rule as the field log.
+
+       invitems is what a product IS: its name, what a container holds, when
+       to reorder. Those genuinely change, so they may be updated — but only
+       by somebody the app already lets edit a product.
+
+       TWO PERMISSIONS, transcribed from the app. invCanMove() and
+       invCanEdit() are the functions; these are their translation, and the
+       two must never drift apart.
+       ------------------------------------------------------------------ */
+
+    /* App: invCanMove() — true for EVERYBODY, undergraduates included. The
+       people who carry the jugs are the people who know what left the shelf,
+       and the field log already trusts them to write the farm's spray
+       records. */
+    function canMoveStock() {
+      return actor();
+    }
+
+    /* App: invCanEdit() — deciding what a product is, rather than recording
+       what happened to it. */
+    function canEditProduct() {
+      return actor() && roleOf(me()) != 'Undergraduate Student';
+    }
+
+    match /invmoves/{moveId} {
+      allow read: if actor();
+
+      allow create: if canMoveStock()
+        && request.resource.data.id == moveId
+        && request.resource.data.item is string
+        && request.resource.data.delta is number
+        && str(request.resource.data.get('who','')) == me();
+
+      /* Correct it with another movement. Never rewrite this one. */
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /invitems/{itemId} {
+      allow read: if actor();
+      allow create, update: if canEditProduct()
+        && request.resource.data.id == itemId;
+      allow delete: if false;
+    }
+
+    /* ------------------------------------------------------------------
        EVERYTHING ELSE IS CLOSED.
 
-       Calendar, equipment, the field log, inventory and the map get their
-       own blocks here as each drawer is built. Until then the database
+       Calendar and equipment get their own blocks here as each drawer is
+       built. Tasks, the map, crew claims, the field log and inventory
+       already have theirs. Until then the database
        refuses them, which is what we want: an empty drawer nobody can
        write into beats an open one nobody is watching.
        ------------------------------------------------------------------ */

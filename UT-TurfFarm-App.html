@@ -3979,6 +3979,237 @@ function flsyncSummary(){
   return FLSYNC.up+' sent · '+FLSYNC.down+' received'+(f?(' · '+f+' refused'):'');
 }
 
+
+/* ==================== SHARING THE SHELF ====================
+   Drawer 4. Two collections under ONE switch, because they are two halves of
+   one answer and a phone holding only one of them is worse than a phone
+   holding neither:
+
+     invmoves/{id}  the ledger. APPEND ONLY. Nothing is ever edited or
+                    deleted, by the app or by the rules - the same rule the
+                    field log lives by, and for the same reason: a movement is
+                    a record of something that happened, and things that
+                    happened do not stop having happened. A mistake is
+                    corrected by ANOTHER movement.
+     invitems/{id}  the product records - what a thing is, what a container
+                    holds, when to reorder. These DO change, because a product
+                    genuinely changes. Only somebody who may edit a product
+                    sends them (invCanEdit), which is not everybody.
+
+   WHY BOTH. A movement names a product by id. If products did not travel,
+   a delivery of something one person added on their phone would arrive
+   everywhere else as a movement against a product nobody has, and quietly
+   count towards nothing. All 23 phones ship with the same 191 products baked
+   in, so this only bites for products added afterwards - which is exactly the
+   case a shared shelf exists to handle.
+
+   WHAT IT DELIBERATELY DOES NOT DO: reconcile. There is no merge, no
+   last-write-wins on a total, and no arithmetic anywhere in the sync. Every
+   phone receives the same movements and adds them up itself, and addition
+   gives the same answer in any order. That is the whole reason the ledger was
+   built before the sync was.
+   =========================================================== */
+
+var INVSYNC_KEY='ut_inventory_shared_v1';
+var INVSYNC_MOVES='invmoves';
+var INVSYNC_ITEMS='invitems';
+var INVSYNC_RETRY_MS=10000;
+
+var INVSYNC={ on:false, live:false, ready:false, seen:{}, itemSeen:{}, err:null,
+              up:0, down:0, failed:{} };
+var _invsyncNextTry=0;
+
+function invsyncWanted(){
+  try{ return localStorage.getItem(INVSYNC_KEY)==='1'; }catch(e){ return false; }
+}
+function invsyncHydrate(){ INVSYNC.on=invsyncWanted(); }
+function invsyncSetWanted(on){
+  try{ localStorage.setItem(INVSYNC_KEY,on?'1':'0'); }catch(e){}
+  INVSYNC.on=!!on;
+  if(on){ _invsyncNextTry=0; invsyncStart(); } else invsyncStop();
+}
+
+function invMoveDoc(m){
+  var out; try{ out=JSON.parse(JSON.stringify(m||{})); }catch(e){ return null; }
+  if(!out||!out.id||!out.item) return null;
+  out.id=String(out.id); out.item=String(out.item);
+  out.delta=+out.delta||0;
+  if(!out.who) out.who=(typeof SESSION!=='undefined'&&SESSION.pid)||null;
+  return out;
+}
+function invItemDoc(it){
+  var out; try{ out=JSON.parse(JSON.stringify(it||{})); }catch(e){ return null; }
+  if(!out||!out.id) return null;
+  out.id=String(out.id);
+  return out;
+}
+function invMoveById(id){
+  for(var i=0;i<INVMOVES.length;i++) if(INVMOVES[i]&&String(INVMOVES[i].id)===String(id)) return INVMOVES[i];
+  return null;
+}
+
+function invsyncStart(){
+  if(INVSYNC.live) return true;
+  if(Date.now()<_invsyncNextTry) return false;
+  var db=fbDb();
+  if(!db || !(typeof SESSION!=='undefined'&&SESSION.pid)){
+    INVSYNC.err=db?'Nobody is signed in yet':'The database code did not load on this device';
+    _invsyncNextTry=Date.now()+INVSYNC_RETRY_MS; return false;
+  }
+  try{
+    INVSYNC.unsubM=db.collection(INVSYNC_MOVES).onSnapshot(invsyncOnMoves,function(e){
+      INVSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+      INVSYNC.live=false; INVSYNC.ready=false; _invsyncNextTry=Date.now()+INVSYNC_RETRY_MS;
+    });
+    INVSYNC.unsubI=db.collection(INVSYNC_ITEMS).onSnapshot(invsyncOnItems,function(e){
+      /* The products failing is not fatal - the ledger is still right, the
+         phone just may not know a name yet. Do not tear the whole thing down. */
+      INVSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+    });
+    INVSYNC.live=true; INVSYNC.err=null;
+  }catch(e){
+    INVSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+    _invsyncNextTry=Date.now()+INVSYNC_RETRY_MS;
+  }
+  return INVSYNC.live;
+}
+function invsyncStop(){
+  try{ if(INVSYNC.unsubM) INVSYNC.unsubM(); }catch(e){}
+  try{ if(INVSYNC.unsubI) INVSYNC.unsubI(); }catch(e){}
+  INVSYNC.unsubM=null; INVSYNC.unsubI=null;
+  INVSYNC.live=false; INVSYNC.ready=false;
+  INVSYNC.seen={}; INVSYNC.itemSeen={}; INVSYNC.failed={};
+}
+
+/* Inbound movements. New ones are appended; an id this phone already holds is
+   left ALONE rather than overwritten, because a movement never legitimately
+   changes and a rewrite arriving from anywhere is a bug somewhere else. */
+function invsyncOnMoves(snap){
+  var changes; try{ changes=snap.docChanges(); }catch(e){ return; }
+  var touched=false;
+  changes.forEach(function(ch){
+    if(ch.type==='removed'){ delete INVSYNC.seen[String(ch.doc.id)]; return; }
+    var data; try{ data=ch.doc.data(); }catch(e){ return; }
+    if(!data) return;
+    data.id=String(ch.doc.id);
+    INVSYNC.seen[data.id]=JSON.stringify(data);
+    delete INVSYNC.failed[data.id];
+    INVSYNC.down++;
+    if(invMoveById(data.id)) return;                 /* already here, and immutable */
+    INVMOVES.push(data); touched=true;
+  });
+  var fromCache=true;
+  try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
+  if(!INVSYNC.ready&&!fromCache){ INVSYNC.ready=true; invsyncUploadNew(); }
+  if(touched){
+    invSumsDirty();                                  /* the totals are now stale */
+    try{ storeTouch(); }catch(e){}
+    invsyncRepaintScreens();
+  }
+}
+
+/* Inbound products. Updated IN PLACE so the dozens of closures already holding
+   a reference keep pointing at live data - the same rule storeHydrate follows. */
+function invsyncOnItems(snap){
+  var changes; try{ changes=snap.docChanges(); }catch(e){ return; }
+  var touched=false;
+  changes.forEach(function(ch){
+    if(ch.type==='removed') return;                  /* products are never deleted */
+    var data; try{ data=ch.doc.data(); }catch(e){ return; }
+    if(!data) return;
+    data.id=String(ch.doc.id);
+    INVSYNC.itemSeen[data.id]=JSON.stringify(data);
+    var have=INVENTORY.find(function(x){return x.id===data.id;});
+    if(have){
+      if(JSON.stringify(invItemDoc(have))!==JSON.stringify(data)){
+        Object.keys(data).forEach(function(k){ have[k]=data[k]; });
+        touched=true;
+      }
+      return;
+    }
+    INVENTORY.push(data); touched=true;
+  });
+  if(touched){
+    try{ storeTouch(); }catch(e){}
+    invsyncRepaintScreens();
+  }
+}
+
+function invsyncRepaintScreens(){
+  try{
+    var scr=document.querySelector('.screen.active');
+    var id=scr?scr.id.replace(/^s-/,''):'';
+    if(id==='inventory'&&typeof renderInvList==='function') renderInvList();
+    if(id==='lowstock'&&typeof renderLowStock==='function') renderLowStock();
+    if(id==='sharedb'&&typeof sdbRender==='function') sdbRender();
+  }catch(e){}
+}
+
+/* This phone's ledger going up for the first time. */
+function invsyncUploadNew(){
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  INVMOVES.slice().forEach(function(m){
+    if(!m||!m.id) return;
+    var id=String(m.id);
+    if(INVSYNC.seen[id]!==undefined) return;
+    var doc=invMoveDoc(m); if(!doc) return;
+    INVSYNC.seen[id]=JSON.stringify(doc);
+    n++; INVSYNC.up++;
+    try{ db.collection(INVSYNC_MOVES).doc(id).set(doc).catch(function(e){ invsyncFail(id,e); }); }
+    catch(e){ invsyncFail(id,e); }
+  });
+  if(n){ try{ toast(n+' stock movement'+(n===1?'':'s')+' from this phone sent up'); }catch(e){} }
+  return n;
+}
+function invsyncFail(id,e){
+  INVSYNC.failed[id]=(typeof sdbError==='function')?sdbError(e):String((e&&e.message)||e);
+}
+
+/* Outbound. Movements from anybody; product records only from somebody the app
+   already lets edit a product, so the rules and the screens agree. */
+function invPush(){
+  if(!INVSYNC.on||!INVSYNC.live||!INVSYNC.ready) return 0;
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  INVMOVES.forEach(function(m){
+    if(!m||!m.id) return;
+    var doc=invMoveDoc(m); if(!doc) return;
+    var id=String(m.id), json=JSON.stringify(doc);
+    if(INVSYNC.seen[id]===json) return;
+    INVSYNC.seen[id]=json; n++; INVSYNC.up++;
+    try{ db.collection(INVSYNC_MOVES).doc(id).set(doc).catch(function(e){ invsyncFail(id,e); }); }
+    catch(e){ invsyncFail(id,e); }
+  });
+  if(typeof invCanEdit==='function' && invCanEdit()){
+    INVENTORY.forEach(function(it){
+      if(!it||!it.id) return;
+      var doc=invItemDoc(it); if(!doc) return;
+      var id=String(it.id), json=JSON.stringify(doc);
+      if(INVSYNC.itemSeen[id]===json) return;
+      INVSYNC.itemSeen[id]=json; n++; INVSYNC.up++;
+      try{ db.collection(INVSYNC_ITEMS).doc(id).set(doc).catch(function(e){ invsyncFail(id,e); }); }
+      catch(e){ invsyncFail(id,e); }
+    });
+  }
+  return n;
+}
+
+function invsyncTick(){
+  if(!INVSYNC.on) return;
+  if(!INVSYNC.live){ invsyncStart(); return; }
+  invPush();
+}
+
+function invsyncSummary(){
+  if(!INVSYNC.on) return 'Off — this phone keeps its own stock figures';
+  if(INVSYNC.err) return INVSYNC.err;
+  if(!INVSYNC.live) return 'Connecting…';
+  if(!INVSYNC.ready) return 'Connected — waiting for the shared copy';
+  var f=Object.keys(INVSYNC.failed).length;
+  return INVSYNC.up+' sent · '+INVSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+}
+
 /* ---- the correction sheet ----
    Small on purpose. It offers the things that actually go wrong — the plot,
    the date, the time, and on a chemical entry the product and the amounts —
@@ -11592,7 +11823,7 @@ function sdbTasksBlock(){
     explain:'Turning this on sends this phone\'s tasks up to the shared copy and starts showing '
            +'everybody else\'s. Nothing is deleted by turning it on, and turning it off again puts '
            +'this phone back to keeping its own copy.'
-  })+sdbMapBlock()+sdbCrewBlock()+sdbLogBlock();
+  })+sdbMapBlock()+sdbCrewBlock()+sdbLogBlock()+sdbInvBlock();
 }
 
 function sdbLogBlock(){
@@ -11603,6 +11834,18 @@ function sdbLogBlock(){
     explain:'Every mow, spray and application, in one place, readable by whoever writes the '
            +'reports. Nothing in the log is ever deleted — a correction writes a new entry and '
            +'keeps the old one — so turning this on can only ever add to the record.'
+  });
+}
+
+function sdbInvBlock(){
+  return sdbSwitchBlock({
+    on:INVSYNC.on, failed:INVSYNC.failed, summary:invsyncSummary(), btnId:'sdb-inv',
+    title:'Share what is on the shelf',
+    offLabel:'Off — this phone keeps its own stock figures',
+    explain:'Every delivery booked in and every amount taken out, in one place, so the number on '
+           +'your phone is the number in the chemical building. Stock is kept as a list of what '
+           +'moved rather than one running total, so two people booking a delivery at the same '
+           +'moment both count and neither is lost. Nothing here is ever deleted.'
   });
 }
 
@@ -11668,6 +11911,13 @@ function sdbPush(){
       var logOn=!FLSYNC.on;
       flsyncSetWanted(logOn);
       toast(logOn?'Sharing the field log':'The log stays on this phone');
+      sdbRender();
+      return;
+    }
+    if(e.target.closest('#sdb-inv')){
+      var invOn=!INVSYNC.on;
+      invsyncSetWanted(invOn);
+      toast(invOn?'Sharing the shelf':'Stock figures stay on this phone');
       sdbRender();
       return;
     }
@@ -15418,6 +15668,7 @@ function storeScan(){
   try{ msyncTick(); }catch(e){}
   try{ csyncTick(); }catch(e){}
   try{ flsyncTick(); }catch(e){}
+  try{ invsyncTick(); }catch(e){}
 }
 function storeFlush(){ storeScan(); }
 function storeTouch(){ storeScan(); }   /* callers that want an immediate write */
@@ -15446,6 +15697,7 @@ function storeHydrate(){
   try{ msyncHydrate(); }catch(e){}
   try{ csyncHydrate(); }catch(e){}
   try{ flsyncHydrate(); }catch(e){}
+  try{ invsyncHydrate(); }catch(e){}
   _storeOn=true;
   try{ setInterval(storeScan,STORE_SCAN_MS); }catch(e){}
 }

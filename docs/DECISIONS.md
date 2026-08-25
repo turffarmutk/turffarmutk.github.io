@@ -322,6 +322,47 @@ regenerate the product list from the sheet without knowing the ledger exists.
 and the scalar *is* the bug. Don't read `it.qty` anywhere; ask `invQty()`.
 Don't let anything write stock except `invMove()`.
 
+### The field log takes stock out, and charges the job once — 2026-08-25
+**Decision:** logging a chemical application matches the product against
+`INVENTORY` and books an `out` movement for the amount. The "Amount used" box is
+now a number plus a unit picker defaulting to the product's own unit. The
+movement is written **once per save, not once per plot**, and the box says
+"total for this job".
+**Why:** the farm already writes down what it sprayed; asking for it a second
+time on the inventory screen is how stock numbers rot. The once-per-save rule
+matters more than it looks: the field log writes one entry per plot, so a
+three-plot spray from one tank would otherwise take the amount off three times
+and drain the shelf at triple speed with nothing to show why.
+**Don't:** move the deduction inside the per-plot loop. Don't make the product
+match compulsory — see below.
+
+### An uncertain amount leaves the shelf alone; it never blocks the save — 2026-08-25
+**Decision:** stock only moves when the product is matched **and** the amount
+converts into that product's own unit. Otherwise the entry saves exactly as
+before and stock is untouched, with the screen saying so. Weight never converts
+to volume, `oz` and `fl oz` are different units, and countable units (bag, can,
+ea) only match themselves.
+**Why:** the same rule as the rest of the field log — **nobody is ever blocked
+in a field**. Spraying something not yet on the list is a real thing that
+happens, and the application record matters more than the stock figure. A
+guessed conversion is worse than no conversion: `fl oz` read as `gal` is a
+128-fold error on a record the farm may have to defend.
+**Don't:** add "helpful" fallbacks that assume a unit. `invConvert()` returning
+null means *leave the shelf alone*, never *treat as zero*.
+
+### A correction to a field log entry is reconciled across the whole chain — 2026-08-25
+**Decision:** correcting the amount writes a **new** compensating movement for
+the difference; the original movement is never edited or deleted.
+`invReconcileFromLog()` sums the movements of every entry in the correction
+chain (`corrects` walked back through `invLogChainIds()`), not just the entry
+being corrected.
+**Why:** it mirrors the field log's own rule — a correction adds, it never
+overwrites. The chain part is the sharp edge: each correction hangs its
+movement off its own id, so asking only the latest entry compares a *difference*
+against a *total* and books the gap a second time. A 20 fl oz spray corrected to
+12 and then corrected again for an unrelated typo would take another 20 off a
+shelf nobody had touched. There is a test for exactly that.
+
 ### Stock going below zero warns, it never blocks — 2026-08-25
 **Decision:** taking out more than the record shows is recorded, with a warning
 that names the resulting figure and suggests a recount. `invNegWarn()` produces

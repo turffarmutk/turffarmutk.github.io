@@ -163,6 +163,29 @@ over their own lab's person.
 
 ---
 
+## And again on 2026-08-25 — the shelf
+
+A fourth new section, and the last one for a while. **Publish it again**, same
+eight steps.
+
+Inventory is kept as a **list of what moved**, not as one running total. Every
+delivery booked in and every amount taken out is its own record, and each phone
+adds them up itself. That is what makes two people booking the same delivery at
+the same moment safe — two records, both counted, neither lost. Under a single
+number one of the two would simply have vanished.
+
+So the database is strict here in the same way it is strict about the field
+log: **a stock movement can never be edited and never be deleted.** Got the
+amount wrong? Record another movement. Recounted the shelf? That is a movement
+too. The history of what the shelf did stays readable.
+
+**Anyone can record stock moving**, undergraduates included — the people who
+carry the jugs are the people who know what left the shelf. **Changing what a
+product is** — its name, what a container holds, when to reorder — stays closed
+to undergraduates, same as it is in the app.
+
+---
+
 ## You will do this again
 
 Each drawer we build adds a block to the same file. When it does, I will tell

@@ -72,7 +72,9 @@ const EX = ['INVENTORY','INVMOVES','invQty','invMove','invMovesFor','invSums','i
             'STORE_DEFS','INV_WHY','renderInvList','renderLowStock',
             'invConvert','invParseAmount','invAmountIn','invUnitChoices','invMovesForRef',
             'invRefTotal','invReconcileFromLog','FLFORM','FIELDLOG','flSave','flCorrect',
-            'flnStockAmount','flnProduct','flById'];
+            'flnStockAmount','flnProduct','flById',
+            'INVSYNC','invsyncOnMoves','invsyncOnItems','invsyncWanted','invsyncSetWanted',
+            'invMoveDoc','invItemDoc','invsyncSummary','invMoveById'];
 
 function boot(store) {
   const vc = new VirtualConsole();
@@ -419,6 +421,142 @@ section('15. the correction screen really does call the reconciler');
   ok('and reconciles stock after correcting', src.indexOf('invReconcileFromLog') >= 0);
   const j = HTML.indexOf('function flSave()');
   ok('flSave asks how much to take off', HTML.slice(j, j + 3000).indexOf('flnStockAmount') >= 0);
+}
+
+/* A Firestore snapshot, near enough. fromCache:true keeps the handler from
+   trying to upload, which would need a real database. */
+const snapOf = (docs, fromCache) => ({
+  docChanges: () => docs.map(d => ({ type: 'added', doc: { id: d.id, data: () => d } })),
+  metadata: { fromCache: fromCache !== false }
+});
+
+section('16. sharing the shelf — the switch');
+{
+  const b = boot();
+  ok('it starts OFF, like every other drawer', b.p.INVSYNC.on === false);
+  ok('and off is what the device says', b.p.invsyncWanted() === false);
+  ok('the summary says so in plain words', /own stock figures/i.test(b.p.invsyncSummary()),
+     b.p.invsyncSummary());
+
+  const store = {};
+  const c = boot(store);
+  c.p.invsyncSetWanted(true);
+  ok('turning it on is remembered on THIS device', store['ut_inventory_shared_v1'] === '1');
+  ok('and it is per device, not per person', /_v1$/.test('ut_inventory_shared_v1'));
+}
+
+section('17. movements arriving from another phone');
+{
+  const b = boot();
+  const it = first(b), opening = it.qty;
+
+  b.p.invsyncOnMoves(snapOf([
+    { id: 'm-other-1', item: it.id, delta: -5, unit: it.unit, why: 'out', who: 'p09',
+      at: '2026-08-25T10:00:00', ref: null, note: '' }
+  ]));
+  ok('it lands in the ledger', b.p.INVMOVES.length === 1);
+  /* The real check: the cached totals have to be thrown away, or the screen
+     keeps showing yesterday's figure with today's data underneath it. */
+  ok('and the total on this phone changes', near(b.p.invQty(it), opening - 5), b.p.invQty(it));
+
+  /* The same movement again — a re-listen, a reconnect, a second tab. */
+  b.p.invsyncOnMoves(snapOf([
+    { id: 'm-other-1', item: it.id, delta: -5, unit: it.unit, why: 'out', who: 'p09',
+      at: '2026-08-25T10:00:00', ref: null, note: '' }
+  ]));
+  ok('arriving twice counts once', b.p.INVMOVES.length === 1, b.p.INVMOVES.length);
+  ok('and the total is not double-counted', near(b.p.invQty(it), opening - 5), b.p.invQty(it));
+
+  /* Two people, same moment, different products or the same — both count. */
+  b.p.invsyncOnMoves(snapOf([
+    { id: 'm-other-2', item: it.id, delta: 50, unit: it.unit, why: 'in', who: 'p07', at: '2026-08-25T10:00:01' },
+    { id: 'm-other-3', item: it.id, delta: 50, unit: it.unit, why: 'in', who: 'p18', at: '2026-08-25T10:00:01' }
+  ]));
+  ok('two deliveries in the same second both count', near(b.p.invQty(it), opening - 5 + 100),
+     b.p.invQty(it));
+}
+
+section('18. products arriving from another phone');
+{
+  const b = boot();
+  const before = b.p.INVENTORY.length;
+  const it = first(b);
+
+  b.p.invsyncOnItems(snapOf([{ id: 'i-new-1', name: 'ZZ Test Product', cat: 'fungicide',
+    form: 'other', loc: '—', ctype: 'jug', csize: 2.5, unit: 'gal', qty: 0, thr: 0 }]));
+  ok('a product somebody else added appears here', b.p.INVENTORY.length === before + 1);
+
+  /* Updated IN PLACE, so the closures already holding this object keep
+     pointing at live data — the same rule storeHydrate follows. */
+  const ref = b.p.INVENTORY.find(x => x.id === it.id);
+  b.p.invsyncOnItems(snapOf([Object.assign({}, b.p.invItemDoc(it), { thr: 99 })]));
+  ok('a changed product is updated in place, not replaced',
+     b.p.INVENTORY.find(x => x.id === it.id) === ref);
+  ok('and the change is really there', ref.thr === 99, ref.thr);
+}
+
+section('19. what goes up is the right shape');
+{
+  const b = boot();
+  const it = first(b);
+  b.p.sessionSet('p01');
+  const m = b.p.invMove(it.id, -3, 'out');
+  const doc = b.p.invMoveDoc(m);
+  ok('a movement carries its own id', doc.id === m.id);
+  ok('the product it moved', doc.item === it.id);
+  ok('a number, not a string', typeof doc.delta === 'number', typeof doc.delta);
+  ok('and who moved it', doc.who === 'p01', doc.who);
+
+  ok('a movement with no product is refused', b.p.invMoveDoc({ id: 'x', delta: 1 }) === null);
+  ok('a product with no id is refused', b.p.invItemDoc({ name: 'x' }) === null);
+}
+
+section('20. the rules and the app say the same thing');
+{
+  const rules = fs.readFileSync(path.join(__dirname, '..', 'firestore.rules'), 'utf8');
+  const block = name => {
+    const i = rules.indexOf('match /' + name + '/');
+    if (i < 0) return '';
+    const j = rules.indexOf('\n    }', i);
+    return rules.slice(i, j < 0 ? rules.length : j);
+  };
+  const moves = block('invmoves'), items = block('invitems');
+
+  ok('the ledger has a rules block', moves.length > 0);
+  ok('the products have one too', items.length > 0);
+
+  /* The ledger is append-only in BOTH places, or it is append-only in
+     neither. A movement records something that happened. */
+  ok('a movement can never be rewritten', /allow update: if false;/.test(moves), moves.slice(0, 80));
+  ok('and never deleted', /allow delete: if false;/.test(moves));
+  ok('nor can a product be deleted', /allow delete: if false;/.test(items));
+  ok('a movement must say who made it', /get\('who',''\)\) == me\(\)/.test(moves.replace(/\s+/g, ' ')),
+     moves.slice(-160));
+
+  /* invCanMove() is true for everybody; invCanEdit() is not. The rules have
+     to draw the same line or the app offers a button the database refuses. */
+  const canMove = rules.slice(rules.indexOf('function canMoveStock()'), rules.indexOf('function canEditProduct()'));
+  ok('the rules let anybody move stock, as the app does',
+     /return actor\(\);/.test(canMove) && canMove.indexOf('Undergraduate') < 0, canMove.slice(-90));
+  const canEdit = rules.slice(rules.indexOf('function canEditProduct()'), rules.indexOf('function canEditProduct()') + 220);
+  ok('but not anybody to redefine a product', canEdit.indexOf('Undergraduate Student') >= 0);
+
+  const b = boot();
+  b.p.sessionSet('p19');
+  ok('and the app agrees on the undergrad side',
+     b.p.invCanMove() === true && b.p.invCanEdit() === false);
+}
+
+section('21. nothing anywhere deletes a movement');
+{
+  /* The property the whole drawer rests on. Said once in the app, once in the
+     rules, and checked here so neither can quietly stop being true. */
+  const CODE = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  ok('the app never splices the ledger', !/INVMOVES\.splice/.test(CODE));
+  ok('nor empties it', !/INVMOVES\s*=\s*\[\]/.test(CODE.replace('var INVMOVES=[]', '')));
+  ok('and the only thing that writes to it is invMove()',
+     (CODE.match(/INVMOVES\.push/g) || []).length <= 2,
+     (CODE.match(/INVMOVES\.push/g) || []).length);
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

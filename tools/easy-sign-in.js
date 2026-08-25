@@ -28,14 +28,20 @@
  * twice. There is only ever one of it, and it cannot drift.
  *
  * WHAT YOU NEED - same as tools/create-accounts.js
- *   1. The service-account key JSON, kept OUTSIDE this repo (the repo is
- *      public). It is the master key to the project.
+ *   1. The service-account key JSON from Step 4, kept OUTSIDE this repo (the
+ *      repo is public). It is the master key to the project. This script looks
+ *      for it on the Desktop, in Downloads and in the home folder.
  *   2. roster-emails.local.json, the git-ignored list of who has an account.
  *
  * RUN
- *   GOOGLE_APPLICATION_CREDENTIALS=/path/outside/the/repo/serviceAccount.json \
- *     node tools/easy-sign-in.js on --dry-run
- *   ...then again without --dry-run once the plan looks right.
+ *   node tools/easy-sign-in.js on --dry-run     (a rehearsal, changes nothing)
+ *   node tools/easy-sign-in.js on               (for real)
+ *
+ * It finds the master key itself, as long as the .json file from Step 4 is on
+ * your Desktop, in Downloads, or in your home folder. If you keep it somewhere
+ * else, say so:
+ *   GOOGLE_APPLICATION_CREDENTIALS=/path/to/serviceAccount.json \
+ *     node tools/easy-sign-in.js on
  *
  * Anyone who has changed their own password since is simply set back to the
  * shared one by "on" - they can still get in, which is the whole point.
@@ -59,12 +65,69 @@ if (MODE !== 'on' && MODE !== 'off') {
                 'Add --dry-run to see the plan without changing anything.');
   process.exit(1);
 }
-if (!process.env.GOOGLE_APPLICATION_CREDENTIALS && !DRY) {
-  console.error('Set GOOGLE_APPLICATION_CREDENTIALS to the service-account JSON.\n' +
-                'Keep that file OUTSIDE this repo - the repo is public.');
-  process.exit(1);
+/* Finding the master key WITHOUT having to type a path.
+   GOOGLE_APPLICATION_CREDENTIALS still wins if it is set. Otherwise look in the
+   handful of places Step 4 of the go-live manual tells you to put the file -
+   Desktop, Downloads, home folder - and use it only if there is exactly ONE
+   and it really is a key for THIS project. Never inside the repo: the repo is
+   public, and a key in it is the one mistake that cannot be undone quietly.
+
+   This exists because the person running it in three years' time will not know
+   what an environment variable is. If it finds nothing, it says where to look
+   rather than printing a shell incantation. */
+function findKey() {
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  const dirs = [path.join(home, 'Desktop'), path.join(home, 'Downloads'), home];
+  /* Read the app here rather than using the `html` further down: this runs
+     before that line, and a const cannot be read before it is set. */
+  let appSrc = ''; try { appSrc = fs.readFileSync(APP, 'utf8'); } catch (e) {}
+  const wanted = (appSrc.match(/projectId:\s*'([^']+)'/) || [])[1] || '';
+  const hits = [];
+  for (const d of dirs) {
+    let names = [];
+    try { names = fs.readdirSync(d); } catch (e) { continue; }
+    for (const n of names) {
+      if (!/\.json$/i.test(n)) continue;
+      const full = path.join(d, n);
+      if (path.resolve(full).startsWith(path.resolve(ROOT))) continue;
+      let j = null;
+      try {
+        const raw = fs.readFileSync(full, 'utf8');
+        if (raw.length > 20000) continue;          /* a key is a few KB */
+        j = JSON.parse(raw);
+      } catch (e) { continue; }
+      if (!j || j.type !== 'service_account' || !j.private_key) continue;
+      if (wanted && j.project_id && j.project_id !== wanted) continue;
+      if (hits.indexOf(full) < 0) hits.push(full);
+    }
+  }
+  return hits;
 }
-const cred = process.env.GOOGLE_APPLICATION_CREDENTIALS || '';
+
+let cred = process.env.GOOGLE_APPLICATION_CREDENTIALS || '';
+if (!cred && !DRY) {
+  const hits = findKey();
+  if (hits.length === 1) {
+    cred = hits[0];
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = cred;
+    console.log('Using the master key found at: ' + cred + '\n');
+  } else if (hits.length > 1) {
+    console.error('Found more than one master key, so I will not guess which:');
+    hits.forEach(h => console.error('  ' + h));
+    console.error('\nRun it again with the one you mean, like this:\n' +
+                  '  GOOGLE_APPLICATION_CREDENTIALS="' + hits[0] + '" \\\n' +
+                  '    node tools/easy-sign-in.js ' + MODE);
+    process.exit(1);
+  } else {
+    console.error('Could not find the master key for this project.\n\n' +
+                  'It is the .json file from Step 4 of docs/GO-LIVE-MANUAL.md:\n' +
+                  '  Firebase console -> gear icon -> Project settings ->\n' +
+                  '  Service accounts -> Generate new private key\n\n' +
+                  'Put it on your Desktop (NOT in the project folder - that folder\n' +
+                  'is published to a public website) and run this again.');
+    process.exit(1);
+  }
+}
 if (cred && path.resolve(cred).startsWith(path.resolve(ROOT))) {
   console.error('The service-account key is inside the repo: ' + cred + '\n' +
                 'Move it elsewhere before running this. It must never be committed.');

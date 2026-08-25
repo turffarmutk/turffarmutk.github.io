@@ -16658,7 +16658,12 @@ function authSignIn(email, pass){
          address has no account. The wording has to be true of both without
          saying which - same rule as everywhere else on this screen. */
       authEasyAskPassword();
-      authMsg('That did not work. If you have already chosen your own password, type it below and tap Sign in again. Otherwise check the spelling of your email address.');
+      /* Three things cause this, and the wording has to fit all three without
+         saying which: the person has a password of their own; the shared
+         password has not been put on the accounts yet (tools/easy-sign-in.js
+         on was never run); or the address is wrong. The middle one is by far
+         the most likely on the first day, so it gets named. */
+      authMsg('That did not work. If you have chosen your own password before, type it below and tap Sign in again. If you have not, tell the app manager \u2014 the switch to email-only sign-in has not been finished. Otherwise, check the spelling of your address.');
     } else {
       /* Every other failure gets the SAME wording on purpose. Distinguishing
          "no such account" from "wrong password" would let anyone with the URL

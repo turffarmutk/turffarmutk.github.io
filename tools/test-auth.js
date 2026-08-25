@@ -105,8 +105,9 @@ function boot(store, fake) {
 
   const authObj = {
     get currentUser() { return fake.session || null; },
-    signInWithEmailAndPassword: () => {
+    signInWithEmailAndPassword: (email, pass) => {
       seen.signIn++;
+      seen.signInWith = { email: email, pass: pass };
       if (fake.throws) return rej();
       return fake.user ? Promise.resolve({ user: fake.user }) : rej('auth/invalid-credential');
     },
@@ -422,6 +423,84 @@ section('15. offline, it says so rather than pretending to send');
   await settle();
   ok('nothing was sent', b.seen.reset === 0);
   ok('and it explains why', /signal|connection/i.test((b.doc.getElementById('lg-msg') || {}).textContent || ''));
+}
+
+section('16. TEMPORARY email-only sign-in, and the way back off it');
+{
+  ok('the switch ships in the file', /var EASY_SIGN_IN = (true|false);/.test(HTML));
+  ok('and the shared password with it', /var EASY_PASSWORD = '[^']+';/.test(HTML));
+
+  const b = boot({}, { user: userFor('p09') });
+  b.win.__set('EASY_SIGN_IN', true);
+  b.p.authRenderLogin();
+  const passw = b.doc.getElementById('lg-pass'), link = b.doc.getElementById('lg-reset');
+  ok('the password box is off the screen', passw.style.display === 'none', passw.style.display);
+  /* The emailed link is the thing that is broken. Leaving it on screen would
+     have people standing in a field waiting for mail that never comes. */
+  ok('so is the emailed-link offer', link.style.display === 'none', link.style.display);
+  ok('and the screen says no password is needed',
+     /no password is needed/i.test((b.doc.getElementById('lg-note') || {}).textContent || ''));
+
+  b.p.authSignIn('rose@example.edu', '');
+  await settle();
+  ok('an email address on its own signs you in', b.win.__get('SESSION').pid === 'p09',
+     b.win.__get('SESSION').pid);
+  ok('and it was the app that supplied the password, not the person',
+     b.seen.signInWith && b.seen.signInWith.pass === b.win.__get('EASY_PASSWORD'),
+     JSON.stringify(b.seen.signInWith));
+}
+{
+  const b = boot({}, { user: userFor('p09') });
+  b.win.__set('EASY_SIGN_IN', true);
+  b.p.authSignIn('', '');
+  await settle();
+  ok('an empty address asks for one rather than doing nothing',
+     b.seen.signIn === 0 && /email/i.test((b.doc.getElementById('lg-msg') || {}).textContent || ''));
+}
+{
+  /* Anyone who already has a password of their own - Dillon does. The shared
+     one is refused for them, and the box has to come back. */
+  const b = boot({}, { user: null });
+  b.win.__set('EASY_SIGN_IN', true);
+  b.p.authRenderLogin();
+  b.p.authSignIn('dillon@example.edu', '');
+  await settle();
+  const msg = (b.doc.getElementById('lg-msg') || {}).textContent || '';
+  ok('a refused shared password brings the password box back',
+     b.doc.getElementById('lg-pass').style.display !== 'none');
+  ok('and says what to do about it', /type it below/i.test(msg), msg);
+  ok('while still not saying whether that account exists',
+     !/no account|not found|unknown|does not exist/i.test(msg), msg);
+}
+{
+  /* The check that says this is a switch and not a one-way door. */
+  const b = boot({}, { user: userFor('p09') });
+  b.win.__set('EASY_SIGN_IN', false);
+  b.p.authRenderLogin();
+  ok('switched off, the password box is back',
+     b.doc.getElementById('lg-pass').style.display !== 'none');
+  ok('and so is the emailed-link offer',
+     b.doc.getElementById('lg-reset').style.display !== 'none');
+  ok('and the note goes back to the ordinary wording',
+     /choose your own password/i.test((b.doc.getElementById('lg-note') || {}).textContent || ''));
+  b.p.authSignIn('rose@example.edu', '');
+  await settle();
+  ok('an email alone gets nobody in', b.seen.signIn === 0 && b.win.__get('SESSION').pid === null);
+  ok('and it asks for a password', /password/i.test((b.doc.getElementById('lg-msg') || {}).textContent || ''));
+}
+{
+  /* The other half of the switch. Turning EASY_SIGN_IN off in the app without
+     running this leaves a public password on 23 live accounts, so the script
+     has to exist, has to refuse to run in the wrong order, and must not keep a
+     second copy of the password that could drift out of step. */
+  const src = fs.readFileSync(path.join(__dirname, 'easy-sign-in.js'), 'utf8');
+  ok('the account script is there', src.length > 0);
+  ok('it reads the shared password out of the app', /var EASY_PASSWORD/.test(src));
+  const pw = (HTML.match(/var EASY_PASSWORD = '([^']+)';/) || [])[1];
+  ok('and keeps no second copy of it that could drift',
+     !!pw && src.indexOf("'" + pw + "'") < 0, pw);
+  ok('it refuses to switch off in the wrong order', /Set it to false FIRST/.test(src));
+  ok('and switching off leaves a password nobody knows', /unknowablePassword/.test(src));
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

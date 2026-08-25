@@ -180,6 +180,217 @@ knowing before anybody edits a lab:
 `sameLab()` requires both people to actually have a lab; a blank lab or the em
 dash the app writes for "none" is not a lab everyone shares.
 
+
+---
+
+## How tasks actually move — built 2026-08-25
+
+`vendor/firebase/firebase-firestore-compat.js` (547 KB, firebase 12.18.0, the
+same version as the app and auth builds already there). Vendored like
+everything else — nothing in this app loads from a CDN — and precached by the
+service worker, so it is downloaded once per device rather than once per visit.
+It has to be local anyway: a farm with no signal cannot fetch a library before
+it can read its own task list.
+
+**`fbDb()` is the one handle**, made on first use, exactly like `fbAuth()`. It
+turns on `enablePersistence({synchronizeTabs:true})` in the constructor rather
+than at a call site, because it must run before the first read or write and a
+caller who forgot would silently produce an app that needs bars.
+
+**The array stays.** ~900 render functions read `TASKS` synchronously and some
+capture a reference, so records arriving from the database are written *into*
+the existing objects (`tsyncApply`) rather than replacing them — the same rule
+as `storeHydrate`.
+
+**Outbound changes ride the existing 2-second scan.** `tsyncScan()` hangs off
+`storeScan()`. Around thirty places change a task across twelve thousand lines;
+adding a `save()` to each is thirty chances to miss one. The scan serialises
+each task, compares it with what the server last agreed to (`TSYNC.seen`), and
+writes only what differs. It cannot be defeated by a mutation site nobody
+remembered.
+
+### The three things it must never do
+
+1. **Lose a day's work.** Local-only records are uploaded on the first *server*
+   snapshot — `snap.metadata.fromCache === false`. Uploading off a cached
+   snapshot would resurrect records somebody else had deleted. Matching is on
+   the device-generated `id`, so opening the app twice cannot double anything.
+   Legacy records with no `createdBy` are stamped on the way up, since the
+   database refuses a create without it.
+2. **Delete the farm.** An empty local array and "everything was deleted" look
+   identical to a diff. So a scan that would remove everything, or more than
+   `TSYNC_MAX_DELETE` (5) at once, refuses and says so. Losing all of it at once
+   is a fault, not a deletion. Symmetrically, a `removed` from the server only
+   takes a record off the phone if that record was in `TSYNC.seen` — one this
+   phone is still trying to send up is ours going out, not theirs coming down.
+3. **Echo.** A record arriving from the server is written into `TSYNC.seen`
+   *before* anything else reads it, so the next scan sees no difference.
+
+### The switch is per device, and starts off
+
+`ut_tasks_shared_v1` in localStorage, flipped on the Shared database screen
+(More → Farm settings → Shared database). This matches the rollout: build it,
+everyone opens the app once on wifi so their records go up, then flip. Dillon
+can turn it on for himself and watch it for a week without changing anybody
+else's phone.
+
+**Making the flip farm-wide is the next step and it needs a rules change** — a
+`refdata/config` document with the same write permission as `refdata/roster`,
+read at boot. Worth doing before the crew are switched over, so the flip is one
+decision rather than twenty-three.
+
+### Proven by
+
+`tools/test-tasksync.js` — 39 checks against a fake database that records every
+write and delete. Sections 4, 5 and 6 are the three rules above. `tools/test-db.js`
+— 40 checks on the handle, the roster payload, and who may send it; section 3
+compares the payload field-for-field against the shape `firestore.rules` reads,
+which nothing else in the system checks.
+
+
+---
+
+## The map, and who is working where — built 2026-08-25
+
+### `mapplaces/{placeId}` — one document per place somebody has changed
+
+Four localStorage keys became four fields on one record, keyed by the place —
+B12, AZ06, CAFS9. A place nobody has touched has no document at all.
+
+| Field | Was | Holds |
+|---|---|---|
+| `places` | `ut_places_v1` | what a named place IS |
+| `plotinfo` | `ut_plot_info_v1` | turfgrass, cultivar, area, rootzone |
+| `mgmt` | `ut_mgmt_data_v1` | mower, cut height, irrigation heads |
+| `geom` / `added` / `removed` | `ut_plot_shapes_v1` | polygon, a place drawn, a place taken off |
+
+**Still overrides, never whole objects.** Storing the finished object would
+shadow `farm-geo.js` forever: the next time the file gains a plot or a corrected
+area, every device would go on serving its own stale copy and nobody would know
+why. Same reasoning as the local overrides this replaces — it is why the file
+stays useful. A field carrying `null` means the file has it and the farm has
+removed it, exactly as `mapDiff` has always meant it.
+
+**This sync never deletes a document, and the rules refuse deletion outright.**
+That is the difference between it and the task sync, and it exists for one
+button: "clear this device's plot edits" wipes localStorage and reloads. Under a
+scan that deletes, that button would take the whole farm's map corrections with
+it. Removing a *place* is expressible without deleting a *record*
+(`removed: true`), so the dangerous case cannot arise. After that button the
+farm's edits come back down on the next load, which is the right answer for a
+shared map — and the button now says so.
+
+**Who may change it: anyone but an undergrad.** Dillon, 2026-08-25. Before this
+the app had three different answers — reshaping needed Bill or faculty, a cut
+height needed a technician or grad student, and the plot information form was
+not gated at all. That was not a decision anybody made, it was how it grew.
+`mapCan(actor, action)` is now the single rule, transcribed into
+`firestore.rules` as `canMap()`, with the same warning attached as `taskCan()`.
+Actions are named separately (`shape` / `info` / `mowing`) so that if the farm
+ever wants them to differ, one function changes.
+
+### `crew/{taskId}` — who is working which piece of ground
+
+When two or three people share a mow, each zone or plot is claimed by one of
+them so the same ground is not worked twice. This existed already, over a
+BroadcastChannel — which reaches other *tabs on the same machine* and nothing
+else. Honest as a prototype, useless in a field.
+
+One document per task, holding a claim per unit. **Writes name the unit they
+touch** (`{claims:{AZ06:…}}` merged in) rather than replacing the record, so two
+people claiming different zones cannot overwrite each other. Releasing a claim
+writes `FieldValue.delete()` for that one key.
+
+**Heartbeats had to start leaving the phone.** A claim expires after eight
+minutes without one; a beat that never reached the other phones would let a live
+claim read as abandoned everywhere but the phone holding it — which is precisely
+how the same ground gets mown twice. They cost a write each, so the beat slows
+from 45 seconds to two minutes when claims are shared. Eight minutes is still
+four chances to miss.
+
+Writing is gated on being **on that job** — assignee, helper, or the
+undergrad-job holder sorting it out from the shed. Not on rank: undergrads claim
+ground, and being out on the mow is exactly who this is for. A task with no
+record in the database yet is not a reason to refuse, since tasks and the map are
+separate drawers and either may be switched over first.
+
+### Three switches, one screen
+
+`ut_tasks_shared_v1`, `ut_map_shared_v1`, `ut_crew_shared_v1` — all per device,
+all starting off, all on **More → Farm settings → Shared database**. One per
+drawer on purpose: the rollout is one drawer at a time, and a single switch for
+everything would mean the first thing that went wrong took the rest with it.
+
+Proven by `tools/test-mapsync.js` — 49 checks, including that clearing one phone
+deletes nothing, that a correction coming down is not sent straight back, and
+that two people on different zones of one job write different fields.
+
+
+---
+
+## The field log — drawer 3, built 2026-08-25
+
+The record that outlives everybody currently on the farm. Two rules shape the
+whole drawer, and both are enforced by the database, not just by the app.
+
+### Nothing is ever edited. A correction is a new entry.
+
+Dillon, 2026-08-25, choosing between four options: **the wrong entry stays.**
+`flCorrect()` copies the entry, applies the fix, stamps `corrects`,
+`correctionNote`, `correctedAt` and `loggedBy` on the copy, and marks the
+original with `correctedBy` / `correctedAt` / `correctedWho`. The original is
+never touched otherwise.
+
+The feed and the counts read `flLive()` — entries with no `correctedBy` — so a
+wrong mow does not sit in the totals forever. The superseded record is still
+there, linked from the correction that replaced it, and both halves of the pair
+say so on screen. That is the difference between a total that is right and a
+record that is missing something.
+
+The reason is **required**. A correction with no sentence saying what was wrong
+is refused by the form. The reason is the part somebody reading this in 2035
+will actually need.
+
+Why it works this way rather than an edit-in-place: the spray entries are the
+farm's application records, and a log that can be quietly rewritten is worth
+much less than one where you can see what changed and when. Recordkeeping
+requirements for pesticide applications vary by state and have moved at the
+federal level recently, so this is not written against a specific rule — it is
+written so that whatever the rule turns out to be, the record survives it.
+
+### Nothing is ever deleted
+
+`allow delete: if false` on `fieldlog/{entryId}`, and no code path in the app
+removes a record from the shared copy. The only permitted change to an existing
+entry is the three fields that mark it superseded, and whoever does it has to
+be named in `correctedWho`.
+
+### The 5,000-entry cap is a phone limit, not a farm limit
+
+`flCommit()` keeps the newest `FL_CAP` records on the device. Under a naive sync
+that is a disaster twice over: the trimmed records get deleted from the shared
+copy, and then the listener drags them back down and the cap trims them again,
+forever. So the sync never deletes, and `flsyncOnSnapshot()` ignores an arriving
+record older than `flOldestKeptOrd()` once the phone is at the cap. **The farm's
+history lives in the shared copy; the phone carries a window onto it.**
+
+### Who may do what — `flCan(actor, action, entry)`
+
+| Action | Who |
+|---|---|
+| `log` | everybody. An undergrad who mowed is exactly who should record that they mowed. |
+| `correct` | whoever wrote it down, whoever did the work, Bill or the undergrad-job holder, or faculty over their own lab's person |
+| `delete` | nobody, ever |
+
+`loggedBy` is now stamped on both creation paths — the manual form and
+`flAddFromTask()`. It is distinct from `person`, which is who did the work: Bill
+closing a job on Rose's behalf writes an entry where `person` is Rose and
+`loggedBy` is Bill, and both of them can correct it.
+
+Proven by `tools/test-fieldlog-sync.js` — 63 checks. Section 2 is the one that
+matters: the log grows, the original still says what it always said, and only
+the correction counts in the totals.
+
 ---
 
 ## How the two copies of the rule are kept honest

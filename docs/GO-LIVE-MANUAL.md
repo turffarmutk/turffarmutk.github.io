@@ -18,6 +18,10 @@ folder waiting to be pushed.
 
 **Not started:** the shared database. That is Part Two.
 
+**Temporary, since 25 August 2026:** password links are not arriving at
+`@utk.edu` addresses, so the app currently signs people in on their email
+address alone. See **Step 8b**, which also says how to turn that back off.
+
 ---
 
 # PART ONE — Turn on the logins
@@ -263,6 +267,74 @@ Then:
 
 You can still reset someone from Firebase → Authentication → Users → the three
 dots → **Reset password**, if somebody's mailbox is the problem.
+
+---
+
+## Step 8b — TEMPORARY: sign in with an email address alone  **YOU**
+
+**Switched on 25 August 2026.** The password links are not arriving at
+`@utk.edu` addresses, and the crew cannot wait for OIT. So for now the app asks
+for an email address and nothing else — no password box, no emailed link.
+
+### What the crew do
+
+> Go to turffarmutk.github.io, type your UT email address, tap Sign in.
+> That's it. No password for now.
+
+Everything else works exactly as before. They are still signed in *as
+themselves*, so the app still knows who marked what done.
+
+### What you had to do to turn it on
+
+1. In `UT-TurfFarm-App.html`, `EASY_SIGN_IN` is set to `true` (near the top of
+   the SIGN IN section — it has a big comment above it).
+2. Run this once, with the master key from Step 4:
+
+   ```
+   GOOGLE_APPLICATION_CREDENTIALS=/path/to/serviceAccount.json \
+     node tools/easy-sign-in.js on
+   ```
+
+   Add `--dry-run` first if you want to see the list before anything changes.
+
+### What it costs, in plain words
+
+The app file is public, so the shared password inside it is public too. Anyone
+who bothers to open the file and knows a crew email address can sign in as that
+person. Nothing is *hidden* by this login any more — what it still does is keep
+records attached to the right name, and keep the casually curious out.
+
+Records do not move to the shared database until Part Two, so for the moment
+this is a stopgap on a phone-only app. **Do not still be running this way once
+Part Two is live.**
+
+### Turning it back off — BOTH halves
+
+The day email works again:
+
+1. Set `EASY_SIGN_IN` back to `false` in `UT-TurfFarm-App.html`.
+2. Run:
+
+   ```
+   GOOGLE_APPLICATION_CREDENTIALS=/path/to/serviceAccount.json \
+     node tools/easy-sign-in.js off
+   ```
+
+Step 2 puts a brand-new password on every account that **nobody** knows, not
+even you. Then everyone taps "First time here, or forgotten your password?"
+once, the way Step 8 describes, and chooses their own.
+
+Doing only step 1 leaves the public password sitting on 23 live accounts. The
+script refuses to run in the wrong order to stop that happening by accident.
+
+**Test one address yourself before telling the crew**, or you will find out
+mail is still broken from 23 people at once.
+
+### Your own account
+
+You already set a real password in Step 7, so the shared one will be refused
+for you. The app notices, puts the password box back on screen, and asks you to
+type yours. That is expected — not a fault.
 
 ---
 

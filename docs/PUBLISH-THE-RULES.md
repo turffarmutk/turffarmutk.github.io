@@ -134,6 +134,35 @@ do what is driven by the roster inside the app, which you already edit through
 
 ---
 
+## What changed on 2026-08-25
+
+The file grew two new sections — one for map corrections, one for who is
+working which piece of ground. **Publish it again**, same eight steps. Nothing
+in the farm's day changes when you do; it just means the database will accept
+those two things once the switches are turned on.
+
+Both are governed by one rule you set: **anyone but an undergrad may correct
+the map.** Reshaping a plot, fixing an area, changing a mower or a cut height.
+Claiming a zone on a shared mow is different — that one is open to whoever is
+actually on the job, undergrads included, because being out on the mow is
+exactly who it is for.
+
+## And again on 2026-08-25 — the field log
+
+A third new section. **Publish it again**, same eight steps.
+
+The field log is the one place the database is strict on purpose. **No entry
+can ever be deleted, and no entry can ever be edited** — not by Bill, not by
+you, not by me. Correcting an entry writes a new one carrying the fix and marks
+the old one as replaced, and the app makes you say what was wrong. Both halves
+stay in the record, and only the corrected version counts in the totals.
+
+Everybody can log their own work, including undergrads. Correcting is narrower:
+whoever wrote it down, whoever did the work, you or Bill, or a faculty member
+over their own lab's person.
+
+---
+
 ## You will do this again
 
 Each drawer we build adds a block to the same file. When it does, I will tell

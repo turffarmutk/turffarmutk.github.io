@@ -52,10 +52,14 @@ n += copy(need(path.join(NM, '@turf/turf/turf.min.js')), path.join(OUT, 'turf/tu
 /* Firebase's compat builds, which are the ones that work without a bundler:
    they are UMD, so the bare require() inside only runs in the Node branch that
    a browser never takes, and they set the `firebase` global the app reads.
-   Only app and auth are vendored — firestore-compat is another 547 KB and is
-   not needed until the records themselves move. */
+   firestore-compat is 547 KB, far the largest thing in vendor/, and it is
+   here because the records now live in the database. The service worker
+   precaches it, so it is downloaded once per device rather than per visit —
+   and it has to be local anyway, since a farm with no signal cannot fetch a
+   library before it can read its own task list. */
 n += copy(need(path.join(NM, 'firebase/firebase-app-compat.js')), path.join(OUT, 'firebase/firebase-app-compat.js'));
 n += copy(need(path.join(NM, 'firebase/firebase-auth-compat.js')), path.join(OUT, 'firebase/firebase-auth-compat.js'));
+n += copy(need(path.join(NM, 'firebase/firebase-firestore-compat.js')), path.join(OUT, 'firebase/firebase-firestore-compat.js'));
 
 /* One stylesheet out of the per-weight ones @fontsource ships: .woff dropped,
    ./files/x flattened to ./x so the whole family sits in one folder. */

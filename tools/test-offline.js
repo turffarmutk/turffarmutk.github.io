@@ -58,14 +58,20 @@ section('2. every vendored path exists');
   /* Named rather than counted. A count says nothing about WHICH library went
      missing, and it has to be edited every time one is added — which is how a
      stale assertion ends up looking like a regression. */
-  ['vendor/leaflet/leaflet.js', 'vendor/leaflet/leaflet.css',
+  const WANT = ['vendor/leaflet/leaflet.js', 'vendor/leaflet/leaflet.css',
    'vendor/geoman/leaflet-geoman.min.js', 'vendor/geoman/leaflet-geoman.css',
    'vendor/turf/turf.min.js', 'vendor/fonts/fonts.css',
    'vendor/firebase/firebase-app-compat.js',
-   'vendor/firebase/firebase-auth-compat.js'].forEach(function (want) {
+   'vendor/firebase/firebase-auth-compat.js',
+   'vendor/firebase/firebase-firestore-compat.js'];
+  WANT.forEach(function (want) {
     ok('the app loads ' + want, refs.indexOf(want) >= 0, refs.join(' '));
   });
-  ok('and nothing else is pulled from vendor/', refs.length === 8, String(refs.length) + ': ' + refs.join(' '));
+  /* Named, not counted — see above. A stray reference is reported by name so
+     it is obvious what appeared, and adding a library to WANT is the only edit
+     this assertion ever needs. */
+  const stray = refs.filter(function (r) { return WANT.indexOf(r) < 0; });
+  ok('and nothing else is pulled from vendor/', stray.length === 0, stray.join(' '));
   refs.forEach(r => {
     ok('exists: ' + r, fs.existsSync(path.join(ROOT, r)));
   });

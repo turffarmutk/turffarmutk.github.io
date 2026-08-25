@@ -256,6 +256,126 @@ service cloud.firestore {
     }
 
     /* ------------------------------------------------------------------
+       THE MAP — drawer 2
+
+       One document per place that somebody has CHANGED. A place nobody has
+       touched has no document at all, and what is stored is the change, not
+       the finished object — so farm-geo.js is never shadowed and a corrected
+       area in the file still reaches everybody.
+
+       Who may change it: anyone but an undergrad. Dillon, 2026-08-25. Before
+       this the app had three different answers for reshaping, plot
+       information and the mowing setup; one rule is easier to explain, and
+       what it protects against is a wrong number staying wrong because the
+       person who spotted it had to go and find somebody.
+
+       Transcribed from mapCan() in the app. Same warning as taskCan(): one
+       rule, two places, and the copy that drifts is the one that causes harm.
+       ------------------------------------------------------------------ */
+    function canMap() {
+      return roleOf(me()) != 'Undergraduate Student';
+    }
+
+    match /mapplaces/{placeId} {
+      allow read: if actor();
+      allow create, update: if actor()
+        && canMap()
+        && request.resource.data.id == placeId
+        && str(request.resource.data.get('updatedBy','')) == me();
+      /* Nothing deletes a map record. Removing a PLACE is expressible without
+         it (`removed: true`), and "clear this device's edits" must never be
+         able to take the farm's corrections with it. */
+      allow delete: if false;
+    }
+
+    /* ------------------------------------------------------------------
+       CREW CLAIMS — who is working which piece of ground
+
+       When two or three people share a mow, each zone or plot is claimed by
+       one of them so the same ground is not worked twice. One document per
+       task, holding a claim per unit, so two people claiming different zones
+       write different fields and cannot overwrite each other.
+
+       Anybody on the roster may read: the point is seeing who else is out
+       there. Writing is for people actually on that job — or whoever holds
+       the undergrad-assignment job, who may be sorting it out from the shed.
+       A task with no record in the database yet is not a reason to refuse:
+       tasks and the map are separate drawers and either may be switched over
+       first.
+       ------------------------------------------------------------------ */
+    function taskHere(taskId) {
+      return get(/databases/$(database)/documents/tasks/$(taskId)).data;
+    }
+    function onThisJob(taskId) {
+      return !exists(/databases/$(database)/documents/tasks/$(taskId))
+          || str(taskHere(taskId).get('assignee','')) == me()
+          || taskHere(taskId).get('helpers', []).hasAny([me()])
+          || assignsUndergrads(me());
+    }
+
+    match /crew/{taskId} {
+      allow read: if actor();
+      /* Undergrads claim ground too — being out on the mow is exactly who
+         this is for. The gate is being on the job, not the person's rank. */
+      allow create, update: if actor() && onThisJob(taskId);
+      allow delete: if false;
+    }
+
+    /* ------------------------------------------------------------------
+       THE FIELD LOG — drawer 3
+
+       The record that outlives everybody currently on the farm, and the one
+       somebody will read in 2035 to answer a question nobody has thought of
+       yet. Two rules follow from that, and they are the whole block:
+
+       NOTHING IS EVER DELETED. Not by anybody, ever. `allow delete: if false`.
+
+       NOTHING IS EVER EDITED. A correction writes a NEW entry carrying the
+       fix; the only change ever made to an existing entry is the three fields
+       that mark it as superseded by that new one. Dillon, 2026-08-25: the
+       wrong entry stays. The spray entries are the farm's application records,
+       and a log that can be quietly rewritten is worth much less than one
+       where you can see what changed and when.
+
+       Transcribed from flCan() in the app.
+       ------------------------------------------------------------------ */
+    function logEntry() {
+      return resource.data;
+    }
+    /* Who wrote it down, whose work it was, Bill, or faculty over their own
+       lab's person. Mirrors flCan(…,'correct',…) exactly. */
+    function canCorrectLog() {
+      return str(logEntry().get('correctedBy','')) == ''
+        && ( str(logEntry().get('loggedBy','')) == me()
+          || str(logEntry().get('person','')) == me()
+          || assignsUndergrads(me())
+          || (roleOf(me()) == 'Faculty'
+              && str(logEntry().get('person','')) != ''
+              && sameLab(me(), str(logEntry().get('person','')))) );
+    }
+
+    match /fieldlog/{entryId} {
+      allow read: if actor();
+
+      /* Everybody logs their own work — an undergrad who mowed is exactly the
+         person who should be recording that they mowed. */
+      allow create: if actor()
+        && request.resource.data.id == entryId
+        && str(request.resource.data.get('loggedBy','')) == me();
+
+      /* The ONLY permitted change to an entry that already exists: marking it
+         superseded by the correction that replaced it. */
+      allow update: if actor()
+        && canCorrectLog()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['correctedBy', 'correctedAt', 'correctedWho'])
+        && str(request.resource.data.get('correctedWho','')) == me()
+        && str(request.resource.data.get('correctedBy','')) != '';
+
+      allow delete: if false;
+    }
+
+    /* ------------------------------------------------------------------
        EVERYTHING ELSE IS CLOSED.
 
        Calendar, equipment, the field log, inventory and the map get their

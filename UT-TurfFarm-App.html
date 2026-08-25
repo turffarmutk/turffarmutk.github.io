@@ -585,6 +585,7 @@ body{background:#0f1011;display:flex;align-items:center;justify-content:center;f
 <script src="vendor/turf/turf.min.js"></script>
 <script src="vendor/firebase/firebase-app-compat.js"></script>
 <script src="vendor/firebase/firebase-auth-compat.js"></script>
+<script src="vendor/firebase/firebase-firestore-compat.js"></script>
 <!-- The farm itself: plot outlines, alleys, alley zones, plot info and mowing
      assignments. Split out of this file so the app stays editable; must sit in
      the same folder. Loaded here, ahead of the app, so the globals exist before
@@ -1359,7 +1360,7 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
         <input id="lg-email" class="lg-in" type="email" name="email" inputmode="email"
                autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"
                placeholder="you@utk.edu">
-        <div class="lg-lab" style="margin-top:14px">Password</div>
+        <div id="lg-pass-lab" class="lg-lab" style="margin-top:14px">Password</div>
         <input id="lg-pass" class="lg-in" type="password" name="password"
                autocomplete="current-password" placeholder="Your password">
         <div id="lg-msg" class="lg-msg" role="alert" aria-live="polite"></div>
@@ -1752,6 +1753,15 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
 <section class="screen" id="s-farmsettings"><div class="app field">
 <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Farm settings</div></div>
 <div style="flex:1;overflow-y:auto" id="fst-body"></div>
+</div></section>
+<section class="screen" id="s-flfix"><div class="app field">
+<div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Correct this entry</div></div>
+<div style="flex:1;overflow-y:auto" id="flx-body"></div>
+<div class="actionbar"><div class="action tap" id="flx-save">Save the correction</div></div>
+</div></section>
+<section class="screen" id="s-sharedb"><div class="app field">
+<div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Shared database</div></div>
+<div style="flex:1;overflow-y:auto" id="sdb-body"></div>
 </div></section>
 <section class="screen" id="s-bugreport"><div class="app field">
 <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Report a technical bug</div></div>
@@ -3468,7 +3478,7 @@ function show(id,push){ const el=document.getElementById('s-'+id); if(!el)return
      SESSION replaces — your role comes from who signed in, so a screen can no
      longer promote you by being opened. The attribute stays as a label, used
      below to pick which home layout to paint. */
-  if(id==='profile')fillProfile(); if(id==='profedit')renderProfEdit(); if(id==='roster')rstRender(); if(id==='rosteredit')rstEditRender(); if(id==='adminxfer')axfRender(); if(id==='spraysettings')sprRender(); if(id==='farmsettings')fstRender(); if(id==='bugreport')bugRender(); if(id==='bugsettings')bgsRender(); if(id==='mowersettings')mwsRender(); if(id==='labsettings')lbsRender(); if(id==='roles')authRenderAccount();
+  if(id==='profile')fillProfile(); if(id==='profedit')renderProfEdit(); if(id==='roster')rstRender(); if(id==='rosteredit')rstEditRender(); if(id==='adminxfer')axfRender(); if(id==='spraysettings')sprRender(); if(id==='farmsettings')fstRender(); if(id==='bugreport')bugRender(); if(id==='bugsettings')bgsRender(); if(id==='sharedb')sdbRender(); if(id==='flfix')flxRender(); if(id==='mowersettings')mwsRender(); if(id==='labsettings')lbsRender(); if(id==='roles')authRenderAccount();
   if(id==='login')authRenderLogin(); if(id==='notifications'){setSeen(Date.now());setTimeout(updateBellBadges,0);} if(id==='home-manager')renderHomeNotif(); if(id==='weather')wxEnter(); if(id==='map')mapEnter(); if(id==='taskboard')boardEnter(); if(id==='templates')renderTemplates(); if(id==='assign')assignEnter(); if(id==='plotpick')renderPlotPick(); if(id==='taskwork')renderTaskWork(); if(id==='inventory')invEnter(); if(id==='lowstock')renderLowStock(); if(id==='additem')renderAddItem(); if(id==='invlog')renderInvLog(); if(id==='itemdetail')0; if(id==='equipment')equipEnter(); if(id==='eqreport')renderEqReport(); if(id==='eqmaint')renderEqMaint(); if(id==='eqedit')renderEqEdit(); if(id==='eqsched')renderEqSched(); if(id==='calendar')calEnter(); if(id==='caladd')renderCalAdd(); if(id==='timeclock')tcEnter(); if(id==='tcperson')tcRenderPerson(); if(id==='fieldlog')fieldlogEnter(); if(id==='flexport')renderFlExport(); if(id==='flnew')renderFlNew(); if(id==='fldetail')renderFlDetail(); if(id==='more')moreEnter(); if(id==='trial')trialsEnter(); if(id==='trialdetail')trRenderDetail(); if(id==='trialedit')trRenderEdit(); if(id==='trialres')trRenderRes(); if(id==='trialpin')trRenderPin(); if(id==='navsettings')renderPrefsHub(); if(id==='notifsettings')renderNotifSettings(); if(id==='powersettings')renderPowerSettings(); if(id==='navtabs')renderNavSettings(); if(id==='homescreen')renderHomeSettings(); if(id==='theme')renderTheme(); if(id.indexOf('home-')===0)hwApply(r||currentRole); renderTabs();
   try{updateBellBadges();}catch(e){}
   try{syncBack(el);}catch(e){}
@@ -3586,16 +3596,106 @@ function flLoad(){try{var r=JSON.parse(localStorage.getItem(FL_KEY)||'null');if(
 function flNewId(){return newId('fl');}
 function flStampIds(){for(var i=0;i<FIELDLOG.length;i++){if(!FIELDLOG[i].id)FIELDLOG[i].id=flNewId();}}
 function flById(id){for(var i=0;i<FIELDLOG.length;i++){if(FIELDLOG[i].id===id)return FIELDLOG[i];}return null;}
-function flCommit(){flStampIds();try{if(FIELDLOG.length>FL_CAP){FIELDLOG.sort((a,b)=>a.ord-b.ord);FIELDLOG.splice(0,FIELDLOG.length-FL_CAP);}localStorage.setItem(FL_KEY,JSON.stringify(FIELDLOG));}catch(e){}}
+/* The single write point for the log, and therefore the single place the shared
+   copy has to be told about. flStampIds() runs first so every record has its
+   handle before anything sends it anywhere. */
+function flCommit(){flStampIds();try{if(FIELDLOG.length>FL_CAP){FIELDLOG.sort((a,b)=>a.ord-b.ord);FIELDLOG.splice(0,FIELDLOG.length-FL_CAP);}localStorage.setItem(FL_KEY,JSON.stringify(FIELDLOG));}catch(e){}try{flPush();}catch(e){}}
 (function(){var r=flLoad();if(r)FIELDLOG=r;flStampWho();flCommit();})();
+/* ============================================================
+   THE FIELD LOG — corrections that keep the original
+   ------------------------------------------------------------
+   Dillon, 2026-08-25: **the wrong entry stays.** Correcting an entry writes a
+   NEW record carrying the fix, and marks the old one as superseded by it.
+   Nothing is ever edited in place and nothing is ever deleted.
+
+   Why, in his words and mine: the spray entries are the farm's application
+   records. A log that can be quietly rewritten is worth much less than one
+   where you can see what changed and when — and this is the record that
+   outlives everybody currently on the farm.
+
+   The feed and the counts show only live entries, so a wrong mow does not sit
+   in the totals forever. The superseded record is still there, reachable from
+   the correction that replaced it, which is the difference between a total
+   that is right and a record that is missing something.
+
+   ONE FUNCTION for who may do it, like taskCan() and mapCan(), because the
+   database enforces the same rule and two copies would drift.
+   ============================================================ */
+
+/* Everybody logs their own work — an undergrad who mowed is exactly the person
+   who should be recording that they mowed. Correcting is narrower. */
+function flCan(actor,action,entry){
+  var me=pidOf(actor)||SESSION.pid;
+  if(!me||!personActive(me)) return false;
+  var role=personRole(me); if(!role) return false;
+  var e=entry||{};
+  switch(action){
+    case 'log':
+      return true;
+    case 'correct':
+      if(e.correctedBy) return false;                  /* correct the correction instead */
+      if(pidOf(e.loggedBy)===me) return true;          /* I wrote it down */
+      if(pidOf(e.person)===me) return true;            /* the work was mine */
+      if(assignsUndergrads(me)) return true;           /* Bill, or whoever holds the job */
+      if(role==='Faculty'&&e.person&&sameLab(me,pidOf(e.person))) return true;
+      return false;
+    case 'delete':
+      return false;                                     /* never, by anybody */
+  }
+  return false;
+}
+
+/* What a correction is allowed to change. Deliberately not everything: who
+   wrote the original, when it was written and what it superseded are the
+   record of the record, and a correction that could rewrite those would defeat
+   the point of keeping the original. */
+var FL_CORRECTABLE=['plot','type','op','title','date','ord','time','person',
+                    'equipment','product','ai','rate','amount','target','notes','detail'];
+
+function flSuperseded(a){ return !!(a&&a.correctedBy); }
+/* The true record: what the farm actually did, with corrected entries replaced
+   by their corrections rather than counted twice. */
+function flLive(){ return FIELDLOG.filter(function(a){ return !flSuperseded(a); }); }
+
+function flCorrect(id,changes,why){
+  var orig=flById(id);
+  if(!orig){ return null; }
+  if(!flCan(SESSION.pid,'correct',orig)){ return null; }
+
+  var copy; try{ copy=JSON.parse(JSON.stringify(orig)); }catch(e){ return null; }
+  copy.id=flNewId();
+  Object.keys(changes||{}).forEach(function(k){
+    if(FL_CORRECTABLE.indexOf(k)>=0) copy[k]=changes[k];
+  });
+  var at=new Date().toISOString();
+  copy.corrects=orig.id;
+  copy.correctionOf=orig.ord;
+  copy.correctionNote=(why||'').trim()||null;
+  copy.correctedAt=at;
+  copy.loggedBy=SESSION.pid;
+  delete copy.correctedBy;                 /* the new one is live, not superseded */
+  delete copy.correctedWho;
+  FIELDLOG.push(copy);
+
+  orig.correctedBy=copy.id;
+  orig.correctedAt=at;
+  orig.correctedWho=SESSION.pid;
+
+  flCommit();
+  return copy;
+}
+
 let flState={type:'all',plots:[]};
 function flPlotMatch(p){return flState.plots.length===0||flState.plots.indexOf(p)>=0;}
 function flRender(){
  const feed=document.getElementById('fl-feed'); if(!feed)return;
- let items=FIELDLOG.filter(a=>(flState.type==='all'||a.type===flState.type)&&flPlotMatch(a.plot));
+ /* flLive(): a corrected entry is replaced by its correction, never counted
+    twice and never left sitting in the totals. It is still reachable from
+    the correction that replaced it. */
+ let items=flLive().filter(a=>(flState.type==='all'||a.type===flState.type)&&flPlotMatch(a.plot));
  items.sort((a,b)=>b.ord-a.ord);
  const sum=document.getElementById('fl-sum');
- if(sum){const base=FIELDLOG.filter(a=>flPlotMatch(a.plot));const c={};FL_CATS.forEach(k=>c[k]=0);base.forEach(a=>{if(c[a.type]!=null)c[a.type]++;});
+ if(sum){const base=flLive().filter(a=>flPlotMatch(a.plot));const c={};FL_CATS.forEach(k=>c[k]=0);base.forEach(a=>{if(c[a.type]!=null)c[a.type]++;});
   sum.className='fl-sum'+(flState.type==='all'?'':' dim');
   sum.innerHTML=FL_CATS.map(k=>{const t=FL_TYPES[k];return '<div class="k'+(flState.type===k?' on':'')+'" data-cat="'+k+'"><div class="n">'+c[k]+'</div><div class="l">'+esc(t.label)+'</div></div>';}).join('');}
  const head=document.getElementById('fl-feedhead');
@@ -3606,7 +3706,7 @@ function flRender(){
 const FL_PLOTS=['11','12','13','14','15','16','17','18','GH'];
 function flPlotLabel(id){return id==='all'?'All plots':(id==='GH'?'Greenhouse':(/^\d+$/.test(id)?'Plot '+id:id));}
 function flRowPlot(id){return id==='GH'?'Greenhouse':(/^\d+$/.test(id)?'Plot '+id:id);}
-function flPlotCount(id){return FIELDLOG.filter(a=>a.plot===id).length;}
+function flPlotCount(id){return flLive().filter(a=>a.plot===id).length;}
 /* ---- Field Log: one logged operation ------------------------------------
    Entries arrive two ways — typed into the log form, or written automatically
    when a task board job is finished. Both land here. Anything the record does
@@ -3649,9 +3749,32 @@ function renderFlDetail(){
   +(a.notes?'<div class="sec">Notes</div><div class="list"><div class="fld" style="align-items:flex-start"><span class="fl">Notes</span><span class="fv" style="text-align:right;white-space:pre-wrap">'+esc(a.notes)+'</span></div></div>':'')
   +(!rows&&!a.detail?'':'')
   +'<div style="height:14px"></div>';
+ /* Both halves of a correction say so, and each links to the other. An entry
+    that was quietly replaced would be worse than one that was quietly edited. */
+ var band='';
+ if(a.correctedBy){
+   band='<div style="margin:12px 16px 0;padding:10px 12px;background:#fdeceb;border-radius:10px;'
+       +'font:700 11.5px \'Public Sans\';color:#c0392b;line-height:1.5">'
+       +'This entry was corrected'+(a.correctedWho?(' by '+esc(nameOf(a.correctedWho)||a.correctedWho)):'')
+       +(a.correctedAt?(' on '+esc(String(a.correctedAt).slice(0,10))):'')+'. '
+       +'It is kept because it is part of the record, and it is not counted in the totals.'
+       +'<div class="tap" data-flgo="'+esc(a.correctedBy)+'" style="margin-top:7px;text-decoration:underline">See the entry that replaced it ›</div>'
+       +'</div>';
+ } else if(a.corrects){
+   band='<div style="margin:12px 16px 0;padding:10px 12px;background:#eef4ff;border-radius:10px;'
+       +'font:700 11.5px \'Public Sans\';color:#2f5fa0;line-height:1.5">'
+       +'This is a correction'+(a.correctedAt?(' made on '+esc(String(a.correctedAt).slice(0,10))):'')+'.'
+       +(a.correctionNote?('<br>'+esc(a.correctionNote)):'')
+       +'<div class="tap" data-flgo="'+esc(a.corrects)+'" style="margin-top:7px;text-decoration:underline">See what it replaced ›</div>'
+       +'</div>';
+ }
+ body.innerHTML=band+body.innerHTML;
+
  if(ab){
   var acts='<div class="action tap" id="fld-map" style="flex:1;background:#2f3133">Show on map</div>';
   if(task)acts+='<div class="action tap" id="fld-task" style="flex:1">Open the task</div>';
+  if(flCan(SESSION.pid,'correct',a))
+    acts+='<div class="action tap" id="fld-fix" style="flex:1;background:#e7e9e6;color:#2f3133">Correct this</div>';
   ab.innerHTML=acts;
  }
 }
@@ -3659,7 +3782,304 @@ document.getElementById('s-fldetail').addEventListener('click',function(e){
  var a=flById(flCur); if(!a)return;
  if(e.target.closest('#fld-map')){ if(typeof trGoPlot==='function')trGoPlot(a.plot); else go('map'); return; }
  if(e.target.closest('#fld-task')){ if(a.taskId&&typeof openTask==='function')openTask(a.taskId); return; }
+ if(e.target.closest('#fld-fix')){ go('flfix'); return; }
+ var jump=e.target.closest('[data-flgo]');
+ if(jump){ var to=jump.getAttribute('data-flgo'); if(flById(to)){ flCur=to; renderFlDetail(); } return; }
 });
+/* ============================================================
+   THE FIELD LOG IN THE SHARED DATABASE — drawer 3
+   ------------------------------------------------------------
+   The record that matters most long-term, and the one somebody will be reading
+   in 2035 to answer a question nobody has thought of yet. Two things follow
+   from that and they shape everything here.
+
+   NOTHING IS EVER DELETED. Not by a scan, not by the app, not by the rules —
+   `allow delete: if false`. A correction writes a new record and marks the old
+   one; see flCorrect(). There is no code path that removes a field log record
+   from the shared copy, deliberately.
+
+   THE 5,000-ENTRY CAP IS A PHONE LIMIT, NOT A FARM LIMIT. flCommit() keeps the
+   newest 5,000 records on the device so a phone does not fill up. Under a
+   naive sync that would be a disaster twice over: the trimmed records would be
+   deleted from the shared copy, and then the listener would drag them back
+   down and the cap would trim them again, forever. So: the sync never deletes,
+   and an arriving record older than the oldest one this phone kept is left
+   where it is. The farm's history lives in the shared copy; the phone carries
+   a window onto it.
+   ============================================================ */
+
+var FLSYNC_KEY='ut_fieldlog_shared_v1';
+var FLSYNC_COLL='fieldlog';
+var FLSYNC_RETRY_MS=10000;
+
+var FLSYNC={ on:false, live:false, ready:false, seen:{}, err:null,
+             up:0, down:0, failed:{} };
+var _flsyncNextTry=0;
+
+function flsyncWanted(){
+  try{ return localStorage.getItem(FLSYNC_KEY)==='1'; }catch(e){ return false; }
+}
+function flsyncHydrate(){ FLSYNC.on=flsyncWanted(); }
+function flsyncSetWanted(on){
+  try{ localStorage.setItem(FLSYNC_KEY,on?'1':'0'); }catch(e){}
+  FLSYNC.on=!!on;
+  if(on){ _flsyncNextTry=0; flsyncStart(); } else flsyncStop();
+}
+
+function flDoc(a){
+  var out; try{ out=JSON.parse(JSON.stringify(a||{})); }catch(e){ return null; }
+  if(!out||!out.id) return null;
+  out.id=String(out.id);
+  if(!out.loggedBy) out.loggedBy=out.person||SESSION.pid||null;
+  return out;
+}
+function flJson(a){ var d=flDoc(a); return d?JSON.stringify(d):null; }
+
+/* The oldest day this phone still holds. Anything older was trimmed by the
+   cap, and must not be dragged back down. */
+function flOldestKeptOrd(){
+  var o=null;
+  for(var i=0;i<FIELDLOG.length;i++){
+    var v=+FIELDLOG[i].ord||0;
+    if(v&&(o===null||v<o)) o=v;
+  }
+  return o;
+}
+
+function flsyncStart(){
+  if(FLSYNC.live) return true;
+  if(Date.now()<_flsyncNextTry) return false;
+  var db=fbDb();
+  if(!db||!SESSION.pid){
+    FLSYNC.err=db?'Nobody is signed in yet':'The database code did not load on this device';
+    _flsyncNextTry=Date.now()+FLSYNC_RETRY_MS; return false;
+  }
+  try{
+    FLSYNC.unsub=db.collection(FLSYNC_COLL).onSnapshot(flsyncOnSnapshot,function(e){
+      FLSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+      FLSYNC.live=false; FLSYNC.ready=false; _flsyncNextTry=Date.now()+FLSYNC_RETRY_MS;
+    });
+    FLSYNC.live=true; FLSYNC.err=null;
+    return true;
+  }catch(e){
+    FLSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+    _flsyncNextTry=Date.now()+FLSYNC_RETRY_MS;
+    return false;
+  }
+}
+function flsyncStop(){
+  try{ if(FLSYNC.unsub) FLSYNC.unsub(); }catch(e){}
+  FLSYNC.unsub=null; FLSYNC.live=false; FLSYNC.ready=false;
+  FLSYNC.seen={}; FLSYNC.failed={};
+}
+
+function flsyncOnSnapshot(snap){
+  var changes; try{ changes=snap.docChanges(); }catch(e){ return; }
+  var touched=false, oldest=flOldestKeptOrd();
+
+  changes.forEach(function(ch){
+    if(ch.type==='removed'){ delete FLSYNC.seen[String(ch.doc.id)]; return; }
+    var data; try{ data=ch.doc.data(); }catch(e){ return; }
+    if(!data) return;
+    data.id=String(ch.doc.id);
+    FLSYNC.seen[data.id]=JSON.stringify(data);      /* agreed before anything reads it */
+    delete FLSYNC.failed[data.id];
+    FLSYNC.down++;
+
+    var have=flById(data.id);
+    if(have){
+      if(JSON.stringify(flDoc(have))!==JSON.stringify(data)){
+        Object.keys(have).forEach(function(k){ if(!(k in data)) delete have[k]; });
+        Object.keys(data).forEach(function(k){ have[k]=data[k]; });
+        touched=true;
+      }
+      return;
+    }
+    /* Older than anything this phone kept: it belongs to the shared copy's
+       history, not to this device's window onto it. */
+    if(oldest!==null && FIELDLOG.length>=FL_CAP && (+data.ord||0) < oldest) return;
+    FIELDLOG.push(data); touched=true;
+  });
+
+  var fromCache=true;
+  try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
+  if(!FLSYNC.ready&&!fromCache){ FLSYNC.ready=true; flsyncUploadNew(); }
+
+  if(touched){
+    try{ flStampIds(); localStorage.setItem(FL_KEY,JSON.stringify(FIELDLOG)); }catch(e){}
+    try{ if(typeof flRender==='function') flRender(); }catch(e){}
+    try{ if(typeof flsyncRepaint==='function') flsyncRepaint(); }catch(e){}
+  }
+}
+
+/* This phone's history going up for the first time. */
+function flsyncUploadNew(){
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  FIELDLOG.slice().forEach(function(a){
+    if(!a||!a.id) return;
+    var id=String(a.id);
+    if(FLSYNC.seen[id]!==undefined) return;
+    var doc=flDoc(a); if(!doc) return;
+    FLSYNC.seen[id]=JSON.stringify(doc);
+    n++; FLSYNC.up++;
+    try{ db.collection(FLSYNC_COLL).doc(id).set(doc).catch(function(e){ flsyncFail(id,e); }); }
+    catch(e){ flsyncFail(id,e); }
+  });
+  if(n){ try{ toast(n+' log entr'+(n===1?'y':'ies')+' from this phone sent up'); }catch(e){} }
+  return n;
+}
+function flsyncFail(id,e){
+  FLSYNC.failed[id]=(typeof sdbError==='function')?sdbError(e):String((e&&e.message)||e);
+}
+
+/* Outbound. Writes only — see the note at the top about never deleting. */
+function flPush(){
+  if(!FLSYNC.on||!FLSYNC.live||!FLSYNC.ready) return 0;
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  FIELDLOG.forEach(function(a){
+    if(!a||!a.id) return;
+    var id=String(a.id), json=flJson(a);
+    if(json===null||FLSYNC.seen[id]===json) return;
+    FLSYNC.seen[id]=json; n++; FLSYNC.up++;
+    try{ db.collection(FLSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ flsyncFail(id,e); }); }
+    catch(e){ flsyncFail(id,e); }
+  });
+  return n;
+}
+
+function flsyncTick(){
+  if(!FLSYNC.on) return;
+  if(!FLSYNC.live){ flsyncStart(); return; }
+  flPush();
+}
+
+function flsyncRepaint(){
+  try{
+    var d=document.getElementById('s-sharedb');
+    if(d&&d.classList.contains('active')&&typeof sdbRender==='function') sdbRender();
+  }catch(e){}
+}
+
+function flsyncSummary(){
+  if(!FLSYNC.on) return 'Off — this phone keeps its own log';
+  if(FLSYNC.err) return FLSYNC.err;
+  if(!FLSYNC.live) return 'Connecting…';
+  if(!FLSYNC.ready) return 'Connected — waiting for the shared copy';
+  var f=Object.keys(FLSYNC.failed).length;
+  return FLSYNC.up+' sent · '+FLSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+}
+
+/* ---- the correction sheet ----
+   Small on purpose. It offers the things that actually go wrong — the plot,
+   the date, the time, and on a chemical entry the product and the amounts —
+   and it insists on a sentence saying what was wrong. A correction with no
+   reason is only half a record, and the reason is the part somebody reading
+   this in three years will actually need. */
+function flxPlotOptions(sel){
+  var src=[];
+  try{ src=(typeof jobAllPlots==='function')?jobAllPlots().concat(['GH']):[]; }catch(e){ src=[]; }
+  if(!src.length) src=FL_PLOTS.slice();
+  if(sel&&src.indexOf(sel)<0) src.unshift(sel);
+  return src.map(function(p){
+    return '<option value="'+esc(p)+'"'+(p===sel?' selected':'')+'>'+esc(flPlotLabel(p))+'</option>';
+  }).join('');
+}
+/* ord is YYYYMMDD as an integer; the date input speaks YYYY-MM-DD. */
+function flxOrdToInput(o){
+  o=+o||0; if(o<10000101) return '';
+  var y=Math.floor(o/10000), m=Math.floor(o/100)%100, d=o%100;
+  return y+'-'+(m<10?'0':'')+m+'-'+(d<10?'0':'')+d;
+}
+function flxInputToOrd(v){
+  var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(v||''); if(!m) return null;
+  return (+m[1])*10000+(+m[2])*100+(+m[3]);
+}
+function flxOrdLabel(o){
+  var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  o=+o||0; if(o<10000101) return '';
+  return MON[(Math.floor(o/100)%100)-1]+' '+(o%100);
+}
+
+function flxRender(){
+  var body=document.getElementById('flx-body'); if(!body) return;
+  var a=flById(flCur);
+  if(!a){ body.innerHTML='<div class="fl-empty">That entry is gone.</div>'; return; }
+
+  var t=FL_TYPES[a.type]||{label:a.type||''};
+  var chem=!!(a.product||a.amount||a.rate||a.target);
+  var fld=function(label,inner){
+    return '<div class="fld"><span class="fl">'+esc(label)+'</span>'+inner+'</div>';
+  };
+  var inp=function(id,val,ph){
+    return '<input class="inv-in" id="'+id+'" value="'+esc(val==null?'':val)+'"'
+          +(ph?(' placeholder="'+esc(ph)+'"'):'')+' style="max-width:210px">';
+  };
+
+  body.innerHTML=
+     '<div style="margin:14px 16px 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px">'
+    +'<div style="font:800 13px \'Archivo\';color:var(--ink)">The original is kept</div>'
+    +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:3px;line-height:1.45">'
+    +'This does not change the entry. It writes a new one carrying the fix, and marks the old one as '
+    +'replaced by it. Both stay in the record, and only the corrected version counts in the totals.'
+    +'</div></div>'
+
+    +'<div class="sec">What it says now</div><div class="list">'
+    +'<div class="fld"><span class="fl">Entry</span><span class="fv">'+esc(a.title||'')+'</span></div>'
+    +'<div class="fld"><span class="fl">Where</span><span class="fv">'+esc(flRowPlot(a.plot))+'</span></div>'
+    +'<div class="fld"><span class="fl">When</span><span class="fv">'+esc(a.date||'')+(a.time?(' · '+esc(a.time)):'')+'</span></div>'
+    +'<div class="fld" style="border-bottom:none"><span class="fl">Kind</span><span class="fv">'+esc(t.label)+'</span></div>'
+    +'</div>'
+
+    +'<div class="sec">What it should say</div><div class="list">'
+    +fld('Where','<select class="inv-in" id="flx-plot" style="max-width:210px">'+flxPlotOptions(a.plot)+'</select>')
+    +fld('Date','<input class="inv-in" type="date" id="flx-date" value="'+esc(flxOrdToInput(a.ord))+'" style="max-width:170px">')
+    +fld('Time',inp('flx-time',a.time,'7:20 AM'))
+    +(chem?(fld('Product',inp('flx-product',a.product))
+           +fld('Amount used',inp('flx-amount',a.amount))
+           +fld('Rate',inp('flx-rate',a.rate))
+           +fld('Target',inp('flx-target',a.target))):'')
+    +'<div class="fld" style="border-bottom:none;align-items:flex-start"><span class="fl">What was wrong</span>'
+    +'<textarea class="inv-in" id="flx-why" rows="3" placeholder="Logged on B12, the mow was actually B13" '
+    +'style="max-width:210px;resize:vertical"></textarea></div>'
+    +'</div>'
+    +'<div style="height:22px"></div>';
+}
+
+function flxSave(){
+  var a=flById(flCur); if(!a){ toast('That entry is gone'); return; }
+  if(!flCan(SESSION.pid,'correct',a)){ toast('You cannot correct this entry'); return; }
+
+  var why=(document.getElementById('flx-why')||{}).value||'';
+  if(!why.trim()){ toast('Say what was wrong — it is the part somebody will need later'); return; }
+
+  var changes={}, v;
+  var g=function(id){ var el=document.getElementById(id); return el?(el.value||'').trim():null; };
+
+  v=g('flx-plot'); if(v&&v!==a.plot) changes.plot=v;
+  v=flxInputToOrd(g('flx-date'));
+  if(v&&v!==a.ord){ changes.ord=v; changes.date=flxOrdLabel(v); }
+  v=g('flx-time'); if(v!==null&&v!==(a.time||'')) changes.time=v;
+  ['product','amount','rate','target'].forEach(function(k){
+    var el=document.getElementById('flx-'+k); if(!el) return;
+    var nv=(el.value||'').trim();
+    if(nv!==(a[k]||'')) changes[k]=nv||null;
+  });
+
+  if(!Object.keys(changes).length){ toast('Nothing was changed'); return; }
+
+  var made=flCorrect(a.id,changes,why);
+  if(!made){ toast('That could not be corrected'); return; }
+  flCur=made.id;
+  toast('Corrected ✓ · the original is kept');
+  back(); renderFlDetail(); flRender();
+}
+(function(){
+  var b=document.getElementById('flx-save');
+  if(b) b.addEventListener('click',flxSave);
+})();
+
 let flSugIdx=-1;
 function flSugList(q){
  q=(q||'').trim().toLowerCase();
@@ -3718,7 +4138,7 @@ function flAddFromTask(t){
    id:flNewId(),plot:p,type:type,title:t.title,
    detail:(t.type||'Field practice')+' · '+by+' · '+at,
    date:flTodayLabel(),ord:flTodayOrd(),fromTask:true,source:'task',
-   taskId:t.id,op:t.type||'Field practice',person:byId,time:at,
+   taskId:t.id,op:t.type||'Field practice',person:byId,loggedBy:SESSION.pid,time:at,
    equipment:flEqName(t.machine),area:(t.area&&t.area!=='—')?t.area:null,
    dueAt:t.dueAt||null,due:dueLabel(t)||null,repeat:(t.repeat&&t.repeat!=='None')?t.repeat:null,
    product:mx?mx.productName:null,rate:mx?mx.rateText:null,amount:mx?mx.productText:null,
@@ -4133,7 +4553,7 @@ function flSave(){
  var ord=now.getFullYear()*10000+(now.getMonth()+1)*100+now.getDate();
  var time=nowTime();
  FLFORM.plots.forEach(function(p){
-   FIELDLOG.push({plot:p,type:op.feed,title:title,detail:detail,date:date,ord:ord,op:op.label,product:FLFORM.product||null,ai:FLFORM.ai||null,amount:FLFORM.amount||null,rate:FLFORM.rate||null,target:FLFORM.target||null,equipment:FLFORM.equipment||null,notes:FLFORM.notes||'',person:whoId,time:time,source:'manual'});
+   FIELDLOG.push({plot:p,type:op.feed,title:title,detail:detail,date:date,ord:ord,op:op.label,product:FLFORM.product||null,ai:FLFORM.ai||null,amount:FLFORM.amount||null,rate:FLFORM.rate||null,target:FLFORM.target||null,equipment:FLFORM.equipment||null,notes:FLFORM.notes||'',person:whoId,loggedBy:whoId,time:time,source:'manual'});
  });
  flCommit();
  toast(op.chem?'Logged ✓ · chemical record saved':'Operation logged ✓');
@@ -5198,6 +5618,31 @@ function taskCan(actor,action,task){
       return false;
   }
   return false;
+}
+
+/* ---- who may change the map ----
+   ONE function, for the same reason taskCan() is one function: this is now a
+   rule the database enforces as well as the app, and two copies of it would
+   drift.
+
+   Dillon, 2026-08-25: **anyone but an undergrad.** Before this the app had
+   three different answers — reshaping needed Bill or faculty, a cut height
+   needed a technician or grad student, and the plot information form was not
+   gated at all. That was not a decision anybody made, it was how it grew. One
+   rule is easier to explain, and the thing it protects against is a wrong
+   number staying wrong because the person who spotted it had to go and find
+   somebody.
+
+   Actions: 'shape' (draw, reshape, delete a plot) · 'info' (turfgrass,
+   cultivar, area, rootzone) · 'mowing' (mower, cut height, irrigation heads).
+   They take the same answer today; they are named separately so that if the
+   farm ever wants them to differ, this is the only place that changes. */
+function mapCan(actor,action){
+  var me=pidOf(actor)||SESSION.pid;
+  if(!me||!personActive(me)) return false;
+  var role=personRole(me); if(!role) return false;
+  if(role==='Undergraduate Student') return false;
+  return action==='shape'||action==='info'||action==='mowing';
 }
 
 function taskIsFor(t,who){ var id=pidOf(who); return !!t&&!!id&&taskCrew(t).indexOf(id)>=0; }
@@ -10102,7 +10547,7 @@ function editPlot(name){ if(!_pop)return; var o=infoObj(name);
   else { var v=(o[lb]||'').replace(/"/g,'&quot;'); h+='<tr><td class="pp-k">'+lb+'</td><td class="pp-v"><input id="'+id+'" class="pp-in" value="'+v+'"/></td></tr>'; } });
  h+='</table><div class="pp-actions"><button class="pp-btn save" data-pp="savePlot" data-ppn="'+esc(name)+'">Save</button><button class="pp-btn" data-pp="cancelEdit" data-ppn="'+esc(name)+'">Cancel</button></div><div class="pp-demo">Demo - session only</div></div>';
  _pop.setContent(h); }
-function savePlot(name){ var arr=[]; EDIT_FIELDS.forEach(function(lb){ var el=document.getElementById(efId(lb)); if(!el)return; var v=(el.value||'').trim(); if(v&&v!=='-'&&v.toUpperCase()!=='NA') arr.push([lb,v]); }); PLOT_INFO[name]=arr; if(_pop)_pop.setContent(plotPopupHtml({number:name})); }
+function savePlot(name){ if(!mapCan(SESSION.pid,'info')){ toast('Undergrads cannot change plot information'); return; } var arr=[]; EDIT_FIELDS.forEach(function(lb){ var el=document.getElementById(efId(lb)); if(!el)return; var v=(el.value||'').trim(); if(v&&v!=='-'&&v.toUpperCase()!=='NA') arr.push([lb,v]); }); PLOT_INFO[name]=arr; if(_pop)_pop.setContent(plotPopupHtml({number:name})); }
 function cancelEdit(name){ if(_pop)_pop.setContent(plotPopupHtml({number:name})); }
 
 /* ---- Mowing setup · height and machine, kept in step ---------------------
@@ -10229,6 +10674,7 @@ function mowJobLabel(lb){
 }
 
 function saveMowing(name){
+  if(!mapCan(SESSION.pid,'mowing')){ toast('Undergrads cannot change the mowing setup'); return; }
   var ci=document.getElementById('mg_c'), sel=document.getElementById('mg_m');
   if(!ci||!sel) return;
   var raw=(ci.value||'').trim(), c=(raw===''?null:+raw), lb=sel.value;
@@ -10441,6 +10887,11 @@ var FARM_CATS=[
     var u=labsUnlisted().length, pi=FARM_LABS.filter(function(l){return l.pi;}).length;
     return FARM_LABS.length+' labs · '+pi+' in trials'+(u?(' · '+u+' unlisted in use'):'');
   }},
+ {go:'sharedb', t:'Shared database', d:function(){
+    if(!dbConfigured()) return 'The database code did not load on this device';
+    var at=rosterSentAt();
+    return at ? ('Roster sent '+at.slice(0,10)) : 'The roster has not been sent yet — nothing can save until it is';
+  }},
  {go:'bugsettings', t:'Bug reports', d:function(){
     if(!bugConfigured()) return 'Not set up — crew reports are piling up on their phones';
     var q=bugQueued().length;
@@ -10466,6 +10917,206 @@ function fstRender(){
     +pwaVersionLine()
     +'<div style="height:22px"></div>';
 }
+
+/* ---- Shared database screen ----
+   The one screen in the app that talks about the database as a thing. Everybody
+   else's screens should never have to mention it. */
+var _sdbBusy=false;
+
+function sdbStatusRow(label,value,good){
+  var col=good===false?'#c0392b':(good===true?'#2f9e4f':'var(--muted)');
+  return '<div class="row" style="align-items:flex-start">'
+    +'<div style="flex:1;min-width:0"><div class="rt">'+esc(label)+'</div>'
+    +'<div class="rs" style="color:'+col+'">'+esc(value)+'</div></div></div>';
+}
+
+function sdbRender(){
+  var body=document.getElementById('sdb-body'); if(!body) return;
+  var loaded=dbConfigured();
+  var can=rosterCanPush();
+  var at=rosterSentAt();
+  var cache=(DB_CACHE==='on')?'On — the app works with no signal'
+          :(DB_CACHE==='unknown')?'Not started yet'
+          :('Off — this device will need signal ('+DB_CACHE+')');
+
+  var rows=sdbStatusRow('The database code', loaded?'Loaded on this device':'Did not load — the app still works on its own', loaded)
+    +sdbStatusRow('Signed in as', SESSION.pid?(meName()+' · '+SESSION.pid):'Nobody', !!SESSION.pid)
+    +sdbStatusRow('Working copy on this phone', cache, DB_CACHE==='on'?true:null)
+    +sdbStatusRow('Roster last sent', at?(at.slice(0,10)+' at '+at.slice(11,16)):'Never', at?true:false);
+
+  var btn = can
+    ? '<div class="action tap" id="sdb-push" style="margin:14px 16px 0">'+(at?'Send the roster again':'Send the roster to the database')+'</div>'
+    : '<div style="margin:14px 16px 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px;'
+      +'font:600 11.5px \'Public Sans\';color:var(--muted);line-height:1.45">'
+      +'Only Bill, or whoever is holding the undergrad-assignment job, can send the roster. '
+      +'Everything else on this page is here so you can see whether it has been done.</div>';
+
+  body.innerHTML=
+     '<div style="margin:14px 16px 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px">'
+    +'<div style="font:800 13px \'Archivo\';color:var(--ink)">What this page is for</div>'
+    +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:3px;line-height:1.45">'
+    +'The database decides who may do what by reading a copy of the roster — who is a technician, '
+    +'who is in which lab, who holds the undergrad job. That copy has to be sent up before anything '
+    +'else can save. Send it again whenever somebody joins, leaves, or changes lab in More → People.'
+    +'</div></div>'
+    +'<div class="list" style="margin-top:12px">'+rows+'</div>'
+    +btn
+    +'<div style="margin:12px 16px 0;font:600 11px \'Public Sans\';color:var(--muted);line-height:1.45">'
+    +'Sending it is safe to repeat. It replaces the copy rather than adding to it, so pressing it '
+    +'twice does exactly the same as pressing it once.</div>'
+    +sdbTasksBlock()
+    +'<div style="height:22px"></div>';
+}
+
+/* ---- the drawer switches ----
+   Off on every phone until somebody turns one on, and each says plainly what
+   turning it on does. "Off" here does not mean broken: it means this phone is
+   still keeping its own copy, which is exactly what it did before.
+
+   One switch per drawer, on purpose. The whole rollout is one drawer at a
+   time, and a single switch for everything would mean the first thing that
+   went wrong took the rest with it. */
+function sdbSwitchBlock(o){
+  var on=o.on;
+  var sent=rosterSentAt();
+  var failed=Object.keys(o.failed||{});
+
+  var warn = sent ? '' :
+      '<div style="margin-top:9px;padding:9px 11px;background:#fdeceb;border-radius:9px;'
+     +'font:700 11px \'Public Sans\';color:#c0392b;line-height:1.45">'
+     +'Send the roster first. Until it is up there, the database refuses everything.</div>';
+
+  var detail = on
+    ? '<div style="margin-top:9px;font:600 11px \'Public Sans\';color:var(--muted);line-height:1.45">'
+      +esc(o.summary)
+      +(failed.length?('<br>'+failed.length+' record'+(failed.length===1?'':'s')+' the database would not take.'):'')
+      +'</div>'
+    : '<div style="margin-top:9px;font:600 11px \'Public Sans\';color:var(--muted);line-height:1.45">'
+      +esc(o.explain)+'</div>';
+
+  return '<div style="margin:18px 16px 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px">'
+    +'<div style="display:flex;align-items:center;gap:10px">'
+    +'<div style="flex:1;min-width:0">'
+    +'<div style="font:800 13px \'Archivo\';color:var(--ink)">'+esc(o.title)+'</div>'
+    +'<div style="font:600 11px \'Public Sans\';color:'+(on?'#2f9e4f':'var(--muted)')+';margin-top:2px">'
+    +(on?'On for this phone':esc(o.offLabel))+'</div></div>'
+    +'<div class="tap" id="'+o.btnId+'" style="flex:none;padding:7px 14px;border-radius:9px;'
+    +'font:800 11.5px \'Public Sans\';'
+    +(on?'background:#e7e9e6;color:#2f3133':'background:var(--acc);color:#fff')+'">'
+    +(on?'Turn off':'Turn on')+'</div></div>'
+    +warn+detail+'</div>';
+}
+
+function sdbTasksBlock(){
+  return sdbSwitchBlock({
+    on:TSYNC.on, failed:TSYNC.failed, summary:tsyncSummary(), btnId:'sdb-tasks',
+    title:'Share tasks with everyone',
+    offLabel:'Off — this phone keeps its own copy',
+    explain:'Turning this on sends this phone\'s tasks up to the shared copy and starts showing '
+           +'everybody else\'s. Nothing is deleted by turning it on, and turning it off again puts '
+           +'this phone back to keeping its own copy.'
+  })+sdbMapBlock()+sdbCrewBlock()+sdbLogBlock();
+}
+
+function sdbLogBlock(){
+  return sdbSwitchBlock({
+    on:FLSYNC.on, failed:FLSYNC.failed, summary:flsyncSummary(), btnId:'sdb-log',
+    title:'Share the field log',
+    offLabel:'Off — this phone keeps its own log',
+    explain:'Every mow, spray and application, in one place, readable by whoever writes the '
+           +'reports. Nothing in the log is ever deleted — a correction writes a new entry and '
+           +'keeps the old one — so turning this on can only ever add to the record.'
+  });
+}
+
+function sdbCrewBlock(){
+  return sdbSwitchBlock({
+    on:CSYNC.on, failed:{}, summary:csyncSummary(), btnId:'sdb-crew',
+    title:'Share who is working where',
+    offLabel:'Off — only tabs on this machine see each other',
+    explain:'When two or three people share a mow, each claims a zone so the same ground is not '
+           +'worked twice. With this off, those claims never leave the phone that made them. With '
+           +'it on, the other people on the job see them.'
+  });
+}
+
+function sdbMapBlock(){
+  return sdbSwitchBlock({
+    on:MSYNC.on, failed:MSYNC.failed, summary:msyncSummary(), btnId:'sdb-map',
+    title:'Share map corrections',
+    offLabel:'Off — corrections stay on this phone',
+    explain:'Reshaping a plot, fixing an area, changing a mower or cut height. With this off, '
+           +'those save on this phone only. With it on, a correction reaches everybody — no code '
+           +'change and no new download.'
+  });
+}
+
+/* Plain words for every way this can fail. A code nobody can act on is the
+   same as no message at all. */
+function sdbError(e){
+  var c=String((e&&(e.code||e.message))||'');
+  if(c==='nodb') return 'The database code did not load on this device';
+  if(c==='notallowed') return 'Only Bill or the undergrad-job holder can send the roster';
+  if(c.indexOf('permission-denied')>=0) return 'The database refused it — were the rules published?';
+  if(c.indexOf('unauthenticated')>=0) return 'Sign in first, then try again';
+  if(c.indexOf('unavailable')>=0) return 'No connection — try again on wifi';
+  return 'It did not save: '+c;
+}
+
+function sdbPush(){
+  if(_sdbBusy) return;
+  if(!rosterCanPush()){ toast(sdbError(new Error('notallowed'))); return; }
+  _sdbBusy=true;
+  /* A write with no signal sits in the queue and the promise simply does not
+     settle. Say so rather than leaving somebody staring at a button. */
+  var slow=setTimeout(function(){
+    if(_sdbBusy) toast('Waiting for signal — it will finish on its own');
+  },6000);
+  rosterPush().then(function(n){
+    clearTimeout(slow); _sdbBusy=false;
+    toast(n+' people sent to the database ✓');
+    sdbRender();
+  }).catch(function(e){
+    clearTimeout(slow); _sdbBusy=false;
+    toast(sdbError(e));
+    sdbRender();
+  });
+}
+
+(function(){
+  var scr=document.getElementById('s-sharedb'); if(!scr) return;
+  scr.addEventListener('click',function(e){
+    if(e.target.closest('#sdb-push')){ sdbPush(); return; }
+    if(e.target.closest('#sdb-log')){
+      var logOn=!FLSYNC.on;
+      flsyncSetWanted(logOn);
+      toast(logOn?'Sharing the field log':'The log stays on this phone');
+      sdbRender();
+      return;
+    }
+    if(e.target.closest('#sdb-crew')){
+      var crewOn=!CSYNC.on;
+      csyncSetWanted(crewOn);
+      toast(crewOn?'Sharing claims with everyone on the job':'Claims stay on this machine');
+      sdbRender();
+      return;
+    }
+    if(e.target.closest('#sdb-map')){
+      var mapOn=!MSYNC.on;
+      msyncSetWanted(mapOn);
+      toast(mapOn?'Sharing map corrections':'Map corrections stay on this phone');
+      sdbRender();
+      return;
+    }
+    if(e.target.closest('#sdb-tasks')){
+      var turningOn=!TSYNC.on;
+      tsyncSetWanted(turningOn);
+      toast(turningOn?'Sharing tasks — sending this phone\'s records up':'This phone is back to its own copy');
+      sdbRender();
+      return;
+    }
+  });
+})();
 
 /* ---- Mowers screen ---- */
 var mwAdding=false;
@@ -12851,12 +13502,150 @@ function crewLoad() {
 function crewSave(db) {
   try { localStorage.setItem(CREW_KEY, JSON.stringify(db)); } catch (e) {}
 }
-/* The one place the transport lives. Swapping to Firestore listeners replaces
-   this body with a channel.send and leaves every caller untouched. */
+/* The one place the transport lives — and it was written to be replaced. Every
+   caller (crewTake, crewDrop, crewComplete, …) goes through here, so sharing
+   claims between phones is this function and nothing else.
+
+   Until 2026-08-25 this only reached other TABS on the same machine, over a
+   BroadcastChannel. That was honest as a prototype and useless in a field: two
+   people on the same alley mow saw nothing of each other, which is exactly the
+   thing claims exist to prevent. */
 function crewSend(db) {
   crewSave(db);
   try { if (CREW_CH) CREW_CH.postMessage({ at: Date.now() }); } catch (e) {}
+  try { crewPush(db); } catch (e) {}
   crewEmit();
+}
+
+/* ============================================================
+   CREW CLAIMS IN THE SHARED DATABASE
+   ------------------------------------------------------------
+   One document per task, holding a claim per unit — a zone, a plot. Two people
+   claiming DIFFERENT units must not overwrite each other, so writes name the
+   unit they touch (`{claims:{AZ06:…}}` merged in) rather than replacing the
+   whole record. Firestore merges nested maps, so a claim on AZ06 leaves a
+   claim on AZ11 alone.
+
+   Heartbeats are what make a claim expire when somebody walks away, and they
+   have to reach the other phones or a claim would go stale everywhere but the
+   phone holding it. They also cost a write each, so the beat is slowed from 45
+   seconds to two minutes when claims are shared — the claim is free after
+   eight minutes without one, so that is still four chances to miss.
+   ============================================================ */
+
+var CSYNC_KEY='ut_crew_shared_v1';
+var CSYNC_COLL='crew';
+var CSYNC_RETRY_MS=10000;
+var CREW_BEAT_SHARED_MS=120000;
+
+var CSYNC={ on:false, live:false, seen:{}, err:null, up:0, down:0 };
+var _csyncNextTry=0;
+
+function csyncWanted(){
+  try{ return localStorage.getItem(CSYNC_KEY)==='1'; }catch(e){ return false; }
+}
+function csyncHydrate(){ CSYNC.on=csyncWanted(); }
+function csyncSetWanted(on){
+  try{ localStorage.setItem(CSYNC_KEY,on?'1':'0'); }catch(e){}
+  CSYNC.on=!!on;
+  if(on){ _csyncNextTry=0; csyncStart(); } else csyncStop();
+}
+function crewBeatMs(){ return CSYNC.on?CREW_BEAT_SHARED_MS:CREW_BEAT_MS; }
+
+function csyncStart(){
+  if(CSYNC.live) return true;
+  if(Date.now()<_csyncNextTry) return false;
+  var db=fbDb();
+  if(!db||!SESSION.pid){
+    CSYNC.err=db?'Nobody is signed in yet':'The database code did not load on this device';
+    _csyncNextTry=Date.now()+CSYNC_RETRY_MS; return false;
+  }
+  try{
+    CSYNC.unsub=db.collection(CSYNC_COLL).onSnapshot(csyncOnSnapshot,function(e){
+      CSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+      CSYNC.live=false; _csyncNextTry=Date.now()+CSYNC_RETRY_MS;
+    });
+    CSYNC.live=true; CSYNC.err=null;
+    return true;
+  }catch(e){
+    CSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+    _csyncNextTry=Date.now()+CSYNC_RETRY_MS;
+    return false;
+  }
+}
+function csyncStop(){
+  try{ if(CSYNC.unsub) CSYNC.unsub(); }catch(e){}
+  CSYNC.unsub=null; CSYNC.live=false; CSYNC.seen={};
+}
+
+/* Arriving claims are laid over the local copy and saved WITHOUT crewSend, so
+   what came down does not go straight back up. */
+function csyncOnSnapshot(snap){
+  var changes; try{ changes=snap.docChanges(); }catch(e){ return; }
+  if(!changes.length) return;
+  var db=crewLoad(), touched=false;
+
+  changes.forEach(function(ch){
+    var id=String(ch.doc.id);
+    if(ch.type==='removed'){ delete CSYNC.seen[id]; return; }
+    var data; try{ data=ch.doc.data(); }catch(e){ return; }
+    if(!data) return;
+    var rec={ claims:data.claims||{}, done:data.done||{} };
+    CSYNC.seen[id]=JSON.parse(JSON.stringify(rec));   /* agreed before anything reads it */
+    CSYNC.down++;
+    try{
+      if(JSON.stringify(db[id])!==JSON.stringify(rec)){ db[id]=rec; touched=true; }
+    }catch(e){ db[id]=rec; touched=true; }
+  });
+
+  if(touched){ crewSave(db); crewEmit(); }
+}
+
+/* Only the units that actually changed are named, so two people on different
+   zones of the same job never overwrite each other. */
+function crewPush(db){
+  if(!CSYNC.on||!CSYNC.live) return 0;
+  var fdb=fbDb(); if(!fdb) return 0;
+  var DEL=null;
+  try{ DEL=firebase.firestore.FieldValue.delete(); }catch(e){ DEL=null; }
+  var wrote=0;
+
+  Object.keys(db||{}).forEach(function(taskId){
+    var prev=CSYNC.seen[taskId]||{claims:{},done:{}};
+    var next=db[taskId]||{claims:{},done:{}};
+    var payload={claims:{},done:{}}, any=false;
+
+    ['claims','done'].forEach(function(kind){
+      var a=prev[kind]||{}, b=next[kind]||{};
+      Object.keys(b).forEach(function(u){
+        var same; try{ same=JSON.stringify(a[u])===JSON.stringify(b[u]); }catch(e){ same=false; }
+        if(!same){ payload[kind][u]=b[u]; any=true; }
+      });
+      Object.keys(a).forEach(function(u){
+        if(!(u in b) && DEL){ payload[kind][u]=DEL; any=true; }
+      });
+    });
+    if(!any) return;
+
+    CSYNC.seen[taskId]=JSON.parse(JSON.stringify(next));
+    wrote++; CSYNC.up++;
+    try{ fdb.collection(CSYNC_COLL).doc(String(taskId)).set(payload,{merge:true})
+           .catch(function(e){ CSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e); }); }
+    catch(e){ CSYNC.err=String(e&&e.message||e); }
+  });
+  return wrote;
+}
+
+function csyncTick(){
+  if(!CSYNC.on) return;
+  if(!CSYNC.live) csyncStart();
+}
+
+function csyncSummary(){
+  if(!CSYNC.on) return 'Off — only tabs on this machine see each other';
+  if(CSYNC.err) return CSYNC.err;
+  if(!CSYNC.live) return 'Connecting…';
+  return CSYNC.up+' sent · '+CSYNC.down+' received';
 }
 function crewOn(fn)  { if (CREW_SUBS.indexOf(fn) < 0) CREW_SUBS.push(fn); }
 function crewOff(fn) { var i = CREW_SUBS.indexOf(fn); if (i >= 0) CREW_SUBS.splice(i, 1); }
@@ -12955,8 +13744,10 @@ function crewHeartbeat(taskId, on) {
     Object.keys(t.claims).forEach(function (u) {
       if (t.claims[u].who === me) { t.claims[u].beat = Date.now(); touched = true; }
     });
-    if (touched) crewSave(db);
-  }, CREW_BEAT_MS);
+    /* A beat that never leaves the phone lets a live claim read as abandoned
+       on everybody else's, which is how the same ground gets mown twice. */
+    if (touched) { if (CSYNC.on) crewSend(db); else crewSave(db); }
+  }, crewBeatMs());
 }
 
 /* Colour per person so the map reads at a glance. Stable by name, not by
@@ -13674,7 +14465,7 @@ var PE_STORE=peLoad();
 function peSave(){
   try{ localStorage.setItem(PE_KEY,JSON.stringify({geom:PE_STORE.geom,added:PE_STORE.added,deleted:PE_STORE.deleted})); }catch(e){}
 }
-function peCanEdit(){ return currentRole==='manager'||currentRole==='faculty'; }
+function peCanEdit(){ return mapCan(SESSION.pid,'shape'); }
 function peDirty(){ return Object.keys(PE_STORE.geom).length>0||PE_STORE.added.length>0||PE_STORE.deleted.length>0
   ||(typeof DUMP_NOTES!=='undefined'&&Object.keys(DUMP_NOTES).length>0); }
 /* Layer the saved overrides over the shapes baked into the file. */
@@ -14042,6 +14833,10 @@ function storeScan(){
   try{ mowersScan(); }catch(e){}
   try{ labsScan(); }catch(e){}
   try{ bugcfgScan(); }catch(e){}
+  try{ tsyncTick(); }catch(e){}
+  try{ msyncTick(); }catch(e){}
+  try{ csyncTick(); }catch(e){}
+  try{ flsyncTick(); }catch(e){}
 }
 function storeFlush(){ storeScan(); }
 function storeTouch(){ storeScan(); }   /* callers that want an immediate write */
@@ -14066,6 +14861,10 @@ function storeHydrate(){
   try{ sprayHydrate(); }catch(e){}
   try{ mowersHydrate(); }catch(e){}
   try{ labsHydrate(); }catch(e){}
+  try{ tsyncHydrate(); }catch(e){}
+  try{ msyncHydrate(); }catch(e){}
+  try{ csyncHydrate(); }catch(e){}
+  try{ flsyncHydrate(); }catch(e){}
   _storeOn=true;
   try{ setInterval(storeScan,STORE_SCAN_MS); }catch(e){}
 }
@@ -14075,6 +14874,257 @@ try{
   document.addEventListener('visibilitychange',function(){ if(document.visibilityState==='hidden') storeFlush(); });
 }catch(e){}
 
+
+/* ============================================================
+   TASKS IN THE SHARED DATABASE — drawer 1
+   ------------------------------------------------------------
+   The first collection to leave the phone. Everything after it copies this
+   shape, so it is worth reading once.
+
+   THE ARRAY STAYS. ~900 render functions read TASKS synchronously and some
+   capture a reference to it, so the array is still the thing the screens draw
+   from. What changes is where it is filled from and where changes go. Records
+   arriving from the database are written INTO the existing objects rather than
+   replacing them, for the same reason storeHydrate() refills in place.
+
+   OUTBOUND CHANGES RIDE THE SAME 2-SECOND SCAN. There are around thirty places
+   that change a task, spread over twelve thousand lines. Adding a save() to
+   each is thirty chances to miss one and thirty chances to break something
+   that works. The scan serialises each task, compares it with what the server
+   last agreed to, and writes only what actually differs — and it cannot be
+   defeated by a mutation site nobody remembered.
+
+   THREE THINGS THIS MUST NEVER DO, in order of how bad they are:
+
+   1. LOSE A DAY'S WORK. A record that exists only on a phone is uploaded,
+      matched on its device-generated id, so opening the app twice does not
+      create two copies of the same job.
+   2. DELETE THE FARM. If the local array empties — a cleared browser, a failed
+      hydrate, a bug — the difference between "empty" and "everything was
+      deleted" is invisible to a scan. So a scan that would remove everything,
+      or more than a handful at once, refuses and says so. Losing all of it at
+      once is a fault, not a deletion.
+   3. ECHO. A record that arrives from the server is recorded as agreed before
+      anything else looks at it, so the scan does not immediately send it back.
+
+   THE SWITCH IS PER DEVICE AND STARTS OFF. That is deliberate and it matches
+   the rollout in docs/BACKEND-STEPS.md: build it, everyone opens the app once
+   on wifi so their records go up, then flip. Dillon can turn it on for himself
+   and watch it for a week without anybody else's phone changing behaviour.
+   Making the flip farm-wide needs a config document and another rules publish;
+   it is written down in docs/DATABASE-SHAPE.md as the next step.
+   ============================================================ */
+
+var TSYNC_KEY='ut_tasks_shared_v1';
+var TSYNC_COLL='tasks';
+var TSYNC_RETRY_MS=10000;      /* how often to re-try attaching, if it failed */
+var TSYNC_MAX_DELETE=5;        /* more than this at once reads as a fault */
+
+var TSYNC={
+  on:false,        /* the switch on this device */
+  live:false,      /* a listener is attached */
+  ready:false,     /* a snapshot has come from the SERVER, not just the cache */
+  seen:{},         /* id -> the record this device and the server last agreed on */
+  err:null,        /* the last thing that went wrong, in words */
+  up:0, down:0,    /* records sent / received, for the status screen */
+  failed:{}        /* id -> why it would not save */
+};
+var _tsyncNextTry=0;
+
+function tsyncWanted(){
+  try{ return localStorage.getItem(TSYNC_KEY)==='1'; }catch(e){ return false; }
+}
+function tsyncHydrate(){
+  TSYNC.on=tsyncWanted();
+}
+function tsyncSetWanted(on){
+  try{ localStorage.setItem(TSYNC_KEY,on?'1':'0'); }catch(e){}
+  TSYNC.on=!!on;
+  if(on){ _tsyncNextTry=0; tsyncStart(); } else tsyncStop();
+}
+
+/* What actually gets stored. Plain data only: Firestore rejects undefined, and
+   a round trip through JSON drops it wherever it is hiding. */
+function taskDoc(t){
+  var out;
+  try{ out=JSON.parse(JSON.stringify(t||{})); }catch(e){ return null; }
+  if(!out||!out.id) return null;
+  out.id=String(out.id);
+  /* Records made before createdBy was stamped would be refused by the database,
+     which checks it on every new record. On this device, in this app, a task
+     nobody synced was raised here — so the person uploading it is the person
+     who raised it. */
+  if(!out.createdBy) out.createdBy=SESSION.pid||null;
+  return out;
+}
+function tsyncJson(t){ var d=taskDoc(t); return d?JSON.stringify(d):null; }
+
+function tsyncFail(id,e){
+  TSYNC.failed[id]=(typeof sdbError==='function')?sdbError(e):String((e&&e.message)||e);
+}
+
+/* ---- attaching ---- */
+function tsyncStart(){
+  if(TSYNC.live) return true;
+  if(Date.now()<_tsyncNextTry) return false;
+  var db=fbDb();
+  if(!db){ TSYNC.err='The database code did not load on this device'; _tsyncNextTry=Date.now()+TSYNC_RETRY_MS; return false; }
+  if(!SESSION.pid){ TSYNC.err='Nobody is signed in yet'; _tsyncNextTry=Date.now()+TSYNC_RETRY_MS; return false; }
+  try{
+    TSYNC.unsub=db.collection(TSYNC_COLL).onSnapshot(tsyncOnSnapshot,tsyncOnError);
+    TSYNC.live=true; TSYNC.err=null;
+    return true;
+  }catch(e){
+    TSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+    _tsyncNextTry=Date.now()+TSYNC_RETRY_MS;
+    return false;
+  }
+}
+function tsyncStop(){
+  try{ if(TSYNC.unsub) TSYNC.unsub(); }catch(e){}
+  TSYNC.unsub=null; TSYNC.live=false; TSYNC.ready=false;
+  TSYNC.seen={}; TSYNC.failed={};
+}
+function tsyncOnError(e){
+  TSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+  TSYNC.live=false; TSYNC.ready=false;
+  _tsyncNextTry=Date.now()+TSYNC_RETRY_MS;
+  tsyncRepaint();
+}
+
+/* ---- records coming in ---- */
+
+/* Fill the existing object rather than swapping it, so a screen holding a
+   reference sees the change instead of going stale. */
+function tsyncApply(target,data){
+  Object.keys(target).forEach(function(k){ if(!(k in data)) delete target[k]; });
+  Object.keys(data).forEach(function(k){ target[k]=data[k]; });
+}
+function tsyncIndex(){
+  var by={};
+  for(var i=0;i<TASKS.length;i++){ var t=TASKS[i]; if(t&&t.id) by[String(t.id)]=i; }
+  return by;
+}
+
+function tsyncOnSnapshot(snap){
+  var touched=false, changes;
+  try{ changes=snap.docChanges(); }catch(e){ return; }
+
+  changes.forEach(function(ch){
+    var id=String(ch.doc.id);
+    if(ch.type==='removed'){
+      /* Only take it off this phone if this phone had it FROM the server. A
+         record we have never seen from the server is one of ours going up, not
+         one of theirs coming down. */
+      if(TSYNC.seen[id]!==undefined){
+        var by=tsyncIndex();
+        if(by[id]!==undefined){ TASKS.splice(by[id],1); touched=true; }
+      }
+      delete TSYNC.seen[id];
+      return;
+    }
+    var data; try{ data=ch.doc.data(); }catch(e){ return; }
+    if(!data) return;
+    data.id=id;
+    var json=JSON.stringify(data);
+    TSYNC.seen[id]=json;             /* agreed BEFORE anything reads it — no echo */
+    delete TSYNC.failed[id];
+    TSYNC.down++;
+    var by=tsyncIndex();
+    if(by[id]===undefined){ TASKS.push(data); touched=true; }
+    else if(tsyncJson(TASKS[by[id]])!==json){ tsyncApply(TASKS[by[id]],data); touched=true; }
+  });
+
+  /* The first SERVER snapshot — not a cached one — is the moment this device
+     knows what the shared copy actually holds, and therefore the only safe
+     moment to send up what only it has. */
+  var fromCache=true;
+  try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
+  if(!TSYNC.ready&&!fromCache){ TSYNC.ready=true; tsyncUploadNew(); }
+
+  if(touched){ try{ storeTouch(); }catch(e){} tsyncRepaint(); }
+}
+
+/* The migration step, and the reason everyone has to open the app once on
+   wifi. Matched on the device-generated id, so it cannot double anything up. */
+function tsyncUploadNew(){
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  TASKS.slice().forEach(function(t){
+    if(!t||!t.id) return;
+    var id=String(t.id);
+    if(TSYNC.seen[id]!==undefined) return;      /* the shared copy already has it */
+    var doc=taskDoc(t); if(!doc) return;
+    TSYNC.seen[id]=JSON.stringify(doc);
+    n++; TSYNC.up++;
+    try{ db.collection(TSYNC_COLL).doc(id).set(doc).catch(function(e){ tsyncFail(id,e); }); }
+    catch(e){ tsyncFail(id,e); }
+  });
+  if(n){ try{ toast(n+' of this phone\'s records sent up'); }catch(e){} }
+  return n;
+}
+
+/* ---- records going out ---- */
+function tsyncScan(){
+  if(!TSYNC.on||!TSYNC.live||!TSYNC.ready) return;
+  var db=fbDb(); if(!db) return;
+
+  var here={};
+  for(var i=0;i<TASKS.length;i++){ var t=TASKS[i]; if(t&&t.id) here[String(t.id)]=t; }
+
+  Object.keys(here).forEach(function(id){
+    var json=tsyncJson(here[id]); if(json===null) return;
+    if(TSYNC.seen[id]===json) return;
+    TSYNC.seen[id]=json; TSYNC.up++;
+    try{ db.collection(TSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ tsyncFail(id,e); }); }
+    catch(e){ tsyncFail(id,e); }
+  });
+
+  var gone=Object.keys(TSYNC.seen).filter(function(id){ return !(id in here); });
+  if(!gone.length) return;
+
+  /* See note 2 at the top. An empty array or a mass disappearance is a fault,
+     and the safe reading of a fault is to touch nothing. */
+  if(!Object.keys(here).length || gone.length>TSYNC_MAX_DELETE){
+    TSYNC.err='Refused to remove '+gone.length+' records at once — nothing was deleted. '
+             +'If that was deliberate, do it a few at a time.';
+    return;
+  }
+  gone.forEach(function(id){
+    delete TSYNC.seen[id];
+    try{ db.collection(TSYNC_COLL).doc(id).delete().catch(function(e){ tsyncFail(id,e); }); }
+    catch(e){ tsyncFail(id,e); }
+  });
+}
+
+/* Called by the 2-second scan. Keeps trying to attach if the first go failed —
+   a phone that boots out of signal must not stay disconnected once it is back. */
+function tsyncTick(){
+  if(!TSYNC.on) return;
+  if(!TSYNC.live){ tsyncStart(); return; }
+  tsyncScan();
+}
+
+function tsyncRepaint(){
+  try{
+    var b=document.getElementById('s-taskboard');
+    if(b&&b.classList.contains('active')&&typeof renderBoard==='function') renderBoard();
+  }catch(e){}
+  try{
+    var d=document.getElementById('s-sharedb');
+    if(d&&d.classList.contains('active')&&typeof sdbRender==='function') sdbRender();
+  }catch(e){}
+}
+
+/* One line for the status screen. */
+function tsyncSummary(){
+  if(!TSYNC.on) return 'Off — this phone keeps its own copy';
+  if(TSYNC.err) return TSYNC.err;
+  if(!TSYNC.live) return 'Connecting…';
+  if(!TSYNC.ready) return 'Connected — waiting for the shared copy';
+  var f=Object.keys(TSYNC.failed).length;
+  return TSYNC.up+' sent · '+TSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+}
 
 /* ---- map records: store the difference, not the whole thing ----
    PLOT_INFO and MGMT_DATA are baked into farm-geo.js and edited on top of it.
@@ -14201,10 +15251,256 @@ function mapScan(){
   });
 }
 
+/* ============================================================
+   THE MAP IN THE SHARED DATABASE — drawer 2
+   ------------------------------------------------------------
+   THE PROBLEM THIS SOLVES. Until now, reshaping a plot, correcting an area or
+   changing a cut height saved on one phone and stopped there. Making it real
+   for the farm meant somebody hand-editing farm-geo.js and everybody
+   re-downloading the app. That is a routine job that needed a programmer, and
+   it was the worst standing violation of the rule that nothing routine may
+   require a code edit.
+
+   ONE DOCUMENT PER PLACE, and it holds only what has been CHANGED about that
+   place. Four sets of edits used to live in four localStorage keys:
+
+     ut_plot_shapes_v1  polygon geometry, and places added or removed
+     ut_places_v1       what a named place is
+     ut_plot_info_v1    turfgrass, cultivar, area, rootzone
+     ut_mgmt_data_v1    mower, cut height, irrigation heads
+
+   They are now four fields on one record, keyed by the place — B12, AZ06,
+   CAFS9. A place nobody has touched has no record at all.
+
+   STILL OVERRIDES, NEVER WHOLE OBJECTS. Storing the finished object would
+   shadow farm-geo.js forever: the next time the file gains a plot or a
+   corrected area, every device would go on serving its own stale copy and
+   nobody would know why. Only what somebody actually changed is stored, laid
+   over whatever the file currently says. This is the same reasoning as the
+   local overrides it replaces, and it is why the file stays useful.
+
+   THIS SYNC NEVER DELETES A DOCUMENT. Deliberate, and it is the difference
+   between this and the task sync. "Clear this device's plot edits" wipes local
+   storage and reloads — under a scan that deletes, that button would take the
+   whole farm's map corrections with it. Removing a PLACE is expressible
+   without deleting a record (`removed:true`), so nothing needs doc deletion,
+   and the dangerous case simply cannot arise. After that button, the farm's
+   edits come back down on the next load, which is the right answer for a
+   shared map.
+   ============================================================ */
+
+var MSYNC_KEY='ut_map_shared_v1';
+var MSYNC_COLL='mapplaces';
+var MSYNC_RETRY_MS=10000;
+
+var MSYNC={ on:false, live:false, ready:false, seen:{}, err:null,
+            up:0, down:0, failed:{} };
+var _msyncNextTry=0;
+
+function msyncWanted(){
+  try{ return localStorage.getItem(MSYNC_KEY)==='1'; }catch(e){ return false; }
+}
+function msyncHydrate(){ MSYNC.on=msyncWanted(); }
+function msyncSetWanted(on){
+  try{ localStorage.setItem(MSYNC_KEY,on?'1':'0'); }catch(e){}
+  MSYNC.on=!!on;
+  if(on){ _msyncNextTry=0; msyncStart(); } else msyncStop();
+}
+
+/* Everything this device has changed, gathered by place. The three MAP_DEFS
+   diffs already come back keyed by place, so they drop straight in; the shape
+   editor's store is keyed differently and is folded in here. */
+function mapPlaceRecords(){
+  var out={};
+  function touch(id){ id=String(id); if(!out[id]) out[id]={id:id}; return out[id]; }
+
+  MAP_DEFS.forEach(function(d){
+    if(!d.get()) return;
+    var diff; try{ diff=mapDiff(d); }catch(e){ return; }
+    Object.keys(diff).forEach(function(k){ touch(k)[d.name]=diff[k]; });
+  });
+
+  try{
+    Object.keys(PE_STORE.geom||{}).forEach(function(k){ touch(k).geom=PE_STORE.geom[k]; });
+    (PE_STORE.added||[]).forEach(function(a){ if(a&&a.number) touch(a.number).added=a; });
+    (PE_STORE.deleted||[]).forEach(function(k){ touch(k).removed=true; });
+  }catch(e){}
+
+  return out;
+}
+
+/* A record is plain data or it does not go. */
+function mapPlaceDoc(rec){
+  var out; try{ out=JSON.parse(JSON.stringify(rec||{})); }catch(e){ return null; }
+  if(!out||!out.id) return null;
+  out.id=String(out.id);
+  out.updatedBy=SESSION.pid||null;
+  out.updatedAt=new Date().toISOString();
+  return out;
+}
+/* What is compared. updatedAt and updatedBy are stamped on every write, so
+   they must be left out of the comparison or every scan would look changed. */
+function mapPlaceJson(rec){
+  var d; try{ d=JSON.parse(JSON.stringify(rec||{})); }catch(e){ return null; }
+  if(!d) return null;
+  delete d.updatedAt; delete d.updatedBy;
+  return JSON.stringify(d);
+}
+
+/* Lay an arriving record over what this device has. Mirrors mapApply(): a
+   field carrying null means the file has it and the farm has removed it. */
+function mapPlaceApply(rec){
+  if(!rec||!rec.id) return false;
+  var id=String(rec.id), changed=false;
+
+  MAP_DEFS.forEach(function(d){
+    if(!(d.name in rec)) return;
+    var o=d.get(); if(!o||typeof o!=='object') return;
+    var v=rec[d.name];
+    if(v===null){ if(id in o){ delete o[id]; changed=true; } }
+    else { try{ if(JSON.stringify(o[id])!==JSON.stringify(v)){ o[id]=v; changed=true; } }catch(e){ o[id]=v; changed=true; } }
+  });
+
+  try{
+    if('geom' in rec){
+      if(rec.geom===null){ if(PE_STORE.geom[id]){ delete PE_STORE.geom[id]; changed=true; } }
+      else if(JSON.stringify(PE_STORE.geom[id])!==JSON.stringify(rec.geom)){ PE_STORE.geom[id]=rec.geom; changed=true; }
+    }
+    if(rec.added){
+      var have=PE_STORE.added.some(function(a){ return a&&a.number===id; });
+      if(!have){ PE_STORE.added.push(rec.added); changed=true; }
+    }
+    if(rec.removed===true){
+      if(PE_STORE.deleted.indexOf(id)<0){ PE_STORE.deleted.push(id); changed=true; }
+    }
+  }catch(e){}
+
+  return changed;
+}
+
+/* ---- attaching ---- */
+function msyncStart(){
+  if(MSYNC.live) return true;
+  if(Date.now()<_msyncNextTry) return false;
+  var db=fbDb();
+  if(!db){ MSYNC.err='The database code did not load on this device'; _msyncNextTry=Date.now()+MSYNC_RETRY_MS; return false; }
+  if(!SESSION.pid){ MSYNC.err='Nobody is signed in yet'; _msyncNextTry=Date.now()+MSYNC_RETRY_MS; return false; }
+  try{
+    MSYNC.unsub=db.collection(MSYNC_COLL).onSnapshot(msyncOnSnapshot,msyncOnError);
+    MSYNC.live=true; MSYNC.err=null;
+    return true;
+  }catch(e){
+    MSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+    _msyncNextTry=Date.now()+MSYNC_RETRY_MS;
+    return false;
+  }
+}
+function msyncStop(){
+  try{ if(MSYNC.unsub) MSYNC.unsub(); }catch(e){}
+  MSYNC.unsub=null; MSYNC.live=false; MSYNC.ready=false;
+  MSYNC.seen={}; MSYNC.failed={};
+}
+function msyncOnError(e){
+  MSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+  MSYNC.live=false; MSYNC.ready=false;
+  _msyncNextTry=Date.now()+MSYNC_RETRY_MS;
+}
+
+function msyncOnSnapshot(snap){
+  var touched=false, changes;
+  try{ changes=snap.docChanges(); }catch(e){ return; }
+
+  changes.forEach(function(ch){
+    if(ch.type==='removed'){ delete MSYNC.seen[String(ch.doc.id)]; return; }
+    var data; try{ data=ch.doc.data(); }catch(e){ return; }
+    if(!data) return;
+    data.id=String(ch.doc.id);
+    MSYNC.seen[data.id]=mapPlaceJson(data);   /* agreed before anything reads it */
+    delete MSYNC.failed[data.id];
+    MSYNC.down++;
+    if(mapPlaceApply(data)) touched=true;
+  });
+
+  var fromCache=true;
+  try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
+  if(!MSYNC.ready&&!fromCache){ MSYNC.ready=true; msyncUploadNew(); }
+
+  if(touched){
+    try{ peSave(); }catch(e){}
+    try{ storeTouch(); }catch(e){}
+    /* ~160 live polygon objects are holding the old geometry. peRedraw() is
+       the app's own answer to that and it already exists. */
+    try{ if(typeof peRedraw==='function') peRedraw(); }catch(e){}
+    try{ if(typeof msyncRepaint==='function') msyncRepaint(); }catch(e){}
+  }
+}
+
+/* This device's corrections, going up for the first time. */
+function msyncUploadNew(){
+  var db=fbDb(); if(!db) return 0;
+  var recs=mapPlaceRecords(), n=0;
+  Object.keys(recs).forEach(function(id){
+    if(MSYNC.seen[id]!==undefined) return;
+    var doc=mapPlaceDoc(recs[id]); if(!doc) return;
+    MSYNC.seen[id]=mapPlaceJson(recs[id]);
+    n++; MSYNC.up++;
+    try{ db.collection(MSYNC_COLL).doc(id).set(doc).catch(function(e){ msyncFail(id,e); }); }
+    catch(e){ msyncFail(id,e); }
+  });
+  if(n){ try{ toast(n+' map correction'+(n===1?'':'s')+' from this phone sent up'); }catch(e){} }
+  return n;
+}
+function msyncFail(id,e){
+  MSYNC.failed[id]=(typeof sdbError==='function')?sdbError(e):String((e&&e.message)||e);
+}
+
+/* Outbound. Writes only. See the note at the top about never deleting. */
+function msyncScan(){
+  if(!MSYNC.on||!MSYNC.live||!MSYNC.ready) return;
+  var db=fbDb(); if(!db) return;
+  var recs=mapPlaceRecords();
+  Object.keys(recs).forEach(function(id){
+    var json=mapPlaceJson(recs[id]); if(json===null) return;
+    if(MSYNC.seen[id]===json) return;
+    var doc=mapPlaceDoc(recs[id]); if(!doc) return;
+    MSYNC.seen[id]=json; MSYNC.up++;
+    try{ db.collection(MSYNC_COLL).doc(id).set(doc).catch(function(e){ msyncFail(id,e); }); }
+    catch(e){ msyncFail(id,e); }
+  });
+}
+
+function msyncTick(){
+  if(!MSYNC.on) return;
+  if(!MSYNC.live){ msyncStart(); return; }
+  msyncScan();
+}
+
+function msyncRepaint(){
+  try{
+    var d=document.getElementById('s-sharedb');
+    if(d&&d.classList.contains('active')&&typeof sdbRender==='function') sdbRender();
+  }catch(e){}
+}
+
+function msyncSummary(){
+  if(!MSYNC.on) return 'Off — corrections stay on this phone';
+  if(MSYNC.err) return MSYNC.err;
+  if(!MSYNC.live) return 'Connecting…';
+  if(!MSYNC.ready) return 'Connected — waiting for the shared copy';
+  var f=Object.keys(MSYNC.failed).length;
+  return MSYNC.up+' sent · '+MSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+}
+
 /* Drop this device's edits and go back to what the file says. The reload is
    the honest way to do it — the overrides are already sitting in ~160 live
    objects that half the app is holding references to. */
 function mapClearOverrides(){
+  /* With the map shared, this button no longer means what it says: the farm's
+     corrections come straight back down on the next load. Say so rather than
+     letting somebody press it expecting a clean slate. */
+  if(MSYNC.on){
+    toast('The map is shared — the farm\'s corrections will come back on reload');
+  }
   MAP_DEFS.forEach(function(d){
     try{ localStorage.removeItem(d.key); }catch(e){}
     _storeSeen['map:'+d.name]=undefined;
@@ -14924,6 +16220,34 @@ var FB_CONFIG = {
   appId: '1:619659467819:web:74aabad9f2187d4cb15e6e'
 };
 
+/* ---------------------------------------------------------------
+   TEMPORARY: EMAIL-ONLY SIGN-IN                       (2026-08-25)
+   ---------------------------------------------------------------
+   Switched on because the password-set links sent to @utk.edu addresses are
+   not arriving, and the crew have to be able to get into the app meanwhile.
+
+   true  - the sign-in screen asks for an email address and nothing else. The
+           app fills in one shared password behind the scenes, the same for
+           every account, which tools/easy-sign-in.js has put on all of them.
+   false - normal. Everybody types their own password.
+
+   WHAT THIS COSTS, written down so nobody has to work it out later: this page
+   is public, so the password below is public too. Anyone who reads it and
+   knows a crew email address can sign in as that person. Dillon weighed that
+   on 2026-08-25 and accepted it as a short-term trade while UT OIT sort the
+   mail out. It is not a permanent arrangement.
+
+   TO SWITCH IT BACK OFF - BOTH halves, or the shared password stays live on
+   23 real accounts:
+       1. set EASY_SIGN_IN to false, just below
+       2. run   node tools/easy-sign-in.js off
+   Step 2 puts a fresh password nobody knows on every account, so each person
+   uses "First time here, or forgotten your password?" once and chooses their
+   own. Written up in docs/GO-LIVE-MANUAL.md.
+   --------------------------------------------------------------- */
+var EASY_SIGN_IN = true;
+var EASY_PASSWORD = 'utturf-temp-2026';
+
 var AUTH_KEY = 'ut_auth_v1';
 var _fbAuth = null, _fbTried = false;
 
@@ -14942,6 +16266,101 @@ function fbAuth(){
   return _fbAuth;
 }
 function authConfigured(){ return !!fbAuth(); }
+
+/* ============================================================
+   THE SHARED DATABASE — the handle, and the roster it reads
+   ------------------------------------------------------------
+   One handle, made on first use, exactly like fbAuth() above. If the vendored
+   library did not load, or the project is not configured, this returns null
+   and every caller degrades rather than throwing. The app has to keep working
+   when the database does not.
+
+   Two things live here and nowhere else:
+
+   1. THE LOCAL COPY. enablePersistence() keeps everything this phone has seen
+      on the phone. It is what makes the app work at the far end of the farm,
+      and it is the reason Firebase was chosen over the alternatives. It has to
+      be switched on BEFORE the first read or write, which is why it sits in
+      the constructor rather than at a call site — a caller that forgot would
+      silently get an app that needs bars.
+
+   2. THE ROSTER DOCUMENT. `refdata/roster` is the one document the database's
+      own rules read, to decide who may do what. Until it exists, every rule
+      that asks a question about a person fails, and the database refuses
+      everything. So it is the first thing that has to be written, and there is
+      a button for it — see the Shared database screen. Not a script: a script
+      would need a terminal, and the farm will not always have somebody who
+      owns one.
+   ============================================================ */
+
+var _fbDb=null, _fbDbTried=false;
+var DB_CACHE='unknown';           /* 'on' | 'off' | the reason it could not */
+
+function fbDb(){
+  if(_fbDbTried) return _fbDb;
+  _fbDbTried=true;
+  try{
+    if(!fbAuth()) return null;                              /* also initialises the app */
+    if(typeof firebase.firestore!=='function') return null;  /* library missing */
+    _fbDb=firebase.firestore();
+    try{
+      /* synchronizeTabs so two open tabs on one machine share the copy rather
+         than one of them silently losing it. */
+      _fbDb.enablePersistence({synchronizeTabs:true})
+        .then(function(){ DB_CACHE='on'; })
+        .catch(function(e){ DB_CACHE=(e&&e.code)||'off'; });
+    }catch(e){ DB_CACHE='off'; }
+  }catch(e){ _fbDb=null; }
+  return _fbDb;
+}
+function dbConfigured(){ return !!fbDb(); }
+
+var ROSTER_PATH='refdata/roster';
+var ROSTER_SENT_KEY='ut_roster_sent';
+
+/* MUST MATCH the bootstrap list in firestore.rules. The rules check the roster
+   to decide who may write the roster, so somebody has to be allowed before
+   there is a roster to check — these two are it. tools/test-db.js fails if the
+   app's list and the rules' list ever differ. */
+var DB_BOOTSTRAP_PIDS=['p01','p07'];
+
+function rosterCanPush(who){
+  var pid=pidOf(who)||SESSION.pid;
+  if(!pid) return false;
+  return DB_BOOTSTRAP_PIDS.indexOf(pid)>=0 || assignsUndergrads(pid);
+}
+
+/* Only the four things the rules actually ask about travel. Names, pronouns
+   and email addresses stay in the app — the crew's addresses were taken out
+   deliberately (docs/DECISIONS.md) and this is not the place to put them back. */
+function rosterPayload(){
+  var people={};
+  (PEOPLE||[]).forEach(function(p){
+    if(!p||!p.id) return;
+    people[p.id]={ role:p.role||'', lab:p.lab||'',
+                   active:p.active!==false, grants:(p.grants||[]).slice() };
+  });
+  return { people:people, count:Object.keys(people).length,
+           updatedAt:new Date().toISOString(), updatedBy:SESSION.pid||null };
+}
+
+function rosterSentAt(){
+  try{ return localStorage.getItem(ROSTER_SENT_KEY)||null; }catch(e){ return null; }
+}
+
+/* Writes the WHOLE document rather than patching it. It is 23 short entries,
+   and a whole-document write cannot leave one person half-updated the way a
+   field-by-field merge can. */
+function rosterPush(){
+  var db=fbDb();
+  if(!db) return Promise.reject(new Error('nodb'));
+  if(!rosterCanPush()) return Promise.reject(new Error('notallowed'));
+  var payload=rosterPayload();
+  return db.doc(ROSTER_PATH).set(payload).then(function(){
+    try{ localStorage.setItem(ROSTER_SENT_KEY,payload.updatedAt); }catch(e){}
+    return payload.count;
+  });
+}
 
 /* What this device last knew about who is signed in. */
 function authLocal(){
@@ -15029,16 +16448,42 @@ function authMsg(text, ok){
   el.textContent = text||'';
   el.className = 'lg-msg' + (ok?' ok':'');
 }
+/* Email-only mode: take the password box and the emailed-link offer off the
+   screen. The elements stay in the page - they are simply not shown - so
+   turning EASY_SIGN_IN off puts everything back with no other change. */
+function authEasyLayout(){
+  var lab=document.getElementById('lg-pass-lab'),
+      p=document.getElementById('lg-pass'),
+      link=document.getElementById('lg-reset');
+  var hide = !!EASY_SIGN_IN;
+  if(lab) lab.style.display = hide ? 'none' : '';
+  if(p){ p.style.display = hide ? 'none' : ''; if(hide) p.value=''; }
+  /* The link would send mail that is not arriving. Hiding it saves somebody
+     standing in a field waiting for an email that never comes. */
+  if(link) link.style.display = hide ? 'none' : '';
+}
+
+/* One person whose account already has a real password of its own - Dillon's,
+   and anyone who has changed theirs. Put the box back for them. */
+function authEasyAskPassword(){
+  var lab=document.getElementById('lg-pass-lab'), p=document.getElementById('lg-pass');
+  if(lab) lab.style.display='';
+  if(p){ p.style.display=''; try{ p.focus(); }catch(e){} }
+}
+
 function authRenderLogin(msg){
   var e=document.getElementById('lg-email'), p=document.getElementById('lg-pass');
   if(p) p.value='';
   if(e && !e.value){ var rec=null; try{ rec=JSON.parse(localStorage.getItem(AUTH_KEY+'_last')||'null'); }catch(_e){} if(rec&&rec.email) e.value=rec.email; }
   authMsg(msg||'');
+  authEasyLayout();
   var note=document.getElementById('lg-note');
   if(note){
-    note.textContent = authConfigured()
-      ? 'Signing in for the first time? Use the link above to choose your own password.'
-      : 'Sign-in is not set up on this copy of the app yet.';
+    note.textContent = !authConfigured()
+      ? 'Sign-in is not set up on this copy of the app yet.'
+      : (EASY_SIGN_IN
+          ? 'Type your farm email address and tap Sign in. No password is needed at the moment. Passwords come back once farm email is working.'
+          : 'Signing in for the first time? Use the link above to choose your own password.');
   }
 }
 
@@ -15165,7 +16610,12 @@ function authSignIn(email, pass){
   var auth=fbAuth();
   if(!auth){ authMsg('Sign-in is not set up on this copy of the app.'); return; }
   email=(email||'').trim();
-  if(!email || !pass){ authMsg('Enter your email and password.'); return; }
+  /* Did the person actually type a password, or are we supplying the shared
+     one? The answer decides what a refusal is allowed to say, further down. */
+  var typedPass = !!pass;
+  if(!pass && EASY_SIGN_IN) pass = EASY_PASSWORD;
+  if(!email){ authMsg(EASY_SIGN_IN ? 'Enter your farm email address.' : 'Enter your email and password.'); return; }
+  if(!pass){ authMsg('Enter your email and password.'); return; }
   if(navigator.onLine===false){ authMsg('No signal. The first sign-in on a device needs a connection.'); return; }
 
   var btn=document.getElementById('lg-go');
@@ -15202,6 +16652,13 @@ function authSignIn(email, pass){
       authMsg('Too many tries. Wait a few minutes and try again.');
     } else if(code === 'auth/user-disabled'){
       authMsg('That account has been turned off. Ask the app manager.');
+    } else if(EASY_SIGN_IN && !typedPass){
+      /* Email-only mode, and the shared password was refused. Two possible
+         reasons: this account already has a password of its own, or that
+         address has no account. The wording has to be true of both without
+         saying which - same rule as everywhere else on this screen. */
+      authEasyAskPassword();
+      authMsg('That did not work. If you have already chosen your own password, type it below and tap Sign in again. Otherwise check the spelling of your email address.');
     } else {
       /* Every other failure gets the SAME wording on purpose. Distinguishing
          "no such account" from "wrong password" would let anyone with the URL

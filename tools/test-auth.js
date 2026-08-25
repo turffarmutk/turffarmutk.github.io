@@ -295,17 +295,28 @@ section('9. signing out clears the device even if the network fails');
   ok('and the role drops to the least privileged', b.win.__get('currentRole') === 'undergrad');
 }
 
-section('10. the admin flag is honoured, and only from the token');
+section('10. the App Manager post is a HAT, not a replacement job');
 {
+  /* p01 is Dillon: Technician in the Sorochan lab, and also the App Manager.
+     The post used to be `currentRole='admin'`, which REPLACED the job - so
+     signing in stopped him being a technician, buried his own home screen and
+     dropped him on the roster. The post now sits on top of the job. */
   const a = boot({}, { user: userFor('p01', true) });
   a.p.authSignIn('admin@example.edu', 'pw');
   await settle();
-  ok('an admin account lands in the admin role', a.win.__get('currentRole') === 'admin', a.win.__get('currentRole'));
+  ok('the post-holder keeps the job the roster gives them',
+     a.win.__get('currentRole') === 'tech', a.win.__get('currentRole'));
+  ok('and still holds every admin power', a.win.__get('rstIsAdmin')() === true);
+  ok('their account card is their own, not an "App Manager" card',
+     a.win.__get('me')().t === 'Technician', a.win.__get('me')().t);
+  ok('and the roster still opens for them', a.win.__get('rstCanOpen')() === true);
 
   const c = boot({}, { user: userFor('p01', false) });
   c.p.authSignIn('admin@example.edu', 'pw');
   await settle();
-  ok('the same person without the flag does not', c.win.__get('currentRole') !== 'admin', c.win.__get('currentRole'));
+  ok('the same person without the flag holds no admin power',
+     c.win.__get('rstIsAdmin')() === false);
+  ok('but is still a technician', c.win.__get('currentRole') === 'tech', c.win.__get('currentRole'));
 }
 
 section('11. a copy with no Firebase project still runs and says so');
@@ -501,6 +512,61 @@ section('16. TEMPORARY email-only sign-in, and the way back off it');
      !!pw && src.indexOf("'" + pw + "'") < 0, pw);
   ok('it refuses to switch off in the wrong order', /Set it to false FIRST/.test(src));
   ok('and switching off leaves a password nobody knows', /unknowablePassword/.test(src));
+}
+
+section('17. Admin is a page you go to, not the first thing you see');
+{
+  const store = {};
+  const b = boot(store, { user: userFor('p01', true) });
+  b.p.authSignIn('admin@example.edu', 'pw');
+  await settle();
+  ok('signing in lands on your own home, not the roster',
+     (b.doc.querySelector('.screen.active') || {}).id === 's-home-tech',
+     (b.doc.querySelector('.screen.active') || {}).id);
+
+  /* Same farm phone, next person. A post left lying around is how somebody
+     ends up holding powers nobody gave them. */
+  const c = boot(store, { user: userFor('p09', false) });
+  c.p.authSignIn('rose@example.edu', 'pw');
+  await settle();
+  ok('the post does not carry over to the next person on the phone',
+     c.win.__get('rstIsAdmin')() === false);
+  ok('and they land on their own home too',
+     (c.doc.querySelector('.screen.active') || {}).id === 's-home-grad',
+     (c.doc.querySelector('.screen.active') || {}).id);
+}
+{
+  const b = boot({}, { user: userFor('p01', true) });
+  ok('there is an Admin screen', !!b.doc.getElementById('s-admin'));
+  const row = b.doc.getElementById('more-admin');
+  ok('and a row on More that reaches it', !!row && row.getAttribute('data-go') === 'admin');
+
+  b.p.authSignIn('admin@example.edu', 'pw');
+  await settle();
+  b.win.__get('moreEnter')();
+  ok('the post-holder sees that row', row.style.display !== 'none', row.style.display);
+
+  b.win.__get('admRender')();
+  const body = b.doc.getElementById('adm-body').innerHTML;
+  ok('the page holds the roster', /data-go="roster"/.test(body));
+  ok('farm settings', /data-go="farmsettings"/.test(body));
+  ok('the shared database', /data-go="sharedb"/.test(body));
+  ok('and bug reports', /data-go="bugsettings"/.test(body));
+  ok('and it says the post is not the job', /post, not a job/i.test(body), body.slice(0, 120));
+}
+{
+  /* A hidden row is a courtesy. The page checks again, because courtesy is
+     not a lock. */
+  const b = boot({}, { user: userFor('p09', false) });
+  b.p.authSignIn('rose@example.edu', 'pw');
+  await settle();
+  b.win.__get('moreEnter')();
+  ok('somebody without the post does not see the row',
+     b.doc.getElementById('more-admin').style.display === 'none');
+  b.win.__get('admRender')();
+  const body = b.doc.getElementById('adm-body').innerHTML;
+  ok('and gets none of it if they reach the page anyway', !/data-go="roster"/.test(body));
+  ok('with an explanation rather than a blank screen', /App Manager/.test(body));
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

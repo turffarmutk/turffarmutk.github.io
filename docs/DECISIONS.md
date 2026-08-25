@@ -305,6 +305,43 @@ pin this behaviour — keep them green.
 
 ## Field data & farm constants
 
+### Stock is a ledger of movements, never a running total — 2026-08-25
+**Decision:** inventory records **movements** (`INVMOVES`: `+50 lb in`,
+`−12 fl oz out`) and adds them up. `it.qty` is frozen as the **April opening
+balance** from the spreadsheet; on hand is `invQty(it)` = opening + every
+movement since. `invMove()` is the only thing that writes. A recount is a
+movement (`why:'count'`), and editing "On hand" on the item screen books the
+difference rather than rewriting April.
+**Why:** `it.qty += n` is a read-modify-write. Two people booking a delivery at
+the same moment both read the old figure, both add to it, and one write
+disappears with nothing to show it ever happened. On one phone that is
+unlikely; across 23 phones and a shared database it is a Tuesday. Keeping the
+opening balance separate also means `tools/build-inventory.py` can still
+regenerate the product list from the sheet without knowing the ledger exists.
+**Don't:** add a running total back "for speed" — `invSums()` already caches,
+and the scalar *is* the bug. Don't read `it.qty` anywhere; ask `invQty()`.
+Don't let anything write stock except `invMove()`.
+
+### Stock going below zero warns, it never blocks — 2026-08-25
+**Decision:** taking out more than the record shows is recorded, with a warning
+that names the resulting figure and suggests a recount. `invNegWarn()` produces
+the wording; nothing refuses the save.
+**Why:** Dillon's call. The April counts are known to be stale, so a negative is
+evidence the *record* is wrong, not that the person is. Stopping someone in a
+field to fix paperwork is worse than carrying a wrong number for a day.
+**Don't:** turn it into a validation error. A negative is a prompt to recount.
+
+### Anyone may move stock; not everyone may redefine a product — 2026-08-25
+**Decision:** `invCanMove()` is true for everybody, undergraduates included —
+booking a delivery in and taking stock out. `invCanEdit()` (a product's name,
+container size, reorder point) stays closed to undergrads.
+**Why:** the people who carry the jugs are the people who know what left the
+shelf, and the field log already trusts them to write the farm's spray records.
+Recording what happened and deciding what the shelf *is* are different jobs.
+**Don't:** narrow the movement side to Bill without asking Dillon — it was an
+explicit answer, not a default.
+
+
 ### One labs list, four consumers — 2026-08-15
 **Decision:** `FARM_LABS` (name, colour, badge, `pi`) is the source. `RST_LABS`,
 `CAL_LABS`, `TR_LABS` and `TR_LAB_AB` are all derived from it by `labsRebuild()`
@@ -442,6 +479,28 @@ always offer the bake-in after map editing.
 ---
 
 ## Interface
+
+### The App Manager post is a hat, not a job — 2026-08-25
+**Decision:** holding the App Manager post no longer sets `currentRole`. It is
+its own flag, `IS_APP_ADMIN`, read off the `app_admin` claim on the sign-in
+token and answered by `rstIsAdmin()`. Your role still comes from the roster, so
+Dillon signs in as a **Technician in the Sorochan lab** who also happens to
+look after the app. Everything the post can do lives on one screen, **More →
+Admin**, and only its holder sees the row that reaches it.
+**Why:** the post used to be `currentRole='admin'`, which *replaced* the job.
+The moment Dillon signed in he stopped being a technician: no technician home,
+no technician tabs, `me()` returned an "App Manager" card instead of his own,
+and sign-in dropped him on the roster. He could see the whole farm's records
+and not his own work. Nobody at this farm holds the post *instead of* working —
+whoever inherits it will be doing a farm job too.
+**Don't:** add `admin` back to `HOME_DEST`, `ROLE_SLUG`, `navMap` or any other
+map keyed by role — the post is not a role and must not appear beside the five
+that are. Don't grant a power by checking `currentRole`; ask `rstIsAdmin()`,
+which is the one question every admin check already asks. Don't persist the
+flag: it comes off the token on every sign-in, and `authEnter()` clears it
+*before* anyone is put in, so a shared farm phone can never hand the post to
+the next person who signs in.
+
 
 ### There is no task priority field — 2026-08-06
 **Decision:** High/Med/Low was removed globally — entry form, seed data, all

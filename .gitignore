@@ -30,3 +30,11 @@ testperm.tmp
 
 # Local map edits export nothing here, but scratch files land as untitled blobs
 ziajuYl3
+
+# A master key to the Firebase project. It is meant to live OUTSIDE this folder
+# (Step 4 of docs/GO-LIVE-MANUAL.md) and the scripts refuse to run if they find
+# one in here - but the repo is PUBLIC, so this is the belt as well as braces.
+# Firebase names its downloads like utk-turf-farm-app-firebase-adminsdk-xxxxx.json
+*firebase-adminsdk*.json
+*serviceAccount*.json
+service-account*.json

@@ -58,11 +58,12 @@ const DRY = process.argv.indexOf('--dry-run') >= 0;
 
 /* --- guard rails ------------------------------------------------------- */
 
-if (MODE !== 'on' && MODE !== 'off') {
+if (MODE !== 'on' && MODE !== 'off' && MODE !== 'check') {
   console.error('Say which way round:\n' +
+                '  node tools/easy-sign-in.js check (WHO CAN GET IN RIGHT NOW - start here)\n' +
                 '  node tools/easy-sign-in.js on    (put the shared password on every account)\n' +
                 '  node tools/easy-sign-in.js off   (take it off again - nobody knows the new one)\n' +
-                'Add --dry-run to see the plan without changing anything.');
+                'Add --dry-run to on/off to see the plan without changing anything.');
   process.exit(1);
 }
 /* Finding the master key WITHOUT having to type a path.
@@ -105,7 +106,9 @@ function findKey() {
 }
 
 let cred = process.env.GOOGLE_APPLICATION_CREDENTIALS || '';
-if (!cred && !DRY) {
+/* "check" only asks the same public question the app asks, so it needs no
+   master key and cannot change anything. */
+if (!cred && !DRY && MODE !== 'check') {
   const hits = findKey();
   if (hits.length === 1) {
     cred = hits[0];
@@ -169,6 +172,92 @@ if (MODE === 'off' && switchIsOn) {
 /* --- who --------------------------------------------------------------- */
 
 const people = JSON.parse(fs.readFileSync(ROSTER, 'utf8')).filter(p => p.email);
+
+/* --- "check": who can actually get in right now ------------------------- */
+
+/* This asks Firebase exactly the question the app asks - the shared password
+   for this address, does it work - and prints a yes or no per person. It needs
+   no master key, changes nothing, and is the fastest way to tell these three
+   apart when somebody says "it will not let me in":
+
+     - the shared password was never put on the accounts  (run "on")
+     - that person set a password of their own            (they type theirs)
+     - the address they typed is not the one on the roster (spelling, or
+       @utk.edu vs @vols.utk.edu - the roster has both)
+
+   It signs in 23 times in a row, so it goes slowly on purpose. Firebase starts
+   refusing everybody if you hammer it. */
+if (MODE === 'check') {
+  const https = require('https');
+  const apiKey = (html.match(/apiKey:\s*'([^']+)'/) || [])[1] || '';
+  if (!apiKey) {
+    console.error('No Firebase apiKey found in ' + path.basename(APP) + '.');
+    process.exit(1);
+  }
+
+  const tryOne = (email) => new Promise(resolve => {
+    const body = JSON.stringify({ email: email, password: shared, returnSecureToken: false });
+    const req = https.request({
+      hostname: 'identitytoolkit.googleapis.com',
+      path: '/v1/accounts:signInWithPassword?key=' + encodeURIComponent(apiKey),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+    }, res => {
+      let data = '';
+      res.on('data', d => { data += d; });
+      res.on('end', () => {
+        let j = null; try { j = JSON.parse(data); } catch (e) {}
+        if (res.statusCode === 200) return resolve({ ok: true });
+        const code = (j && j.error && j.error.message) || ('HTTP ' + res.statusCode);
+        resolve({ ok: false, code: String(code).split(' :')[0] });
+      });
+    });
+    req.on('error', e => resolve({ ok: false, code: 'NO NETWORK (' + (e && e.code) + ')' }));
+    req.write(body); req.end();
+  });
+
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  (async function () {
+    console.log('The app file says EASY_SIGN_IN = ' + (switchIsOn ? 'true' : 'false') +
+                (switchIsOn ? '   (email-only sign-in is switched on)' : '   (normal passwords)'));
+    console.log('Trying the shared password for ' + people.length + ' address(es). Nothing is changed.\n');
+
+    let good = 0; const bad = [];
+    for (const p of people) {
+      const email = String(p.email).trim().toLowerCase();
+      const r = await tryOne(email);
+      if (r.ok) { good++; console.log('  CAN GET IN   ' + p.id + '  ' + email); }
+      else {
+        bad.push({ p: p, email: email, code: r.code });
+        console.log('  cannot       ' + p.id + '  ' + email.padEnd(32) + r.code);
+      }
+      await sleep(400);
+    }
+
+    console.log('\n' + good + ' of ' + people.length + ' can sign in with their email alone.');
+
+    if (good === 0) {
+      console.log('\nNobody can. That almost always means the shared password was never');
+      console.log('put on the accounts. Fix it with:');
+      console.log('    node tools/easy-sign-in.js on');
+    } else if (bad.length) {
+      console.log('\nThe ones that cannot:');
+      console.log('  INVALID_PASSWORD / INVALID_LOGIN_CREDENTIALS - either that person');
+      console.log('    set their own password (they type theirs), or that address has no');
+      console.log('    account. Running "on" again fixes the first one.');
+      console.log('  EMAIL_NOT_FOUND - no account for that address. Run create-accounts.js.');
+      console.log('  USER_DISABLED - marked inactive on the roster, on purpose.');
+      console.log('  TOO_MANY_ATTEMPTS_TRY_LATER - you are being rate limited, not broken.');
+      console.log('    Wait a few minutes and run this again.');
+    }
+    console.log('\nIf somebody says they cannot get in, check the address above against');
+    console.log('what they actually typed. The roster has BOTH @utk.edu and');
+    console.log('@vols.utk.edu, and they are different accounts.');
+    process.exit(0);
+  })();
+  return;
+}
 
 /* Same random-string maker as create-accounts.js: generated, used once by
    Firebase, and never printed or kept. */

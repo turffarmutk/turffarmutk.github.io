@@ -297,6 +297,28 @@ themselves*, so the app still knows who marked what done.
 
    Add `--dry-run` first if you want to see the list before anything changes.
 
+### "It won't let me in" — one command that says why
+
+```
+cd ~/Documents/GitHub/UT-TurfFarm-app
+node tools/easy-sign-in.js check
+```
+
+It tries the shared password for all 23 addresses and prints who can get in
+right now. It changes nothing and needs no master key. Run it *first*, every
+time somebody reports a problem — it tells the three causes apart:
+
+- **Nobody can get in** → the shared password was never put on the accounts.
+  Run `node tools/easy-sign-in.js on`.
+- **Most can, one can't** → either that person set their own password (they
+  type theirs), or the address they typed isn't the one on the roster.
+- **`TOO_MANY_ATTEMPTS`** → you're being rate-limited, not broken. Wait a few
+  minutes.
+
+The list it prints shows each person's exact address. **The roster has both
+`@utk.edu` and `@vols.utk.edu`** and they are different accounts — that catches
+people out. Check what they actually typed against that list.
+
 ### What it costs, in plain words
 
 The app file is public, so the shared password inside it is public too. Anyone

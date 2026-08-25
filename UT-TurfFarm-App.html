@@ -1381,7 +1381,7 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
             <div class="chips" id="inv-chips"></div>
             <div class="unitrow"><span class="lbl">Show amounts as</span><div class="utog" id="inv-units"><span class="on" data-u="cont">Containers</span><span data-u="meas">Measured</span></div></div>
             <div style="flex:1;overflow:auto" id="inv-body"></div>
-            <div class="actionbar"><div class="action tap" id="inv-restock" data-go="invlog" data-mode="restock">Restock</div></div>
+            <div class="actionbar" style="display:flex;gap:8px"><div class="action tap" id="inv-restock" data-go="invlog" data-mode="restock" style="flex:1">Restock</div><div class="action tap" id="inv-takeout" data-go="invlog" data-mode="out" style="flex:1;background:#8a3b2f">Take out</div></div>
           </div>
 <div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab"><span class="te">📋</span>Tasks</div><div class="tab"><span class="te">🗺️</span>Map</div><div class="tab on"><span class="te">📦</span>Inventory</div><div class="tab"><span class="te">•••</span>More</div></div>
 </section>
@@ -1725,7 +1725,7 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
   <div class="hdr" style="background:#2f3133"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Switch user</div></div>
   <div id="sw-body" style="flex:1;overflow-y:auto;padding:0 16px 24px;min-height:0"></div>
 </div></section>
-<section class="screen" id="s-more"><div class="app field"><div class="hdr"><div class="title" style="flex:1">More</div></div><div style="flex:1;overflow-y:auto"><div class="list" style="margin-top:12px"><div class="row tap" data-go="roles"><span style="font-size:19px;width:26px">🔀</span><div style="flex:1"><div class="rt">Switch user</div><div class="rs" id="more-signedin"></div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" id="more-signout"><span style="font-size:19px;width:26px">🚪</span><div style="flex:1"><div class="rt">Sign out</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="taskboard"><span style="font-size:19px;width:26px">📋</span><div style="flex:1"><div class="rt">Tasks</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="map"><span style="font-size:19px;width:26px">🗺️</span><div style="flex:1"><div class="rt">Farm Map</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="calendar"><span style="font-size:19px;width:26px">📅</span><div style="flex:1"><div class="rt">Calendar</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="fieldlog"><span style="font-size:19px;width:26px">✏️</span><div style="flex:1"><div class="rt">Field Log</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="timeclock"><span style="font-size:19px;width:26px">⏱️</span><div style="flex:1"><div class="rt">Time clock</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="weather"><span style="font-size:19px;width:26px">🌤️</span><div style="flex:1"><div class="rt">Weather & conditions</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="inventory" id="more-inv"><span style="font-size:19px;width:26px">📦</span><div style="flex:1"><div class="rt">Inventory</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="trial" id="more-trials"><span style="font-size:19px;width:26px">🔬</span><div style="flex:1"><div class="rt">Trials</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="equipment"><span style="font-size:19px;width:26px">🚜</span><div style="flex:1"><div class="rt">Equipment</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="farmsettings" id="more-spray"><span style="font-size:19px;width:26px">🔧</span><div style="flex:1"><div class="rt">Farm settings</div><div class="rs">Sprayer, mowers and labs</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="bugreport"><span style="font-size:19px;width:26px">🐞</span><div style="flex:1"><div class="rt">Report a technical bug</div><div class="rs" id="more-bugsub">Something in the app is broken</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="login"><span style="font-size:19px;width:26px">⏻</span><div style="flex:1"><div class="rt">Log out</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div></div></div></div><div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab"><span class="te">📋</span>Tasks</div><div class="tab"><span class="te">🗺️</span>Map</div><div class="tab"><span class="te">📦</span>Inventory</div><div class="tab on"><span class="te">•••</span>More</div></div></section>
+<section class="screen" id="s-more"><div class="app field"><div class="hdr"><div class="title" style="flex:1">More</div></div><div style="flex:1;overflow-y:auto"><div class="list" style="margin-top:12px"><div class="row tap" data-go="roles"><span style="font-size:19px;width:26px">🔀</span><div style="flex:1"><div class="rt">Switch user</div><div class="rs" id="more-signedin"></div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" id="more-signout"><span style="font-size:19px;width:26px">🚪</span><div style="flex:1"><div class="rt">Sign out</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="taskboard"><span style="font-size:19px;width:26px">📋</span><div style="flex:1"><div class="rt">Tasks</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="map"><span style="font-size:19px;width:26px">🗺️</span><div style="flex:1"><div class="rt">Farm Map</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="calendar"><span style="font-size:19px;width:26px">📅</span><div style="flex:1"><div class="rt">Calendar</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="fieldlog"><span style="font-size:19px;width:26px">✏️</span><div style="flex:1"><div class="rt">Field Log</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="timeclock"><span style="font-size:19px;width:26px">⏱️</span><div style="flex:1"><div class="rt">Time clock</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="weather"><span style="font-size:19px;width:26px">🌤️</span><div style="flex:1"><div class="rt">Weather & conditions</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="inventory" id="more-inv"><span style="font-size:19px;width:26px">📦</span><div style="flex:1"><div class="rt">Inventory</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="trial" id="more-trials"><span style="font-size:19px;width:26px">🔬</span><div style="flex:1"><div class="rt">Trials</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="equipment"><span style="font-size:19px;width:26px">🚜</span><div style="flex:1"><div class="rt">Equipment</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="farmsettings" id="more-spray"><span style="font-size:19px;width:26px">🔧</span><div style="flex:1"><div class="rt">Farm settings</div><div class="rs">Sprayer, mowers and labs</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="admin" id="more-admin"><span style="font-size:19px;width:26px">🛠️</span><div style="flex:1"><div class="rt">Admin</div><div class="rs">Roster, accounts and app settings</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="bugreport"><span style="font-size:19px;width:26px">🐞</span><div style="flex:1"><div class="rt">Report a technical bug</div><div class="rs" id="more-bugsub">Something in the app is broken</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="login"><span style="font-size:19px;width:26px">⏻</span><div style="flex:1"><div class="rt">Log out</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div></div></div></div><div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab"><span class="te">📋</span>Tasks</div><div class="tab"><span class="te">🗺️</span>Map</div><div class="tab"><span class="te">📦</span>Inventory</div><div class="tab on"><span class="te">•••</span>More</div></div></section>
 <section class="screen" id="s-navsettings"><div class="app field">
 <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Preferences</div></div>
 <div style="flex:1;overflow-y:auto" id="prf-body"></div>
@@ -1749,6 +1749,10 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
 <section class="screen" id="s-powersettings"><div class="app field">
 <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Battery</div></div>
 <div style="flex:1;overflow-y:auto" id="pwr-body"></div>
+</div></section>
+<section class="screen" id="s-admin"><div class="app field">
+<div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Admin</div></div>
+<div style="flex:1;overflow-y:auto" id="adm-body"></div>
 </div></section>
 <section class="screen" id="s-farmsettings"><div class="app field">
 <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Farm settings</div></div>
@@ -2135,7 +2139,7 @@ window.addEventListener('orientationchange',function(){ setTimeout(adaptiveResiz
 /* bugreport is on this list on purpose: a broken app is exactly the thing that
    every role has to be able to flag, including the undergrad whose nav has been
    trimmed to four tabs. It is never hidden behind a permission. */
-var MORE_ALWAYS={roles:1,login:1,farmsettings:1,bugreport:1};
+var MORE_ALWAYS={roles:1,login:1,farmsettings:1,bugreport:1,admin:1};
 function moreEnter(){ var role=currentRole,nav=navMap[role]||{},chosen=navChosen(role);
   var onNav={}; chosen.forEach(function(l){ if(nav[l]) onNav[nav[l]]=1; });
   var reachable={}; (NAV_OPTIONS[role]||[]).forEach(function(l){ if(PAGE_DEST[l]) reachable[PAGE_DEST[l]]=1; });
@@ -2145,6 +2149,10 @@ function moreEnter(){ var role=currentRole,nav=navMap[role]||{},chosen=navChosen
     if(MORE_ALWAYS[d]){ r.style.display=''; return; }
     r.style.display=(reachable[d]&&!onNav[d])?'':'none';
   });
+  /* The one row on this screen that depends on the HAT rather than the job.
+     Hiding it is a courtesy, not a lock - admRender() checks again. */
+  var ad=document.getElementById('more-admin');
+  if(ad) ad.style.display=((typeof rstIsAdmin==='function')&&rstIsAdmin())?'':'none';
   /* Mixing is a chemical job: only the roles that can log one see the numbers. */
   var sp=document.getElementById('more-spray');
   if(sp) sp.style.display=(((typeof farmCanSee==='function')&&farmCanSee()))?'':'none';
@@ -2343,7 +2351,7 @@ var HOME_WIDGETS={
   {id:'equip',  t:'Equipment',         d:'What is down and what you have out'},
   {id:'trials', t:'Protocols',         d:'Studies running on the plots · view only'},
   {id:'field',  t:'Field log',         d:'Work logged under your name · view only'},
-  {id:'inv',    t:'Inventory',         d:'What is on the shelf · view only'}
+  {id:'inv',    t:'Inventory',         d:'Low stock · log what you use'}
  ],
  grad:[
   {id:'kpis',  t:'My numbers',         d:'Trials · Restrictions · Plots'},
@@ -2363,7 +2371,7 @@ var HOME_WIDGETS={
   {id:'map',   t:'My plots',           d:'Restrictions your lab has set'},
   {id:'field', t:'Field log',          d:'Operations on your plots · view only'},
   {id:'clock', t:'Crew hours',         d:'No-show tally and pay-period hours'},
-  {id:'inv',   t:'Inventory',          d:'Stock levels · view only'},
+  {id:'inv',   t:'Inventory',          d:'Stock levels · log what you use'},
   {id:'equip', t:'Equipment',          d:'Status board · view only'},
   {id:'cal',   t:'This week',          d:'Sprays, ratings and lab events'},
   {id:'wx',    t:'Weather',            d:'Conditions and the spray window'}
@@ -2563,7 +2571,7 @@ function hwMgrInv(){
  var low=lowList(),show=low.slice(0,hwRows('inv'));
  var rows=show.map(function(it,i){
    return hwRow(hwName(it.name,(it.ai||it.loc)+' · reorder at '+it.thr+' '+it.unit),
-     hwPill(it.qty+' '+it.unit,'#fdeceb','#c0392b'),i===show.length-1,'item:'+it.id);
+     hwPill(fmt(invQty(it))+' '+it.unit,'#fdeceb','#c0392b'),i===show.length-1,'item:'+it.id);
  }).join('');
  hwFill('hw-m-inv',hwHead('Low stock','Reorder list')
   +hwSub(low.length+' of '+INVENTORY.length+' items at or below reorder point')
@@ -2730,7 +2738,7 @@ function hwInvCard(id,mode){
  var low=lowList(),show=low.slice(0,hwRows(hwWid(id)));
  var rows=show.map(function(it,i){
    return hwRow(hwName(it.name,(it.ai||it.loc)+' · reorder at '+it.thr+' '+it.unit),
-     hwPill(it.qty+' '+it.unit,'#fdeceb','#c0392b'),i===show.length-1,'item:'+it.id);
+     hwPill(fmt(invQty(it))+' '+it.unit,'#fdeceb','#c0392b'),i===show.length-1,'item:'+it.id);
  }).join('');
  /* The card counts what is low, so the page opens on the reorder list rather
     than the full shelf — same numbers either side of the tap. */
@@ -3038,7 +3046,7 @@ var HW_RENDER={
   hwEquipCard('hw-u-equip','view');
   hwTrialsCard('hw-u-trials','undergrad','view');
   hwFieldCard('hw-u-field','undergrad','me');
-  hwInvCard('hw-u-inv','view');
+  hwInvCard('hw-u-inv','log');
  },
  /* Grad: runs studies, logs ops, self-assigns work. */
  grad:function(){
@@ -3066,7 +3074,7 @@ var HW_RENDER={
   hwMapRes('hw-f-map','faculty','lab');
   hwFieldCard('hw-f-field','faculty','lab');
   hwClockCard('hw-f-clock','faculty','board');
-  hwInvCard('hw-f-inv','view');
+  hwInvCard('hw-f-inv','log');
   hwEquipCard('hw-f-equip','view');
   hwCal('hw-f-cal','faculty','all');
   hwWx('hw-f-wx','spray');
@@ -3478,7 +3486,7 @@ function show(id,push){ const el=document.getElementById('s-'+id); if(!el)return
      SESSION replaces — your role comes from who signed in, so a screen can no
      longer promote you by being opened. The attribute stays as a label, used
      below to pick which home layout to paint. */
-  if(id==='profile')fillProfile(); if(id==='profedit')renderProfEdit(); if(id==='roster')rstRender(); if(id==='rosteredit')rstEditRender(); if(id==='adminxfer')axfRender(); if(id==='spraysettings')sprRender(); if(id==='farmsettings')fstRender(); if(id==='bugreport')bugRender(); if(id==='bugsettings')bgsRender(); if(id==='sharedb')sdbRender(); if(id==='flfix')flxRender(); if(id==='mowersettings')mwsRender(); if(id==='labsettings')lbsRender(); if(id==='roles')authRenderAccount();
+  if(id==='profile')fillProfile(); if(id==='profedit')renderProfEdit(); if(id==='roster')rstRender(); if(id==='rosteredit')rstEditRender(); if(id==='adminxfer')axfRender(); if(id==='spraysettings')sprRender(); if(id==='farmsettings')fstRender(); if(id==='bugreport')bugRender(); if(id==='bugsettings')bgsRender(); if(id==='sharedb')sdbRender(); if(id==='admin')admRender(); if(id==='flfix')flxRender(); if(id==='mowersettings')mwsRender(); if(id==='labsettings')lbsRender(); if(id==='roles')authRenderAccount();
   if(id==='login')authRenderLogin(); if(id==='notifications'){setSeen(Date.now());setTimeout(updateBellBadges,0);} if(id==='home-manager')renderHomeNotif(); if(id==='weather')wxEnter(); if(id==='map')mapEnter(); if(id==='taskboard')boardEnter(); if(id==='templates')renderTemplates(); if(id==='assign')assignEnter(); if(id==='plotpick')renderPlotPick(); if(id==='taskwork')renderTaskWork(); if(id==='inventory')invEnter(); if(id==='lowstock')renderLowStock(); if(id==='additem')renderAddItem(); if(id==='invlog')renderInvLog(); if(id==='itemdetail')0; if(id==='equipment')equipEnter(); if(id==='eqreport')renderEqReport(); if(id==='eqmaint')renderEqMaint(); if(id==='eqedit')renderEqEdit(); if(id==='eqsched')renderEqSched(); if(id==='calendar')calEnter(); if(id==='caladd')renderCalAdd(); if(id==='timeclock')tcEnter(); if(id==='tcperson')tcRenderPerson(); if(id==='fieldlog')fieldlogEnter(); if(id==='flexport')renderFlExport(); if(id==='flnew')renderFlNew(); if(id==='fldetail')renderFlDetail(); if(id==='more')moreEnter(); if(id==='trial')trialsEnter(); if(id==='trialdetail')trRenderDetail(); if(id==='trialedit')trRenderEdit(); if(id==='trialres')trRenderRes(); if(id==='trialpin')trRenderPin(); if(id==='navsettings')renderPrefsHub(); if(id==='notifsettings')renderNotifSettings(); if(id==='powersettings')renderPowerSettings(); if(id==='navtabs')renderNavSettings(); if(id==='homescreen')renderHomeSettings(); if(id==='theme')renderTheme(); if(id.indexOf('home-')===0)hwApply(r||currentRole); renderTabs();
   try{updateBellBadges();}catch(e){}
   try{syncBack(el);}catch(e){}
@@ -4071,6 +4079,10 @@ function flxSave(){
 
   var made=flCorrect(a.id,changes,why);
   if(!made){ toast('That could not be corrected'); return; }
+  /* If the amount changed, the shelf is now wrong too. Fix it the way the
+     field log fixes itself - a NEW movement for the difference, with the
+     original left exactly as it was. */
+  try{ invReconcileFromLog(a,made); }catch(e){}
   flCur=made.id;
   toast('Corrected ✓ · the original is kept');
   back(); renderFlDetail(); flRender();
@@ -4461,8 +4473,14 @@ const FL_OPS=[
 ];
 function flOp(id){return FL_OPS.find(function(o){return o.id===id;});}
 function flCanChem(){return currentRole==='tech'||currentRole==='grad'||currentRole==='manager';}
-let FLFORM={op:'',plots:[],day:28,time:'',product:'',ai:'',amount:'',rate:'',target:'',equipment:'',notes:''};
-function openFlNew(){FLFORM={op:'',plots:[],day:28,time:'',product:'',ai:'',amount:'',rate:'',target:'',equipment:'',notes:''};go('flnew');}
+/* productId / amtNum / amtUnit / takeStock were added 2026-08-25 so a spray can
+   come off the shelf. `product` and `amount` are still here and still hold the
+   same strings they always did - the detail line, the export columns and the
+   correction screen all read them, and none of that had to change. */
+let FLFORM={op:'',plots:[],day:28,time:'',product:'',productId:null,ai:'',amount:'',
+            amtNum:'',amtUnit:'',takeStock:true,rate:'',target:'',equipment:'',notes:''};
+function openFlNew(){FLFORM={op:'',plots:[],day:28,time:'',product:'',productId:null,ai:'',
+   amount:'',amtNum:'',amtUnit:'',takeStock:true,rate:'',target:'',equipment:'',notes:''};go('flnew');}
 function renderFlNew(){
  var body=document.getElementById('fln-body'); if(!body)return;
  var canChem=flCanChem();
@@ -4478,15 +4496,26 @@ function renderFlNew(){
    +'<div class="action tap" id="fln-mapbtn" style="background:#489FDF;color:#fff;margin-top:8px">Choose on map</div></div>';
  var chemRows='';
  if(op&&op.chem){
+   var pit=flnProduct();
+   var uOpts=flnUnitChoices().map(function(u){
+     return '<option'+((FLFORM.amtUnit||'')===u?' selected':'')+'>'+esc(u)+'</option>';}).join('');
    chemRows=''
     +'<div class="sec" style="margin:12px 18px 7px">Chemical application record</div><div class="list">'
-    +'<div class="fld"><span class="fl">Product *</span><input class="inv-in" id="fln-product" value="'+esc(FLFORM.product)+'" placeholder="e.g. Daconil Weatherstik" style="max-width:175px"></div>'
+    +'<div class="fld" style="position:relative"><span class="fl">Product *</span>'
+    +'<input class="inv-in" id="fln-product" value="'+esc(FLFORM.product)+'" placeholder="e.g. Daconil Weatherstik" autocomplete="off" style="max-width:175px">'
+    +'<div id="fln-prodsug" class="il-sugg" style="display:none;left:auto;right:16px;top:38px"></div></div>'
     +'<div class="fld"><span class="fl">Active ingredient</span><input class="inv-in" id="fln-ai" value="'+esc(FLFORM.ai)+'" placeholder="e.g. Chlorothalonil" style="max-width:175px"></div>'
-    +'<div class="fld"><span class="fl">Amount used *</span><input class="inv-in" id="fln-amount" value="'+esc(FLFORM.amount)+'" placeholder="e.g. 12 fl oz" style="max-width:175px"></div>'
+    +'<div class="fld"><span class="fl">Amount used *<div style="font:600 10px \'Public Sans\';color:var(--muted);font-weight:600">total for this job</div></span>'
+    +'<span style="display:flex;align-items:center;gap:6px">'
+    +'<input class="inv-in" id="fln-amtnum" inputmode="decimal" value="'+esc(FLFORM.amtNum)+'" placeholder="12" style="max-width:74px">'
+    +'<select class="inv-sel" id="fln-amtunit" style="max-width:92px">'+uOpts+'</select></span></div>'
     +'<div class="fld"'+(op.pest?'':' style="border-bottom:none"')+'><span class="fl">Rate</span><input class="inv-in" id="fln-rate" value="'+esc(FLFORM.rate)+'" placeholder="e.g. 3.6 fl oz/M" style="max-width:175px"></div>'
     +(op.pest?'<div class="fld" style="border-bottom:none"><span class="fl">Target pest/weed</span><input class="inv-in" id="fln-target" value="'+esc(FLFORM.target)+'" placeholder="e.g. Dollar spot" style="max-width:175px"></div>':'')
     +'</div>'
-    +'<div style="margin:6px 16px 0;background:#eafaef;border:1px solid #bfe6c9;border-radius:12px;padding:9px 12px;font:600 11px \'Public Sans\';color:#2f7d3a">Logged as a chemical application record and decrements product stock.</div>';
+    +(pit?('<div class="list" style="margin-top:10px"><div class="fld tap" id="fln-takestock" style="border-bottom:none">'
+       +'<span class="fl">Take it out of stock</span>'
+       +'<span class="fv" style="color:'+(FLFORM.takeStock?'#2f7d3a':'var(--muted)')+'">'+(FLFORM.takeStock?'Yes':'No')+'</span></div></div>'):'')
+    +'<div id="fln-stocknote">'+flnStockNoteHTML()+'</div>';
  }
  var eqRow=(op&&op.eq)?'<div class="sec" style="margin:12px 18px 7px">Equipment</div><div class="list"><div class="fld" style="border-bottom:none"><span class="fl">Machine used</span><input class="inv-in" id="fln-eq" value="'+esc(FLFORM.equipment)+'" placeholder="e.g. Toro 3 reel" style="max-width:175px"></div></div>':'';
  body.innerHTML=
@@ -4503,12 +4532,98 @@ function renderFlNew(){
   +'<div class="sec" style="margin:12px 18px 7px">Notes</div><div class="list"><div class="fld" style="border-bottom:none;align-items:flex-start"><textarea class="inv-in" id="fln-notes" rows="2" placeholder="Optional details…" style="max-width:none;width:100%;flex:1;resize:none">'+esc(FLFORM.notes)+'</textarea></div></div>'
   +'<div style="height:12px"></div>';
 }
+/* ---- the field log's link to the shelf ----
+   A spray is already written down here; making the crew write it a second time
+   on the inventory screen is how stock numbers rot. So this screen takes it
+   off the shelf - but ONLY when it is certain what came off:
+
+     - the product has to be matched to something in INVENTORY, and
+     - the amount has to convert into that product's own unit.
+
+   Anything less and the entry still saves and stock is simply left alone. The
+   field log's own rule applies here too: NOBODY IS EVER BLOCKED IN A FIELD.
+   Spraying something not on the list is a real thing that happens, and the
+   application record matters more than the stock figure. */
+function flnProduct(){
+  return FLFORM.productId ? (INVENTORY.find(function(x){return x.id===FLFORM.productId;})||null) : null;
+}
+function flnUnitChoices(){
+  var pit=flnProduct();
+  var list=pit?invUnitChoices(pit):['fl oz','gal','qt','pt','L','mL','oz','lb','kg','g'];
+  if(FLFORM.amtUnit && list.indexOf(FLFORM.amtUnit)<0) list=[FLFORM.amtUnit].concat(list);
+  return list;
+}
+/* How much comes off the shelf, in the product's own unit. null = nothing
+   does, and the caller must treat that as "leave it alone", never as zero. */
+function flnStockAmount(){
+  var pit=flnProduct(); if(!pit || !FLFORM.takeStock) return null;
+  var n=parseFloat(FLFORM.amtNum);
+  if(!isFinite(n) || n<=0) return null;
+  return invConvert(n, FLFORM.amtUnit||pit.unit, pit.unit);
+}
+function flnBox(bg,br,col,txt){
+  return '<div style="margin:6px 16px 0;background:'+bg+';border:1px solid '+br
+    +';border-radius:12px;padding:9px 12px;font:600 11px \'Public Sans\';color:'+col+'">'+txt+'</div>';
+}
+function flnStockNoteHTML(){
+  var pit=flnProduct();
+  if(!pit) return flnBox('#eef4ff','#cfe0ff','#2456b8',
+    'Saved as a chemical application record. This product is not matched to anything on the shelf, so stock will not change.');
+  if(!FLFORM.takeStock) return flnBox('#f4f5f6','#e2e5e8','#6b7076',
+    'Saved as a chemical application record. Stock will not change.');
+  var n=parseFloat(FLFORM.amtNum);
+  if(!isFinite(n)||n<=0) return flnBox('#eef4ff','#cfe0ff','#2456b8',
+    'Enter the amount and it will come off '+esc(pit.name)+' automatically.');
+  var conv=invConvert(n, FLFORM.amtUnit||pit.unit, pit.unit);
+  if(conv===null) return flnBox('#fff6e6','#f0d9a8','#8a5a00',
+    esc((FLFORM.amtUnit||''))+' cannot be converted to '+esc(pit.unit)+', so stock will not change. The record still saves.');
+  var after=invQty(pit)-conv;
+  if(after<-1e-9) return flnBox('#fdeceb','#f3c9c4','#c0392b',
+    '\u2212'+fmt(conv)+' '+esc(pit.unit)+' from '+esc(pit.name)+' \u2192 '+fmt(after)+' '+esc(pit.unit)
+    +'. That is below zero, so the count is probably out. It will still be recorded.');
+  return flnBox('#eafaef','#bfe6c9','#2f7d3a',
+    '\u2713 \u2212'+fmt(conv)+' '+esc(pit.unit)+' from '+esc(pit.name)+' \u2192 leaves '+fmt(after)+' '+esc(pit.unit));
+}
+function flnPaintStockNote(){
+  var el=document.getElementById('fln-stocknote');
+  if(el) el.innerHTML=flnStockNoteHTML();
+}
+/* The product typeahead. Matching is what turns a written record into a stock
+   movement, so it is offered rather than demanded - typing straight past it
+   leaves productId null and that is a valid way to save. */
+function flnProdSug(q){
+  var box=document.getElementById('fln-prodsug'); if(!box)return;
+  q=(q||'').trim().toLowerCase();
+  if(q.length<2){ box.style.display='none'; return; }
+  var hits=INVENTORY.filter(function(it){
+    return it.name.toLowerCase().indexOf(q)>=0 || String(it.ai||'').toLowerCase().indexOf(q)>=0;
+  }).slice(0,6);
+  if(!hits.length){ box.style.display='none'; return; }
+  box.innerHTML=hits.map(function(it){
+    return '<div class="s-row" data-flprod="'+it.id+'"><span class="s-nm">'+esc(it.name)+'</span>'
+      +'<span class="s-sub">'+fmt(invQty(it))+' '+esc(it.unit)+' on hand</span></div>';
+  }).join('');
+  box.style.display='block';
+}
+function flnPickProduct(id){
+  var it=INVENTORY.find(function(x){return x.id===id;}); if(!it) return;
+  flReadInputs();
+  FLFORM.productId=it.id;
+  FLFORM.product=it.name;
+  if(!FLFORM.ai && it.ai) FLFORM.ai=it.ai;
+  if(!FLFORM.amtUnit) FLFORM.amtUnit=it.unit;
+  renderFlNew();
+}
+
 function flReadInputs(){
  var g=function(id){var e=document.getElementById(id);return e?e.value:undefined;};
  var v;
  if((v=g('fln-product'))!==undefined)FLFORM.product=v.trim();
  if((v=g('fln-ai'))!==undefined)FLFORM.ai=v.trim();
- if((v=g('fln-amount'))!==undefined)FLFORM.amount=v.trim();
+ if((v=g('fln-amtnum'))!==undefined)FLFORM.amtNum=v.trim();
+ if((v=g('fln-amtunit'))!==undefined)FLFORM.amtUnit=v.trim();
+ /* `amount` stays the readable string everything downstream already reads. */
+ FLFORM.amount=FLFORM.amtNum?((FLFORM.amtNum+' '+(FLFORM.amtUnit||'')).trim()):'';
  if((v=g('fln-rate'))!==undefined)FLFORM.rate=v.trim();
  if((v=g('fln-target'))!==undefined)FLFORM.target=v.trim();
  if((v=g('fln-eq'))!==undefined)FLFORM.equipment=v.trim();
@@ -4524,13 +4639,26 @@ function flnRenderSug(q){
 }
 document.getElementById('s-flnew').addEventListener('click',function(e){
  var mb=e.target.closest('#fln-mapbtn'); if(mb){flReadInputs();openFlPlotPick();return;}
+ var pp=e.target.closest('[data-flprod]'); if(pp){flnPickProduct(pp.getAttribute('data-flprod'));return;}
+ var ts=e.target.closest('#fln-takestock'); if(ts){flReadInputs();FLFORM.takeStock=!FLFORM.takeStock;renderFlNew();return;}
  var pc=e.target.closest('[data-flplot]'); if(pc){flReadInputs();var p=pc.getAttribute('data-flplot');var i=FLFORM.plots.indexOf(p);if(i>=0)FLFORM.plots.splice(i,1);else FLFORM.plots.push(p);renderFlNew();return;}
 });
 document.getElementById('s-flnew').addEventListener('input',function(e){
  if(e.target.id==='fln-plotsearch'){flnRenderSug(e.target.value);}
+ /* Editing the name after picking BREAKS the match on purpose. Otherwise a
+    typo'd name could still take stock off the product that was picked three
+    keystrokes ago, and the record and the shelf would disagree. */
+ else if(e.target.id==='fln-product'){
+   var pit=flnProduct();
+   if(pit && e.target.value.trim()!==pit.name) FLFORM.productId=null;
+   FLFORM.product=e.target.value.trim();
+   flnProdSug(e.target.value); flnPaintStockNote();
+ }
+ else if(e.target.id==='fln-amtnum'){ flReadInputs(); flnPaintStockNote(); }
 });
 document.getElementById('s-flnew').addEventListener('change',function(e){
  if(e.target.id==='fln-op'){flReadInputs();FLFORM.op=e.target.value;renderFlNew();return;}
+ if(e.target.id==='fln-amtunit'){ flReadInputs(); flnPaintStockNote(); return; }
 });
 function flSave(){
  flReadInputs();
@@ -4555,8 +4683,32 @@ function flSave(){
  FLFORM.plots.forEach(function(p){
    FIELDLOG.push({plot:p,type:op.feed,title:title,detail:detail,date:date,ord:ord,op:op.label,product:FLFORM.product||null,ai:FLFORM.ai||null,amount:FLFORM.amount||null,rate:FLFORM.rate||null,target:FLFORM.target||null,equipment:FLFORM.equipment||null,notes:FLFORM.notes||'',person:whoId,loggedBy:whoId,time:time,source:'manual'});
  });
- flCommit();
- toast(op.chem?'Logged ✓ · chemical record saved':'Operation logged ✓');
+ flCommit();                                    /* stamps the ids we need below */
+
+ /* ONE movement per save, not one per plot.
+    Spraying three plots writes three entries - that is how the field log has
+    always worked - but the person mixed ONE tank. Taking the amount off three
+    times would drain the shelf at triple speed and nobody would spot it for
+    weeks. The box says "total for this job" for the same reason. The movement
+    hangs off the FIRST entry's id, which is what a later correction looks for.
+
+    Nothing here can stop the save: the entry is already committed above. If
+    the product is unmatched or the unit will not convert, flnStockAmount()
+    returns null and the shelf is simply left alone. */
+ var _msg=op.chem?'Logged ✓ · chemical record saved':'Operation logged ✓';
+ try{
+   var _take=flnStockAmount(), _pit=flnProduct();
+   if(_take!==null && _take>0 && _pit){
+     var _made=FIELDLOG.slice(-FLFORM.plots.length);
+     var _warn=invNegWarn(_pit,-_take);          /* BEFORE the movement lands */
+     invMove(_pit.id, -_take, 'out',
+       {ref:(_made[0]&&_made[0].id)||null, note:'Field log · '+op.label});
+     flCommit();                                 /* the ref may have stamped an id */
+     _msg+=' · '+fmt(_take)+' '+_pit.unit+' off the shelf';
+     if(_warn) _msg=_warn;
+   }
+ }catch(e){}
+ toast(_msg);
  flState={type:'all',plots:[]};
  back(); flRender();
 }
@@ -5041,7 +5193,25 @@ var RST_ADMIN_KEY='ut_appadmin_v1';
 var APP_ADMIN={name:'Dillon McCallum',email:'',pid:'p01',since:'2026-08-07'};
 try{var _aa=localStorage.getItem(RST_ADMIN_KEY);if(_aa){var _ap=JSON.parse(_aa);if(_ap&&_ap.name)APP_ADMIN=_ap;}}catch(e){}
 function rstAdminSave(){try{localStorage.setItem(RST_ADMIN_KEY,JSON.stringify(APP_ADMIN));}catch(e){}}
-function rstIsAdmin(){return currentRole==='admin';}
+/* THE APP MANAGER POST IS A HAT, NOT A JOB.       (changed 2026-08-25)
+
+   It used to be `currentRole='admin'`, which REPLACED the holder's farm role.
+   Dillon holds the post and is also a Technician in the Sorochan lab, and the
+   old way meant signing in stopped him being a technician: no technician home
+   screen, no technician tabs, and `me()` returned an "App Manager" card
+   instead of his own. He landed on the roster and could not get to his own
+   work.
+
+   Now the post is its own flag, worn on top of whatever job the roster says.
+   currentRole stays whatever `sessionSet()` derived from the roster, and every
+   admin power still answers to `rstIsAdmin()` exactly as before - so nothing
+   that grants a power had to change, only the question it asks.
+
+   It is deliberately NOT stored anywhere. It comes off the sign-in token every
+   time (the `app_admin` claim), which is the only thing that can be trusted to
+   say who holds the post. */
+var IS_APP_ADMIN=false;
+function rstIsAdmin(){return IS_APP_ADMIN===true;}
 function rstAdminInit(){return (APP_ADMIN.name||'').split(/\s+/).map(function(x){return x[0]||'';}).join('').slice(0,2).toUpperCase()||'AM';}
 function rstBuildAdminUser(){USERS.admin={pid:APP_ADMIN.pid||null,n:APP_ADMIN.name,i:rstAdminInit(),t:'App Manager',e:APP_ADMIN.email||'',c:'#58595b',lab:'—',hired:APP_ADMIN.since||''};}
 rstBuildAdminUser();
@@ -5074,10 +5244,15 @@ function lgHome(){ return HOME_DEST[currentRole]||'home-undergrad'; }
    rather than a login of its own. It arrives on the auth token as
    app_metadata.is_app_admin and is applied on top of a normal sign-in. */
 function signInAdmin(){
-  currentRole='admin';
+  IS_APP_ADMIN=true;
   rstBuildAdminUser();
-  if(typeof prefsSwitch==='function')prefsSwitch();
+  /* No prefsSwitch() here any more. Preferences follow the PERSON (their
+     roster pid, see prefsWho), and sessionSet has already switched them. This
+     call used to be needed only because the line above it changed the role. */
 }
+/* Taking the hat off. Called wherever somebody stops being signed in, so the
+   post can never carry over to whoever signs in next on the same device. */
+function signOutAdmin(){ IS_APP_ADMIN=false; }
 function signOut(){ authSignOut(); }
 
 function rstPaintRolesCard(){
@@ -5109,7 +5284,7 @@ function rstSync(){
    ever leaves, the faculty can still hand the job to someone. A PI cannot edit
    another PI or another lab's grads and techs. */
 function rstMe(){ return sessionPerson(); }
-function rstCanOpen(){return currentRole==='manager'||currentRole==='faculty'||currentRole==='admin';}
+function rstCanOpen(){return currentRole==='manager'||currentRole==='faculty'||rstIsAdmin();}
 function rstCanEdit(p){
   if(!p)return false;
   if(rstIsAdmin())return true;                     /* the App Manager holds every record */
@@ -6158,7 +6333,7 @@ function mixProdItem(p){
   if(!p) return null;
   return (p.id?mixInvById(p.id):null)||mixInvByName(p.name);
 }
-function mixInvQty(it){ return fmt(it.qty)+' '+it.unit; }
+function mixInvQty(it){ return fmt(invQty(it))+' '+it.unit; }
 function mixSugHtml(q){
   var list=mixInvMatch(q);
   if(!list.length) return '<div class="none">Nothing in inventory matches — add it on the Inventory page first.</div>';
@@ -6240,7 +6415,7 @@ function mixCompute(t){
     var need=it?mixToInvQty(total,un.unit,it.unit):null;
     return {name:(p.name||'').trim(),un:un,rate:rate,onTarget:onTarget,total:total,
             leftover:(total!=null)?(total-onTarget):null,
-            item:it,need:need,short:(need!=null&&it)?(need>it.qty+1e-9):false};
+            item:it,need:need,short:(need!=null&&it)?(need>invQty(it)+1e-9):false};
   });
   return {noz:noz,precise:precise,auto:auto,area:area,areaIsAuto:!(override!=null&&override>0),
           base:base,charge:charge,chargeAuto:chargeAuto,chargeIsAuto:chargeIsAuto,
@@ -7609,13 +7784,233 @@ var PRODREF=[
 ];
 function fmt(n){n=Math.round(n*100)/100;return (n%1===0)?String(n):String(n);}
 function plural(t,n){if(n===1)return t;if(t==='box')return 'boxes';return t+'s';}
-function isLow(it){return it.qty<=it.thr;}
-function contCount(it){return it.csize?it.qty/it.csize:it.qty;}
+/* ================= THE MOVEMENT LEDGER =================
+   Stock is NOT a number that gets overwritten.
+
+   `it.qty += n` is a read-modify-write: two people booking the same delivery
+   at the same moment both read the old figure, both add to it, and one of the
+   two writes disappears leaving no trace that it ever happened. On one phone
+   that is unlikely. Across 23 phones and a shared database it is a Tuesday.
+
+   So the shelf is RECORDED AS MOVEMENTS and added up. "50 lb in", "12 fl oz
+   out". Two people booking at once write two movements and both count. There
+   is nothing to overwrite.
+
+   `it.qty` stays as the OPENING BALANCE - the April count out of the
+   spreadsheet - so tools/build-inventory.py can still regenerate the product
+   list without knowing any of this exists. On hand = opening balance + every
+   movement since. A RECOUNT IS A MOVEMENT TOO (why:'count'), never an edit of
+   the opening figure, because "what the shelf said in April" is a fact and
+   should stay readable next to what happened afterwards.
+
+   Settled with Dillon 2026-08-25, before any of it was written. Do not
+   collapse it back into a scalar to "simplify" - the scalar is the bug.
+   ======================================================= */
+
+/* A movement: {id, item, delta, unit, why, ref, who, at, note}
+     delta  in the PRODUCT'S unit (it.unit). Positive in, negative out.
+     why    'in'    a delivery arrived
+            'out'   it was used
+            'count' a recount - the difference between shelf and record
+            'adjust' anything else, and it must carry a note
+     ref    what caused it: a field-log entry id, or null
+     who    roster pid.   at  ISO local time. */
+var INVMOVES=[];
+
+/* Totals are worked out lazily and cached. The inventory list asks for 191
+   products' totals one after another, and walking the whole ledger 191 times
+   is exactly what would make that screen feel slow on a phone. Anything that
+   changes INVMOVES must call invSumsDirty() - invMove() does it for you, and
+   the sync will too. */
+var _invSums=null;
+function invSumsDirty(){ _invSums=null; }
+function invSums(){
+  if(_invSums) return _invSums;
+  var s={};
+  for(var i=0;i<INVMOVES.length;i++){
+    var m=INVMOVES[i]; if(!m||!m.item) continue;
+    s[m.item]=(s[m.item]||0)+(+m.delta||0);
+  }
+  return (_invSums=s);
+}
+
+/* THE one answer to "how much is on the shelf". Every screen asks this.
+   NOTHING reads it.qty directly any more - if you find something that does, it
+   is a bug, and it will be wrong the moment anybody moves any stock. */
+function invQty(it){
+  if(!it) return 0;
+  return (+it.qty||0)+(invSums()[it.id]||0);
+}
+
+/* Newest first, for the item screen. */
+function invMovesFor(id){
+  return INVMOVES.filter(function(m){return m&&m.item===id;})
+                 .sort(function(a,b){return String(b.at||'').localeCompare(String(a.at||''));});
+}
+
+/* THE single write point. Everything that changes stock comes through here:
+   one place to read, one place for the shared-database sync to hang off, and
+   one place that stamps who and when. Same shape as flCommit() in the field
+   log, and for the same reason. */
+function invMove(itemId, delta, why, opts){
+  opts=opts||{};
+  var it=INVENTORY.find(function(x){return x.id===itemId;});
+  if(!it || !delta) return null;
+  var m={ id:newId('m'), item:itemId, delta:+delta, unit:it.unit,
+          why:why||'adjust', ref:opts.ref||null,
+          who:(typeof SESSION!=='undefined'&&SESSION.pid)||null,
+          at:isoLocal(new Date()), note:opts.note||'' };
+  INVMOVES.push(m); invSumsDirty();
+  return m;
+}
+
+/* Going below zero WARNS, it never blocks - Dillon, 2026-08-25. The April
+   counts are known to be stale, and stopping somebody in a field to fix
+   paperwork is worse than carrying a wrong number for a day. A negative is a
+   prompt to recount, not an error. Returns the warning to show, or ''. */
+function invNegWarn(it, delta){
+  if(!it || delta>=0) return '';
+  var after=invQty(it)+delta;
+  if(after>=-1e-9) return '';
+  return 'That takes '+it.name+' to '+fmt(after)+' '+it.unit+'. Recorded anyway - worth a recount.';
+}
+
+/* Who moved it, for the history rows. */
+function invWhoName(pid){
+  if(!pid) return 'Someone';
+  var p=(typeof rstFind==='function')?rstFind(pid):null;
+  return p?pName(p):'Someone';
+}
+
+var INV_WHY={in:'Delivery',out:'Used',count:'Recount',adjust:'Adjustment'};
+
+/* ---- units, so the field log can subtract what it says was used ----
+
+   The field log records "12 fl oz" and the shelf is counted in gallons. One of
+   them has to convert, and it must NEVER guess: an amount it cannot convert
+   with certainty leaves stock alone and says so, rather than taking a number
+   off the shelf that might be 128 times wrong.
+
+   Two families that never meet: volume (based on fl oz) and weight (based on
+   oz). `oz` is weight and `fl oz` is volume - they are different things and
+   the app must not treat them as the same word. Countable units (bag, can,
+   ea, jug) belong to no family and only ever match themselves. */
+var INV_UNIT_FAM={
+  'fl oz':['v',1],'floz':['v',1],'fluid ounce':['v',1],'fluid ounces':['v',1],
+  'gal':['v',128],'gallon':['v',128],'gallons':['v',128],
+  'qt':['v',32],'quart':['v',32],'quarts':['v',32],
+  'pt':['v',16],'pint':['v',16],'pints':['v',16],
+  'cup':['v',8],'cups':['v',8],
+  'l':['v',33.8140226],'liter':['v',33.8140226],'litre':['v',33.8140226],
+  'ml':['v',0.0338140226],
+  'oz':['w',1],'ounce':['w',1],'ounces':['w',1],
+  'lb':['w',16],'lbs':['w',16],'pound':['w',16],'pounds':['w',16],
+  'kg':['w',35.2739619],
+  'g':['w',0.0352739619],'gram':['w',0.0352739619],'grams':['w',0.0352739619]
+};
+function invUnitKey(u){ return String(u||'').trim().toLowerCase().replace(/\./g,'').replace(/\s+/g,' '); }
+
+/* Returns the converted number, or NULL meaning "I do not know" - and null is
+   always treated as "leave the shelf alone". */
+function invConvert(n, from, to){
+  n=+n; if(!isFinite(n)) return null;
+  var a=invUnitKey(from), b=invUnitKey(to);
+  if(a===b) return n;
+  var fa=INV_UNIT_FAM[a], fb=INV_UNIT_FAM[b];
+  if(!fa || !fb) return null;              /* a countable unit, or one we do not know */
+  if(fa[0]!==fb[0]) return null;           /* never weight <-> volume */
+  return n*fa[1]/fb[1];
+}
+
+/* "12 fl oz" -> {n:12, unit:'fl oz'}. Used for entries typed before the amount
+   box was split in two, and for the correction screen, which is still free
+   text on purpose - a correction must never be harder to write than the
+   original. */
+function invParseAmount(text){
+  var m=String(text||'').trim().match(/^([0-9]*\.?[0-9]+)\s*(.*)$/);
+  if(!m) return null;
+  var n=parseFloat(m[1]);
+  if(!isFinite(n)) return null;
+  return {n:n, unit:(m[2]||'').trim()};
+}
+function invAmountIn(text, it){
+  var p=invParseAmount(text); if(!p || !it) return null;
+  if(!p.unit) return p.n;                  /* no unit typed reads as the product's own */
+  return invConvert(p.n, p.unit, it.unit);
+}
+
+/* Every unit it is safe to offer for a product: its own first, then the rest
+   of its family. A countable product gets only its own. */
+function invUnitChoices(it){
+  var own=(it&&it.unit)||'', k=invUnitKey(own), fam=INV_UNIT_FAM[k];
+  if(!fam) return [own];
+  var out=[own], seen={};
+  seen[k]=1;
+  ['fl oz','gal','qt','pt','L','mL','oz','lb','kg','g'].forEach(function(u){
+    var uk=invUnitKey(u), f=INV_UNIT_FAM[uk];
+    if(f && f[0]===fam[0] && !seen[uk]){ seen[uk]=1; out.push(u); }
+  });
+  return out;
+}
+
+/* Movements caused by one field-log entry. The link is the entry id, so a
+   correction can find what its original took off the shelf. */
+function invMovesForRef(ref){
+  return ref ? INVMOVES.filter(function(m){return m&&m.ref===ref;}) : [];
+}
+function invRefTotal(ref){
+  return invMovesForRef(ref).reduce(function(t,m){return t+(+m.delta||0);},0);
+}
+
+/* A field log entry was corrected, and the correction may have changed how
+   much was used. Fix the shelf the way the field log fixes itself: by writing
+   a NEW movement for the difference, never by editing or deleting the one that
+   is already there. See [[fieldlog]] - the original stays exactly as it was.
+   Returns the compensating movement, or null if there was nothing to fix. */
+/* An entry can be corrected more than once, and each correction hangs its own
+   movement off its own id. So the question "how much has this job taken off
+   the shelf" has to be asked of the WHOLE CHAIN, not of one entry.
+
+   Getting this wrong is not a small error: reconciling against only the last
+   correction's movement compares a difference with a total and books the gap
+   between them a second time. A 20 fl oz spray corrected to 12 and then
+   corrected again for an unrelated typo would take another 20 off a shelf
+   nobody had touched. */
+function invLogChainIds(entry){
+  var ids=[], seen={}, cur=entry, guard=0;
+  while(cur && !seen[cur.id] && guard++ < 50){
+    seen[cur.id]=1; ids.push(cur.id);
+    cur=(cur.corrects && typeof flById==='function') ? flById(cur.corrects) : null;
+  }
+  return ids;
+}
+function invLogChainMoves(entry){
+  var out=[];
+  invLogChainIds(entry).forEach(function(id){ out=out.concat(invMovesForRef(id)); });
+  return out;
+}
+function invReconcileFromLog(orig, corrected){
+  if(!orig || !corrected) return null;
+  var moves=invLogChainMoves(corrected);
+  if(!moves.length) return null;                     /* stock was never touched */
+  var it=INVENTORY.find(function(x){return x.id===moves[0].item;});
+  if(!it) return null;
+  var was=moves.reduce(function(t,m){return t+(+m.delta||0);},0);   /* negative */
+  var amt=invAmountIn(corrected.amount, it);
+  var now=(amt===null)?was:-amt;                     /* unreadable amount: change nothing */
+  var diff=now-was;
+  if(Math.abs(diff)<1e-9) return null;
+  return invMove(it.id, diff, 'adjust',
+    {ref:corrected.id, note:'Field log entry corrected'});
+}
+
+function isLow(it){return invQty(it)<=it.thr;}
+function contCount(it){var q=invQty(it);return it.csize?q/it.csize:q;}
 function amtStr(it){
- if(invUnit==='meas')return fmt(it.qty)+' '+it.unit;
+ if(invUnit==='meas')return fmt(invQty(it))+' '+it.unit;
  var c=contCount(it); return fmt(c)+' '+plural(it.ctype,c);
 }
-function amtBoth(it){var c=contCount(it);return fmt(c)+' '+plural(it.ctype,c)+' · '+fmt(it.qty)+' '+it.unit;}
+function amtBoth(it){var c=contCount(it);return fmt(c)+' '+plural(it.ctype,c)+' · '+fmt(invQty(it))+' '+it.unit;}
 function lowList(){return INVENTORY.filter(isLow);}
 
 function buildChips(){
@@ -7627,11 +8022,21 @@ function buildChips(){
  cats.forEach(function(c){h+='<span class="chip'+(invFilter===c.k?' on':'')+'" data-f="'+c.k+'">'+esc(c.label)+'</span>';});
  el.innerHTML=h;
 }
+/* TWO different permissions, and they were one before the ledger existed.
+
+   invCanMove  - book a delivery in, take stock out. EVERYBODY, undergraduates
+                 included. Dillon, 2026-08-25: the people who carry the jugs
+                 are the people who know what left the shelf, and the field log
+                 already trusts them to write the farm's spray records.
+   invCanEdit  - change what a PRODUCT IS: its name, its container size, its
+                 reorder point. That is a decision about the shelf rather than
+                 a record of what happened on it, so it stays where it was. */
+function invCanMove(){return true;}
 function invCanEdit(){return currentRole!=='undergrad';}
 function invEnter(){
  var u=document.getElementById('inv-units'); if(u)u.querySelectorAll('span').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-u')===invUnit);});
  document.getElementById('inv-addbtn').style.display=invCanEdit()?'block':'none';
- var rb=document.getElementById('inv-restock'); if(rb)rb.parentElement.style.display=invCanEdit()?'block':'none';
+ var rb=document.getElementById('inv-restock'); if(rb)rb.parentElement.style.display=invCanMove()?'block':'none';
  buildChips(); renderInvList();
 }
 function renderInvAlert(){
@@ -7676,16 +8081,33 @@ function openItem(id){
  rows+=fldRowI('Container', '1 '+it.ctype+' = '+fmt(it.csize)+' '+it.unit);
  rows+=fldRowI('On hand', amtBoth(it));
  rows+=fldRowI('Reorder at', fmt(it.thr)+' '+it.unit, true);
- var hist='<div class="row"><span class="dot" style="background:#2f9e4f"></span><div style="flex:1"><div class="rt">Restock · +'+fmt(it.csize)+' '+it.unit+'</div><div class="rs">Bill Czekai · Mon</div></div></div>'
-   +'<div class="row"><span class="dot" style="background:#c0392b"></span><div style="flex:1"><div class="rt">Usage · −'+fmt(it.csize/2)+' '+it.unit+'</div><div class="rs">Plots 14, 16 · Garrett Willard · Fri</div></div></div>';
+ /* Real movements now. This block used to be two hardcoded demo rows with
+    Bill's and Garrett's names on them - the last of the fake data, and it
+    would have been read as a real record the day the shelf went shared. */
+ var mv=invMovesFor(it.id).slice(0,12);
+ var hist=mv.length ? mv.map(function(m){
+     var up=m.delta>0;
+     var sign=up?'+':'−';
+     var why=INV_WHY[m.why]||'Adjustment';
+     var sub=invWhoName(m.who)+' · '+String(m.at||'').slice(0,10)+(m.note?(' · '+m.note):'');
+     return '<div class="row"><span class="dot" style="background:'+(up?'#2f9e4f':'#c0392b')+'"></span>'
+       +'<div style="flex:1;min-width:0"><div class="rt">'+esc(why)+' · '+sign+fmt(Math.abs(m.delta))+' '+esc(m.unit||it.unit)+'</div>'
+       +'<div class="rs">'+esc(sub)+'</div></div></div>';
+   }).join('')
+ : '<div class="row"><div style="flex:1"><div class="rs">Nothing has moved yet. The figure above is the April count.</div></div></div>';
  document.getElementById('id-body').innerHTML=
    '<div class="hdr" style="background:#2f3133;padding:15px 16px;gap:10px"><div class="title" style="color:#fff;font-size:17px;flex:1;line-height:1.15">'+esc(it.name)+'</div>'+stat+'</div>'
   +'<div class="sec">Details</div><div class="list">'+rows+'</div>'
-  +'<div class="sec">Recent movement</div><div class="list">'+hist+'</div>';
- document.getElementById('id-actions').innerHTML= invCanEdit()?
-   ('<div class="action tap" data-go="invlog" data-mode="restock" data-item="'+it.id+'" style="flex:1">Restock</div>'
-   +'<div class="action tap" data-go="additem" data-edit="'+it.id+'" style="flex:1;background:#17181a">Edit</div>')
-  : '<div style="text-align:center;width:100%;font:700 12px \'Public Sans\';color:var(--muted);padding:6px">View only</div>';
+  +'<div class="sec">Recent movement</div><div class="list">'+hist+'</div>'
+   +'<div style="height:18px"></div>';
+ document.getElementById('id-actions').innerHTML=
+   (invCanMove()
+     ? ('<div class="action tap" data-go="invlog" data-mode="restock" data-item="'+it.id+'" style="flex:1">Restock</div>'
+       +'<div class="action tap" data-go="invlog" data-mode="out" data-item="'+it.id+'" style="flex:1;background:#8a3b2f">Take out</div>')
+     : '')
+  +(invCanEdit()
+     ? '<div class="action tap" data-go="additem" data-edit="'+it.id+'" style="flex:1;background:#17181a">Edit</div>'
+     : '');
  show('itemdetail',true);
 }
 
@@ -7713,13 +8135,67 @@ function newDetailHTML(){
   +whoBlock()+previewBlock();
 }
 function curLogItem(){return window.ilSel?INVENTORY.find(function(x){return x.id===window.ilSel;}):null;}
+
+/* ---- taking stock out ----
+   The same screen as a restock, pointed the other way. It is deliberately NOT
+   a second screen: one product picker, one save button, one place a movement
+   is written from.
+
+   Amounts are typed in the PRODUCT'S OWN UNIT rather than in containers,
+   because nobody uses a whole jug - they use 12 fl oz out of one. The
+   container line is shown as a reminder of what a full one holds.
+
+   Going below zero warns and records anyway. See invNegWarn(). */
+function ilOut(){ return window.ilMode==='out'; }
+
+var IL_OUT_REASONS=[
+ {v:'used',  t:'Used on the farm',               why:'out'},
+ {v:'spill', t:'Spilled, damaged or thrown out', why:'adjust'},
+ {v:'lent',  t:'Lent or given to another lab',   why:'adjust'},
+ {v:'other', t:'Something else',                 why:'adjust'}
+];
+function ilOutReason(v){
+  for(var i=0;i<IL_OUT_REASONS.length;i++) if(IL_OUT_REASONS[i].v===v) return IL_OUT_REASONS[i];
+  return IL_OUT_REASONS[0];
+}
+function outDetailHTML(it){
+ return '<div class="sec" style="margin:14px 18px 7px">What went out</div><div class="list">'
+  +'<div class="fld"><span class="fl">Amount</span><span style="display:flex;align-items:center;gap:7px">'
+  +'<input class="inv-in" id="il-outamt" inputmode="decimal" placeholder="0" style="max-width:90px">'
+  +'<span class="fv">'+esc(it.unit)+'</span></span></div>'
+  +'<div class="fld" style="border-bottom:none"><span class="fl">A full '+esc(it.ctype)+' holds</span><span class="fv">'+fmt(it.csize)+' '+esc(it.unit)+'</span></div></div>'
+  +'<div class="sec" style="margin:14px 18px 7px">Why</div><div class="list">'
+  +'<div class="fld"><span class="fl">Reason</span><select class="inv-sel" id="il-outwhy">'
+  +IL_OUT_REASONS.map(function(r){return '<option value="'+r.v+'">'+esc(r.t)+'</option>';}).join('')
+  +'</select></div>'
+  +'<div class="fld" style="border-bottom:none"><span class="fl">Note</span><input class="inv-in" id="il-outnote" placeholder="optional" style="max-width:175px"></div></div>'
+  +whoBlock()+previewBlock();
+}
+function updateOutPreview(){
+ var pv=document.getElementById('il-preview'); if(!pv)return;
+ var it=curLogItem(); if(!it){pv.innerHTML='';return;}
+ var amt=parseFloat((document.getElementById('il-outamt')||{}).value)||0;
+ if(!amt){
+   pv.style.background='#eef4ff';pv.style.borderColor='#cfe0ff';pv.style.color='#2456b8';
+   pv.innerHTML='Enter how much came off the shelf.'; return;
+ }
+ var after=invQty(it)-amt;
+ if(after<-1e-9){
+   /* Red, but not a refusal - the button still works. */
+   pv.style.background='#fdeceb';pv.style.borderColor='#f3c9c4';pv.style.color='#c0392b';
+   pv.innerHTML='−'+fmt(amt)+' '+it.unit+' → '+fmt(after)+' '+it.unit+'. That is below zero, so the count is probably out. It will still be recorded.';
+ } else {
+   pv.style.background='#eafaef';pv.style.borderColor='#bfe6c9';pv.style.color='#2f7d3a';
+   pv.innerHTML='✓ −'+fmt(amt)+' '+it.unit+' → new on hand '+fmt(after)+' '+it.unit;
+ }
+}
 function invSuggest(txt){
  var box=document.getElementById('il-sugg'); if(!box)return;
  var q=txt.trim().toLowerCase();
  if(!q){box.style.display='none';box.innerHTML='';return;}
  var matches=INVENTORY.filter(function(it){return it.name.toLowerCase().indexOf(q)>=0;}).slice(0,6);
  var exact=INVENTORY.some(function(it){return it.name.toLowerCase()===q;});
- var h=matches.map(function(it){return '<div class="s-row" data-pick="'+it.id+'"><span class="s-nm">'+esc(it.name)+'</span><span class="s-sub">'+catMeta(it.cat).label+' · '+fmt(it.qty)+' '+it.unit+'</span></div>';}).join('');
+ var h=matches.map(function(it){return '<div class="s-row" data-pick="'+it.id+'"><span class="s-nm">'+esc(it.name)+'</span><span class="s-sub">'+catMeta(it.cat).label+' · '+fmt(invQty(it))+' '+it.unit+'</span></div>';}).join('');
  if(!exact){h+='<div class="s-row" data-new="1"><span class="s-new">＋ Add “'+txt.trim()+'”</span><span class="s-sub">new product</span></div>';}
  box.innerHTML=h; box.style.display='block';
 }
@@ -7728,11 +8204,14 @@ function setExisting(id){
  window.ilSel=id; window.ilNew=false; window.ilQty=1;
  var inp=document.getElementById('il-prod-in'); if(inp)inp.value=it.name;
  document.getElementById('il-sugg').style.display='none';
- document.getElementById('il-detail').innerHTML=existingDetailHTML(it);
- updateRestockPreview();
+ document.getElementById('il-detail').innerHTML=ilOut()?outDetailHTML(it):existingDetailHTML(it);
+ if(ilOut()) updateOutPreview(); else updateRestockPreview();
 }
 function setNew(name){
  name=(name||'').trim(); if(!name)return;
+ /* You cannot use what the shelf has never heard of. Booking it in first is
+    the honest order, and it is one tap away. */
+ if(ilOut()){ toast('That product is not on the shelf yet — restock it first'); return; }
  window.ilSel=null; window.ilNew=true; window.ilNewName=name; window.ilQty=1;
  var inp=document.getElementById('il-prod-in'); if(inp)inp.value=name;
  document.getElementById('il-sugg').style.display='none';
@@ -7752,11 +8231,13 @@ function updateRestockPreview(){
    var it=curLogItem(); if(!it){pv.innerHTML='';return;}
    var cs=document.getElementById('il-csize'); if(cs)cs.textContent='1 '+it.ctype+' = '+fmt(it.csize)+' '+it.unit;
    var add=n*it.csize;
-   pv.innerHTML='✓ +'+fmt(add)+' '+it.unit+' → new on hand '+fmt(it.qty+add)+' '+it.unit;
+   pv.innerHTML='✓ +'+fmt(add)+' '+it.unit+' → new on hand '+fmt(invQty(it)+add)+' '+it.unit;
  }
 }
 function renderInvLog(){
- document.getElementById('il-title').textContent='Restock';
+ var out=ilOut();
+ document.getElementById('il-title').textContent=out?'Take stock out':'Restock';
+ var sv=document.getElementById('il-save'); if(sv)sv.textContent=out?'Take it out':'Save';
  window.ilQty=1; window.ilNew=false; window.ilSel=null; window.ilNewName='';
  document.getElementById('il-body').innerHTML=
    '<div class="sec" style="margin:12px 18px 7px">Product</div>'
@@ -7773,9 +8254,11 @@ document.getElementById('s-invlog').addEventListener('click',function(e){
 document.getElementById('s-invlog').addEventListener('input',function(e){
  if(e.target.id==='il-prod-in'){window.ilSel=null;window.ilNew=false;document.getElementById('il-detail').innerHTML='';invSuggest(e.target.value);}
  else if(e.target.id==='il-vol'){updateRestockPreview();}
+ else if(e.target.id==='il-outamt'||e.target.id==='il-outnote'){updateOutPreview();}
 });
 document.getElementById('s-invlog').addEventListener('change',function(e){
  if(e.target.id==='il-vunit'||e.target.id==='il-ctype'||e.target.id==='il-cat')updateRestockPreview();
+ else if(e.target.id==='il-outwhy')updateOutPreview();
 });
 document.getElementById('s-invlog').addEventListener('keydown',function(e){
  if(e.target.id!=='il-prod-in'||e.key!=='Enter')return;
@@ -7788,6 +8271,23 @@ document.getElementById('s-invlog').addEventListener('keydown',function(e){
  setNew(q);
 });
 document.getElementById('il-save').addEventListener('click',function(){
+ if(ilOut()){
+   var oit=curLogItem(); if(!oit){toast('Pick a product');return;}
+   var amt=parseFloat((document.getElementById('il-outamt')||{}).value);
+   if(!amt||amt<=0){toast('Enter how much went out');return;}
+   var r=ilOutReason((document.getElementById('il-outwhy')||{}).value);
+   var typed=((document.getElementById('il-outnote')||{}).value||'').trim();
+   var note=(r.v==='used'?'':r.t)+((r.v!=='used'&&typed)?' — ':'')+(r.v==='used'?typed:(typed?'':''));
+   if(r.v==='used'&&typed) note=typed;
+   /* Work the warning out BEFORE the movement lands, or it is measuring the
+      shelf after the fact and always comes back clean. */
+   var warn=invNegWarn(oit,-amt);
+   invMove(oit.id,-amt,r.why,{note:note});
+   toast(warn||('Took out '+fmt(amt)+' '+oit.unit+' ✓'));
+   window.ilItem=null; show('inventory');
+   stack=stack.filter(function(x){return x!=='invlog'&&x!=='itemdetail';});
+   return;
+ }
  if(window.ilNew){
    var name=(window.ilNewName||document.getElementById('il-prod-in').value||'').trim();
    if(!name){toast('Type a product name');return;}
@@ -7795,11 +8295,18 @@ document.getElementById('il-save').addEventListener('click',function(){
    if(!amt||amt<=0){toast('Enter volume per container');return;}
    var cat=document.getElementById('il-cat').value, ctype=document.getElementById('il-ctype').value, unit=document.getElementById('il-vunit').value;
    var qty=window.ilQty*amt;
-   INVENTORY.push({id:newId('i'),name:name,ai:null,moa:null,cat:cat,form:'other',loc:'—',ctype:ctype,csize:amt,unit:unit,qty:qty,thr:0});
+   /* Opening balance ZERO, then book the delivery. The product did not
+      exist a moment ago, so it has no April count - everything it holds
+      arrived, and the ledger should say so. */
+   var nid=newId('i');
+   INVENTORY.push({id:nid,name:name,ai:null,moa:null,cat:cat,form:'other',loc:'—',ctype:ctype,csize:amt,unit:unit,qty:0,thr:0});
+   invMove(nid, qty, 'in', {note:'First delivery of a new product'});
    toast('Added '+name+' · '+fmt(qty)+' '+unit+' ✓'); invFilter=cat;
  } else {
    var it=curLogItem(); if(!it){toast('Pick a product');return;}
-   var add=window.ilQty*it.csize; it.qty+=add; toast('Restocked +'+fmt(add)+' '+it.unit+' ✓');
+   var add=window.ilQty*it.csize;
+   invMove(it.id, add, 'in');
+   toast('Restocked +'+fmt(add)+' '+it.unit+' ✓');
  }
  window.ilItem=null; show('inventory');
  stack=stack.filter(function(x){return x!=='invlog'&&x!=='itemdetail';});
@@ -7829,7 +8336,7 @@ function renderAddItem(){
   +'</div>'
   +'<div style="margin:12px 16px;background:#eef4ff;border:1px solid #cfe0ff;border-radius:12px;padding:11px 13px;font:600 11.5px;color:#2456b8">Type a known brand name to autofill ingredient, category, formulation &amp; resistance group. Everything stays editable.</div>';
  var reslbl=function(){var c=catMeta(document.getElementById('ai-cat').value);document.getElementById('ai-reslbl').textContent=(c.res||'Resistance')+' group';};
- if(ed){var g=function(x){return document.getElementById('ai-'+x);};g('name').value=ed.name;g('ai').value=ed.ai||'';g('moa').value=ed.moa||'';g('cat').value=ed.cat;g('form').value=ed.form;g('loc').value=(ed.loc==='—'?'':ed.loc);g('ctype').value=ed.ctype;g('csize').value=ed.csize;g('unit').value=ed.unit;g('qty').value=ed.qty;g('thr').value=ed.thr;}
+ if(ed){var g=function(x){return document.getElementById('ai-'+x);};g('name').value=ed.name;g('ai').value=ed.ai||'';g('moa').value=ed.moa||'';g('cat').value=ed.cat;g('form').value=ed.form;g('loc').value=(ed.loc==='—'?'':ed.loc);g('ctype').value=ed.ctype;g('csize').value=ed.csize;g('unit').value=ed.unit;g('qty').value=fmt(invQty(ed));g('thr').value=ed.thr;}
  reslbl();
  document.getElementById('ai-cat').addEventListener('change',reslbl);
  if(!ed)document.getElementById('ai-name').addEventListener('input',function(){
@@ -7844,7 +8351,14 @@ document.getElementById('ai-save').addEventListener('click',function(){
  var csize=parseFloat(g('csize').value)||1, qty=parseFloat(g('qty').value)||0, thr=parseFloat(g('thr').value)||0;
  var ed=window.aiEdit?INVENTORY.find(function(x){return x.id===window.aiEdit;}):null;
  if(ed){
-   ed.name=name; ed.ai=g('ai').value.trim()||null; ed.moa=g('moa').value.trim()||null; ed.cat=g('cat').value; ed.form=g('form').value; ed.loc=g('loc').value.trim()||'—'; ed.ctype=g('ctype').value; ed.csize=csize; ed.unit=g('unit').value.trim()||'unit'; ed.qty=qty; ed.thr=thr;
+   ed.name=name; ed.ai=g('ai').value.trim()||null; ed.moa=g('moa').value.trim()||null; ed.cat=g('cat').value; ed.form=g('form').value; ed.loc=g('loc').value.trim()||'—'; ed.ctype=g('ctype').value; ed.csize=csize; ed.unit=g('unit').value.trim()||'unit'; ed.thr=thr;
+    /* "On hand" on this form is a RECOUNT. Writing ed.qty would quietly
+       rewrite the April opening balance and leave every movement since
+       describing a shelf that no longer adds up. Book the difference instead,
+       so the number reads what was typed AND the record still says how it got
+       there. */
+    var diff=qty-invQty(ed);
+    if(Math.abs(diff)>1e-9) invMove(ed.id, diff, 'count', {note:'Recount on the item screen'});
    toast('Saved changes ✓'); invFilter=ed.cat; window.aiEdit=null;
    show('inventory'); stack=stack.filter(function(x){return x!=='additem'&&x!=='itemdetail';});
    return;
@@ -7861,7 +8375,7 @@ function renderLowStock(){
  if(!lows.length){body.innerHTML='<div class="sec" style="text-align:center;margin-top:30px">Nothing below reorder ✓</div>';return;}
  var html='<div class="sec">'+lows.length+' at or below reorder point</div><div class="list">';
  html+=lows.map(function(it){
-   return '<div class="row tap" data-item="'+it.id+'"><span class="dot" style="background:#c0392b"></span><div style="flex:1;min-width:0"><div class="rt">'+esc(it.name)+'</div><div class="rs">'+catMeta(it.cat).label+' · '+fmt(it.qty)+' '+it.unit+' left · reorder at '+fmt(it.thr)+' '+it.unit+'</div></div><span class="pill lowpill">Low</span></div>';
+   return '<div class="row tap" data-item="'+it.id+'"><span class="dot" style="background:#c0392b"></span><div style="flex:1;min-width:0"><div class="rt">'+esc(it.name)+'</div><div class="rs">'+catMeta(it.cat).label+' · '+fmt(invQty(it))+' '+it.unit+' left · reorder at '+fmt(it.thr)+' '+it.unit+'</div></div><span class="pill lowpill">Low</span></div>';
  }).join('')+'</div>';
  body.innerHTML=html;
 }
@@ -10913,6 +11427,69 @@ function fstRender(){
     +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:3px;line-height:1.45">'
     +'Machines, labs and spray figures the rest of the app reads. Kept here so changing one is a job for the farm, '
     +'not a job for whoever wrote the app.</div></div>'
+    +'<div class="list" style="margin-top:12px">'+rows+'</div>'
+    +pwaVersionLine()
+    +'<div style="height:22px"></div>';
+}
+
+/* ============================== ADMIN ==============================
+   Everything belonging to whoever holds the App Manager post, in one place and
+   nowhere near anybody's day.
+
+   It is a HUB, not a new pile of screens: every row opens something that
+   already existed. What changed is where they hang. Before this, holding the
+   post made the roster the first thing you saw on signing in, which put
+   looking after the app above doing your actual job - and for the person who
+   holds the post AND works the farm, that was the wrong way round.
+
+   Only the post-holder sees the row that reaches this (see moreEnter), and the
+   guard in admRender repeats the check, because a hidden row is a courtesy and
+   not a lock.
+   =================================================================== */
+
+/* Farm settings already words these two well. Borrow rather than write a
+   second version that can drift out of step with the first. */
+function admSub(go){
+  for(var i=0;i<FARM_CATS.length;i++) if(FARM_CATS[i].go===go){
+    try{ return FARM_CATS[i].d(); }catch(e){ return ''; }
+  }
+  return '';
+}
+
+var ADMIN_ROWS=[
+ {go:'roster', t:'Roster & accounts', d:function(){
+    var n=PEOPLE.filter(function(p){return p.active!==false;}).length;
+    return n+' people \u00b7 jobs, labs, faculty records and handing the app on';
+  }},
+ {go:'farmsettings', t:'Farm settings', d:function(){ return 'Sprayer, mowers and labs'; }},
+ {go:'sharedb', t:'Shared database', d:function(){ return admSub('sharedb'); }},
+ {go:'bugsettings', t:'Bug reports', d:function(){ return admSub('bugsettings'); }}
+];
+
+function admRender(){
+  var body=document.getElementById('adm-body'); if(!body) return;
+  if(!rstIsAdmin()){
+    body.innerHTML=
+       '<div style="margin:14px 16px 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px">'
+      +'<div style="font:800 13px \'Archivo\';color:var(--ink)">This screen belongs to the App Manager</div>'
+      +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:3px;line-height:1.45">'
+      +esc(APP_ADMIN.name||'The App Manager')+' holds the app today. Nothing on it is part of your job.</div></div>';
+    return;
+  }
+  var rows=ADMIN_ROWS.map(function(c,i){
+    var sub=''; try{ sub=c.d(); }catch(e){ sub=''; }
+    return '<div class="row tap" data-go="'+c.go+'"'+(i===ADMIN_ROWS.length-1?' style="border-bottom:none"':'')+'>'
+      +'<div style="flex:1;min-width:0"><div class="rt">'+esc(c.t)+'</div><div class="rs">'+esc(sub)+'</div></div>'
+      +'<span style="color:#c2c7cd;font-size:18px;flex:none">\u203a</span></div>';
+  }).join('');
+  var m=me();
+  body.innerHTML=
+     '<div style="margin:14px 16px 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px">'
+    +'<div style="font:800 13px \'Archivo\';color:var(--ink)">You hold the App Manager post</div>'
+    +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:3px;line-height:1.45">'
+    +'A post, not a job. On the farm you are still '+esc(m.t||'the person the roster says you are')
+    +((m.lab&&m.lab!=='\u2014')?(' in the '+esc(m.lab)+' lab'):'')
+    +', and the rest of the app treats you that way. This screen is the app itself.</div></div>'
     +'<div class="list" style="margin-top:12px">'+rows+'</div>'
     +pwaVersionLine()
     +'<div style="height:22px"></div>';
@@ -14791,7 +15368,11 @@ var STORE_DEFS=[
      out yet still rides along in the backup export. A queued bug that lived
      only in its own key would be dropped by exactly the export/restore step
      the move to hosting forces every user through. */
-  {name:'bugs',       key:'ut_bugs_v1',       label:'Bug reports',        get:function(){return BUGS;}}
+  {name:'bugs',       key:'ut_bugs_v1',       label:'Bug reports',        get:function(){return BUGS;}},
+  /* The stock ledger. Registered like everything else, so it is saved, backed
+     up and restored with the rest - losing it would leave every product back
+     at its April opening balance with no record of what moved. */
+  {name:'invmoves',   key:'ut_invmoves_v1',   label:'Stock movements',    get:function(){return INVMOVES;}}
 ];
 var STORE_LAST_EXPORT_KEY='ut_last_export';
 var STORE_SCAN_MS=2000;
@@ -16389,6 +16970,9 @@ function authIsAdminClaims(c){ return !!(c && c.app_admin === true); }
 /* Put a person into the app. Shared by boot and by a fresh sign-in so the two
    paths cannot drift. Returns false if the id is not a live roster person. */
 function authEnter(pid, isAdmin){
+  /* Off FIRST, every time. Two people share a farm phone; the second one must
+     not inherit the first one's post because the flag was left lying around. */
+  signOutAdmin();
   if(!sessionSet(pid)) return false;
   if(isAdmin) signInAdmin();
   return true;
@@ -16405,7 +16989,10 @@ function authBoot(){
     authClearLocal();
     return false;
   }
-  goRoot(rec.admin ? 'roster' : lgHome());
+  /* Your own home, whoever you are. Holding the App Manager post used to send
+     you to the roster instead, which buried the job you actually do. The post
+     now lives on More -> Admin. */
+  goRoot(lgHome());
   setTimeout(authVerify, 1200);   /* after the first paint, never before it */
   return true;
 }
@@ -16641,7 +17228,7 @@ function authSignIn(email, pass){
       var pw=document.getElementById('lg-pass'); if(pw) pw.value='';
       authMsg('');
       stack.length=0;
-      goRoot(admin ? 'roster' : lgHome());
+      goRoot(lgHome());
     });
   }).catch(function(err){
     done();
@@ -16679,6 +17266,7 @@ function authSignOut(){
      half-signed-out, still looking at another person's screens. */
   authClearLocal();
   try{ sessionClear(); }catch(e){}
+  signOutAdmin();
   currentRole='undergrad';
   stack.length=0;
   if(auth){ try{ auth.signOut().catch(function(){}); }catch(e){} }

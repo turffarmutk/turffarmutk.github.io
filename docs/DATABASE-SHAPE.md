@@ -151,10 +151,34 @@ Answers change the rules, so they are worth getting before the drawer ships:
   than inherited.
 - Can anyone edit or delete **somebody else's** field log entry? (Drawer 4, but
   the answer shapes how corrections work everywhere.)
-- **p23 Lauren Valk is an undergrad in Brosnan's lab**, and under the rule as
-  written Dr. Brosnan cannot assign her — only Bill or the grant-holder can. That
-  follows the instruction "undergrad labour is requested from Bill". Flagged in
-  case lab-assigned undergrads were meant to be an exception.
+- ~~Lauren Valk / lab-assigned undergrads~~ — **settled 2026-08-25**, see below.
+
+
+---
+
+## The lab-assigned exception — Dillon, 2026-08-25
+
+An undergrad who **belongs to a lab** answers to that lab. Anybody in it above
+undergrad — faculty, grad students and technicians alike — may put them on a
+job directly. Dr. Brosnan, Greg, Javi and Logan can all direct Lauren Valk.
+
+Undergrads with **no lab of their own remain pooled** and are still handed out
+only by whoever holds `assign_undergrads`.
+
+**The pool is expressed as `lab:'Bill'`.** The five pooled undergrads carry Bill
+Czekai's own lab value, and Bill is the only non-undergrad in it, so "same lab"
+resolves to "Bill" and the exception cannot reach the pool. This is worth
+knowing before anybody edits a lab:
+
+- Moving a pooled undergrad into a real lab through **More → People** hands that
+  lab direction over them *immediately*, with no code change. That is the
+  intended behaviour and it is a small win for [[handoff-constraint]].
+- Giving any other person `lab:'Bill'` would hand them direction over all five
+  pooled undergrads. Nothing stops it and nothing should — it is the same
+  mechanism — but it is the one edit with a surprising blast radius.
+
+`sameLab()` requires both people to actually have a lab; a blank lab or the em
+dash the app writes for "none" is not a lab everyone shares.
 
 ---
 

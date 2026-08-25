@@ -147,6 +147,31 @@ ok(cases.length + ' checks, app and database agree on every one', mismatches.len
    mismatches.slice(0, 8).join(' | '));
 if (mismatches.length > 8) console.log('        ...and ' + (mismatches.length - 8) + ' more');
 
+
+/* ------------------------------------- 3b. the lab-assigned exception ----- */
+section('3b. A lab-assigned undergrad, in both places');
+{
+  /* Covered by the sweep above, but named here so the intent survives:
+     Lauren (p23) is an undergrad in Brosnan's lab. The other five carry
+     Bill's own lab, which is how the pool is expressed. */
+  const pairs = [
+    ['p13', 'p23', true,  "her faculty advisor"],
+    ['p05', 'p23', true,  "a technician in her lab"],
+    ['p12', 'p23', true,  "a grad student in her lab"],
+    ['p07', 'p23', true,  "Bill, who holds the job"],
+    ['p02', 'p23', false, "a technician from another lab"],
+    ['p16', 'p23', false, "faculty from another lab"],
+    ['p05', 'p18', false, "a technician reaching into the pool"],
+    ['p16', 'p20', false, "faculty reaching into the pool"]
+  ];
+  pairs.forEach(([a, b, want, label]) => {
+    const app = win.taskCan(a, 'assign', { assignee: b });
+    const db = rulesCan(DOC, a, 'assign', { assignee: b });
+    ok(label + ' -> ' + (want ? 'may' : 'may not') + ' assign',
+       app === want && db === want, 'app ' + app + ', database ' + db);
+  });
+}
+
 /* --------------------------------------------- 4. people off the roster --- */
 section('4. Somebody who is not on the roster, or has been switched off');
 {

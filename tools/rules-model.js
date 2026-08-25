@@ -64,10 +64,15 @@ function Rules(doc, mePid) {
 
   function canCreate() { return roleOf(me) !== 'Undergraduate Student'; }
 
+  function canDirectUndergrad(target) {
+    return assignsUndergrads(me)
+      || (roleOf(me) !== 'Undergraduate Student' && sameLab(me, target));
+  }
+
   function canAssignTo(target) {
     return target === '' ? false
       : target === me ? roleOf(me) !== 'Undergraduate Student'
-      : roleOf(target) === 'Undergraduate Student' ? assignsUndergrads(me)
+      : roleOf(target) === 'Undergraduate Student' ? canDirectUndergrad(target)
       : roleOf(me) === 'Faculty'
         ? ((roleOf(target) === 'Graduate Student' || roleOf(target) === 'Technician')
            && sameLab(me, target))
@@ -94,7 +99,7 @@ function Rules(doc, mePid) {
           && sameLab(me, str(d.assignee)));
   }
 
-  return { actor, canCreate, canAssignTo, canClaim, canComplete, canEdit, onTask };
+  return { actor, canCreate, canAssignTo, canDirectUndergrad, canClaim, canComplete, canEdit, onTask };
 }
 
 /*

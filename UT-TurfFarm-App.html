@@ -5124,7 +5124,8 @@ function taskCrew(t){ return t?[t.assignee].concat(t.helpers||[]).filter(Boolean
      - Faculty may direct their own lab's techs and grad students, and only
        their own lab's.
      - Undergrad labour is pooled. Nobody hands out an undergrad except
-       whoever is holding that job, which is normally Bill.
+       whoever is holding that job, which is normally Bill - UNLESS the
+       undergrad belongs to a lab, in which case that lab directs them.
 
    That last one is a GRANT on a person rather than a test for the words "Farm
    Manager", because it moves: Dillon holds it today, and Bill needs to be able
@@ -5164,7 +5165,15 @@ function taskCan(actor,action,task){
     case 'assign':
       if(!target) return false;
       if(target===me) return role!==UG;                     /* taking it yourself */
-      if(personRole(target)===UG) return assignsUndergrads(me);
+      if(personRole(target)===UG){
+        if(assignsUndergrads(me)) return true;
+        /* THE LAB-ASSIGNED EXCEPTION - Dillon, 2026-08-25.
+           An undergrad who belongs to a lab answers to that lab, so anybody
+           in it above undergrad may direct them - faculty, grad students and
+           technicians alike. The pooled undergrads carry Bill's own lab, so
+           the pool is untouched by this and still goes through him. */
+        return role!==UG && sameLab(me,target);
+      }
       if(role==='Faculty'){
         var tr=personRole(target);
         return (tr==='Graduate Student'||tr==='Technician') && sameLab(me,target);

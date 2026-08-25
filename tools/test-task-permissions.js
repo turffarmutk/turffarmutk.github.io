@@ -77,7 +77,7 @@ section('2. faculty direct their own lab, and nobody else\'s');
   ok('and his own grad student', can('p16', 'assign', to('p09')));
   ok('but NOT another lab\'s technician', !can('p16', 'assign', to('p05')));
   ok('nor another lab\'s grad student', !can('p16', 'assign', to('p12')));
-  ok('and not an undergrad, even one in his lab', !can('p13', 'assign', to('p23')));
+  ok('and an undergrad in his own lab, who answers to it', can('p13', 'assign', to('p23')));
   ok('faculty may not assign the Farm Manager', !can('p16', 'assign', to('p07')));
 }
 
@@ -87,7 +87,8 @@ section('3. techs and grads assign only themselves');
   ok('a grad student self-assigns', can('p09', 'assign', to('p09')));
   ok('a technician may NOT assign a colleague in the same lab', !can('p02', 'assign', to('p09')));
   ok('nor their own faculty advisor', !can('p02', 'assign', to('p16')));
-  ok('nor an undergrad', !can('p02', 'assign', to('p18')));
+  ok('nor a pooled undergrad', !can('p02', 'assign', to('p18')));
+  ok('nor another lab\'s undergrad', !can('p02', 'assign', to('p23')));
   ok('but they can ask for undergrad help', can('p02', 'request', {}));
 }
 
@@ -154,6 +155,25 @@ section('8. nobody who has left the roster can do anything');
      !can('p07', 'launch_the_missiles', to('p18')));
 }
 
+section('8b. a lab-assigned undergrad answers to their lab');
+{
+  /* Dillon, 2026-08-25. Lauren (p23) is an undergrad in Brosnan's lab. The
+     other five carry Bill's own lab, which is how the pool is expressed, so
+     this exception does not reach them. */
+  ok('her faculty advisor can put her on a job',      can('p13', 'assign', to('p23')));
+  ok('so can a technician in her lab',                can('p05', 'assign', to('p23')));
+  ok('and a grad student in her lab',                 can('p12', 'assign', to('p23')));
+  ok('Bill still can, as he always could',            can('p07', 'assign', to('p23')));
+  ok('another undergrad in her lab still cannot',     !can('p23', 'assign', to('p23')));
+  ok('a technician in a DIFFERENT lab cannot',        !can('p02', 'assign', to('p23')));
+  ok('faculty in a different lab cannot',             !can('p16', 'assign', to('p23')));
+
+  /* The pool is untouched: only the job-holder hands those five out. */
+  ok('a Brosnan technician cannot take a pooled undergrad',  !can('p05', 'assign', to('p18')));
+  ok('a Sorochan faculty member cannot either',              !can('p16', 'assign', to('p20')));
+  ok('Bill can, because he holds the job',                   can('p07', 'assign', to('p20')));
+}
+
 section('9. the whole grid, so nothing is allowed by accident');
 {
   /* Every actor against every target. Anything true that is not in this list
@@ -161,7 +181,8 @@ section('9. the whole grid, so nothing is allowed by accident');
   const expected = new Set([
     'p07>p18','p07>p19','p07>p20','p07>p21','p07>p22','p07>p23',   /* Bill -> undergrads */
     'p01>p18','p01>p19','p01>p20','p01>p21','p01>p22','p01>p23',   /* Dillon holds the grant */
-    'p13>p05','p13>p06','p13>p12',                                  /* Brosnan -> own lab */
+    'p13>p05','p13>p06','p13>p12','p13>p23',                        /* Brosnan -> own lab */
+    'p05>p23','p06>p23','p12>p23',                                  /* ...and Lauren's lab-mates */
     'p14>p08',                                                      /* Horvath -> own lab */
     'p15>p10','p15>p11',                                            /* Bowling -> own lab */
     'p16>p01','p16>p02','p16>p03','p16>p04','p16>p09',              /* Sorochan -> own lab */

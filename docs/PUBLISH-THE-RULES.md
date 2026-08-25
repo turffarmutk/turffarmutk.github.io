@@ -18,7 +18,8 @@ the reason the wording of the rules matters more than it used to.
 
 The file says exactly one thing, in a lot of words: **the farm's organisation
 chart.** Bill directs undergrads and asks everybody else. Faculty direct their
-own lab's people. Undergrad labour is handed out by whoever holds that job. It
+own lab's people. Undergrad labour is handed out by whoever holds that job —
+unless the undergrad belongs to a lab, in which case that lab directs them. It
 is the same rule that is already in the app — written a second time, in the
 language the database speaks.
 
@@ -89,13 +90,25 @@ somebody permissions they should not have.
 |---|---|
 | Anyone signed in and on the roster | See every task on the board |
 | Everyone except undergrads | Raise a job, or ask for one |
-| Bill, and whoever holds the undergrad-assignment job | Put an undergrad on a job; close a job on somebody's behalf |
-| Faculty | Put their **own lab's** grad students and technicians on a job |
-| Grad students and technicians | Put themselves on a job; pick up anything from the open pool |
+| Bill, and whoever holds the undergrad-assignment job | Put **any** undergrad on a job; close a job on somebody's behalf |
+| Faculty | Put their **own lab's** grad students, technicians and undergrads on a job |
+| Grad students and technicians | Put themselves on a job; put **their own lab's undergrads** on one; pick up anything from the open pool |
 | Undergrads | Do the work they are given, and mark it done |
 | Anybody who is not on the roster, or is switched off | Nothing at all |
 
-Two things the database now insists on that the app only *suggested* today:
+### Undergrads attached to a lab
+
+An undergrad who **belongs to a lab** answers to that lab, and anyone in it can
+put them on a job — Lauren Valk works to Brosnan's lab, so Dr. Brosnan, Greg,
+Javi and Logan can all give her work directly. The five undergrads who work for
+the farm rather than for a lab are still handed out by you and Bill.
+
+You control this yourself, from inside the app: **More → People**, change
+somebody's lab, and the rule follows. No code change, nothing to republish.
+
+### Two things the database now insists on
+
+Two things it insists on that the app only *suggested* today:
 
 - **Credit goes to whoever did the work, not whoever closed it.** Bill can close
   a job for Rose, and the record still says Rose did it. The database will now

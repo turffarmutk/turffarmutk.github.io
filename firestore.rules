@@ -112,11 +112,21 @@ service cloud.firestore {
     function canAssignTo(target) {
       return target == '' ? false
         : target == me() ? roleOf(me()) != 'Undergraduate Student'
-        : roleOf(target) == 'Undergraduate Student' ? assignsUndergrads(me())
+        : roleOf(target) == 'Undergraduate Student' ? canDirectUndergrad(target)
         : roleOf(me()) == 'Faculty'
           ? ((roleOf(target) == 'Graduate Student' || roleOf(target) == 'Technician')
              && sameLab(me(), target))
         : false;
+    }
+
+    /* THE LAB-ASSIGNED EXCEPTION — Dillon, 2026-08-25.
+       An undergrad who belongs to a lab answers to that lab, so anybody in it
+       above undergrad may direct them: faculty, grad students and technicians
+       alike. The five pooled undergrads carry Bill's own lab, so the pool is
+       untouched by this and still goes through whoever holds the job. */
+    function canDirectUndergrad(target) {
+      return assignsUndergrads(me())
+        || (roleOf(me()) != 'Undergraduate Student' && sameLab(me(), target));
     }
 
     /* claim — picking up something nobody is on. Undergrads never see the

@@ -31,6 +31,17 @@
  *
  * Safe to run more than once: existing accounts are updated rather than
  * duplicated, and existing passwords are never touched.
+ *
+ * AND SAFE WHEN SOMEBODY'S ADDRESS CHANGES. People move from @vols.utk.edu to
+ * @utk.edu, and addresses get typed wrong. Fix the address in
+ * roster-emails.local.json and run this again: it finds the account by the
+ * ROSTER ID on its token, not by the address, so it renames the account that
+ * already exists rather than making a second one. The person keeps their
+ * password and their history; only what they type to sign in changes.
+ *
+ * Looking people up by address was the earlier behaviour and it was quietly
+ * wrong: a corrected address created a NEW account, left the old one live, and
+ * the person ended up owning two - one of which nobody could see was stale.
  */
 const fs = require('fs');
 const path = require('path');
@@ -103,8 +114,10 @@ plan.forEach(p => console.log(
 
 if (DRY) {
   console.log('\n--dry-run: nothing was sent to Firebase.');
-  console.log('No passwords are set or printed by this script — each person chooses');
-  console.log('their own through the emailed link on the sign-in screen.');
+  console.log('No passwords are set or printed by this script, and none is ever changed.');
+  console.log('\nA dry run cannot see the project, so it CANNOT show you which addresses');
+  console.log('have changed since last time — only the real run can. It will print any');
+  console.log('it renames, and it renames rather than duplicating.');
   process.exit(0);
 }
 
@@ -119,10 +132,28 @@ initializeApp({ credential: applicationDefault() });
 const auth = getAuth();
 
 (async function () {
-  const handout = [];
+  /* Everybody already in the project, indexed by the roster id on their token.
+     This is what makes a changed address safe. */
+  const byPid = {};
+  let pageToken;
+  do {
+    const page = await auth.listUsers(1000, pageToken);
+    page.users.forEach(u => {
+      const pid = u.customClaims && u.customClaims.pid;
+      if (pid) byPid[pid] = u;
+    });
+    pageToken = page.pageToken;
+  } while (pageToken);
+
+  const handout = [], renamed = [], clashes = [];
   for (const p of plan) {
-    let user = null;
-    try { user = await auth.getUserByEmail(p.email); } catch (e) { user = null; }
+    /* By roster id first. Only fall back to the address for somebody who has
+       an account but no claim yet - which can only be an account made before
+       this script existed. */
+    let user = byPid[p.pid] || null;
+    if (!user) {
+      try { user = await auth.getUserByEmail(p.email); } catch (e) { user = null; }
+    }
 
     if (!user) {
       user = await auth.createUser({
@@ -135,8 +166,30 @@ const auth = getAuth();
       handout.push({ name: p.name, email: p.email });
       console.log('created  ' + p.pid + '  ' + p.email + '  (they set their own password)');
     } else {
-      await auth.updateUser(user.uid, { displayName: p.name, disabled: !p.active });
-      console.log('updated  ' + p.pid + '  ' + p.email + '  (password left alone)');
+      const was = String(user.email || '').toLowerCase();
+      const patch = { displayName: p.name, disabled: !p.active };
+      const moving = was && was !== p.email;
+      if (moving) { patch.email = p.email; patch.emailVerified = true; }
+      try {
+        await auth.updateUser(user.uid, patch);
+      } catch (e) {
+        /* The one failure worth naming: the new address is already an account
+           of its own, so there are two and this script must not pick. */
+        if (e && String(e.code || '').indexOf('email-already-exists') >= 0) {
+          clashes.push({ pid: p.pid, was: was, now: p.email });
+          console.log('SKIPPED  ' + p.pid + '  ' + was + ' -> ' + p.email +
+                      '  (that address is already another account)');
+          continue;
+        }
+        throw e;
+      }
+      if (moving) {
+        renamed.push({ pid: p.pid, name: p.name, was: was, now: p.email });
+        console.log('RENAMED  ' + p.pid + '  ' + was + '  ->  ' + p.email +
+                    '  (same account, same password)');
+      } else {
+        console.log('updated  ' + p.pid + '  ' + p.email + '  (password left alone)');
+      }
     }
 
     /* The claim is the whole point of this script. */
@@ -148,6 +201,21 @@ const auth = getAuth();
     console.log('Tell each person: open the app, type your farm email, and tap');
     console.log('"First time here, or forgotten your password?". They get a link,');
     console.log('choose their own password, and sign in.');
+  }
+
+  if (renamed.length) {
+    console.log('\n' + renamed.length + ' address(es) changed:');
+    renamed.forEach(r => console.log('  ' + r.name + '  ' + r.was + '  ->  ' + r.now));
+    console.log('Tell each of them the address they sign in with has changed.');
+    console.log('Their password and everything they have recorded are untouched.');
+  }
+  if (clashes.length) {
+    console.log('\n' + clashes.length + ' address(es) could NOT be changed, because the new');
+    console.log('address already belongs to a separate account:');
+    clashes.forEach(c => console.log('  ' + c.pid + '  ' + c.was + '  ->  ' + c.now));
+    console.log('\nTwo accounts exist for one person and only you can say which to keep.');
+    console.log('In Firebase console -> Authentication -> Users, delete the one that is');
+    console.log('NOT wanted, then run this again.');
   }
 
   console.log('\nDone. A person only picks up a changed claim on their next sign-in,');

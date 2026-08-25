@@ -1002,6 +1002,7 @@ html[data-size="tablet"] .screen[id^="s-home-"] > .app.field{columns:300px 2;pad
 html[data-size="tablet"] .screen[id^="s-home-"] > .app.field > .hdr,
 html[data-size="tablet"] .screen[id^="s-home-"] > .app.field > .wx,
 html[data-size="tablet"] .screen[id^="s-home-"] > .app.field > .kpis,
+html[data-size="tablet"] .screen[id^="s-home-"] > .app.field > [data-w="shift"],
 html[data-size="tablet"] .screen[id^="s-home-"] > .app.field > .hw-runout{column-span:all}
 /* The banner has to cancel the WHOLE inset, not just the rail: home's column
    box adds its own gutter on top of var(--rail), and pulling back only the
@@ -3098,6 +3099,16 @@ var HW_RENDER={
    this is what makes the saved choices stick after a reload or role switch. */
 function hwApply(role){
  var scr=document.getElementById('s-'+(HOME_DEST[role]||'')); if(!scr)return;
+ /* The greeting and avatar in the home header were static demo markup
+    ('Hey, Tyler', a hardcoded initials chip) that nothing ever repainted.
+    me() already builds the right card for whoever is actually signed in
+    (see sessionPerson/meCard) -- this is the one place every home screen
+    passes through, so it is the one place that needs to set it. */
+ var _u=me(),_p=sessionPerson();
+ var _greet=scr.querySelector('.hh .title');
+ if(_greet)_greet.textContent='Hey, '+((_p&&_p.first)||(_u.n||'').split(' ')[0]||_u.n||'');
+ var _av=scr.querySelector('.hh-av');
+ if(_av){ _av.textContent=_u.i; _av.style.background=_u.c; }
  try{ if(HW_RENDER[role])HW_RENDER[role](); }catch(e){}
  var wrap=scr.querySelector('.app.field'); if(!wrap)return;
  /* Re-seat the cards in the saved order. Everything that isn't a widget — the
@@ -3585,7 +3596,7 @@ const FL_CATS=['spray','fert','cult','mow','irrig','misc'];
 const FL_CAP=5000;              // rolling cap: keep newest 5,000 entries
 /* v2 stores the person as a roster id rather than the name typed at the time.
    The entries in v1 are prototype seed, so it is not migrated. */
-const FL_KEY='ut_fieldlog_v2';
+const FL_KEY='ut_fieldlog_v3';   /* bumped 2026-08-25 to clear out any cached prototype/demo rows still sitting in a browser's local storage -- see seed-data notes */
 /* The seeded history is expressed as "N days before today" rather than as
    fixed dates in July 2026, so the log always covers the fortnight leading up
    to now and the month/week export ranges have something in them. Real entries
@@ -9852,7 +9863,7 @@ var CTYPE_ORDER=['crew','task','spray','trial','event'];
 var EVENTS=[
  /* Empty on purpose — see TASKS. Held 28 sample calendar entries. */
 ];
-var NOSHOW={'Devon K.':1};   /* demo names with no roster record; nameOf() passes them through */
+var NOSHOW={};   /* calendar no-show tally, keyed by name; nameOf() passes an unmatched name through. Paused along with Time Clock no-shows -- see TC_NOSHOW_LATE_PAUSED. */
 var CAL_MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 var CAL_TODAY_DT=(function(){var d=new Date();d.setHours(0,0,0,0);return d;})();
 var CAL_LABS=labNames();
@@ -10201,6 +10212,7 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
   // Automatic no-shows: any scheduled day that has already passed with no clock-in
   // and no approved absence becomes a no-show. Runs before any count/render.
   function autoDetect(){
+    if(TC_NOSHOW_LATE_PAUSED)return;
     var today=midnight(new Date());
     TC_STUDENTS.forEach(function(name){
       TC_NOSHOW[name]=TC_NOSHOW[name]||[];
@@ -10285,22 +10297,13 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
 
   /* ---- seed / persist ---- */
   function seed(){
+    /* Used to fabricate two weeks of punches, a full backdated year (seedYear),
+       and demo no-shows/lates (seedNoShows/seedLates) for Garrett, Taryn, Jed and
+       Caroline's real accounts. Removed 2026-08-25 -- nothing but equipment, the
+       roster and the task catalog is supposed to ship pre-loaded. Time Clock now
+       starts genuinely empty; real punches build the real history from here. */
     TC_PUNCHES={};TC_NOSHOW={};TC_EXCUSED={};TC_EXLATE={};
-    var i=curIdx(),today=midnight(new Date()),s=periodStart(i);
     TC_STUDENTS.forEach(function(n){TC_PUNCHES[n]=[];TC_NOSHOW[n]=[];TC_EXCUSED[n]=[];TC_EXLATE[n]=[];});
-    for(var k=0;k<14;k++){
-      var d=new Date(s);d.setDate(s.getDate()+k);if(d>today)break;var di=iso(d);
-      TC_STUDENTS.forEach(function(name){
-        var sch=TC_SCHED[name];if(sch.days.indexOf(d.getDay())<0)return;
-        if(name==='p18'&&di===todayISO())return;   // Garrett: leave today open so he can clock in live
-        sch.pairs.forEach(function(pr,idx){
-          TC_PUNCHES[name].push({date:di,in:pr[0],out:pr[1],locOk:(sch.unverified&&idx===0)?false:true,note:'',editedBy:''});
-        });
-      });
-    }
-    seedYear(s);
-    seedNoShows(today,s);
-    seedLates(today,s);
   }
   /* Demo late arrivals. Seeded punches all land exactly on the scheduled start,
      so without this the leaderboard would read zero for everyone. Push the first
@@ -10418,6 +10421,12 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
      their roster id. Old v4 data is not migrated — the punches in it are
      prototype, and a half-converted clock is worse than a clean one. */
   var TC_KEY='ut_timeclock_v5';
+  /* Dillon asked (2026-08-25) to pause no-show and late check-in tracking --
+     remove it from the app for right now, not delete it for good. Clocking in
+     and out still works normally; this only turns off the automatic "you were
+     scheduled and didn't show" / "you clocked in late" detection and the two
+     leaderboards built from it. Flip this back to false to resume. */
+  var TC_NOSHOW_LATE_PAUSED=true;
   function save(){try{localStorage.setItem(TC_KEY,JSON.stringify({idx:curIdx(),punches:TC_PUNCHES,noshow:TC_NOSHOW,excused:TC_EXCUSED,exlate:TC_EXLATE}));}catch(e){}}
   function load(){try{var r=JSON.parse(localStorage.getItem(TC_KEY)||'null');if(r&&r.idx===curIdx()){TC_PUNCHES=r.punches;TC_NOSHOW=r.noshow||{};TC_EXCUSED=r.excused||{};TC_EXLATE=r.exlate||{};return true;}}catch(e){}return false;}
   if(!load()){seed();save();}
@@ -10525,6 +10534,7 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
   }
   // Shared no-show count list. interactive=true lets Bill tap through to a worker's days.
   function noShowListHTML(interactive){
+    if(TC_NOSHOW_LATE_PAUSED)return '';
     var h='<div style="display:flex;align-items:baseline;justify-content:space-between;margin:2px 16px 6px"><span style="font:800 11px \'Public Sans\';color:var(--muted);text-transform:uppercase;letter-spacing:.6px">No-shows · '+termLabel()+'</span><span style="font:700 9.5px \'Public Sans\';color:var(--muted)">auto · resets each summer &amp; fall</span></div><div class="list" style="margin-bottom:16px">';
     var any=false;
     // ranked worst-first — it reads as a leaderboard, and Bill scans the top of it
@@ -10541,6 +10551,7 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
      board, and posted to every role — the crew see where they stand, not just
      Bill. interactive=true lets Bill tap through to approve one. */
   function lateListHTML(interactive){
+    if(TC_NOSHOW_LATE_PAUSED)return '';
     var h='<div style="display:flex;align-items:baseline;justify-content:space-between;margin:2px 16px 6px"><span style="font:800 11px \'Public Sans\';color:var(--muted);text-transform:uppercase;letter-spacing:.6px">Late check-ins · '+termLabel()+'</span><span style="font:700 9.5px \'Public Sans\';color:var(--muted)">more than '+LATE_GRACE_MIN+' min past start</span></div><div class="list" style="margin-bottom:16px">';
     var any=false;
     var ranked=TC_STUDENTS.slice().sort(function(a,b){return lateCount(b)-lateCount(a)||a.localeCompare(b);});
@@ -10578,7 +10589,7 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
     var i=tcIdx,k=tcRange,totAll=crewHours(k,i),clockedNow=0,noShows=0;
     TC_STUDENTS.forEach(function(n){if(openPunch(n))clockedNow++;noShows+=noShowCount(n);});
     var html=rangeTop(i)+ytdBanner();
-    html+='<div class="kpis"><div class="kpi"><div class="n">'+fh(totAll)+'</div><div class="l">'+(k==='period'?'Total hrs':rangeName(k)+' hrs')+'</div></div><div class="kpi"><div class="n">'+clockedNow+'</div><div class="l">On clock now</div></div><div class="kpi"><div class="n">'+noShows+'</div><div class="l">No-shows</div></div></div>';
+    html+='<div class="kpis"><div class="kpi"><div class="n">'+fh(totAll)+'</div><div class="l">'+(k==='period'?'Total hrs':rangeName(k)+' hrs')+'</div></div><div class="kpi"><div class="n">'+clockedNow+'</div><div class="l">On clock now</div></div>'+(TC_NOSHOW_LATE_PAUSED?'':'<div class="kpi"><div class="n">'+noShows+'</div><div class="l">No-shows</div></div>')+'</div>';
     html+='<div style="font:800 11px \'Public Sans\';color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:14px 16px 6px">Crew · tap to view &amp; edit</div><div class="list" style="margin-bottom:16px">';
     TC_STUDENTS.forEach(function(n){
       var h=hoursIn(n,k,i),on=!!openPunch(n),unv=hasUnverified(n,i),b='';
@@ -10772,7 +10783,7 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
       people:TC_STUDENTS.map(function(n){
         return {pid:n,name:nameOf(n),hours:hoursForPeriod(n,i),days:workedDays(n,i),
                 ytd:hoursIn(n,'ytd',i),ytdDays:daysIn(n,'ytd',i),
-                noshow:noShowDates(n).length,late:lateCount(n),onClock:!!openPunch(n),
+                noshow:(TC_NOSHOW_LATE_PAUSED?0:noShowDates(n).length),late:(TC_NOSHOW_LATE_PAUSED?0:lateCount(n)),onClock:!!openPunch(n),
                 unverified:hasUnverified(n,i)};
       })};
   };
@@ -12614,7 +12625,14 @@ var TRIALS_SEED=[
 ];
 
 var TRIALS=[];
-var TR_SEED_V=4;                       /* bump when the demo studies change */
+var TR_SEED_V=5;                       /* bump when the demo studies change */
+/* The ids from the 23-trial demo seed removed 2026-08-24 (see TRIALS_SEED,
+   now empty). trReseed() used to find these by matching against TRIALS_SEED --
+   once that array was emptied there was nothing left to match, so a browser
+   that had already cached the demo trials kept them forever. This literal list
+   is what makes the v5 cleanup actually strip them. Never add to this list for
+   anything but that original seed. */
+var TRIALS_STRIPPED_SEED_IDS=['s1','r1','r2','s2','r3','r4','r12','s3','r5','r13','s4','r6','r7','s5','r8','r14','r15','s6','r9','s7','r10','s8','r11'];
 function trLoad(){
   try{var r=JSON.parse(localStorage.getItem(TR_KEY)||'null'); if(r&&r.length){TRIALS=r;trReseed();trMigrate();return;}}catch(e){}
   TRIALS=JSON.parse(JSON.stringify(TRIALS_SEED)); trSave();
@@ -12626,6 +12644,7 @@ function trReseed(){
   var v=0; try{ v=+localStorage.getItem(TR_KEY+'_v')||0; }catch(e){}
   if(v>=TR_SEED_V) return;
   var seedIds={}; TRIALS_SEED.forEach(function(x){ seedIds[x.id]=x; });
+  TRIALS_STRIPPED_SEED_IDS.forEach(function(id){ seedIds[id]=true; });
   var kept=TRIALS.filter(function(t){ return !seedIds[t.id]; });
   TRIALS=JSON.parse(JSON.stringify(TRIALS_SEED)).concat(kept);
   trSave();

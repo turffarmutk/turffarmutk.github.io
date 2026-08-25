@@ -3103,12 +3103,17 @@ function hwApply(role){
     ('Hey, Tyler', a hardcoded initials chip) that nothing ever repainted.
     me() already builds the right card for whoever is actually signed in
     (see sessionPerson/meCard) -- this is the one place every home screen
-    passes through, so it is the one place that needs to set it. */
- var _u=me(),_p=sessionPerson();
- var _greet=scr.querySelector('.hh .title');
- if(_greet)_greet.textContent='Hey, '+((_p&&_p.first)||(_u.n||'').split(' ')[0]||_u.n||'');
- var _av=scr.querySelector('.hh-av');
- if(_av){ _av.textContent=_u.i; _av.style.background=_u.c; }
+    passes through, so it is the one place that needs to set it. Wrapped in
+    its own try/catch, same as the HW_RENDER call below: this runs before the
+    roster/session are necessarily ready (boot, tests), and a failure here
+    must not stop the widgets underneath from rendering. */
+ try{
+   var _u=me(),_p=sessionPerson();
+   var _greet=scr.querySelector('.hh .title');
+   if(_greet)_greet.textContent='Hey, '+((_p&&_p.first)||(_u.n||'').split(' ')[0]||_u.n||'');
+   var _av=scr.querySelector('.hh-av');
+   if(_av){ _av.textContent=_u.i; _av.style.background=_u.c; }
+ }catch(e){}
  try{ if(HW_RENDER[role])HW_RENDER[role](); }catch(e){}
  var wrap=scr.querySelector('.app.field'); if(!wrap)return;
  /* Re-seat the cards in the saved order. Everything that isn't a widget — the
@@ -10420,7 +10425,7 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
   /* v5 re-keys every punch, no-show and excusal from the person's name to
      their roster id. Old v4 data is not migrated — the punches in it are
      prototype, and a half-converted clock is worse than a clean one. */
-  var TC_KEY='ut_timeclock_v5';
+  var TC_KEY='ut_timeclock_v6';   /* bumped 2026-08-25: v5 and earlier could hold the fabricated year of demo punches/no-shows/lates seed() used to generate -- this forces every browser to drop that cache and start clean */
   /* Dillon asked (2026-08-25) to pause no-show and late check-in tracking --
      remove it from the app for right now, not delete it for good. Clocking in
      and out still works normally; this only turns off the automatic "you were

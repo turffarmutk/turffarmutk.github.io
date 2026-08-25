@@ -66,76 +66,6 @@ if (MODE !== 'on' && MODE !== 'off' && MODE !== 'check') {
                 'Add --dry-run to on/off to see the plan without changing anything.');
   process.exit(1);
 }
-/* Finding the master key WITHOUT having to type a path.
-   GOOGLE_APPLICATION_CREDENTIALS still wins if it is set. Otherwise look in the
-   handful of places Step 4 of the go-live manual tells you to put the file -
-   Desktop, Downloads, home folder - and use it only if there is exactly ONE
-   and it really is a key for THIS project. Never inside the repo: the repo is
-   public, and a key in it is the one mistake that cannot be undone quietly.
-
-   This exists because the person running it in three years' time will not know
-   what an environment variable is. If it finds nothing, it says where to look
-   rather than printing a shell incantation. */
-function findKey() {
-  const home = process.env.HOME || process.env.USERPROFILE || '';
-  const dirs = [path.join(home, 'Desktop'), path.join(home, 'Downloads'), home];
-  /* Read the app here rather than using the `html` further down: this runs
-     before that line, and a const cannot be read before it is set. */
-  let appSrc = ''; try { appSrc = fs.readFileSync(APP, 'utf8'); } catch (e) {}
-  const wanted = (appSrc.match(/projectId:\s*'([^']+)'/) || [])[1] || '';
-  const hits = [];
-  for (const d of dirs) {
-    let names = [];
-    try { names = fs.readdirSync(d); } catch (e) { continue; }
-    for (const n of names) {
-      if (!/\.json$/i.test(n)) continue;
-      const full = path.join(d, n);
-      if (path.resolve(full).startsWith(path.resolve(ROOT))) continue;
-      let j = null;
-      try {
-        const raw = fs.readFileSync(full, 'utf8');
-        if (raw.length > 20000) continue;          /* a key is a few KB */
-        j = JSON.parse(raw);
-      } catch (e) { continue; }
-      if (!j || j.type !== 'service_account' || !j.private_key) continue;
-      if (wanted && j.project_id && j.project_id !== wanted) continue;
-      if (hits.indexOf(full) < 0) hits.push(full);
-    }
-  }
-  return hits;
-}
-
-let cred = process.env.GOOGLE_APPLICATION_CREDENTIALS || '';
-/* "check" only asks the same public question the app asks, so it needs no
-   master key and cannot change anything. */
-if (!cred && !DRY && MODE !== 'check') {
-  const hits = findKey();
-  if (hits.length === 1) {
-    cred = hits[0];
-    process.env.GOOGLE_APPLICATION_CREDENTIALS = cred;
-    console.log('Using the master key found at: ' + cred + '\n');
-  } else if (hits.length > 1) {
-    console.error('Found more than one master key, so I will not guess which:');
-    hits.forEach(h => console.error('  ' + h));
-    console.error('\nRun it again with the one you mean, like this:\n' +
-                  '  GOOGLE_APPLICATION_CREDENTIALS="' + hits[0] + '" \\\n' +
-                  '    node tools/easy-sign-in.js ' + MODE);
-    process.exit(1);
-  } else {
-    console.error('Could not find the master key for this project.\n\n' +
-                  'It is the .json file from Step 4 of docs/GO-LIVE-MANUAL.md:\n' +
-                  '  Firebase console -> gear icon -> Project settings ->\n' +
-                  '  Service accounts -> Generate new private key\n\n' +
-                  'Put it on your Desktop (NOT in the project folder - that folder\n' +
-                  'is published to a public website) and run this again.');
-    process.exit(1);
-  }
-}
-if (cred && path.resolve(cred).startsWith(path.resolve(ROOT))) {
-  console.error('The service-account key is inside the repo: ' + cred + '\n' +
-                'Move it elsewhere before running this. It must never be committed.');
-  process.exit(1);
-}
 if (!fs.existsSync(ROSTER)) {
   console.error('Missing ' + ROSTER + '\nThat file holds the crew addresses and is git-ignored on purpose.');
   process.exit(1);
@@ -166,6 +96,19 @@ if (MODE === 'off' && switchIsOn) {
   console.error('EASY_SIGN_IN is still TRUE in the app. Set it to false FIRST, then\n' +
                 'run this - otherwise the app keeps trying a password that no longer\n' +
                 'works and the whole crew is locked out.');
+  process.exit(1);
+}
+
+/* The key is FOUND, not typed — tools/_key.js, shared with
+   create-accounts.js so there is only ever one copy of this behaviour.
+   "check" asks the same public question the app asks, so it needs no key at
+   all and cannot change anything.
+
+   LAST of the guard rails on purpose. Everything above can be answered from
+   this machine alone, and "you have them in the wrong order" is far more use
+   than "I could not find your key" when both are true. */
+if (!DRY && MODE !== 'check' && !require('./_key').resolveKey({
+      root: ROOT, appPath: APP, cmd: 'node tools/easy-sign-in.js ' + MODE })) {
   process.exit(1);
 }
 

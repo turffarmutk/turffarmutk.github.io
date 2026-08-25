@@ -18,10 +18,15 @@
  *   2. roster-emails.local.json — the git-ignored list of who gets an account.
  *
  * RUN
- *   npm install firebase-admin
- *   GOOGLE_APPLICATION_CREDENTIALS=/path/outside/the/repo/serviceAccount.json \
- *     node tools/create-accounts.js --dry-run
- *   ...then again without --dry-run once the plan looks right.
+ *   npm install
+ *   node tools/create-accounts.js --dry-run     (a rehearsal, changes nothing)
+ *   node tools/create-accounts.js               (for real)
+ *
+ * It finds the master key itself, as long as the .json file from Step 4 is on
+ * your Desktop, in Downloads, or in your home folder. Only if you keep it
+ * somewhere else do you have to say where:
+ *   GOOGLE_APPLICATION_CREDENTIALS=/the/real/path/key.json \
+ *     node tools/create-accounts.js
  *
  * Nobody's password is set here, and none is ever printed. Each account is
  * created with a throwaway random string, and the person chooses their real
@@ -53,19 +58,16 @@ const DRY = process.argv.indexOf('--dry-run') >= 0;
 
 /* --- guard rails ------------------------------------------------------- */
 
-if (!process.env.GOOGLE_APPLICATION_CREDENTIALS && !DRY) {
-  console.error('Set GOOGLE_APPLICATION_CREDENTIALS to the service-account JSON.\n' +
-                'Keep that file OUTSIDE this repo — the repo is public.');
-  process.exit(1);
-}
-const cred = process.env.GOOGLE_APPLICATION_CREDENTIALS || '';
-if (cred && path.resolve(cred).startsWith(path.resolve(ROOT))) {
-  console.error('The service-account key is inside the repo: ' + cred + '\n' +
-                'Move it elsewhere before running this. It must never be committed.');
-  process.exit(1);
-}
 if (!fs.existsSync(ROSTER)) {
   console.error('Missing ' + ROSTER + '\nThat file holds the crew addresses and is git-ignored on purpose.');
+  process.exit(1);
+}
+
+/* The key is FOUND, not typed. See tools/_key.js. Kept LAST of the guard
+   rails: everything above is answerable from this machine, and a missing
+   roster file is more useful to hear about than a missing key. */
+if (!DRY && !require('./_key').resolveKey({
+      root: ROOT, appPath: APP, cmd: 'node tools/create-accounts.js' })) {
   process.exit(1);
 }
 

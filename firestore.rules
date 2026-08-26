@@ -512,11 +512,46 @@ service cloud.firestore {
     }
 
     /* ------------------------------------------------------------------
+       THE TASK LIST — drawer 7
+
+       The jobs the farm does, as opposed to the jobs somebody has been given.
+       The assign screen is built from this, so a job that is not here is a job
+       nobody can hand out.
+
+       Transcribed from tplCanEdit() in the app.
+       ------------------------------------------------------------------ */
+
+    /* App: tplCanEdit() — everybody but the undergraduates, the same line
+       invCanEdit() draws. Doing a job and deciding what the job IS are two
+       different things. Undergrads read it: looking up what the work you have
+       been handed actually involves is the point of having it. */
+    function canEditTaskList() {
+      return actor() && roleOf(me()) != 'Undergraduate Student';
+    }
+
+    match /templates/{tplId} {
+      allow read: if actor();
+
+      allow create, update: if canEditTaskList()
+        && request.resource.data.id == tplId
+        && request.resource.data.name is string;
+
+      /* Taking a job off the list is an UPDATE that sets removed:true, never a
+         deleted document — see the note in the app's sync module. A phone that
+         has been switched off still holds its own copy of the list, and on
+         reconnecting it pushes up everything the shared copy is missing; a
+         genuinely deleted job would come straight back. A tombstone travels,
+         so it stays gone. Nothing needs to delete here, so nothing may. */
+      allow delete: if false;
+    }
+
+    /* ------------------------------------------------------------------
        EVERYTHING ELSE IS CLOSED.
 
        Calendar and equipment get their own blocks here as each drawer is
        built. Tasks, the map, crew claims, the field log, inventory, the
-       weekly schedules and the time clock already have theirs. Until then the database
+       weekly schedules, the time clock and the task list already have
+       theirs. Until then the database
        refuses them, which is what we want: an empty drawer nobody can
        write into beats an open one nobody is watching.
        ------------------------------------------------------------------ */

@@ -244,6 +244,39 @@ actually see change.
 
 ---
 
+## And again on 2026-08-26 — the task list
+
+One more section. **Publish again**, the same eight steps. This one went up the
+same day as the schedule and the time clock, so if you have not published since
+this morning you are getting all three at once — which is fine, it is still one
+copy and paste.
+
+**What the task list is:** the jobs the farm does — Rotary – Plots, Greens –
+Walk, Hand Water. Not jobs anybody has been given; the menu those are chosen
+from. The assign screen is built from it, so a job that is not on the list is a
+job nobody can hand out.
+
+Until now it was the one list on the Tasks page that never left the phone that
+made it. Add a job on Bill's phone and it existed on Bill's phone only.
+
+**Everybody but the undergraduates can add to it, change it, and take jobs off
+it.** That is the same line the app already draws for editing a product in the
+inventory: doing a job and deciding what the job *is* are two different things.
+
+**Undergraduates can read it.** Looking up what a job you have been handed
+actually involves — which machine, which plots, how often — is the point of
+having a list at all.
+
+**Nothing on it is ever really deleted.** Taking a job off marks it as removed
+rather than destroying the record, and the bottom of the Task list screen has a
+"Removed · tap to put back" section. This is not caution for its own sake: a
+phone that has had sharing switched off still holds its own copy of the list,
+and when it reconnects it sends up anything the shared copy is missing. A job
+that had been properly deleted would come straight back from that phone. A job
+marked removed stays removed.
+
+---
+
 ## You will do this again
 
 Each drawer we build adds a block to the same file. When it does, I will tell

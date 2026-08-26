@@ -1240,7 +1240,7 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
 
 <section class="screen" id="s-taskboard">
 <div class="app field">
-            <div class="hdr"><div class="title" style="flex:1">Task Board</div></div>
+            <div class="hdr"><div class="title" style="flex:1">Task Board</div><span class="tap" data-go="templates" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;margin:-4px 0;border-radius:11px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.26);font:700 13px 'Public Sans';color:#fff;flex:none;box-shadow:0 1px 2px rgba(0,0,0,.15)">Task list</span></div>
             <div id="tb-daysbar"></div>
             <div class="seg" id="tb-seg"><span class="on" data-tab="open">Open</span><span data-tab="mine">Mine</span><span data-tab="done">Done</span></div>
             <div style="flex:1;overflow:auto" id="tb-body"></div>
@@ -1682,8 +1682,8 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
 </section>
 <section class="screen" id="s-templates">
 <div class="app field">
-            <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Edit Task</div></div>
-            <div style="flex:1;overflow:auto"><div class="searchbar"><span class="si">🔍</span><input id="tpl-search" type="text" placeholder="Search saved tasks"></div><div class="sec">Saved tasks — tap to edit</div><div id="tpl-list"></div></div>
+            <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Task list</div><span class="tap" id="tpl-add" style="display:none;align-items:center;justify-content:center;height:34px;padding:0 14px;margin:-4px 0;border-radius:11px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.26);font:700 13px 'Public Sans';color:#fff;flex:none;box-shadow:0 1px 2px rgba(0,0,0,.15)">＋ Add</span></div>
+            <div style="flex:1;overflow:auto"><div class="searchbar"><span class="si">🔍</span><input id="tpl-search" type="text" placeholder="Search the task list"></div><div id="tpl-intro"></div><div id="tpl-list"></div></div>
           </div>
 <div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab on"><span class="te">📋</span>Tasks</div><div class="tab"><span class="te">🗺️</span>Map</div><div class="tab"><span class="te">📦</span>Inventory</div><div class="tab"><span class="te">•••</span>More</div></div>
 </section>
@@ -4567,6 +4567,162 @@ function tcsyncSummary(){
   return TCSYNC.up+' sent · '+TCSYNC.down+' received'+(f?(' · '+f+' refused'):'');
 }
 
+
+/* ================= THE TASK LIST ================= */
+/* Drawer 7. The jobs the farm does, which the assign screen is built from --
+   so with this off, a job Bill adds on his phone is a job nobody else can hand
+   out. Same shape as the others.
+
+   The one difference: this collection allows DELETE, because a job can be
+   taken off the list. A removal travels as a document marked `removed`, never
+   as a missing document -- a phone that was switched off still holds its own
+   copy of the list, and on being switched on it pushes up everything the
+   shared copy lacks. Against a real deletion that resurrects the job. Against
+   a tombstone it does not. */
+var TPLSYNC_KEY='ut_tasklist_shared_v1';
+var TPLSYNC_COLL='templates';
+var TPLSYNC_RETRY_MS=10000;
+var TPLSYNC={ on:false, live:false, ready:false, seen:{}, err:null, up:0, down:0, failed:{} };
+var _tplsyncNextTry=0;
+
+function tplsyncWanted(){ try{ return localStorage.getItem(TPLSYNC_KEY)==='1'; }catch(e){ return false; } }
+function tplsyncHydrate(){ TPLSYNC.on=tplsyncWanted(); }
+function tplsyncSetWanted(on){
+  try{ localStorage.setItem(TPLSYNC_KEY,on?'1':'0'); }catch(e){}
+  TPLSYNC.on=!!on;
+  if(on){ _tplsyncNextTry=0; tplsyncStart(); } else tplsyncStop();
+}
+function tplDoc(t){
+  var out; try{ out=JSON.parse(JSON.stringify(t||{})); }catch(e){ return null; }
+  if(!out||!out.id||typeof out.name!=='string') return null;
+  out.id=String(out.id);
+  out.removed=!!out.removed;
+  return out;
+}
+function tplJson(t){ var d=tplDoc(t); return d?JSON.stringify(d):null; }
+
+function tplsyncStart(){
+  if(TPLSYNC.live) return true;
+  if(Date.now()<_tplsyncNextTry) return false;
+  var db=fbDb();
+  if(!db||!SESSION.pid){
+    TPLSYNC.err=db?'Nobody is signed in yet':'The database code did not load on this device';
+    _tplsyncNextTry=Date.now()+TPLSYNC_RETRY_MS; return false;
+  }
+  try{
+    TPLSYNC.unsub=db.collection(TPLSYNC_COLL).onSnapshot(tplsyncOnSnapshot,function(e){
+      TPLSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+      TPLSYNC.live=false; TPLSYNC.ready=false; _tplsyncNextTry=Date.now()+TPLSYNC_RETRY_MS;
+    });
+    TPLSYNC.live=true; TPLSYNC.err=null; return true;
+  }catch(e){
+    TPLSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+    _tplsyncNextTry=Date.now()+TPLSYNC_RETRY_MS; return false;
+  }
+}
+function tplsyncStop(){
+  try{ if(TPLSYNC.unsub) TPLSYNC.unsub(); }catch(e){}
+  TPLSYNC.unsub=null; TPLSYNC.live=false; TPLSYNC.ready=false;
+  TPLSYNC.seen={}; TPLSYNC.failed={};
+}
+function tplsyncOnSnapshot(snap){
+  var changes; try{ changes=snap.docChanges(); }catch(e){ return; }
+  var touched=false;
+  changes.forEach(function(ch){
+    if(ch.type==='removed'){
+      /* Someone deleted the document outright rather than marking it removed
+         -- not something this app does, but the console can. Treat it as a
+         removal rather than pretending the job is still on the list. */
+      delete TPLSYNC.seen[String(ch.doc.id)];
+      var had=tplFind(String(ch.doc.id));
+      if(had&&!had.removed){ had.removed=true; touched=true; }
+      return;
+    }
+    var data; try{ data=ch.doc.data(); }catch(e){ return; }
+    if(!data||typeof data.name!=='string') return;
+    data.id=String(ch.doc.id);
+    TPLSYNC.seen[data.id]=JSON.stringify(data);
+    delete TPLSYNC.failed[data.id];
+    TPLSYNC.down++;
+    var have=tplFind(data.id);
+    if(have){
+      if(JSON.stringify(tplDoc(have))!==JSON.stringify(data)){
+        Object.keys(have).forEach(function(k){ if(!(k in data)) delete have[k]; });
+        Object.keys(data).forEach(function(k){ have[k]=data[k]; });
+        touched=true;
+      }
+      return;
+    }
+    TEMPLATES.push(data); touched=true;
+  });
+  var fromCache=true;
+  try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
+  if(!TPLSYNC.ready&&!fromCache){ TPLSYNC.ready=true; tplsyncUploadNew(); }
+  if(touched){
+    try{ storeTouch(); }catch(e){}
+    /* The assign screen and the task list are both built from this, so repaint
+       whichever is open instead of waiting for a navigation. */
+    try{ if(document.getElementById('s-templates').classList.contains('active')&&typeof renderTemplates==='function') renderTemplates(); }catch(e){}
+    try{ if(document.getElementById('s-assign').classList.contains('active')&&typeof renderAssignList==='function') renderAssignList(); }catch(e){}
+    try{ tplsyncRepaint(); }catch(e){}
+  }
+}
+/* Never offer a write that is going to be refused: an undergrad's phone holds
+   the list too, and pushing it back up would log a refusal nobody caused. */
+function tplCanPush(){ return tplCanEdit(); }
+function tplsyncUploadNew(){
+  var db=fbDb(); if(!db||!tplCanPush()) return 0;
+  var n=0;
+  TEMPLATES.slice().forEach(function(t){
+    if(!t||!t.id) return;
+    var id=String(t.id);
+    if(TPLSYNC.seen[id]!==undefined) return;
+    var doc=tplDoc(t); if(!doc) return;
+    TPLSYNC.seen[id]=JSON.stringify(doc);
+    n++; TPLSYNC.up++;
+    try{ db.collection(TPLSYNC_COLL).doc(id).set(doc).catch(function(e){ tplsyncFail(id,e); }); }
+    catch(e){ tplsyncFail(id,e); }
+  });
+  if(n){ try{ toast(n+' job'+(n===1?'':'s')+' from this phone sent up'); }catch(e){} }
+  return n;
+}
+function tplsyncFail(id,e){
+  TPLSYNC.failed[id]=(typeof sdbError==='function')?sdbError(e):String((e&&e.message)||e);
+}
+function tplPush(){
+  if(!TPLSYNC.on||!TPLSYNC.live||!TPLSYNC.ready||!tplCanPush()) return 0;
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  TEMPLATES.forEach(function(t){
+    if(!t||!t.id) return;
+    var id=String(t.id), json=tplJson(t);
+    if(json===null||TPLSYNC.seen[id]===json) return;
+    TPLSYNC.seen[id]=json; n++; TPLSYNC.up++;
+    try{ db.collection(TPLSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ tplsyncFail(id,e); }); }
+    catch(e){ tplsyncFail(id,e); }
+  });
+  return n;
+}
+function tplsyncTick(){
+  if(!TPLSYNC.on) return;
+  if(!TPLSYNC.live){ tplsyncStart(); return; }
+  tplPush();
+}
+function tplsyncRepaint(){
+  try{
+    var d=document.getElementById('s-sharedb');
+    if(d&&d.classList.contains('active')&&typeof sdbRender==='function') sdbRender();
+  }catch(e){}
+}
+function tplsyncSummary(){
+  if(!TPLSYNC.on) return 'Off — the list on this phone stays on it';
+  if(TPLSYNC.err) return TPLSYNC.err;
+  if(!TPLSYNC.live) return 'Connecting…';
+  if(!TPLSYNC.ready) return 'Connected — waiting for the shared copy';
+  var f=Object.keys(TPLSYNC.failed).length;
+  return TPLSYNC.up+' sent · '+TPLSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+}
+
 /* ---- the correction sheet ----
    Small on purpose. It offers the things that actually go wrong — the plot,
    the date, the time, and on a chemical entry the product and the amounts —
@@ -6611,7 +6767,12 @@ function renderBoard(){
  seg.innerHTML=tabs.map(function(x){return '<span'+(x[0]===tbTab?' class="on"':'')+' data-tab="'+x[0]+'">'+x[1]+'</span>';}).join('');
  var ttl=document.querySelector('#s-taskboard .hdr .title'); if(ttl)ttl.textContent=boardView?'Task Board':'My Tasks';
  var ab=document.getElementById('tb-actionbar');
- if(ab)ab.innerHTML=mgr?'<div class="boardbtns"><div class="action tap" data-board="assign" style="background:#2f3133">Assign Tasks</div><div class="boardrow"><div class="action tap" data-board="add">＋ Add Task</div><div class="action tap" data-board="edit" style="background:#489FDF;color:#fff">✎ Edit</div></div></div>'
+ /* "＋ Add Task" and "✎ Edit" both went to the task list -- one to a blank
+    form, one to the list itself -- and neither put anything on the board,
+    which is what "Add Task" plainly reads as. Both are gone: the list has its
+    own button in the header now, with its own Add inside it, and the only
+    thing left down here is the one that actually gives somebody work. */
+ if(ab)ab.innerHTML=mgr?'<div class="boardbtns"><div class="action tap" data-board="assign" style="background:#2f3133">Assign Tasks</div></div>'
    :(viewer?'<div class="boardbtns"><div class="action tap" data-board="assignlab" style="background:#2f3133">Assign to my lab</div><div class="action tap" data-req="undergrad">＋ Request labor from Bill</div></div>'
    :(requester?'<div class="boardbtns"><div class="action tap" data-board="selftask" style="background:#2f3133">＋ New task · assign to me</div><div class="action tap" data-req="undergrad">＋ Request labor from Bill</div></div>':''));
  renderTasks();
@@ -7555,7 +7716,7 @@ function completeTask(id,note){ var t=TASKS.find(function(x){return x.id===id;})
 document.getElementById('tb-seg').addEventListener('click',function(e){var sp=e.target.closest('span[data-tab]');if(!sp)return;tbTab=sp.getAttribute('data-tab');renderTasks();});
 document.getElementById('s-taskboard').addEventListener('click',function(e){
  var bd=e.target.closest('[data-bday]'); if(bd){boardDay=parseInt(bd.getAttribute('data-bday'),10);renderTasks();return;}
- var bb=e.target.closest('[data-board]'); if(bb){var w=bb.getAttribute('data-board');if(w==='add')openForm(null);else if(w==='edit')go('templates');else if(w==='assign')go('assign');else if(w==='assignlab')openAssignForm();else if(w==='selftask')openSelfTask();else if(w==='reqct')openCrewReq();return;}
+ var bb=e.target.closest('[data-board]'); if(bb){var w=bb.getAttribute('data-board');if(w==='assign')go('assign');else if(w==='assignlab')openAssignForm();else if(w==='selftask')openSelfTask();else if(w==='reqct')openCrewReq();return;}
  var ac=e.target.closest('[data-accept]'); if(ac){acceptCrewReq(ac.getAttribute('data-accept'));return;}
  var gr=e.target.closest('[data-req]'); if(gr){openReqForm(gr.getAttribute('data-req')==='undergrad');return;}
  var dl=e.target.closest('[data-del]'); if(dl){e.stopPropagation();var did=dl.getAttribute('data-del');var di=TASKS.findIndex(function(x){return x.id===did;});if(di>=0){var dn=TASKS[di].title;TASKS.splice(di,1);toast('Deleted “'+dn+'”');renderBoard();}return;}
@@ -9739,7 +9900,12 @@ const PLOTS=[
  {n:'17',label:'17',l:5,t:64,w:28,h:22},{n:'18',label:'18',l:36,t:64,w:28,h:22},{n:'GH',label:'GH',l:67,t:64,w:28,h:22}
 ];
 const TPL_KEY='ut_task_templates_v2';
-function saveTemplates(){try{localStorage.setItem(TPL_KEY,JSON.stringify(TEMPLATES));}catch(e){}}
+/* The task list used to save itself with its own localStorage write, which is
+   why it was the one list on the Tasks page that never left the phone that
+   made it. It is a registered store now (see STORE_DEFS), so the same
+   two-second scan that persists tasks, stock and the field log persists this,
+   and the shared-database module can carry it to everybody else. */
+function saveTemplates(){ try{ storeTouch(); }catch(e){} }
 function loadTemplates(){try{return JSON.parse(localStorage.getItem(TPL_KEY)||'null');}catch(e){return null;}}
 /* Task list — sourced from the Tasks sheet of Farm_info.xlsx.
    machines[] = equipment IDs valid for that task; eqNote = raw text when no
@@ -9777,14 +9943,56 @@ const TASK_SEED=[
  {id:'tpl27',category:'Mow',           name:'Weedeat',              machines:['e57','e59','e60','e61']},
  {id:'tpl28',category:'Irrigation',    name:'Hand Water',           machines:[]}
 ];
-let TEMPLATES=loadTemplates();
-if(!TEMPLATES||!TEMPLATES.length){
- TEMPLATES=TASK_SEED.map(function(t){
-  return {id:t.id,name:t.name,category:t.category,plots:[],repeat:'As needed',freq:null,months:[],
-          machines:(t.machines||[]).slice(),machine:'',eqNote:t.eqNote||''};
- });
- saveTemplates();
+/* Filled in place rather than reassigned: STORE_DEFS, the sync module and a
+   dozen closures all hold this one array, and swapping it for a new one would
+   leave every one of them pointing at the old contents. */
+var TEMPLATES=[];
+(function(){
+  var stored=loadTemplates();
+  if(stored&&stored.length){ stored.forEach(function(t){ if(t) TEMPLATES.push(t); }); return; }
+  TASK_SEED.forEach(function(t){
+    TEMPLATES.push({id:t.id,name:t.name,category:t.category,plots:[],repeat:'As needed',freq:null,months:[],
+                    machines:(t.machines||[]).slice(),machine:'',eqNote:t.eqNote||''});
+  });
+})();
+
+/* ---- who may change the task list ----
+   The list of jobs the farm does. Everybody but the undergraduates, matching
+   invCanEdit(): deciding what a job IS is a different thing from doing it.
+   Transcribed into firestore.rules as canEditTaskList(). */
+function tplCanEdit(){
+  if(!SESSION.pid) return false;
+  if(typeof personActive==='function'&&!personActive(SESSION.pid)) return false;
+  /* Off the ROSTER, never off currentRole -- currentRole is screen state the
+     database cannot see, so reading it here guarantees the app and the rules
+     drift apart. Same rule as schedCanEdit(). */
+  return (typeof personRole==='function')&&personRole(SESSION.pid)!=='Undergraduate Student';
 }
+
+/* ---- removal ----
+   Dillon's call, 2026-08-26: anybody who can edit the list can remove from it.
+   Under the hood a removal is a TOMBSTONE, not a deletion, and that is not
+   second-guessing him -- it is the only version that actually works over the
+   shared database. A phone with the switch off keeps its own copy of the list;
+   when it is switched on it pushes up everything the shared copy does not have,
+   which would resurrect anything genuinely deleted. Marking it removed means
+   the removal itself travels, so it stays removed.
+
+   It is invisible either way: nothing but tplRestore() ever shows one again. */
+function tplLive(){ return TEMPLATES.filter(function(t){ return t&&!t.removed; }); }
+function tplFind(id){ for(var i=0;i<TEMPLATES.length;i++) if(TEMPLATES[i]&&TEMPLATES[i].id===id) return TEMPLATES[i]; return null; }
+function tplRemove(id){
+  var t=tplFind(id); if(!t||!tplCanEdit()) return false;
+  t.removed=true; t.removedBy=SESSION.pid||null; t.removedAt=isoLocal(new Date(),true);
+  saveTemplates(); return true;
+}
+function tplRestore(id){
+  var t=tplFind(id); if(!t||!tplCanEdit()) return false;
+  delete t.removed; delete t.removedBy; delete t.removedAt;
+  t.updatedAt=isoLocal(new Date(),true); t.updatedBy=SESSION.pid||null;
+  saveTemplates(); return true;
+}
+function tplRemovedList(){ return TEMPLATES.filter(function(t){ return t&&t.removed; }); }
 /* Machines allowed for a task; falls back to the whole active roster. */
 function tplMachineList(list){
  var all=(typeof EQUIP!=='undefined'?EQUIP:[]).filter(function(e){return e.active;});
@@ -9866,7 +10074,7 @@ function syncForm(){
  document.getElementById('tn-freq').style.display=custom?'':'none';
  document.querySelectorAll('#tn-freq .fchip').forEach(function(c){c.classList.toggle('on',+c.getAttribute('data-freq')===+FORM.freq);});
  document.querySelectorAll('#tn-months .mchip').forEach(function(c){c.classList.toggle('on',FORM.months.indexOf(c.getAttribute('data-month'))>=0);});
- document.getElementById('tn-title').textContent=req?(FORM.reqType==='toCrew'?'Request grad / tech':(FORM.showStudents?'Request an undergrad':'Request a task')):(asg?(FORM.scope==='self'?'New task · assign to me':'Assign to my lab'):(FORM.id?'Edit Task':'New Task'));
+ document.getElementById('tn-title').textContent=req?(FORM.reqType==='toCrew'?'Request grad / tech':(FORM.showStudents?'Request an undergrad':'Request a task')):(asg?(FORM.scope==='self'?'New task · assign to me':'Assign to my lab'):(FORM.id?'Edit this job':'Add to the task list'));
  document.getElementById('tn-save').textContent=(req?'Submit request':(asg?'Assign task':'Save Task'));
 }
 function openAssignForm(){FORM={id:null,mode:'assign',scope:'lab',target:(labMembers()[0]||{}).name||'',name:'',category:CATEGORIES[0],plots:[],repeat:'None',freq:3,months:[],dueOrd:asTodayOrd()};syncForm();go('tasknew');}
@@ -9910,8 +10118,12 @@ function saveForm(){
    toast('Request submitted ✓'); back(); tbTab='requests'; renderBoard(); return;
  }
  if(!FORM.name){toast('Enter a task name');return;}
+ /* The Add button is hidden from undergraduates and the rows are not tappable
+    for them, but a hidden control is a courtesy and not a lock. The database
+    refuses this write too -- see canEditTaskList() in firestore.rules. */
+ if(!tplCanEdit()){ toast('Only staff can change the task list'); return; }
  var editing=!!FORM.id;
- var t={id:FORM.id||(newId('tpl')),name:FORM.name,category:FORM.category,plots:FORM.plots.slice(),mowDir:FORM.mowDir||null,dblMow:!!FORM.dblMow,dblPass:FORM.dblMow?(FORM.dblPass||MOW_PASSES[0]):null,repeat:FORM.repeat,freq:FORM.repeat==='Custom'?FORM.freq:null,months:FORM.months.slice(),machine:FORM.machine||null,machines:(FORM.machines||[]).slice(),eqNote:FORM.eqNote||''};
+ var t={id:FORM.id||(newId('tpl')),updatedAt:isoLocal(new Date(),true),updatedBy:SESSION.pid||null,name:FORM.name,category:FORM.category,plots:FORM.plots.slice(),mowDir:FORM.mowDir||null,dblMow:!!FORM.dblMow,dblPass:FORM.dblMow?(FORM.dblPass||MOW_PASSES[0]):null,repeat:FORM.repeat,freq:FORM.repeat==='Custom'?FORM.freq:null,months:FORM.months.slice(),machine:FORM.machine||null,machines:(FORM.machines||[]).slice(),eqNote:FORM.eqNote||''};
  var idx=TEMPLATES.findIndex(function(x){return x.id===t.id;});
  if(idx>=0)TEMPLATES[idx]=t; else TEMPLATES.push(t);
  saveTemplates();
@@ -9985,15 +10197,93 @@ function tplSummary(t){
  bits.push(t.repeat==='Custom'?(t.freq+'×/wk'):t.repeat);
  return bits.join(' · ');
 }
+/* ================== THE TASK LIST ==================
+   The jobs the farm does, as opposed to the jobs somebody has been given. It
+   is what the assign screen is built from, so it is the closest thing the app
+   has to a definition of the work -- which is why it now lives behind its own
+   button on the Task Board rather than behind an "Edit" button that read like
+   it edited the board.
+
+   Everybody sees it. Undergraduates read it (looking up what a job you have
+   been handed actually involves is the point); everybody else may add, change
+   and remove. See tplCanEdit().
+   ================================================== */
 function renderTemplates(){
  var el=document.getElementById('tpl-list');
+ var intro=document.getElementById('tpl-intro');
+ var addBtn=document.getElementById('tpl-add');
  var qEl=document.getElementById('tpl-search');
  var q=(qEl?qEl.value:'').trim().toLowerCase();
- var items=TEMPLATES.filter(function(t){if(!q)return true;return (t.name+' '+t.category+' '+(t.plots||[]).join(' ')+' '+t.repeat).toLowerCase().indexOf(q)>=0;});
- if(!TEMPLATES.length){el.innerHTML='<div class="sec" style="text-align:center;margin-top:24px">No saved tasks yet</div>';return;}
- el.innerHTML=items.length?'<div class="list">'+items.map(function(t){return '<div class="row tap" data-tpl="'+t.id+'"><div style="flex:1"><div class="rt">'+esc(t.name)+'</div><div class="rs">'+tplSummary(t)+'</div></div><span style="color:#c2c7cd;font-size:17px;flex:none">›</span></div>';}).join('')+'</div>':'<div class="sec" style="text-align:center;margin-top:24px">No matches for “'+q+'”</div>';
+ var edit=tplCanEdit();
+ if(addBtn) addBtn.style.display=edit?'inline-flex':'none';
+
+ var live=tplLive();
+ if(intro){
+   intro.innerHTML='<div class="sec" style="display:flex;align-items:baseline;justify-content:space-between">'
+     +'<span>'+(edit?'Tap a job to change it':'The jobs the farm does')+'</span>'
+     +'<span style="font-weight:700;text-transform:none;letter-spacing:0">'+live.length+' job'+(live.length===1?'':'s')+'</span></div>'
+     +(edit?'':'<div style="margin:0 16px 4px;font:600 11px \'Public Sans\';color:var(--muted);line-height:1.45">'
+       +'This is the list Bill and the labs assign work from. You can read what any job involves — which machine it needs, which plots, how often it comes round.</div>');
+ }
+
+ if(!live.length){
+   el.innerHTML='<div class="sec" style="text-align:center;margin-top:24px">'
+     +(edit?'Nothing on the list yet — tap ＋ Add to put the first job on it':'No jobs on the list yet')+'</div>';
+   return;
+ }
+ var items=live.filter(function(t){if(!q)return true;return (t.name+' '+t.category+' '+(t.plots||[]).join(' ')+' '+t.repeat).toLowerCase().indexOf(q)>=0;});
+ if(!items.length){ el.innerHTML='<div class="sec" style="text-align:center;margin-top:24px">No matches for “'+esc(q)+'”</div>'; return; }
+
+ /* Grouped by category. A flat list of forty jobs is a list you scroll past;
+    the categories are how everybody already talks about the work. */
+ var byCat={};
+ items.forEach(function(t){ (byCat[t.category]=byCat[t.category]||[]).push(t); });
+ var cats=(typeof CATEGORIES!=='undefined'?CATEGORIES:[]).filter(function(c){return byCat[c]&&byCat[c].length;});
+ Object.keys(byCat).forEach(function(c){ if(cats.indexOf(c)<0) cats.push(c); });
+
+ el.innerHTML=cats.map(function(c){
+   return '<div class="sec">'+esc(c)+'</div><div class="list">'+byCat[c].map(function(t){
+     var rm=edit?'<span class="tap" data-tplrm="'+esc(t.id)+'" title="Remove from the list" style="color:#c0392b;font-size:15px;flex:none;padding:0 6px">✕</span>':'';
+     var chev=edit?'<span style="color:#c2c7cd;font-size:17px;flex:none">›</span>':'';
+     return '<div class="row'+(edit?' tap':'')+'" data-tpl="'+esc(t.id)+'">'
+       +'<div style="flex:1;min-width:0"><div class="rt">'+esc(t.name)+'</div>'
+       +'<div class="rs">'+tplSummary(t)+'</div></div>'+rm+chev+'</div>';
+   }).join('')+'</div>';
+ }).join('')
+ /* Removed jobs are kept, not destroyed, so somebody who takes one off by
+    mistake can put it back rather than retyping it from memory. */
+ +(function(){
+    if(!edit) return '';
+    var gone=tplRemovedList();
+    if(!gone.length) return '';
+    return '<div class="sec" style="margin-top:18px">Removed · tap to put back</div><div class="list">'
+      +gone.map(function(t){
+        return '<div class="row tap" data-tplback="'+esc(t.id)+'" style="opacity:.7">'
+          +'<div style="flex:1;min-width:0"><div class="rt">'+esc(t.name)+'</div>'
+          +'<div class="rs">'+esc(t.category||'')+(t.removedBy?(' · removed by '+esc(nameOf(t.removedBy)||t.removedBy)):'')+'</div></div>'
+          +'<span style="font:800 12px \'Public Sans\';color:var(--acc);flex:none">Put back</span></div>';
+      }).join('')+'</div>';
+  })()
+ +'<div style="height:18px"></div>';
 }
-document.getElementById('tpl-list').addEventListener('click',function(e){var r=e.target.closest('[data-tpl]');if(!r)return;var t=TEMPLATES.find(function(x){return x.id===r.getAttribute('data-tpl');});if(t)openForm(t);});
+document.getElementById('tpl-add').addEventListener('click',function(){ if(tplCanEdit()) openForm(null); });
+document.getElementById('tpl-list').addEventListener('click',function(e){
+ var rm=e.target.closest('[data-tplrm]');
+ if(rm){
+   e.stopPropagation();
+   var rid=rm.getAttribute('data-tplrm'), rt=tplFind(rid);
+   if(!rt) return;
+   if(!confirm('Take “'+rt.name+'” off the task list?\n\nIt stops showing when anybody assigns work. You can put it back from the bottom of this screen.')) return;
+   if(tplRemove(rid)){ toast('Removed from the list'); renderTemplates(); }
+   return;
+ }
+ var bk=e.target.closest('[data-tplback]');
+ if(bk){ e.stopPropagation(); if(tplRestore(bk.getAttribute('data-tplback'))){ toast('Back on the list ✓'); renderTemplates(); } return; }
+ var r=e.target.closest('[data-tpl]');
+ if(!r||!tplCanEdit()) return;
+ var t=tplFind(r.getAttribute('data-tpl'));
+ if(t)openForm(t);
+});
 document.getElementById('tpl-search').addEventListener('input',renderTemplates);
 const FULLMONTH={Jan:'January',Feb:'February',Mar:'March',Apr:'April',May:'May',Jun:'June',Jul:'July',Aug:'August',Sep:'September',Oct:'October',Nov:'November',Dec:'December'};
 function curMonth(){return MONTHS[new Date().getMonth()];}
@@ -10114,7 +10404,7 @@ function renderAssignList(){
  var html='';
  if(asTab==='scheduled'){
    var m=curMonth();
-   var items=TEMPLATES.filter(function(t){return (t.months||[]).indexOf(m)>=0;})
+   var items=tplLive().filter(function(t){return (t.months||[]).indexOf(m)>=0;})
      .filter(function(t){return !q||(t.name+' '+t.category+' '+(t.plots||[]).join(' ')).toLowerCase().indexOf(q)>=0;});
    html+='<div class="sec">Repeating in '+(FULLMONTH[m]||m)+'</div>';
    html+= items.length? '<div class="list">'+items.map(function(t){return assignRow('tpl',t.id,t.name,t.category+' · '+(t.plots&&t.plots.length?areaLabel(t.plots):'—')+' · '+asRepeatLabel(t));}).join('')+'</div>'
@@ -10127,7 +10417,7 @@ function renderAssignList(){
    }
  } else if(asTab==='all'){
    var byCat={};
-   TEMPLATES.filter(function(t){return !q||(t.name+' '+t.category+' '+(t.plots||[]).join(' ')).toLowerCase().indexOf(q)>=0;})
+   tplLive().filter(function(t){return !q||(t.name+' '+t.category+' '+(t.plots||[]).join(' ')).toLowerCase().indexOf(q)>=0;})
      .forEach(function(t){(byCat[t.category]=byCat[t.category]||[]).push(t);});
    var cats=CATEGORIES.filter(function(c){return byCat[c]&&byCat[c].length;});
    Object.keys(byCat).forEach(function(c){if(cats.indexOf(c)<0)cats.push(c);});
@@ -11974,7 +12264,7 @@ function mgEffect(name){
 function mowJobLabel(lb){
   if(!lb||typeof TEMPLATES==='undefined') return '';
   var hit='';
-  TEMPLATES.forEach(function(t){
+  tplLive().forEach(function(t){
     if(hit) return;
     var kinds=jobMowerKinds(t.category,t.name);
     /* skip the catch-all: a template that claims every machine names nothing */
@@ -12529,7 +12819,19 @@ function sdbTasksBlock(){
     explain:'Turning this on sends this phone\'s tasks up to the shared copy and starts showing '
            +'everybody else\'s. Nothing is deleted by turning it on, and turning it off again puts '
            +'this phone back to keeping its own copy.'
-  })+sdbMapBlock()+sdbCrewBlock()+sdbLogBlock()+sdbInvBlock()+sdbSchedBlock()+sdbClockBlock();
+  })+sdbMapBlock()+sdbCrewBlock()+sdbLogBlock()+sdbInvBlock()+sdbSchedBlock()+sdbClockBlock()+sdbTplBlock();
+}
+
+function sdbTplBlock(){
+  return sdbSwitchBlock({
+    on:TPLSYNC.on, failed:TPLSYNC.failed, summary:tplsyncSummary(), btnId:'sdb-tpl',
+    title:'Share the task list',
+    offLabel:'Off — the list on this phone stays on it',
+    explain:'The jobs the farm does — the list the assign screen is built from. With this off, a '
+           +'job added on one phone can only ever be handed out from that phone. With it on, the '
+           +'whole farm works from one list. Everybody but the undergraduates can add to it and '
+           +'change it; they can read it.'
+  });
 }
 
 function sdbSchedBlock(){
@@ -12640,6 +12942,13 @@ function sdbPush(){
       var logOn=!FLSYNC.on;
       flsyncSetWanted(logOn);
       toast(logOn?'Sharing the field log':'The log stays on this phone');
+      sdbRender();
+      return;
+    }
+    if(e.target.closest('#sdb-tpl')){
+      var tplOn=!TPLSYNC.on;
+      tplsyncSetWanted(tplOn);
+      toast(tplOn?'Sharing the task list':'The task list stays on this phone');
       sdbRender();
       return;
     }
@@ -13022,7 +13331,7 @@ var _parents=null,_children=null,_parentLabels=null,_childLabels=null;
 var _mower=null,_mowerOn=false;
 var _cutLabels=null,_childCutLabels=null,_cutOn=false;
 function cutText(c){ return (''+c)+'″'; }
-var LABEL_MIN_ZOOM=18, SPLIT_ZOOM=20;
+var LABEL_MIN_ZOOM=15, SPLIT_ZOOM=17;
 var CHILD_RE=/^(.+?\d+)[a-c]$/;
 function uni2(a,b){ if(!a)return b; if(!b)return a; try{return turf.union(turf.featureCollection([a,b]));}catch(e){try{return turf.union(a,b);}catch(e2){return a;}} }
 /* ---- Facilities -----------------------------------------------------------
@@ -13164,9 +13473,9 @@ function mapEnter(){
   mfWire();
   if(_appmap){ setTimeout(function(){_appmap.invalidateSize();updateView();try{trMapPins();}catch(e){}},60); return; }
   if(!el || typeof L==='undefined') return;
-  _appmap=mapChrome(L.map(el,{maxZoom:22,zoomControl:false}));
+  _appmap=mapChrome(L.map(el,{minZoom:13,maxZoom:18,zoomControl:false,renderer:L.canvas()}));
   _appmap.on('popupopen',function(e){_pop=e.popup;});
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:22,maxNativeZoom:19,attribution:'Imagery \u00a9 Esri, Maxar'}).addTo(_appmap);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:18,maxNativeZoom:19,attribution:'Imagery \u00a9 Esri, Maxar'}).addTo(_appmap);
   buildLayers();
   _plots.addTo(_appmap); if(_parents)_parents.addTo(_appmap);
   _alleys=L.geoJSON(ALLEYS_DATA,{style:{color:'#2f9e4f',weight:1,fillColor:'#3cbf5a',fillOpacity:0.42}});
@@ -14173,8 +14482,8 @@ function trRenderPin(){
   _trpLatLng=trDraft.pin?L.latLng(trDraft.pin.lat,trDraft.pin.lng):null;
   _trpRot=(trDraft.rot||0);
   if(!_trpMap){
-    _trpMap=mapChrome(L.map(el,{maxZoom:22,zoomControl:false}));
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:22,maxNativeZoom:19}).addTo(_trpMap);
+    _trpMap=mapChrome(L.map(el,{minZoom:13,maxZoom:18,zoomControl:false,renderer:L.canvas()}));
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:18,maxNativeZoom:19}).addTo(_trpMap);
     _trpMap.on('click',function(e){ _trpLatLng=e.latlng; trpDraw(); });
     var rs=document.getElementById('trp-rot');
     if(rs) rs.addEventListener('input',function(){ _trpRot=+this.value||0; trpDraw(); });
@@ -15732,9 +16041,9 @@ function jobMapEnsure(key,elId){
     try{st.map.remove();}catch(e){}
     delete JOBMAP[key];
   }
-  var m=mapChrome(L.map(el,{maxZoom:22,zoomControl:false}));
+  var m=mapChrome(L.map(el,{minZoom:13,maxZoom:18,zoomControl:false,renderer:L.canvas()}));
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    {maxZoom:22,maxNativeZoom:19,attribution:'Imagery © Esri, Maxar'}).addTo(m);
+    {maxZoom:18,maxNativeZoom:19,attribution:'Imagery © Esri, Maxar'}).addTo(m);
   st=JOBMAP[key]={map:m,g:L.layerGroup().addTo(m),lg:L.layerGroup(),fitted:false};
   m.on('zoomend',function(){ jobLabelSync(st); });
   jobLabelSync(st);
@@ -16377,6 +16686,10 @@ var STORE_DEFS=[
   /* The farm's term dates. Only a few rows, but they are what tells the app
      which semester today falls in, and therefore which weekly schedule to
      read - so they have to survive a reload like anything else. */
+  /* The list of jobs the farm does. It was saving itself by hand, which is
+     why it never reached a second phone -- and it is what the assign screen is
+     built from, so a job missing here is a job nobody else can hand out. */
+  {name:'templates',  key:'ut_task_templates_v2', label:'Task list',       get:function(){return TEMPLATES;}},
   {name:'semesters',  key:'ut_semesters_v1',  label:'Semester dates',     get:function(){return FARM_SEMS;}},
   /* One record per undergrad per term. Bill's day board is drawn from these,
      so a lost schedule is a person who silently stops showing as available. */
@@ -16429,6 +16742,7 @@ function storeScan(){
   try{ invsyncTick(); }catch(e){}
   try{ schsyncTick(); }catch(e){}
   try{ tcsyncTick(); }catch(e){}
+  try{ tplsyncTick(); }catch(e){}
 }
 function storeFlush(){ storeScan(); }
 function storeTouch(){ storeScan(); }   /* callers that want an immediate write */
@@ -16460,6 +16774,7 @@ function storeHydrate(){
   try{ invsyncHydrate(); }catch(e){}
   try{ schsyncHydrate(); }catch(e){}
   try{ tcsyncHydrate(); }catch(e){}
+  try{ tplsyncHydrate(); }catch(e){}
   _storeOn=true;
   try{ setInterval(storeScan,STORE_SCAN_MS); }catch(e){}
 }

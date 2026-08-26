@@ -65,6 +65,7 @@ function makeL() {
                   invalidateSize() {}, hasLayer: () => true, addLayer() {}, removeLayer() {},
                   getContainer: () => null, remove() {}, fitBounds() {} }),
     tileLayer: () => ({ addTo() { return this; } }),
+    canvas: () => ({}),
     control: { zoom: () => ({ addTo() {} }) },
     layerGroup: group,
     geoJSON: (gj) => Object.assign(layerish(coordsOf(gj)), { _gj: gj }),

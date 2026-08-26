@@ -117,7 +117,7 @@
      net zoom ≠ 1 puts clicks in the wrong place. Counter-zooming the map container
      restores a 1:1 ratio with the root while the chrome around it stays scaled. */
   .leaflet-container{zoom:calc(1 / var(--ts,1))}
-  .hdr{display:flex;align-items:center;gap:10px;flex:none;background:#fff;border-bottom:1px solid var(--line);padding:12px 16px}
+  .hdr{display:flex;align-items:center;gap:10px;flex:none;background:#fff;border-bottom:1px solid var(--line);padding:calc(12px + env(safe-area-inset-top)) 16px 12px}
   .title{font:800 17px 'Archivo';color:var(--ink)}
   .sec{font:800 11px 'Public Sans';text-transform:uppercase;letter-spacing:.7px;color:var(--muted)}
   .wx{margin:8px 14px 2px;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:13px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between}
@@ -399,7 +399,7 @@
 
   /* ---- 1b FIELD BOLD ---- */
   .field{--bg:#e9ebe7;--card:#fff;--line:#dfe2de;--ink:#17181a;--muted:#6b7280}
-  .field .hdr{background:var(--banner);padding:15px 16px;border-bottom:none}
+  .field .hdr{background:var(--banner);padding:calc(15px + env(safe-area-inset-top)) 16px 15px;border-bottom:none}
   .field .hdr .title{color:var(--banner-ink);font-size:20px}
   .field .hdr .tap,.field .hdr .backbtn{color:var(--banner-ink)!important}
   .field .hdr .backbtn,.field .hdr span.tap[style*="rgba(255,255,255,.16)"]{background:var(--banner-chip)!important;border-color:var(--banner-chipline)!important}
@@ -464,7 +464,7 @@
 
   /* ---- 1c CALM EDITORIAL ---- */
   .calm{--bg:#faf9f7;--card:#fff;--line:#eeece7;--ink:#26241f;--muted:#a5a29a}
-  .calm .hdr{background:transparent;border-bottom:none;padding:18px 18px 4px}
+  .calm .hdr{background:transparent;border-bottom:none;padding:calc(18px + env(safe-area-inset-top)) 18px 4px}
   .calm .hdr .title{font-size:22px;font-weight:900;letter-spacing:-.3px}
   .calm .card,.calm .list{border:1px solid var(--line);box-shadow:none;border-radius:16px}
   .calm .row{padding:14px 16px;border-color:#f3f1ec}
@@ -564,6 +564,7 @@ body{background:#0f1011;display:flex;align-items:center;justify-content:center;f
 .screen{position:absolute;inset:0;display:none;flex-direction:column;background:#e9ebe7}
 .screen.active{display:flex}
 .app.field{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.app.field,[id$="-body"]{overscroll-behavior-y:contain}
 /* .app is a flex column, so a bare spacer <div> has a min-content height of 0 and
    gets squeezed away the moment the page overflows — which left the last home
    widget sitting flush against the tab bar. flex:none pins the run-out open. */
@@ -1726,7 +1727,7 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
   <div class="hdr" style="background:#2f3133"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Switch user</div></div>
   <div id="sw-body" style="flex:1;overflow-y:auto;padding:0 16px 24px;min-height:0"></div>
 </div></section>
-<section class="screen" id="s-more"><div class="app field"><div class="hdr"><div class="title" style="flex:1">More</div></div><div style="flex:1;overflow-y:auto"><div class="list" style="margin-top:12px"><div class="row tap" data-go="roles"><span style="font-size:19px;width:26px">🔀</span><div style="flex:1"><div class="rt">Switch user</div><div class="rs" id="more-signedin"></div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" id="more-signout"><span style="font-size:19px;width:26px">🚪</span><div style="flex:1"><div class="rt">Sign out</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="taskboard"><span style="font-size:19px;width:26px">📋</span><div style="flex:1"><div class="rt">Tasks</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="map"><span style="font-size:19px;width:26px">🗺️</span><div style="flex:1"><div class="rt">Farm Map</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="calendar"><span style="font-size:19px;width:26px">📅</span><div style="flex:1"><div class="rt">Calendar</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="fieldlog"><span style="font-size:19px;width:26px">✏️</span><div style="flex:1"><div class="rt">Field Log</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="timeclock"><span style="font-size:19px;width:26px">⏱️</span><div style="flex:1"><div class="rt">Time clock</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="weather"><span style="font-size:19px;width:26px">🌤️</span><div style="flex:1"><div class="rt">Weather & conditions</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="inventory" id="more-inv"><span style="font-size:19px;width:26px">📦</span><div style="flex:1"><div class="rt">Inventory</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="trial" id="more-trials"><span style="font-size:19px;width:26px">🔬</span><div style="flex:1"><div class="rt">Trials</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="equipment"><span style="font-size:19px;width:26px">🚜</span><div style="flex:1"><div class="rt">Equipment</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="farmsettings" id="more-spray"><span style="font-size:19px;width:26px">🔧</span><div style="flex:1"><div class="rt">Farm settings</div><div class="rs">Sprayer, mowers and labs</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="admin" id="more-admin"><span style="font-size:19px;width:26px">🛠️</span><div style="flex:1"><div class="rt">Admin</div><div class="rs">Roster, accounts and app settings</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="bugreport"><span style="font-size:19px;width:26px">🐞</span><div style="flex:1"><div class="rt">Report a technical bug</div><div class="rs" id="more-bugsub">Something in the app is broken</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="login"><span style="font-size:19px;width:26px">⏻</span><div style="flex:1"><div class="rt">Log out</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div></div></div></div><div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab"><span class="te">📋</span>Tasks</div><div class="tab"><span class="te">🗺️</span>Map</div><div class="tab"><span class="te">📦</span>Inventory</div><div class="tab on"><span class="te">•••</span>More</div></div></section>
+<section class="screen" id="s-more"><div class="app field"><div class="hdr"><div class="title" style="flex:1">More</div></div><div style="flex:1;overflow-y:auto"><div class="list" style="margin-top:12px"><div class="row tap" data-go="taskboard"><span style="font-size:19px;width:26px">📋</span><div style="flex:1"><div class="rt">Tasks</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="map"><span style="font-size:19px;width:26px">🗺️</span><div style="flex:1"><div class="rt">Farm Map</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="calendar"><span style="font-size:19px;width:26px">📅</span><div style="flex:1"><div class="rt">Calendar</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="fieldlog"><span style="font-size:19px;width:26px">✏️</span><div style="flex:1"><div class="rt">Field Log</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="timeclock"><span style="font-size:19px;width:26px">⏱️</span><div style="flex:1"><div class="rt">Time clock</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="weather"><span style="font-size:19px;width:26px">🌤️</span><div style="flex:1"><div class="rt">Weather & conditions</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="inventory" id="more-inv"><span style="font-size:19px;width:26px">📦</span><div style="flex:1"><div class="rt">Inventory</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="trial" id="more-trials"><span style="font-size:19px;width:26px">🔬</span><div style="flex:1"><div class="rt">Trials</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="equipment"><span style="font-size:19px;width:26px">🚜</span><div style="flex:1"><div class="rt">Equipment</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="farmsettings" id="more-spray"><span style="font-size:19px;width:26px">🔧</span><div style="flex:1"><div class="rt">Farm settings</div><div class="rs">Sprayer, mowers and labs</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="admin" id="more-admin"><span style="font-size:19px;width:26px">🛠️</span><div style="flex:1"><div class="rt">Admin</div><div class="rs">Roster, accounts and app settings</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="bugreport"><span style="font-size:19px;width:26px">🐞</span><div style="flex:1"><div class="rt">Report a technical bug</div><div class="rs" id="more-bugsub">Something in the app is broken</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="login"><span style="font-size:19px;width:26px">⏻</span><div style="flex:1"><div class="rt">Log out</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div></div></div></div><div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab"><span class="te">📋</span>Tasks</div><div class="tab"><span class="te">🗺️</span>Map</div><div class="tab"><span class="te">📦</span>Inventory</div><div class="tab on"><span class="te">•••</span>More</div></div></section>
 <section class="screen" id="s-navsettings"><div class="app field">
 <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Preferences</div></div>
 <div style="flex:1;overflow-y:auto" id="prf-body"></div>
@@ -1792,7 +1793,7 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
 <div style="flex:1;overflow-y:auto" id="spr-body"></div>
 </div></section>
 <section class="screen" id="s-notifications"><div class="app field"><div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Notifications</div></div><div style="flex:1;overflow-y:auto"><div style="font:700 10px 'Public Sans';color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:12px 18px 6px">Today</div><div class="list"><div class="row"><span class="dot" style="background:#c0392b"></span><div style="flex:1"><div class="rt">Toro 3 marked down</div><div class="rs">Greg Breeden · reel damage · blocking 2 tasks</div></div><span class="rs" style="flex:none">2h</span></div><div class="row"><span class="dot" style="background:#c0392b"></span><div style="flex:1"><div class="rt">Daconil low stock</div><div class="rs">2.5 gal left · below reorder point</div></div><span class="rs" style="flex:none">3h</span></div><div class="row"><span class="dot" style="background:#2f9e4f"></span><div style="flex:1"><div class="rt">Spray window is good</div><div class="rs">Wind 4 mph · clear</div></div><span class="rs" style="flex:none">7:02a</span></div></div><div style="font:700 10px 'Public Sans';color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:16px 18px 6px">This week</div><div class="list"><div class="row"><span class="dot" style="background:#489FDF"></span><div style="flex:1"><div class="rt">Rose submitted a protocol draft</div><div class="rs">Spring green-up · needs review</div></div><span class="rs" style="flex:none">Mon</span></div><div class="row"><span class="dot" style="background:#9a5b00"></span><div style="flex:1"><div class="rt">Restriction set · Plot 14</div><div class="rs">No fungicide · N section</div></div><span class="rs" style="flex:none">Mon</span></div></div><div style="font:700 10px 'Public Sans';color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:16px 18px 6px">Previous</div><div class="list"><div class="row"><span class="dot" style="background:#58595b"></span><div style="flex:1"><div class="rt">Garrett clocked in</div><div class="rs">7:02a · barn crew</div></div><span class="rs" style="flex:none">Jul 14</span></div><div class="row"><span class="dot" style="background:#58595b"></span><div style="flex:1"><div class="rt">Toro 5410 serviced</div><div class="rs">Blades sharpened · back in service</div></div><span class="rs" style="flex:none">Jul 10</span></div></div><div style="height:16px"></div></div></div></section>
-<section class="screen" id="s-profile"><div class="app field"><div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Profile</div><span class="tap" data-go="profedit" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;margin:-4px 0;border-radius:11px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.26);font:700 13px 'Public Sans';color:#fff;flex:none;box-shadow:0 1px 2px rgba(0,0,0,.15)">Edit</span></div><div style="flex:1;overflow-y:auto"><div style="text-align:center;padding:24px 20px 8px"><div class="tap" data-toast="Add a photo (demo)" style="position:relative;display:inline-block"><span id="pf-init" style="width:74px;height:74px;border-radius:50%;background:#ff8200;color:#fff;font:800 26px 'Archivo';display:inline-flex;align-items:center;justify-content:center">BC</span><span style="position:absolute;right:-1px;bottom:-1px;width:26px;height:26px;border-radius:50%;background:var(--acc);border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:12px">📷</span></div><div id="pf-name" style="font:800 20px 'Archivo';color:var(--ink);margin-top:12px">Bill Czekai</div><div id="pf-role" style="font:700 12px 'Public Sans';color:var(--muted);margin-top:3px">Farm Manager</div></div><div class="list"><div class="fld"><span class="fl">Email</span><span class="fv" id="pf-email">—</span></div><div class="fld"><span class="fl">Farm</span><span class="fv">UT Turf Farm · Knoxville</span></div><div class="fld"><span class="fl">Lab</span><span class="fv" id="pf-lab">—</span></div></div><div id="pf-sched-wrap" style="display:none"></div><div class="list"><div class="row tap" id="pf-roster-row" data-go="roster" style="display:none"><span style="width:26px;font:800 10px 'Public Sans';color:var(--muted);letter-spacing:.4px">ROS</span><div style="flex:1"><div class="rt">Roster</div><div class="rs" id="pf-roster-sub">Everyone who works at the farm</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="navsettings"><span style="font-size:18px;width:26px">⚙️</span><div style="flex:1"><div class="rt">Preferences</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="login"><span style="font-size:18px;width:26px">⏻</span><div style="flex:1"><div class="rt">Log out</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div></div></div></div></section>
+<section class="screen" id="s-profile"><div class="app field"><div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Profile</div><span class="tap" data-go="profedit" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 14px;margin:-4px 0;border-radius:11px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.26);font:700 13px 'Public Sans';color:#fff;flex:none;box-shadow:0 1px 2px rgba(0,0,0,.15)">Edit</span></div><div style="flex:1;overflow-y:auto"><div style="text-align:center;padding:24px 20px 8px"><div class="tap" data-toast="Add a photo (demo)" style="position:relative;display:inline-block"><span id="pf-init" style="width:74px;height:74px;border-radius:50%;background:#ff8200;color:#fff;font:800 26px 'Archivo';display:inline-flex;align-items:center;justify-content:center">BC</span><span style="position:absolute;right:-1px;bottom:-1px;width:26px;height:26px;border-radius:50%;background:var(--acc);border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:12px">📷</span></div><div id="pf-name" style="font:800 20px 'Archivo';color:var(--ink);margin-top:12px">Bill Czekai</div><div id="pf-role" style="font:700 12px 'Public Sans';color:var(--muted);margin-top:3px">Farm Manager</div></div><div class="list"><div class="fld"><span class="fl">Email</span><span class="fv" id="pf-email">—</span></div><div class="fld"><span class="fl">Farm</span><span class="fv">UT Turf Farm · Knoxville</span></div><div class="fld"><span class="fl">Lab</span><span class="fv" id="pf-lab">—</span></div></div><div id="pf-sched-wrap" style="display:none"></div><div class="list"><div class="row tap" id="pf-roster-row" data-go="roster" style="display:none"><span style="width:26px;font:800 10px 'Public Sans';color:var(--muted);letter-spacing:.4px">ROS</span><div style="flex:1"><div class="rt">Roster</div><div class="rs" id="pf-roster-sub">Everyone who works at the farm</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" data-go="navsettings"><span style="font-size:18px;width:26px">⚙️</span><div style="flex:1"><div class="rt">Preferences</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div><div class="row tap" id="pf-signout"><span style="font-size:18px;width:26px">⏻</span><div style="flex:1"><div class="rt">Log out</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div></div></div></div></section>
 <section class="screen" id="s-profedit"><div class="app field">
 <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Edit profile</div></div>
 <div style="flex:1;overflow:auto" id="pfe-body"></div>
@@ -2079,8 +2080,9 @@ function renderRail(){
 
   /* 82px can't carry the whole account block, and More is redundant now that
      every page is on the rail — Profile and the bell still reach the rest.
-     Switch role takes the slot because it's the one thing nothing else has. */
-  h+=item({k:'Switch',ic:'🔀',dest:'roles',on:dest==='roles',label:'Switch'});
+     The "Switch" slot (switch-role/switch-user) was demo-only and was
+     removed 2026-08-25 -- nothing replaces it, the rail is just one item
+     shorter now. */
   rail.innerHTML=h;
   /* The bell badge paints itself onto anything carrying .bellwrap. */
   try{updateBellBadges();}catch(e){}
@@ -2157,11 +2159,6 @@ function moreEnter(){ var role=currentRole,nav=navMap[role]||{},chosen=navChosen
   /* Mixing is a chemical job: only the roles that can log one see the numbers. */
   var sp=document.getElementById('more-spray');
   if(sp) sp.style.display=(((typeof farmCanSee==='function')&&farmCanSee()))?'':'none';
-  /* Say who is signed in, so "Switch user" is obviously about a person. */
-  var si=document.getElementById('more-signedin');
-  if(si) si.textContent=me().n+' · '+(me().t||'');
-  var so=document.getElementById('more-signout');
-  if(so&&!so._wired){ so._wired=true; so.addEventListener('click',signOut); }
 }
 /* Preferences is a hub: each category is its own screen, reached from these rows.
    Add a category by appending to PREF_CATS — nothing else needs to change. */
@@ -5547,7 +5544,7 @@ function rstWhyLocked(p){
   if(p.role==='Faculty')return 'Faculty records are held by the App Manager · '+APP_ADMIN.name;
   return 'In the '+(p.lab||'—')+' lab · edited by that PI or by Bill';
 }
-function fillProfile(){const u=me();const q=x=>document.getElementById(x);if(!q('pf-init'))return;q('pf-init').textContent=u.i;q('pf-init').style.background=u.c;q('pf-name').textContent=u.n;q('pf-role').textContent=u.t;q('pf-email').textContent=u.e;q('pf-lab').textContent=u.lab;var rr=q('pf-roster-row');if(rr){rr.style.display=rstCanOpen()?'':'none';var rs=q('pf-roster-sub');if(rs)rs.textContent=rstActive().length+' people · '+(currentRole==='manager'?'edit everyone but the faculty':'edit your lab and the undergrads');}renderProfileSchedule();}
+function fillProfile(){const u=me();const q=x=>document.getElementById(x);if(!q('pf-init'))return;q('pf-init').textContent=u.i;q('pf-init').style.background=u.c;q('pf-name').textContent=u.n;q('pf-role').textContent=u.t;q('pf-email').textContent=u.e;q('pf-lab').textContent=u.lab;var rr=q('pf-roster-row');if(rr){rr.style.display=rstCanOpen()?'':'none';var rs=q('pf-roster-sub');if(rs)rs.textContent=rstActive().length+' people · '+(currentRole==='manager'?'edit everyone but the faculty':'edit your lab and the undergrads');}renderProfileSchedule();var pso=q('pf-signout');if(pso&&!pso._wired){pso._wired=true;pso.addEventListener('click',signOut);}}
 function renderProfEdit(){const u=me();
  document.getElementById('pfe-body').innerHTML=
    '<div class="sec" style="margin:14px 18px 7px">Profile</div><div class="list">'
@@ -5572,15 +5569,32 @@ document.getElementById('pfe-save').addEventListener('click',function(){
  const name=g('name'); if(!name){toast('Name is required');return;}
  const pw1=g('pw1'),pw2=g('pw2');
  if(pw1||pw2){
-   if(pw1.length<6){toast('Password must be at least 6 characters');return;}
+   if(pw1.length<8){toast('Password must be at least 8 characters');return;}
    if(pw1!==pw2){toast('Passwords do not match');return;}
  }
- u.n=name; u.lab=g('lab')||'—'; u.hired=g('hired')||u.hired;
- var mp=u.pid?rstFind(u.pid):null;
- if(mp){var np=name.split(/\s+/);mp.first=np.shift()||mp.first;mp.last=np.join(' ');if(u.lab&&u.lab!=='—')mp.lab=u.lab;rstSync();}
- u.i=name.split(/\s+/).map(function(p){return p[0]||'';}).join('').slice(0,2).toUpperCase()||u.i;
- if(pw1)u.pw=pw1;
- fillProfile(); toast(pw1?'Saved changes · password updated ✓':'Saved changes ✓'); back();
+ function finishProfileSave(){
+   u.n=name; u.lab=g('lab')||'—'; u.hired=g('hired')||u.hired;
+   var mp=u.pid?rstFind(u.pid):null;
+   if(mp){var np=name.split(/\s+/);mp.first=np.shift()||mp.first;mp.last=np.join(' ');if(u.lab&&u.lab!=='—')mp.lab=u.lab;rstSync();}
+   u.i=name.split(/\s+/).map(function(p){return p[0]||'';}).join('').slice(0,2).toUpperCase()||u.i;
+   fillProfile(); toast(pw1?'Saved changes · password updated ✓':'Saved changes ✓'); back();
+ }
+ if(!pw1){ finishProfileSave(); return; }
+ /* A password change is a real Firebase call (see the auth notes) -- everything
+    else on this form is only kept locally either way, so only leave the screen
+    once the password change has actually gone through. Same checks and wording
+    as the old "Switch user" account screen used, before it was retired. */
+ var auth=(typeof fbAuth==='function')?fbAuth():null;
+ if(!auth||!auth.currentUser){ toast('Cannot reach the sign-in service.'); return; }
+ if(navigator.onLine===false){ toast('No signal — a password change needs a connection.'); return; }
+ toast('Working…');
+ auth.currentUser.updatePassword(pw1).then(finishProfileSave).catch(function(err){
+   var code=(err&&err.code)||'';
+   if(code==='auth/requires-recent-login') toast('For safety this needs a fresh sign-in. Sign out, sign back in, then try again.');
+   else if(code==='auth/weak-password') toast('That password is too easy to guess. Try a longer one.');
+   else if(code==='auth/network-request-failed') toast('Could not reach the sign-in service. Check your connection.');
+   else toast('That did not work.');
+ });
 });
 /* ---- Roster page: who works here, and what they are ----
    Bill and the PIs get a read of the whole farm; the edit rights are narrower
@@ -5645,9 +5659,10 @@ function rstRender(){
    +'</div>';
   if(!rstIsAdmin())html+='<div style="margin:7px 20px 0;font:600 11px \'Public Sans\';color:var(--muted);line-height:1.45">Faculty are appointed by the university, not hired by the farm, so their records are kept out of the farm chain of command. Ask '+esc(APP_ADMIN.name)+' to add, reclassify or retire a PI.</div>';
   if(rstIsAdmin())html+='<div class="list" style="margin-top:12px">'
-   +'<div class="row tap" data-go="roles"><span style="width:26px;font:800 10px \'Public Sans\';color:var(--muted)">SW</span><div style="flex:1"><div class="rt">Switch account</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div>'
-   +'<div class="row tap" data-go="login"><span style="width:26px;font:800 10px \'Public Sans\';color:var(--muted)">OUT</span><div style="flex:1"><div class="rt">Log out</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div></div>';
+   +'<div class="row tap" id="rst-signout"><span style="width:26px;font:800 10px \'Public Sans\';color:var(--muted)">OUT</span><div style="flex:1"><div class="rt">Log out</div></div><span style="color:#c2c7cd;font-size:18px">›</span></div></div>';
   body.innerHTML=html+'<div style="height:20px"></div>';
+  var rso=document.getElementById('rst-signout');
+  if(rso) rso.addEventListener('click',signOut);
 }
 function rstOpen(id){rstEditId=id;rstArmedDelete=false;go('rosteredit');}
 function rstEditRender(){
@@ -5808,7 +5823,7 @@ document.getElementById('axf-save').addEventListener('click',function(){
   APP_ADMIN={name:name,email:email,pid:axfPid||null,since:d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)};
   axfArmed=false; rstAdminSave(); rstBuildAdminUser(); rstPaintRolesCard();
   toast('App administration handed to '+name+' ✓');
-  stack.length=0; show('roles',true);
+  stack.length=0; show('profile',true);
 });
 
 

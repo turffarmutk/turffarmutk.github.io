@@ -172,9 +172,11 @@ section('3. rail is built from navMap');
   const labels = railLabels();
   ok('rail renders for manager', labels.length > 0);
   ok('Home is first', labels[0] === 'Home', labels[0]);
-  /* Switch role took the slot More used to hold: every page is already on the
-     rail, and Profile plus the bell still reach everything else. */
-  ok('Switch role is last', labels[labels.length - 1] === 'Switch', labels[labels.length - 1]);
+  /* "Switch role" used to take the slot More used to hold, but it was
+     demo-only and was retired 2026-08-25 -- every page is already on the
+     rail, and Profile plus the bell still reach everything else, so nothing
+     took its place. */
+  ok('no Switch entry', !labels.includes('Switch'), labels.join(','));
   ok('no More entry', !labels.includes('More'), labels.join(','));
 
   /* The point of the rail: every page the role can reach, not the three
@@ -359,12 +361,12 @@ section('12. the account rows live behind Profile, not on the rail');
   setWidth(1440);
   win.go('home-manager');
   const labels = railLabels();
-  /* An 82px rail cannot carry "Switch role" and friends as labelled rows, so
-     only Switch is promoted; the rest stay where the phone keeps them. */
-  ['Profile', 'Notifications', 'Preferences', 'Logout'].forEach(k => {
+  /* "Switch" (switch-user/switch-role) was demo-only and was retired
+     2026-08-25 -- the rail is simply one item shorter now, nothing took its
+     old slot. */
+  ['Profile', 'Notifications', 'Preferences', 'Logout', 'Switch'].forEach(k => {
     ok(k + ' is not on the rail', !labels.includes(k), labels.join(','));
   });
-  ok('Switch role is', labels.includes('Switch'), labels.join(','));
 
   /* But every one of them is still reachable, which is the part that matters. */
   ['s-profile', 's-notifications', 's-navsettings', 's-roster', 's-powersettings']
@@ -373,12 +375,11 @@ section('12. the account rows live behind Profile, not on the rail');
      !!doc.querySelector('#s-profile [data-go="navsettings"]'));
   ok('Profile links to the roster',
      !!doc.querySelector('#s-profile [data-go="roster"]'));
-  ok('Profile links to log out',
-     !!doc.querySelector('#s-profile [data-go="login"]'));
-
-  const sw = rail().querySelector('[data-rail="Switch"]');
-  sw.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-  ok('Switch reaches the role picker', active() === 'roles', 'got ' + active());
+  /* Sign out moved onto Profile 2026-08-25 and is wired straight to the real
+     signOut() -- not a data-go link, which used to just repaint the login
+     screen without actually signing anyone out. */
+  ok('Profile has a real sign-out row',
+     !!doc.getElementById('pf-signout'));
 }
 
 section('12b. the sign-in stack is centred on a big screen');

@@ -186,6 +186,64 @@ to undergraduates, same as it is in the app.
 
 ---
 
+## And again on 2026-08-26 — the schedule and the time clock
+
+**Two** new sections this time, and they go up together. **Publish again**, the
+same eight steps.
+
+### The weekly schedules
+
+Undergrads set their standing weekly hours on their own profile, per semester.
+Until now that went nowhere — filling it in changed nothing anybody else could
+see, and Bill's day board knew nothing about it. These are the rules that let
+those hours off the phone.
+
+**Everybody may read them.** Who is on the farm on Thursday is the rota, not
+private information, and the whole point is that the person handing out work
+can see it.
+
+**Everybody writes their own.** Bill may fix anyone's, because he is the one
+who notices the board is wrong while the student is out in a field. A faculty
+member may fix their own lab's, which matches the fact that they can already
+direct those people. Nobody else.
+
+**A schedule is never deleted.** Turning every day off is how somebody says
+"not this term" — there is no reason to remove the record, and removing it
+would quietly drop whatever the shared copy knew.
+
+### The time clock
+
+This one is different from the field log and the shelf, and it is worth knowing
+why. Those two can **never** be edited or deleted: a mistake is corrected by
+writing another record.
+
+A punch cannot work that way. **A punch is opened when somebody clocks in and
+closed hours later when they clock out** — closing it means writing the
+finish time onto the record that already exists. And a wrong time on a
+timesheet has to be fixable by the person who signs it.
+
+So the database allows changes here, narrowly:
+
+- **You clock yourself in and out.** Anybody may open and close their own punch.
+- **Bill may add or correct anyone's times** — the same "add a punch" and time
+  wheel controls his screen has always had.
+- **A punch can never change hands.** An edit cannot move a punch onto a
+  different person's name. That is the one thing spelled out explicitly in the
+  file, because it is the one that would put somebody else's hours on your
+  timesheet.
+- **Only Bill can remove a punch.** Somebody clocking in by mistake at 6am is
+  not a record of work, and leaving it on the timesheet is not honesty — it is
+  a wrong number on a pay slip.
+
+### After you publish
+
+Both drawers have their own switch under **More → Admin → Shared database**,
+and both start **off on every phone**, like the others. Turning the schedule
+one on first is the sensible order: the day board is the thing you will
+actually see change.
+
+---
+
 ## You will do this again
 
 Each drawer we build adds a block to the same file. When it does, I will tell

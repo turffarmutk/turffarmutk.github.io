@@ -431,11 +431,92 @@ service cloud.firestore {
     }
 
     /* ------------------------------------------------------------------
+       SCHEDULES — drawer 5
+
+       One document per person per semester: the standing weekly hours an
+       undergrad sets on their own profile. The day board is drawn from these,
+       which is the whole reason they leave the phone at all.
+
+       Transcribed from schedCanEdit() in the app. The two must never drift.
+       ------------------------------------------------------------------ */
+
+    /* App: schedCanEdit(pid). Your own is yours. Bill may fix anybody's,
+       because he is the one who notices the board is wrong while the student
+       is out in a field. Faculty may fix their own lab's, matching the fact
+       that they may already direct those people. */
+    function canSetSchedule(pid) {
+      return actor()
+        && ( pid == me()
+          || assignsUndergrads(me())
+          || (roleOf(me()) == 'Faculty' && sameLab(me(), pid)) );
+    }
+
+    match /schedules/{schedId} {
+      /* Readable by everybody signed in. Who is on the farm on Thursday is
+         not private information here — it is the rota. */
+      allow read: if actor();
+
+      allow create, update: if canSetSchedule(str(request.resource.data.get('pid','')))
+        && request.resource.data.id == schedId
+        && request.resource.data.pid is string
+        && request.resource.data.sem is string
+        && request.resource.data.days is map;
+
+      /* Turning every day off is how you say "not this term". There is no
+         reason to remove the record, and removing it would silently drop
+         whatever the shared copy knew. */
+      allow delete: if false;
+    }
+
+    /* ------------------------------------------------------------------
+       TIME CLOCK — drawer 6
+
+       One document per punch. NOT append-only, and that is deliberate rather
+       than an oversight: a punch is closed by writing its clock-out time onto
+       the record that was opened hours earlier, and a wrong time on a
+       timesheet has to be correctable by the person who signs it. So updates
+       are allowed, narrowly.
+
+       Transcribed from tcCanPunchFor() and tcCanEditPunches().
+       ------------------------------------------------------------------ */
+
+    function punchRec() { return resource.data; }
+
+    /* App: tcCanPunchFor(pid) — you clock yourself; Bill may clock or correct
+       anybody, which is what the "add a punch" and time-wheel controls on his
+       screen have always done. */
+    function canPunchFor(pid) {
+      return actor() && (pid == me() || assignsUndergrads(me()));
+    }
+
+    match /punches/{punchId} {
+      allow read: if actor();
+
+      allow create: if canPunchFor(str(request.resource.data.get('pid','')))
+        && request.resource.data.id == punchId
+        && request.resource.data.pid is string
+        && request.resource.data.date is string;
+
+      /* Closing your own shift, or Bill correcting a time. The owner may not
+         be changed by an update — that would move somebody else's hours onto
+         your name, which is the one thing worth spelling out here. */
+      allow update: if canPunchFor(str(punchRec().get('pid','')))
+        && str(request.resource.data.get('pid','')) == str(punchRec().get('pid',''))
+        && request.resource.data.id == punchId;
+
+      /* Removing a punch is a payroll correction, so it is Bill's alone. The
+         field log and the stock ledger never delete anything; this one does,
+         because a punch somebody opened by mistake at 6am is not a record of
+         work and leaving it there is not honesty, it is a wrong timesheet. */
+      allow delete: if actor() && assignsUndergrads(me());
+    }
+
+    /* ------------------------------------------------------------------
        EVERYTHING ELSE IS CLOSED.
 
        Calendar and equipment get their own blocks here as each drawer is
-       built. Tasks, the map, crew claims, the field log and inventory
-       already have theirs. Until then the database
+       built. Tasks, the map, crew claims, the field log, inventory, the
+       weekly schedules and the time clock already have theirs. Until then the database
        refuses them, which is what we want: an empty drawer nobody can
        write into beats an open one nobody is watching.
        ------------------------------------------------------------------ */

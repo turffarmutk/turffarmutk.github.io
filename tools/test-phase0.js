@@ -62,7 +62,7 @@ function boot(store) {
   Object.defineProperty(win, 'innerWidth', { value: 390, configurable: true, writable: true });
 
   const scripts = [require('./_geo').geoSource(), ...win.document.querySelectorAll('script:not([src])')].map(s => typeof s === 'string' ? s : s.textContent);
-  const EX = ['TASKS','EVENTS','FIELDLOG','EQMAINT','TEMPLATES','STUDENTS','CREW','WEEKCREW','SHIFT','ROSTER',
+  const EX = ['TASKS','EVENTS','FIELDLOG','EQMAINT','TEMPLATES','STUDENTS','CREW','WEEKCREW','SHIFT','ROSTER','SCHEDULES','FARM_SEMS',
               'dueLabel','fmtDay','fmtTime','fmtDateTime','isoLocal','parseISO','atToday','atOffset','ordOfISO',
               'taskOrd','isFutureTask','newId','flNewId','esc','pidOf','nameOf','isMe','initOf','titleOf',
               'sessionSet','SESSION','rstFind','PEOPLE','renderBoard','renderTasks','eventsOnDate','calSeedDate',
@@ -151,10 +151,17 @@ section('2. a stored person is a roster id');
   ok('nor in requestedBy',
      p.TASKS.every(x => !x.requestedBy || /^p\d+$/.test(x.requestedBy)));
   ok('the crew lists are ids', p.STUDENTS.every(s => /^p\d+$/.test(s)), p.STUDENTS.join(','));
-  ok('the shift tables are keyed by id', Object.keys(p.SHIFT).every(k => /^p\d+$/.test(k)),
-     Object.keys(p.SHIFT).join(','));
-  ok('the weekly boards hold ids',
-     Object.keys(p.WEEKCREW).every(d => p.WEEKCREW[d].every(v => /^p\d+$/.test(v))));
+  /* The three demo shift tables -- SHIFT (invented hours), WEEKCREW (a
+     hand-built weekday roster) and ROSTER (a third, slightly different set of
+     the same invented hours) -- were deleted on 2026-08-26. Who is in on a
+     given day is read from the schedules the undergrads set on their own
+     profile instead. The id rule this section exists to pin still holds:
+     a schedule hangs off a roster id, so it survives a rename. */
+  ok('no demo shift table is left', p.SHIFT === undefined && p.WEEKCREW === undefined && p.ROSTER === undefined,
+     [typeof p.SHIFT, typeof p.WEEKCREW, typeof p.ROSTER].join(','));
+  ok('schedules are keyed by roster id',
+     Array.isArray(p.SCHEDULES) && p.SCHEDULES.every(r => /^p\d+$/.test(r.pid)),
+     (p.SCHEDULES || []).map(r => r.pid).join(','));
 }
 
 section('2b. renaming somebody keeps their work attached');

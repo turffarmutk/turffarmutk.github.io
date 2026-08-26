@@ -717,6 +717,16 @@ select.tn-input{-webkit-appearance:none;appearance:none;text-align-last:right;di
 .ppill.open .ppt{color:#489FDF}
 .ppill.open .dotsm{background:#489FDF}
 .ppill.open.on{background:#489FDF;border-color:#489FDF}
+  /* Scheduled to be here. Green, because "who can I give this to today" is
+     the one thing being scanned for down a row of names. Selection (.on) is
+     still allowed to win over it -- the pill just tapped has to stay
+     unmistakable -- which is what the three-class rules below are for. */
+  .ppill.sched{background:#eaf6ee;border-color:#bfe3cb}
+  .ppill.sched .ppt{color:#2f9e4f;font-weight:800}
+  .ppill.sched .dotsm{background:#2f9e4f}
+  .ppill.sched.on{background:var(--acc);border-color:var(--acc)}
+  .ppill.sched.on .ppn,.ppill.sched.on .ppt{color:#fff}
+  .ppill.sched.on .dotsm{background:#fff}
 .rankpill{width:27px;height:27px;border-radius:50%;background:var(--acc);color:#fff;font:800 12.5px 'Archivo';display:inline-flex;align-items:center;justify-content:center;flex:none}
 .asnote{display:block;width:calc(100% - 24px);box-sizing:border-box;margin:0 12px 12px;margin-top:-2px;border:1px solid #dfe3f0;border-radius:10px;padding:9px 11px;font:600 12.5px 'Public Sans';color:#2f3133;outline:none;background:#f5f9fe}
 .asnote::placeholder{color:#9fb3c9;font-weight:600}
@@ -1783,6 +1793,10 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
 <section class="screen" id="s-mowersettings"><div class="app field">
 <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Mowers</div></div>
 <div style="flex:1;overflow-y:auto" id="mws-body"></div>
+</div></section>
+<section class="screen" id="s-semsettings"><div class="app field">
+<div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Semester dates</div></div>
+<div style="flex:1;overflow-y:auto" id="sms-body"></div>
 </div></section>
 <section class="screen" id="s-labsettings"><div class="app field">
 <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Labs</div></div>
@@ -3499,7 +3513,7 @@ function show(id,push){ const el=document.getElementById('s-'+id); if(!el)return
      SESSION replaces — your role comes from who signed in, so a screen can no
      longer promote you by being opened. The attribute stays as a label, used
      below to pick which home layout to paint. */
-  if(id==='profile')fillProfile(); if(id==='profedit')renderProfEdit(); if(id==='roster')rstRender(); if(id==='rosteredit')rstEditRender(); if(id==='adminxfer')axfRender(); if(id==='spraysettings')sprRender(); if(id==='farmsettings')fstRender(); if(id==='bugreport')bugRender(); if(id==='bugsettings')bgsRender(); if(id==='sharedb')sdbRender(); if(id==='admin')admRender(); if(id==='flfix')flxRender(); if(id==='mowersettings')mwsRender(); if(id==='labsettings')lbsRender(); if(id==='roles')authRenderAccount();
+  if(id==='profile')fillProfile(); if(id==='profedit')renderProfEdit(); if(id==='roster')rstRender(); if(id==='rosteredit')rstEditRender(); if(id==='adminxfer')axfRender(); if(id==='spraysettings')sprRender(); if(id==='farmsettings')fstRender(); if(id==='bugreport')bugRender(); if(id==='bugsettings')bgsRender(); if(id==='sharedb')sdbRender(); if(id==='admin')admRender(); if(id==='flfix')flxRender(); if(id==='mowersettings')mwsRender(); if(id==='labsettings')lbsRender(); if(id==='semsettings')smsRender(); if(id==='roles')authRenderAccount();
   if(id==='login')authRenderLogin(); if(id==='notifications'){setSeen(Date.now());setTimeout(updateBellBadges,0);} if(id==='home-manager')renderHomeNotif(); if(id==='weather')wxEnter(); if(id==='map')mapEnter(); if(id==='taskboard')boardEnter(); if(id==='templates')renderTemplates(); if(id==='assign')assignEnter(); if(id==='plotpick')renderPlotPick(); if(id==='taskwork')renderTaskWork(); if(id==='inventory')invEnter(); if(id==='lowstock')renderLowStock(); if(id==='additem')renderAddItem(); if(id==='invlog')renderInvLog(); if(id==='itemdetail')0; if(id==='equipment')equipEnter(); if(id==='eqreport')renderEqReport(); if(id==='eqmaint')renderEqMaint(); if(id==='eqedit')renderEqEdit(); if(id==='eqsched')renderEqSched(); if(id==='calendar')calEnter(); if(id==='caladd')renderCalAdd(); if(id==='timeclock')tcEnter(); if(id==='tcperson')tcRenderPerson(); if(id==='fieldlog')fieldlogEnter(); if(id==='flexport')renderFlExport(); if(id==='flnew')renderFlNew(); if(id==='fldetail')renderFlDetail(); if(id==='more')moreEnter(); if(id==='trial')trialsEnter(); if(id==='trialdetail')trRenderDetail(); if(id==='trialedit')trRenderEdit(); if(id==='trialres')trRenderRes(); if(id==='trialpin')trRenderPin(); if(id==='navsettings')renderPrefsHub(); if(id==='notifsettings')renderNotifSettings(); if(id==='powersettings')renderPowerSettings(); if(id==='navtabs')renderNavSettings(); if(id==='homescreen')renderHomeSettings(); if(id==='theme')renderTheme(); if(id.indexOf('home-')===0)hwApply(r||currentRole); renderTabs();
   try{updateBellBadges();}catch(e){}
   try{syncBack(el);}catch(e){}
@@ -4221,6 +4235,336 @@ function invsyncSummary(){
   if(!INVSYNC.ready) return 'Connected — waiting for the shared copy';
   var f=Object.keys(INVSYNC.failed).length;
   return INVSYNC.up+' sent · '+INVSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+}
+
+
+/* ============================================================
+   SCHEDULES + TIME CLOCK — drawers 5 and 6
+   ============================================================
+   Two collections, both built on the same pattern as the field log: attach a
+   listener, merge what comes down, push up anything this phone has that the
+   shared copy does not. One switch each on More -> Admin -> Shared database,
+   off on every phone until somebody turns it on.
+
+   WHY THESE TWO ARE WORTH SYNCING AT ALL, said plainly: without them, an
+   undergrad filling in their hours on their own phone changes nothing that
+   anybody else can see, and a punch clocked in the field is a number only
+   that phone knows. Bill's day board and every payroll total read as empty on
+   his device. Neither feature does its job until the records leave the phone
+   that made them.
+   ============================================================ */
+
+/* ---- who may change what --------------------------------------------
+   ONE function each, transcribed into firestore.rules. A drawer means a
+   function, not a rule invented in the rules file. */
+
+/* Your own schedule is yours. Bill may fix anybody's, because he is the one
+   who notices when the board is wrong and the student is out in a field.
+   Faculty may fix their own lab's people, matching how they may already
+   direct them. Nobody else touches it. */
+function schedCanEdit(pid){
+  if(!pid||!SESSION.pid) return false;
+  /* Signed in AND still on the roster, which is the first thing every rule in
+     firestore.rules checks. Somebody switched off keeps their screens until
+     they reload; the database stops taking their writes immediately. */
+  if(typeof personActive==='function'&&!personActive(SESSION.pid)) return false;
+  if(SESSION.pid===pid) return true;
+  if(typeof assignsUndergrads==='function'&&assignsUndergrads(SESSION.pid)) return true;
+  /* The role comes off the ROSTER, never off currentRole. currentRole is a
+     screen state -- it changes when somebody switches user, and the App
+     Manager post used to overwrite it entirely -- while the database reads the
+     roster. Taking it from anywhere but the roster is precisely how the app's
+     copy of the org chart and the database's copy drift apart. */
+  return (typeof personRole==='function'&&personRole(SESSION.pid)==='Faculty'
+       && typeof sameLab==='function'&&sameLab(SESSION.pid,pid));
+}
+/* Clocking yourself in and out is yours. Correcting somebody else's times, or
+   removing a punch, is Bill's -- it is a payroll correction, and the app has
+   only ever offered those controls to him. */
+function tcCanPunchFor(pid){
+  if(!pid||!SESSION.pid) return false;
+  if(typeof personActive==='function'&&!personActive(SESSION.pid)) return false;
+  if(SESSION.pid===pid) return true;
+  return (typeof assignsUndergrads==='function')&&assignsUndergrads(SESSION.pid);
+}
+function tcCanEditPunches(){
+  return !!SESSION.pid&&(typeof assignsUndergrads==='function')&&assignsUndergrads(SESSION.pid);
+}
+
+/* ================= SCHEDULES ================= */
+var SCHSYNC_KEY='ut_schedules_shared_v1';
+var SCHSYNC_COLL='schedules';
+var SCHSYNC_RETRY_MS=10000;
+var SCHSYNC={ on:false, live:false, ready:false, seen:{}, err:null, up:0, down:0, failed:{} };
+var _schsyncNextTry=0;
+
+function schsyncWanted(){ try{ return localStorage.getItem(SCHSYNC_KEY)==='1'; }catch(e){ return false; } }
+function schsyncHydrate(){ SCHSYNC.on=schsyncWanted(); }
+function schsyncSetWanted(on){
+  try{ localStorage.setItem(SCHSYNC_KEY,on?'1':'0'); }catch(e){}
+  SCHSYNC.on=!!on;
+  if(on){ _schsyncNextTry=0; schsyncStart(); } else schsyncStop();
+}
+function schDoc(r){
+  var out; try{ out=JSON.parse(JSON.stringify(r||{})); }catch(e){ return null; }
+  if(!out||!out.id||!out.pid||!out.sem) return null;
+  out.id=String(out.id); out.pid=String(out.pid); out.sem=String(out.sem);
+  if(!out.days||typeof out.days!=='object') return null;
+  return out;
+}
+function schJson(r){ var d=schDoc(r); return d?JSON.stringify(d):null; }
+function schById(id){ for(var i=0;i<SCHEDULES.length;i++) if(SCHEDULES[i]&&String(SCHEDULES[i].id)===String(id)) return SCHEDULES[i]; return null; }
+
+function schsyncStart(){
+  if(SCHSYNC.live) return true;
+  if(Date.now()<_schsyncNextTry) return false;
+  var db=fbDb();
+  if(!db||!SESSION.pid){
+    SCHSYNC.err=db?'Nobody is signed in yet':'The database code did not load on this device';
+    _schsyncNextTry=Date.now()+SCHSYNC_RETRY_MS; return false;
+  }
+  try{
+    SCHSYNC.unsub=db.collection(SCHSYNC_COLL).onSnapshot(schsyncOnSnapshot,function(e){
+      SCHSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+      SCHSYNC.live=false; SCHSYNC.ready=false; _schsyncNextTry=Date.now()+SCHSYNC_RETRY_MS;
+    });
+    SCHSYNC.live=true; SCHSYNC.err=null; return true;
+  }catch(e){
+    SCHSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+    _schsyncNextTry=Date.now()+SCHSYNC_RETRY_MS; return false;
+  }
+}
+function schsyncStop(){
+  try{ if(SCHSYNC.unsub) SCHSYNC.unsub(); }catch(e){}
+  SCHSYNC.unsub=null; SCHSYNC.live=false; SCHSYNC.ready=false;
+  SCHSYNC.seen={}; SCHSYNC.failed={};
+}
+function schsyncOnSnapshot(snap){
+  var changes; try{ changes=snap.docChanges(); }catch(e){ return; }
+  var touched=false;
+  changes.forEach(function(ch){
+    if(ch.type==='removed'){
+      delete SCHSYNC.seen[String(ch.doc.id)];
+      var had=schById(ch.doc.id);
+      if(had){ var k=SCHEDULES.indexOf(had); if(k>=0){ SCHEDULES.splice(k,1); touched=true; } }
+      return;
+    }
+    var data; try{ data=ch.doc.data(); }catch(e){ return; }
+    if(!data) return;
+    data.id=String(ch.doc.id);
+    SCHSYNC.seen[data.id]=JSON.stringify(data);
+    delete SCHSYNC.failed[data.id];
+    SCHSYNC.down++;
+    var have=schById(data.id);
+    if(have){
+      if(JSON.stringify(schDoc(have))!==JSON.stringify(data)){
+        Object.keys(have).forEach(function(k){ if(!(k in data)) delete have[k]; });
+        Object.keys(data).forEach(function(k){ have[k]=data[k]; });
+        touched=true;
+      }
+      return;
+    }
+    SCHEDULES.push(data); touched=true;
+  });
+  var fromCache=true;
+  try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
+  if(!SCHSYNC.ready&&!fromCache){ SCHSYNC.ready=true; schsyncUploadNew(); }
+  if(touched){
+    try{ storeTouch(); }catch(e){}
+    /* Somebody else's hours changing is exactly the thing the day board is
+       for, so repaint whatever is open rather than waiting for a navigation. */
+    try{ if(typeof renderAssignPeople==='function') renderAssignPeople(); }catch(e){}
+    try{ if(typeof renderTasks==='function') renderTasks(); }catch(e){}
+    try{ if(typeof renderProfileSchedule==='function') renderProfileSchedule(); }catch(e){}
+    try{ schsyncRepaint(); }catch(e){}
+  }
+}
+function schsyncUploadNew(){
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  SCHEDULES.slice().forEach(function(r){
+    if(!r||!r.id) return;
+    var id=String(r.id);
+    if(SCHSYNC.seen[id]!==undefined) return;
+    if(!schCanPush(r)) return;
+    var doc=schDoc(r); if(!doc) return;
+    SCHSYNC.seen[id]=JSON.stringify(doc);
+    n++; SCHSYNC.up++;
+    try{ db.collection(SCHSYNC_COLL).doc(id).set(doc).catch(function(e){ schsyncFail(id,e); }); }
+    catch(e){ schsyncFail(id,e); }
+  });
+  if(n){ try{ toast(n+' schedule'+(n===1?'':'s')+' from this phone sent up'); }catch(e){} }
+  return n;
+}
+/* Never offer the database a write it is going to refuse. A phone holding
+   somebody else's schedule (it came down from the shared copy) must not try to
+   push it back up, or every tick logs a refusal nobody caused. */
+function schCanPush(r){ return !!r&&schedCanEdit(String(r.pid||'')); }
+function schsyncFail(id,e){
+  SCHSYNC.failed[id]=(typeof sdbError==='function')?sdbError(e):String((e&&e.message)||e);
+}
+function schPush(){
+  if(!SCHSYNC.on||!SCHSYNC.live||!SCHSYNC.ready) return 0;
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  SCHEDULES.forEach(function(r){
+    if(!r||!r.id||!schCanPush(r)) return;
+    var id=String(r.id), json=schJson(r);
+    if(json===null||SCHSYNC.seen[id]===json) return;
+    SCHSYNC.seen[id]=json; n++; SCHSYNC.up++;
+    try{ db.collection(SCHSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ schsyncFail(id,e); }); }
+    catch(e){ schsyncFail(id,e); }
+  });
+  return n;
+}
+function schsyncTick(){
+  if(!SCHSYNC.on) return;
+  if(!SCHSYNC.live){ schsyncStart(); return; }
+  schPush();
+}
+function schsyncRepaint(){
+  try{
+    var d=document.getElementById('s-sharedb');
+    if(d&&d.classList.contains('active')&&typeof sdbRender==='function') sdbRender();
+  }catch(e){}
+}
+function schsyncSummary(){
+  if(!SCHSYNC.on) return 'Off — hours set on this phone stay on it';
+  if(SCHSYNC.err) return SCHSYNC.err;
+  if(!SCHSYNC.live) return 'Connecting…';
+  if(!SCHSYNC.ready) return 'Connected — waiting for the shared copy';
+  var f=Object.keys(SCHSYNC.failed).length;
+  return SCHSYNC.up+' sent · '+SCHSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+}
+
+/* ================= TIME CLOCK ================= */
+/* The punches live inside the Time Clock's own closure, so this module talks
+   to them through the three doors it opens: tcPunchDocs(), tcApplyRemote()
+   and tcDropRemote(). Reaching in any other way would mean a second copy of
+   the punch list, and two copies of a payroll record is how hours go missing. */
+var TCSYNC_KEY='ut_timeclock_shared_v1';
+var TCSYNC_COLL='punches';
+var TCSYNC_RETRY_MS=10000;
+var TCSYNC={ on:false, live:false, ready:false, seen:{}, err:null, up:0, down:0, failed:{} };
+var _tcsyncNextTry=0;
+
+function tcsyncWanted(){ try{ return localStorage.getItem(TCSYNC_KEY)==='1'; }catch(e){ return false; } }
+function tcsyncHydrate(){ TCSYNC.on=tcsyncWanted(); }
+function tcsyncSetWanted(on){
+  try{ localStorage.setItem(TCSYNC_KEY,on?'1':'0'); }catch(e){}
+  TCSYNC.on=!!on;
+  if(on){ _tcsyncNextTry=0; tcsyncStart(); } else tcsyncStop();
+}
+function tcDoc(p){
+  var out; try{ out=JSON.parse(JSON.stringify(p||{})); }catch(e){ return null; }
+  if(!out||!out.id||!out.pid||!out.date) return null;
+  out.id=String(out.id); out.pid=String(out.pid); out.date=String(out.date);
+  if(out.out===undefined) out.out=null;
+  return out;
+}
+function tcJson(p){ var d=tcDoc(p); return d?JSON.stringify(d):null; }
+function tcAllDocs(){
+  try{ return (typeof window.tcPunchDocs==='function')?(window.tcPunchDocs()||[]):[]; }catch(e){ return []; }
+}
+function tcCanPush(p){ return !!p&&tcCanPunchFor(String(p.pid||'')); }
+
+function tcsyncStart(){
+  if(TCSYNC.live) return true;
+  if(Date.now()<_tcsyncNextTry) return false;
+  var db=fbDb();
+  if(!db||!SESSION.pid){
+    TCSYNC.err=db?'Nobody is signed in yet':'The database code did not load on this device';
+    _tcsyncNextTry=Date.now()+TCSYNC_RETRY_MS; return false;
+  }
+  try{
+    TCSYNC.unsub=db.collection(TCSYNC_COLL).onSnapshot(tcsyncOnSnapshot,function(e){
+      TCSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+      TCSYNC.live=false; TCSYNC.ready=false; _tcsyncNextTry=Date.now()+TCSYNC_RETRY_MS;
+    });
+    TCSYNC.live=true; TCSYNC.err=null; return true;
+  }catch(e){
+    TCSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+    _tcsyncNextTry=Date.now()+TCSYNC_RETRY_MS; return false;
+  }
+}
+function tcsyncStop(){
+  try{ if(TCSYNC.unsub) TCSYNC.unsub(); }catch(e){}
+  TCSYNC.unsub=null; TCSYNC.live=false; TCSYNC.ready=false;
+  TCSYNC.seen={}; TCSYNC.failed={};
+}
+function tcsyncOnSnapshot(snap){
+  var changes; try{ changes=snap.docChanges(); }catch(e){ return; }
+  var add=[], drop=[];
+  changes.forEach(function(ch){
+    if(ch.type==='removed'){ delete TCSYNC.seen[String(ch.doc.id)]; drop.push(String(ch.doc.id)); return; }
+    var data; try{ data=ch.doc.data(); }catch(e){ return; }
+    if(!data||!data.pid||!data.date) return;
+    data.id=String(ch.doc.id);
+    TCSYNC.seen[data.id]=JSON.stringify(data);
+    delete TCSYNC.failed[data.id];
+    TCSYNC.down++;
+    add.push(data);
+  });
+  var touched=false;
+  if(drop.length){ try{ touched=!!window.tcDropRemote(drop)||touched; }catch(e){} }
+  if(add.length){ try{ touched=!!window.tcApplyRemote(add)||touched; }catch(e){} }
+  var fromCache=true;
+  try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
+  if(!TCSYNC.ready&&!fromCache){ TCSYNC.ready=true; tcsyncUploadNew(); }
+  if(touched){ try{ tcsyncRepaint(); }catch(e){} }
+}
+function tcsyncUploadNew(){
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  tcAllDocs().forEach(function(p){
+    if(!p||!p.id) return;
+    var id=String(p.id);
+    if(TCSYNC.seen[id]!==undefined) return;
+    if(!tcCanPush(p)) return;
+    var doc=tcDoc(p); if(!doc) return;
+    TCSYNC.seen[id]=JSON.stringify(doc);
+    n++; TCSYNC.up++;
+    try{ db.collection(TCSYNC_COLL).doc(id).set(doc).catch(function(e){ tcsyncFail(id,e); }); }
+    catch(e){ tcsyncFail(id,e); }
+  });
+  if(n){ try{ toast(n+' punch'+(n===1?'':'es')+' from this phone sent up'); }catch(e){} }
+  return n;
+}
+function tcsyncFail(id,e){
+  TCSYNC.failed[id]=(typeof sdbError==='function')?sdbError(e):String((e&&e.message)||e);
+}
+function tcPush(){
+  if(!TCSYNC.on||!TCSYNC.live||!TCSYNC.ready) return 0;
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  tcAllDocs().forEach(function(p){
+    if(!p||!p.id||!tcCanPush(p)) return;
+    var id=String(p.id), json=tcJson(p);
+    if(json===null||TCSYNC.seen[id]===json) return;
+    TCSYNC.seen[id]=json; n++; TCSYNC.up++;
+    try{ db.collection(TCSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ tcsyncFail(id,e); }); }
+    catch(e){ tcsyncFail(id,e); }
+  });
+  return n;
+}
+function tcsyncTick(){
+  if(!TCSYNC.on) return;
+  if(!TCSYNC.live){ tcsyncStart(); return; }
+  tcPush();
+}
+function tcsyncRepaint(){
+  try{
+    var d=document.getElementById('s-sharedb');
+    if(d&&d.classList.contains('active')&&typeof sdbRender==='function') sdbRender();
+  }catch(e){}
+}
+function tcsyncSummary(){
+  if(!TCSYNC.on) return 'Off — this phone keeps its own hours';
+  if(TCSYNC.err) return TCSYNC.err;
+  if(!TCSYNC.live) return 'Connecting…';
+  if(!TCSYNC.ready) return 'Connected — waiting for the shared copy';
+  var f=Object.keys(TCSYNC.failed).length;
+  return TCSYNC.up+' sent · '+TCSYNC.down+' received'+(f?(' · '+f+' refused'):'');
 }
 
 /* ---- the correction sheet ----
@@ -5512,14 +5856,6 @@ function rstSync(){
   if(typeof CREW!=='undefined'){var c=rstCrewList();CREW.length=0;c.forEach(function(x){CREW.push(x);});}
   if(typeof ROLE_LAB!=='undefined'){Object.keys(ROLE_LAB).forEach(function(k){if(USERS[k]&&USERS[k].lab)ROLE_LAB[k]=USERS[k].lab;});}
   /* someone off the roster can't still be on next week's day board */
-  if(typeof WEEKCREW!=='undefined'&&typeof STUDENTS!=='undefined'){
-    var live=STUDENTS.slice(),touched=false;
-    Object.keys(WEEKCREW).forEach(function(d){
-      var keep=(WEEKCREW[d]||[]).filter(function(n){return live.indexOf(n)>=0;});
-      if(keep.length!==(WEEKCREW[d]||[]).length){WEEKCREW[d]=keep;touched=true;}
-    });
-    if(touched&&typeof saveWeekCrew==='function')saveWeekCrew();
-  }
   rstSave();
 }
 /* ---- who is allowed to change what ----
@@ -5827,46 +6163,197 @@ document.getElementById('axf-save').addEventListener('click',function(){
 });
 
 
-/* ---- undergrad weekly schedule ---- */
-const SCHED_SEMS=['Fall 2026','Spring 2027','Summer 2027'];
-const SCHED_DAYS=['Mon','Tue','Wed','Thu','Fri'];
-const SCHED_DAYFULL={Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday'};
-let schedSem=SCHED_SEMS[0];
-function schedKey(sem){return 'ut_sched_'+currentRole+'_'+sem;}
-function schedDefault(){var d={};SCHED_DAYS.forEach(function(k){d[k]={on:false,start:'08:00',end:'12:00'};});return d;}
-function loadSched(sem){try{var raw=localStorage.getItem(schedKey(sem));if(raw){var p=JSON.parse(raw);var d=schedDefault();SCHED_DAYS.forEach(function(k){if(p[k])d[k]=p[k];});return d;}}catch(e){}return schedDefault();}
-function saveSched(sem,data){try{localStorage.setItem(schedKey(sem),JSON.stringify(data));}catch(e){}}
-function schedToMin(t){var p=(t||'').split(':');return (+p[0])*60+(+p[1]);}
-function schedFmt(t){if(!t)return '';var p=t.split(':'),h=+p[0],m=p[1];var ap=h<12?'a':'p';var hh=h%12;if(hh===0)hh=12;return hh+':'+m+ap;}
-function schedTotals(data){var mins=0,days=0;SCHED_DAYS.forEach(function(k){var d=data[k];if(d&&d.on){var s=schedToMin(d.start),e=schedToMin(d.end);if(e>s){mins+=e-s;days++;}}});return {hrs:Math.round(mins/6)/10,days:days};}
-function renderProfileSchedule(){var w=document.getElementById('pf-sched-wrap');if(!w)return;if(currentRole!=='undergrad'){w.style.display='none';w.innerHTML='';return;}w.style.display='block';renderSchedule();}
+/* ---- semesters ----------------------------------------------------
+   The farm's own list, edited on More -> Farm settings. It used to be three
+   hardcoded strings ('Fall 2026' / 'Spring 2027' / 'Summer 2027') with no
+   dates attached: stale within a year, and unfixable by anybody who cannot
+   edit the code. The DATES are the part that earns its keep -- they are what
+   lets the app answer "which term is today in", and therefore "who is coming
+   in on Thursday". Registered in STORE_DEFS, so it backs up and restores. */
+var SEM_MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var SEM_ISO=/^\d{4}-\d{2}-\d{2}$/;
+var FARM_SEMS=[
+ {id:'sem-f26', name:'Fall 2026',   start:'2026-08-19', end:'2026-12-11'},
+ {id:'sem-s27', name:'Spring 2027', start:'2027-01-13', end:'2027-05-07'},
+ {id:'sem-u27', name:'Summer 2027', start:'2027-05-17', end:'2027-08-07'}
+];
+function semOrd(v){ if(typeof v!=='string'||!SEM_ISO.test(v)) return 0; var p=v.split('-'); return (+p[0])*10000+(+p[1])*100+(+p[2]); }
+function semDateOrd(d){ d=d||new Date(); return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate(); }
+function semValid(x){ return !!(x&&typeof x==='object'&&typeof x.name==='string'&&x.name.trim()&&semOrd(x.start)&&semOrd(x.end)&&semOrd(x.end)>=semOrd(x.start)); }
+function semSorted(){ return FARM_SEMS.filter(semValid).sort(function(a,b){ return semOrd(a.start)-semOrd(b.start); }); }
+function semNames(){ return semSorted().map(function(s){ return s.name; }); }
+function semFind(n){ for(var i=0;i<FARM_SEMS.length;i++) if(FARM_SEMS[i]&&FARM_SEMS[i].name===n) return FARM_SEMS[i]; return null; }
+function semDateLabel(v){ if(!semOrd(v)) return '--'; var p=v.split('-'); return SEM_MON[(+p[1])-1]+' '+(+p[2])+', '+p[0]; }
+/* Which term a date falls inside, or nothing. Between terms the honest answer
+   is that nobody is scheduled -- carrying last term's hours through the winter
+   break would put names on Bill's board for days the farm is shut. */
+function semForDate(d){
+  var o=semDateOrd(d||new Date()), list=semSorted();
+  for(var i=0;i<list.length;i++) if(o>=semOrd(list[i].start)&&o<=semOrd(list[i].end)) return list[i];
+  return null;
+}
+/* What the profile dropdown opens on: the term we are in, else the next one to
+   start, else the last on the list. Never nothing, so the screen always draws. */
+function semCurrent(){
+  var now=semForDate(new Date()); if(now) return now;
+  var o=semDateOrd(new Date()), list=semSorted();
+  for(var i=0;i<list.length;i++) if(semOrd(list[i].start)>o) return list[i];
+  return list.length?list[list.length-1]:null;
+}
+function semCurrentName(){ var s=semCurrent(); return s?s.name:''; }
+
+/* ---- weekly schedules ---------------------------------------------
+   What each undergrad says their standing hours are: one record per person per
+   term. This used to be a single localStorage key named after the ROLE --
+   'ut_sched_undergrad_Fall 2026' -- so every undergrad who touched the same
+   phone overwrote the others, which is the mistake the per-person prefs rule
+   was written to stop. And nothing outside the profile screen ever read it, so
+   filling it in achieved nothing.
+
+   It is keyed on the roster id now, and it is a real store: it backs up,
+   restores and syncs like every other drawer, and Bill's day board is built
+   from it. */
+var SCHED_DAYS=['Mon','Tue','Wed','Thu','Fri'];
+var SCHED_DAYFULL={Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday'};
+var SCHED_BYDOW={1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri'};
+var SCHEDULES=[];
+var schedSem=null;   /* set on first render, once the semester list has loaded */
+
+function schedDefault(){ var d={}; SCHED_DAYS.forEach(function(k){ d[k]={on:false,start:'08:00',end:'12:00'}; }); return d; }
+function schedToMin(t){ var p=(t||'').split(':'); var h=+p[0],m=+p[1]; return (isFinite(h)?h:0)*60+(isFinite(m)?m:0); }
+function schedFmt(t){ if(!t) return ''; var p=t.split(':'),h=+p[0],m=p[1]; var ap=h<12?'a':'p'; var hh=h%12; if(hh===0)hh=12; return hh+':'+m+ap; }
+/* One id per person per term, built from both, so saving twice updates the
+   same record instead of laying down a second one. */
+function schedRecId(pid,sem){ return 'sch-'+String(pid)+'-'+String(sem||'').toLowerCase().replace(/[^a-z0-9]+/g,'-'); }
+function schedRec(pid,sem){ var id=schedRecId(pid,sem); for(var i=0;i<SCHEDULES.length;i++) if(SCHEDULES[i]&&SCHEDULES[i].id===id) return SCHEDULES[i]; return null; }
+/* Always a full five-day object, whatever is stored -- a record written before
+   a day existed, or half-arrived from the database, still draws. */
+function schedDaysOf(pid,sem){
+  var r=schedRec(pid,sem), out=schedDefault();
+  if(r&&r.days&&typeof r.days==='object'){
+    SCHED_DAYS.forEach(function(k){
+      var d=r.days[k];
+      if(d&&typeof d==='object') out[k]={on:!!d.on,start:d.start||'08:00',end:d.end||'12:00'};
+    });
+  }
+  return out;
+}
+function schedSave(pid,sem,days){
+  if(!pid||!sem) return null;
+  var r=schedRec(pid,sem);
+  if(!r){ r={id:schedRecId(pid,sem),pid:String(pid),sem:String(sem)}; SCHEDULES.push(r); }
+  r.days=days; r.updatedAt=isoLocal(new Date(),true); r.updatedBy=SESSION.pid||null;
+  try{ storeTouch(); }catch(e){}
+  return r;
+}
+function schedTotals(data){
+  var mins=0,days=0;
+  SCHED_DAYS.forEach(function(k){ var d=data[k]; if(d&&d.on){ var a=schedToMin(d.start),b=schedToMin(d.end); if(b>a){ mins+=b-a; days++; } } });
+  return {hrs:Math.round(mins/6)/10,days:days};
+}
+
+/* THE question every other screen asks: is this person down to be here on this
+   date, and between what times. ONE function, so the day board, the task
+   board, the assign picker and the time clock can never disagree about who is
+   in. Returns null for a weekend, a day they marked off, a term they have not
+   filled in, and any date that falls between terms. */
+function schedShiftOn(pid,d){
+  if(!pid||!d) return null;
+  var k=SCHED_BYDOW[d.getDay()]; if(!k) return null;
+  var sem=semForDate(d); if(!sem) return null;
+  var day=schedDaysOf(pid,sem.name)[k];
+  if(!day||!day.on) return null;
+  if(schedToMin(day.end)<=schedToMin(day.start)) return null;
+  return {start:day.start,end:day.end,sem:sem.name};
+}
+function schedShiftLabel(pid,d){ var s=schedShiftOn(pid,d); return s?(schedFmt(s.start)+'–'+schedFmt(s.end)):''; }
+function schedHrsOn(pid,d){ var s=schedShiftOn(pid,d); return s?Math.round((schedToMin(s.end)-schedToMin(s.start))/6)/10:0; }
+/* Everyone down for a date, roster order kept. */
+function schedCrewOn(d){
+  var out=[];
+  try{ rstUndergradIds().forEach(function(p){ if(schedShiftOn(p,d)) out.push(p); }); }catch(e){}
+  return out;
+}
+/* Has this person filled ANYTHING in for the term covering this date? Lets a
+   screen say "has not set their hours yet" rather than "off today" -- very
+   different things to whoever is handing out the work. */
+function schedHasAny(pid,d){
+  var sem=semForDate(d||new Date()); if(!sem) return false;
+  var days=schedDaysOf(pid,sem.name);
+  for(var i=0;i<SCHED_DAYS.length;i++) if(days[SCHED_DAYS[i]].on) return true;
+  return false;
+}
+
+/* ---- the profile screen ---- */
+function renderProfileSchedule(){
+  var w=document.getElementById('pf-sched-wrap'); if(!w) return;
+  if(currentRole!=='undergrad'){ w.style.display='none'; w.innerHTML=''; return; }
+  w.style.display='block';
+  if(!schedSem||!semFind(schedSem)) schedSem=semCurrentName();
+  renderSchedule();
+}
 function renderSchedule(){
-  var w=document.getElementById('pf-sched-wrap');if(!w)return;
-  var data=loadSched(schedSem);
-  var sems=SCHED_SEMS.map(function(x){return '<option'+(x===schedSem?' selected':'')+'>'+x+'</option>';}).join('');
+  var w=document.getElementById('pf-sched-wrap'); if(!w) return;
+  var names=semNames();
+  if(!names.length){
+    w.innerHTML='<div class="sec" style="margin:18px 16px 7px">My weekly schedule</div>'
+      +'<div class="sched-note">No semester dates have been set up yet, so there is nothing to fill in against. '
+      +'Whoever looks after the app can add them on More &rarr; Farm settings &rarr; Semester dates.</div>';
+    return;
+  }
+  if(!schedSem||names.indexOf(schedSem)<0) schedSem=semCurrentName()||names[0];
+  var pid=SESSION.pid;
+  var data=schedDaysOf(pid,schedSem);
+  var sems=names.map(function(x){ return '<option'+(x===schedSem?' selected':'')+'>'+esc(x)+'</option>'; }).join('');
   var rows=SCHED_DAYS.map(function(k){
     var d=data[k];
-    var times=d.on?('<div class="sched-times"><input type="time" class="sched-in" data-day="'+k+'" data-f="start" value="'+d.start+'"><span class="sched-dash">–</span><input type="time" class="sched-in" data-day="'+k+'" data-f="end" value="'+d.end+'"></div>'):'';
+    var times=d.on?('<div class="sched-times"><input type="time" class="sched-in" data-day="'+k+'" data-f="start" value="'+d.start+'"><span class="sched-dash">-</span><input type="time" class="sched-in" data-day="'+k+'" data-f="end" value="'+d.end+'"></div>'):'';
     return '<div class="sched-day"><div class="sched-dhead"><span class="sched-dname">'+SCHED_DAYFULL[k]+'</span><span class="sched-status">'+(d.on?'':'Unavailable')+'</span><span class="tgl sched-tgl'+(d.on?' on':'')+'" data-day="'+k+'"></span></div>'+times+'</div>';
   }).join('');
   var t=schedTotals(data);
+  var sem=semFind(schedSem);
+  var when=sem?(semDateLabel(sem.start)+' - '+semDateLabel(sem.end)):'';
+  /* The old screen carried a "Save schedule" button that did nothing but raise
+     a toast -- every change was already written the moment it was made. Saying
+     so plainly beats a button pretending to be the thing that saves. */
   w.innerHTML=
-    '<div class="sec" style="margin:18px 16px 7px">My weekly schedule</div>'
-    +'<div class="list"><div class="fld"><span class="fl">Semester</span><select id="sched-sem" class="sched-sel">'+sems+'</select></div></div>'
+     '<div class="sec" style="margin:18px 16px 7px">My weekly schedule</div>'
+    +'<div class="list"><div class="fld"><span class="fl">Semester</span><select id="sched-sem" class="sched-sel">'+sems+'</select></div>'
+    +(when?'<div class="fld" style="border-bottom:none"><span class="fl">Term runs</span><span class="fv">'+esc(when)+'</span></div>':'')+'</div>'
     +'<div class="list" style="margin-top:8px">'+rows+'</div>'
-    +'<div class="sched-sum"><span>'+t.hrs+' hrs/week</span><span class="sub">· '+t.days+' day'+(t.days===1?'':'s')+'</span></div>'
-    +'<div class="actionbar" style="margin-top:4px"><div class="action" id="sched-save">Save schedule</div></div>'
-    +'<div class="sched-note">Your standard weekly hours for '+schedSem+'. Saved automatically — tap a day to turn it on or off, then set your times.</div>';
+    +'<div class="sched-sum"><span>'+t.hrs+' hrs/week</span><span class="sub">&middot; '+t.days+' day'+(t.days===1?'':'s')+'</span></div>'
+    +'<div class="sched-note">Your standard weekly hours for '+esc(schedSem)+'. Tap a day to turn it on or off, then set your times. '
+    +'Every change saves as you make it &mdash; there is nothing to press. Bill sees these hours on his day board when he hands out work, '
+    +'so keep them up to date if your classes change.</div>';
   attachSchedule();
 }
 function attachSchedule(){
-  var w=document.getElementById('pf-sched-wrap');if(!w)return;
+  var w=document.getElementById('pf-sched-wrap'); if(!w) return;
+  var pid=SESSION.pid;
   var sel=w.querySelector('#sched-sem');
-  if(sel)sel.addEventListener('change',function(){schedSem=this.value;renderSchedule();});
-  w.querySelectorAll('.sched-tgl').forEach(function(tg){tg.addEventListener('click',function(e){e.stopPropagation();var k=this.getAttribute('data-day');var data=loadSched(schedSem);data[k].on=!data[k].on;saveSched(schedSem,data);renderSchedule();});});
-  w.querySelectorAll('.sched-in').forEach(function(inp){inp.addEventListener('change',function(){var k=this.getAttribute('data-day'),fld=this.getAttribute('data-f');var data=loadSched(schedSem);var v=this.value;data[k][fld]=v;if(fld==='start'&&schedToMin(data[k].end)<=schedToMin(v)){var nm=schedToMin(v)+60;var hh=('0'+Math.floor(nm/60)%24).slice(-2),mm=('0'+nm%60).slice(-2);data[k].end=hh+':'+mm;}saveSched(schedSem,data);renderSchedule();});});
-  var sv=w.querySelector('#sched-save');
-  if(sv)sv.addEventListener('click',function(e){e.stopPropagation();toast('Schedule saved ✓');});
+  if(sel) sel.addEventListener('change',function(){ schedSem=this.value; renderSchedule(); });
+  w.querySelectorAll('.sched-tgl').forEach(function(tg){
+    tg.addEventListener('click',function(e){
+      e.stopPropagation();
+      var k=this.getAttribute('data-day'), data=schedDaysOf(pid,schedSem);
+      data[k].on=!data[k].on;
+      schedSave(pid,schedSem,data); renderSchedule();
+    });
+  });
+  w.querySelectorAll('.sched-in').forEach(function(inp){
+    inp.addEventListener('change',function(){
+      var k=this.getAttribute('data-day'), fld=this.getAttribute('data-f'), v=this.value;
+      var data=schedDaysOf(pid,schedSem);
+      data[k][fld]=v;
+      /* An end time that is not after the start is not a shift. Nudge it out an
+         hour rather than storing something every reader has to guard against. */
+      if(fld==='start'&&schedToMin(data[k].end)<=schedToMin(v)){
+        var nm=schedToMin(v)+60, hh=('0'+(Math.floor(nm/60)%24)).slice(-2), mm=('0'+(nm%60)).slice(-2);
+        data[k].end=hh+':'+mm;
+      }
+      schedSave(pid,schedSem,data); renderSchedule();
+    });
+  });
 }
 /* The avatar used to be found by sniffing its inline style for border-radius.
    The home banner's avatar now carries .hh-av and gets its shape from CSS, so
@@ -6194,11 +6681,21 @@ function renderTasks(){
    var people=STUDENTS.slice();
    if(currentRole==='faculty'){ labMembers().map(function(m){return m.name;}).reverse().forEach(function(n){if(people.indexOf(n)<0)people.unshift(n);}); }
    if(currentRole==='manager'&&SESSION.pid&&people.indexOf(SESSION.pid)<0){ people.unshift(SESSION.pid); }
-   html+='<div class="sec" style="color:#2f3133">'+WEEKDAYS[boardDay]+' · '+asDateLabel(boardDayOrd())+'</div>';
+   var bDate=asDateFromOrd(boardDayOrd());
+   var bIn=schedCrewOn(bDate).length;
+   html+='<div class="sec" style="color:#2f3133">'+WEEKDAYS[boardDay]+' · '+asDateLabel(boardDayOrd())
+        +(bIn?(' <span style="color:#2f9e4f">· '+bIn+' in</span>'):'')+'</div>';
    people.forEach(function(s){
      var mine=TASKS.filter(function(t){return taskIsFor(t,s)&&t.status==='todo'&&t.kind==='task'&&taskOnDay(t);});
      var slabel=(isMe(s)?nameOf(s)+' (you)':nameOf(s));
-     html+='<div class="sec">'+slabel+' · '+mine.length+(mine.length===1?' task':' tasks')+'</div>';
+     /* The hours they told us they would be here, under their name. Green
+        means in; no line under the name means they are not down for this day.
+        Same schedShiftOn() the assign screen reads, so the two boards cannot
+        tell Bill different things about the same person on the same day. */
+     var bsh=schedShiftOn(s,bDate);
+     html+='<div class="sec"'+(bsh?' style="color:#2f9e4f"':'')+'>'+esc(slabel)+' · '+mine.length+(mine.length===1?' task':' tasks')
+          +(bsh?('<div style="font:800 10px \'Public Sans\';color:#2f9e4f;letter-spacing:.3px;margin-top:2px;text-transform:none">In '+esc(schedFmt(bsh.start))+'–'+esc(schedFmt(bsh.end))+'</div>'):'')
+          +'</div>';
      /* Bill's own section is his work, not his paperwork. Everyone else's rows
         keep the manager controls — rank arrows and a bin — because that is him
         directing other people. On his own tasks those controls are meaningless
@@ -9499,7 +9996,6 @@ function renderTemplates(){
 document.getElementById('tpl-list').addEventListener('click',function(e){var r=e.target.closest('[data-tpl]');if(!r)return;var t=TEMPLATES.find(function(x){return x.id===r.getAttribute('data-tpl');});if(t)openForm(t);});
 document.getElementById('tpl-search').addEventListener('input',renderTemplates);
 const FULLMONTH={Jan:'January',Feb:'February',Mar:'March',Apr:'April',May:'May',Jun:'June',Jul:'July',Aug:'August',Sep:'September',Oct:'October',Nov:'November',Dec:'December'};
-const ROSTER={p18:'7a–3p',p20:'6a–2p',p21:'12p–6p',p22:null};
 function curMonth(){return MONTHS[new Date().getMonth()];}
 const OPEN='__OPEN__';
 const SELF='__SELF__';
@@ -9519,46 +10015,79 @@ function asDateOptions(selOrd){var t=asToday0();var arr=[];for(var i=0;i<15;i++)
 function evSprayOrd(e){return evOrd(e)||asTodayOrd();}
 function isFutureTask(t){var o=taskOrd(t); return !!o&&o>asTodayOrd();}
 function areaWithDue(t){return (t.area||'')+(isFutureTask(t)?' · 📅 '+dueLabel(t):'');}
-/* ---- weekly crew boards (who works each weekday) ---- */
-/* Shift hours by roster id. p18 Garrett, p20 Taryn, p21 Jed, p22 Caroline. */
-var SHIFT={p18:'7:00a–3:30p',p20:'8:00a–12:00p',p21:'1:00p–5:00p',p22:'9:00a–1:00p'};
-function shiftHours(x){return SHIFT[pidOf(x)]||'Scheduled';}
-var WEEKCREW={'0':[],'1':['p18','p20','p21','p22'],'2':['p18'],'3':['p18','p20'],'4':['p18','p21','p22'],'5':['p18','p20'],'6':[]};
-try{var _wc=localStorage.getItem('ut_weekcrew');if(_wc){WEEKCREW=JSON.parse(_wc);}}catch(e){}
-function saveWeekCrew(){try{localStorage.setItem('ut_weekcrew',JSON.stringify(WEEKCREW));}catch(e){}}
+/* ---- who is in, on any given day ----------------------------------
+   This used to be three tables of made-up demo data: WEEKCREW (a hand-built
+   Mon-Fri roster), SHIFT (invented hours per person) and ROSTER (a third,
+   slightly different set of the same invented hours). Bill also had an
+   "Edit crew" button that let him type the day board in by hand, which meant
+   the app held an opinion about who was working that nobody had told it.
+
+   All of it is gone. The undergrads say when they are coming in, on their own
+   profile, and every screen that needs to know reads schedShiftOn(). One
+   answer, given by the people who actually know it. */
 var asDay=new Date().getDay();
-var asEditCrew=false;
-function dayCrew(d){return WEEKCREW[''+d]||(WEEKCREW[''+d]=[]);}
-function toggleDayCrew(d,name){var arr=dayCrew(d);var i=arr.indexOf(name);if(i>=0)arr.splice(i,1);else arr.push(name);saveWeekCrew();}
 function asDayOrd(){var t=asToday0();for(var i=0;i<7;i++){var d=new Date(t);d.setDate(d.getDate()+i);if(d.getDay()===asDay)return asOrd(d);}return asTodayOrd();}
-function dayPill(s,on){return '<span class="ppill'+(on?' on':'')+'" data-person="'+esc(s)+'"><span class="ppn"><span class="dotsm"></span>'+esc(nameOf(s))+'</span><span class="ppt">Working</span></span>';}
+/* The date the day chips are pointing at -- the next occurrence of that
+   weekday. Which matters: the schedule is read per DATE, not per weekday, so
+   the term the date falls in is what decides whose hours apply. */
+function asDayDate(){ return asDateFromOrd(asDayOrd()); }
 function pickRank(kind,id){for(var i=0;i<PICKS.length;i++){if(PICKS[i].kind===kind&&PICKS[i].id===id)return i+1;}return 0;}
-function rosterPill(s,on){var sch=ROSTER[pidOf(s)];var off=!sch;return '<span class="ppill'+(on?' on':'')+(off?' off':'')+'" data-person="'+esc(s)+'"><span class="ppn"><span class="dotsm"></span>'+esc(nameOf(s))+'</span><span class="ppt">'+(sch?'On · '+esc(sch):'Off today')+'</span></span>';}
+
+/* One pill, three states, used by both the assign screen and the task detail
+   picker so they can never disagree:
+     scheduled  - green, with the hours they said they would be here
+     off        - dimmed, "Off Thursday"
+     not set    - dimmed, and says so, because "has not filled it in" and
+                  "told us they are off" are different facts to whoever is
+                  handing out the work. */
+function schedPill(pid,on,d,clickable){
+  d=d||new Date();
+  var sh=schedShiftOn(pid,d);
+  var dowName=(typeof WEEKDAYS_FULL!=='undefined'&&WEEKDAYS_FULL[d.getDay()])||'that day';
+  var cls='ppill'+(sh?' sched':' off')+(on?' on':'');
+  var sub= sh ? schedFmt(sh.start)+'–'+schedFmt(sh.end)
+        : (schedHasAny(pid,d) ? 'Off '+dowName : 'No hours set');
+  var attr=(clickable===false&&!sh)?'':' data-person="'+esc(pid)+'"';
+  var tip=sh?'':' title="'+esc(sub)+'"';
+  return '<span class="'+cls+'"'+attr+tip+'><span class="ppn"><span class="dotsm"></span>'+esc(nameOf(pid))+'</span>'
+        +'<span class="ppt">'+esc(sub)+'</span></span>';
+}
+/* Scheduled first, then everyone else, each group in roster order. Bill reads
+   the top of the list and stops. */
+function schedSortForDay(ids,d){
+  var inDay=[],out=[];
+  ids.forEach(function(p){ (schedShiftOn(p,d)?inDay:out).push(p); });
+  return inDay.concat(out);
+}
+function rosterPill(s,on){ return schedPill(pidOf(s)||s,on,new Date(),true); }
 function renderAssignPeople(){
  var el=document.getElementById('as-people'); if(!el)return;
  var todayDow=new Date().getDay();
  /* Same two-label trick as boardDayChips() — CSS decides which one shows. */
  var days='<div class="chiprow" id="as-days">'+WEEKDAYS.map(function(w,i){var isToday=(i===todayDow);return '<span class="chip'+(asDay===i?' on':'')+(isToday?' today':'')+'" data-asday="'+i+'"'+(isToday?' title="Today"':'')+'><span class="dl-s">'+w+'</span><span class="dl-f">'+WEEKDAYS_FULL[i]+'</span>'+(isToday?'<span class="todot"></span>':'')+'</span>';}).join('')+'</div>';
  var dayLabel=WEEKDAYS[asDay]+' · '+asDateLabel(asDayOrd());
- if(asEditCrew){
-   var editChips=STUDENTS.map(function(s){var on=dayCrew(asDay).indexOf(s)>=0;return '<span class="chip'+(on?' on':'')+'" data-crewtog="'+esc(s)+'">'+esc(nameOf(s))+(on?' ✓':'')+'</span>';}).join('');
-   el.innerHTML='<div class="sec">Build the '+WEEKDAYS[asDay]+' board</div>'+days
-     +'<div class="sec">Who works '+dayLabel+' · tap to add / remove</div><div class="chiprow">'+editChips+'</div>'
-     +'<div class="chiprow" style="margin-top:6px"><span class="chip on" data-crewdone="1">✓ Done editing</span></div>';
-   return;
- }
  var open='<span class="ppill open'+(asPerson===OPEN?' on':'')+'" data-person="'+OPEN+'"><span class="ppn"><span class="dotsm"></span>Open board</span><span class="ppt">Anyone can claim</span></span>';
  var self='<span class="ppill'+(asPerson===SELF?' on':'')+'" data-person="'+SELF+'"><span class="ppn"><span class="dotsm"></span>'+meName()+' (you)</span><span class="ppt">Assign to yourself</span></span>';
  var grads=CREW.filter(function(c){return c.role==='Grad student';});
  var techs=CREW.filter(function(c){return c.role==='Technician';});
- var workingPills=STUDENTS.map(function(s){
-   var working=dayCrew(asDay).indexOf(s)>=0;
-   if(working)return '<span class="ppill'+(asPerson===s?' on':'')+'" data-person="'+esc(s)+'"><span class="ppn"><span class="dotsm"></span>'+esc(nameOf(s))+'</span><span class="ppt">'+esc(shiftHours(s))+'</span></span>';
-   return '<span class="ppill off" title="Not scheduled '+WEEKDAYS[asDay]+'"><span class="ppn"><span class="dotsm"></span>'+esc(nameOf(s))+'</span><span class="ppt">Off '+WEEKDAYS[asDay]+'</span></span>';
- }).join('');
+ var theDay=asDayDate();
+ var ordered=schedSortForDay(STUDENTS.slice(),theDay);
+ var inCount=schedCrewOn(theDay).length;
+ var workingPills=ordered.map(function(s){ return schedPill(s,asPerson===s,theDay,true); }).join('');
+ /* Said out loud rather than left to be counted off the pills, because "three
+    people are in on Thursday" is the number that decides how much work goes
+    out. Between terms it is nobody, and the reason is worth naming -- an empty
+    board with no explanation reads as a broken screen. */
+ var sem=semForDate(theDay);
+ var note = !sem
+   ? 'No term covers '+dayLabel.replace(/^[^·]*· /,'')+' — nobody is scheduled between terms.'
+   : (inCount? (inCount+' scheduled in'+(inCount===STUDENTS.length?'':' · the rest are off or have not set their hours'))
+             : 'Nobody has hours down for '+WEEKDAYS_FULL[asDay]+' this term.');
  el.innerHTML=
    '<div class="sec">Day board</div>'+days
-  +'<div class="sec">'+dayLabel+' · assign directly <span class="tap" data-editcrew="1" style="color:var(--acc);font-weight:800;float:right">✎ Edit crew</span></div><div class="chiprow">'+workingPills+'</div>'
+  +'<div class="sec">'+dayLabel+' · assign directly</div>'
+  +'<div style="margin:0 16px 6px;font:600 11px \'Public Sans\';color:'+(inCount?'#2f9e4f':'var(--muted)')+';line-height:1.4">'+esc(note)+'</div>'
+  +'<div class="chiprow">'+(workingPills||'<span style="font:600 11.5px \'Public Sans\';color:var(--muted);padding:2px 4px">No undergrads on the roster</span>')+'</div>'
   +'<div class="sec">Yourself</div><div class="chiprow">'+self+'</div>'
   +'<div class="sec">Open</div><div class="chiprow">'+open+'</div>'
   +'<div class="sec">Grad students · sends a request</div><div class="chiprow">'+grads.map(function(c){return crewPill(c,asPerson===c.pid);}).join('')+'</div>'
@@ -9621,7 +10150,7 @@ function renderAssignList(){
 }
 function updateSaveBtn(){var b=document.getElementById('as-save');if(!b)return;b.textContent=PICKS.length?('Save · '+PICKS.length+' task'+(PICKS.length>1?'s':'')):'Save assignments';}
 function assignEnter(){
- asTab='scheduled'; asPerson=null; PICKS=[]; asDay=new Date().getDay(); asEditCrew=false;
+ asTab='scheduled'; asPerson=null; PICKS=[]; asDay=new Date().getDay();
  var seg=document.getElementById('as-seg'); if(seg)seg.querySelectorAll('span').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-atab')==='scheduled');});
  var sr=document.getElementById('as-search'); if(sr)sr.value='';
  closeWiz(); renderAssignPeople(); renderAssignList(); updateSaveBtn();
@@ -9812,9 +10341,6 @@ function saveAssignments(){
 document.getElementById('s-assign').addEventListener('click',function(e){
  if(e.target.closest('#as-save')){saveAssignments();return;}
  var dd=e.target.closest('[data-asday]'); if(dd){asDay=parseInt(dd.getAttribute('data-asday'),10);renderAssignPeople();return;}
- var ec=e.target.closest('[data-editcrew]'); if(ec){asEditCrew=true;renderAssignPeople();return;}
- var cd=e.target.closest('[data-crewdone]'); if(cd){asEditCrew=false;renderAssignPeople();return;}
- var ct=e.target.closest('[data-crewtog]'); if(ct){toggleDayCrew(asDay,ct.getAttribute('data-crewtog'));renderAssignPeople();return;}
  var p=e.target.closest('[data-person]'); if(p){var n=p.getAttribute('data-person');var prev=asPerson;asPerson=asPerson===n?null:n;if(asPerson!==prev)PICKS=[];renderAssignPeople();renderAssignList();updateSaveBtn();return;}
  var at=e.target.closest('span[data-atab]'); if(at){asTab=at.getAttribute('data-atab');renderAssignList();return;}
  var up=e.target.closest('[data-unpick]'); if(up){e.stopPropagation();var parts=up.getAttribute('data-unpick').split(':');removePick(parts[0],parts.slice(1).join(':'));return;}
@@ -10165,15 +10691,19 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
      person who made it even if their name on the roster changes. Names are
      produced with nameOf() at the point of drawing. */
   var TC_STUDENTS=(typeof rstUndergradIds==='function'?rstUndergradIds():[]);
-  var TC_SCHED={
-    p18:{days:[1,2,3,4,5],pairs:[['07:00','11:30'],['12:00','15:30']]},   /* Garrett Willard */
-    p20:{days:[1,3,5],pairs:[['08:00','12:00']]},                          /* Taryn Breeden */
-    p21:{days:[1,4],pairs:[['13:00','17:00']],unverified:true},            /* Jed Bates */
-    p22:{days:[1,4],pairs:[['09:00','13:00']]}                             /* Caroline Hagler */
-  };
-  /* Anyone added to the roster since these shifts were written still needs a
-     schedule, or the no-show sweep has nothing to compare a missed day against. */
-  TC_STUDENTS.forEach(function(n){ if(!TC_SCHED[n]) TC_SCHED[n]={days:[2,4],pairs:[['08:00','12:00']]}; });
+  /* Whether somebody was due in, and between what times, on a given DATE.
+     This used to be a hardcoded table of invented shifts for four named
+     students, with everybody added later silently defaulted to Tue/Thu 8-12 --
+     so the clock compared real punches against hours nobody had ever agreed
+     to. It now asks the same schedShiftOn() the day board asks, which is the
+     hours the person themselves entered on their profile, for the term the
+     date actually falls in. No shift for a weekend, a day off, a term they
+     have not filled in, or a date between terms. */
+  function tcSchedOn(pid,d){
+    if(typeof schedShiftOn!=='function') return null;
+    try{ return schedShiftOn(pid,d); }catch(e){ return null; }
+  }
+  function tcSchedToday(pid){ return tcSchedOn(pid,new Date()); }
   var TC_PUNCHES={};   // pid -> [{date,in,out,locOk,note,editedBy}]
   var TC_NOSHOW={};    // pid -> [dateISO,...]  (auto-created misses)
   var TC_EXCUSED={};   // pid -> [dateISO,...]  (approved call-outs / absences)
@@ -10236,10 +10766,10 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
     var today=midnight(new Date());
     TC_STUDENTS.forEach(function(name){
       TC_NOSHOW[name]=TC_NOSHOW[name]||[];
-      var sch=TC_SCHED[name],s=periodStart(curIdx());
+      var s=periodStart(curIdx());
       for(var k=0;k<14;k++){var d=new Date(s);d.setDate(s.getDate()+k);
         if(d>=today)break;                                  // only days that have fully passed
-        if(sch.days.indexOf(d.getDay())<0)continue;         // not a scheduled shift
+        if(!tcSchedOn(name,d))continue;                     // not a scheduled shift
         var di=iso(d);
         if(punchesFor(name,di).length)continue;             // they clocked in -> present
         if(isExcused(name,di))continue;                     // approved call-out -> excused
@@ -10258,7 +10788,7 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
      wheel — this way fixing the time fixes the record. The only stored piece is
      TC_EXLATE, the days Bill has forgiven. */
   var LATE_GRACE_MIN=30;
-  function schedStart(name,d){var sch=TC_SCHED[name];return (sch&&sch.days.indexOf(d.getDay())>=0)?sch.pairs[0][0]:null;}
+  function schedStart(name,d){var sh=tcSchedOn(name,d);return sh?sh.start:null;}
   function firstPunch(name,di){return punchesFor(name,di).reduce(function(a,p){return (!a||hm(p.in)<hm(a.in))?p:a;},null);}
   /* Minutes past the scheduled start, or 0 when on time / not a scheduled day. */
   function lateMin(name,di){
@@ -10325,116 +10855,13 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
     TC_PUNCHES={};TC_NOSHOW={};TC_EXCUSED={};TC_EXLATE={};
     TC_STUDENTS.forEach(function(n){TC_PUNCHES[n]=[];TC_NOSHOW[n]=[];TC_EXCUSED[n]=[];TC_EXLATE[n]=[];});
   }
-  /* Demo late arrivals. Seeded punches all land exactly on the scheduled start,
-     so without this the leaderboard would read zero for everyone. Push the first
-     clock-in of selected days past the grace window instead of inventing a
-     separate record — lateness is derived from the punch itself.
-     Garrett Willard is the logged-in undergrad demo account and stays clean. */
-  var LATE_TOTAL={p21:4,p22:2,p20:1};     /* Jed, Caroline, Taryn */
-  var LATE_OFFSETS=[37,52,41,64,35];   // minutes past the scheduled start
-  function pushLate(name,di,mins){
-    var p=firstPunch(name,di);if(!p)return false;
-    var st=schedStart(name,parseISO(di));if(!st)return false;
-    var t=hm(st)+mins/60;if(t>=hm(p.out||'23:59'))return false;   // never past their own clock-out
-    p.in=pad(Math.floor(t))+':'+pad(Math.round((t-Math.floor(t))*60));
-    return true;
-  }
-  function seedLates(today,s){
-    // backfill across the term, every other scheduled day so the pattern reads
-    // as habitual rather than one rough week
-    var floor=midnight(termStart());
-    Object.keys(LATE_TOTAL).forEach(function(name){
-      var got=lateCount(name),hit=0,o=0;
-      var d=new Date(today);d.setDate(d.getDate()-1);
-      while(d>=floor&&got<LATE_TOTAL[name]){
-        var di=iso(d);
-        if(punchesFor(name,di).length&&!isNoShow(name,di)&&!lateMin(name,di)){
-          hit++;
-          if(hit%2===0&&pushLate(name,di,LATE_OFFSETS[o++%LATE_OFFSETS.length]))got++;
-        }
-        d.setDate(d.getDate()-1);
-      }
-    });
-    /* Guarantee one inside the current pay period so Bill's default view has a
-       late he can actually approve. The named students above often have their
-       in-period shifts consumed by the no-show backfill, so take the first
-       student who still has a clean shift standing. */
-    var placed=false;
-    TC_STUDENTS.forEach(function(name){
-      if(placed||name==='p18')return;                 // Garrett's record stays clean in the demo seed
-      for(var k=0;k<14&&!placed;k++){
-        var d=new Date(s);d.setDate(s.getDate()+k);
-        if(d>=today)break;
-        var di=iso(d);
-        if(!punchesFor(name,di).length||isNoShow(name,di)||lateMin(name,di))continue;
-        if(pushLate(name,di,LATE_OFFSETS[0]))placed=true;
-      }
-    });
-  }
-  /* Year-to-date has to have a year behind it: seeding only the current pay
-     period would make every annual total read as two weeks. Backfill each
-     student's scheduled shifts from Jan 1 up to the current period, minus the
-     academic breaks when nobody is on the farm. Runs before seedNoShows so the
-     no-show backfill can still carve days back out. */
-  var TC_BREAKS=[['01-01','01-11'],['03-14','03-22'],['05-09','05-17']];  // winter, spring break, between-terms
-  function onBreak(d){var s=pad(d.getMonth()+1)+'-'+pad(d.getDate());
-    return TC_BREAKS.some(function(b){return s>=b[0]&&s<=b[1];});}
-  function seedYear(s){
-    var d=new Date(new Date().getFullYear(),0,1),stop=midnight(s);
-    for(;midnight(d)<stop;d.setDate(d.getDate()+1)){
-      if(onBreak(d))continue;
-      var wd=d.getDay(),di=iso(d);
-      TC_STUDENTS.forEach(function(name){
-        var sch=TC_SCHED[name];if(sch.days.indexOf(wd)<0)return;
-        sch.pairs.forEach(function(pr){TC_PUNCHES[name].push({date:di,in:pr[0],out:pr[1],locOk:true,note:'',editedBy:''});});
-      });
-    }
-  }
-  /* Demo no-show history. Tallies count the whole term (see termStart), not just the
-     current pay period, so the leaderboard is backfilled across the term on each
-     student's real scheduled days — every count has a day Bill can tap into.
-     Garrett Willard is the logged-in undergrad demo account and stays clean. */
-  var NOSHOW_TOTAL={p21:4,p22:3,p20:1};   /* Jed, Caroline, Taryn */
-  function seedNoShows(today,s){
-    // 1. one miss inside the current pay period each for Dana and Josh, so Bill's
-    //    default view (and the undergrad's own list) has something to tap into
-    ['p22','p21'].forEach(function(name){          /* Caroline, Jed */
-      for(var k=0;k<14;k++){
-        var d=new Date(s);d.setDate(s.getDate()+k);
-        if(d>=today)break;
-        if(TC_SCHED[name].days.indexOf(d.getDay())<0)continue;
-        var di=iso(d);
-        TC_PUNCHES[name]=TC_PUNCHES[name].filter(function(p){return p.date!==di;});
-        if(TC_NOSHOW[name].indexOf(di)<0)TC_NOSHOW[name].push(di);
-        break;
-      }
-    });
-    // 2. backfill earlier scheduled days until each student hits their target count.
-    //    Walk backwards taking every 3rd scheduled shift so misses read as spread
-    //    out over the term rather than one bad week.
-    var floor=midnight(termStart());
-    Object.keys(NOSHOW_TOTAL).forEach(function(name){
-      var sch=TC_SCHED[name],got=TC_NOSHOW[name].filter(inTerm).length,hit=0;
-      var d=new Date(today);d.setDate(d.getDate()-1);
-      while(d>=floor&&got<NOSHOW_TOTAL[name]){
-        if(sch.days.indexOf(d.getDay())>=0){
-          hit++;
-          if(hit%3===0){
-            var di=iso(d);
-            /* seedYear now fills these days in, so clear the shift before
-               marking the miss — the old "only if empty" guard left the
-               leaderboard blank once history existed. */
-            if(TC_NOSHOW[name].indexOf(di)<0){
-              TC_PUNCHES[name]=TC_PUNCHES[name].filter(function(p){return p.date!==di;});
-              TC_NOSHOW[name].push(di);got++;
-            }
-          }
-        }
-        d.setDate(d.getDate()-1);
-      }
-      TC_NOSHOW[name].sort();
-    });
-  }
+  /* Removed 2026-08-26 along with the last of the seed: seedYear(),
+     seedNoShows(), seedLates(), pushLate() and their target tables
+     (LATE_TOTAL, NOSHOW_TOTAL, LATE_OFFSETS, TC_BREAKS) fabricated a backdated
+     year of punches plus demo no-shows and late arrivals against four real
+     people's accounts. seed() stopped calling them on 2026-08-25 but they were
+     left in the file, which is how fabricated hours find their way back into a
+     payroll screen. The real punches are the only history now. */
   // Key is versioned: bump it whenever the seed changes, or cached demo data from a
   // previous build masks the new seed and the leaderboard comes up empty.
   /* v5 re-keys every punch, no-show and excusal from the person's name to
@@ -10448,7 +10875,50 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
      leaderboards built from it. Flip this back to false to resume. */
   var TC_NOSHOW_LATE_PAUSED=true;
   function save(){try{localStorage.setItem(TC_KEY,JSON.stringify({idx:curIdx(),punches:TC_PUNCHES,noshow:TC_NOSHOW,excused:TC_EXCUSED,exlate:TC_EXLATE}));}catch(e){}}
-  function load(){try{var r=JSON.parse(localStorage.getItem(TC_KEY)||'null');if(r&&r.idx===curIdx()){TC_PUNCHES=r.punches;TC_NOSHOW=r.noshow||{};TC_EXCUSED=r.excused||{};TC_EXLATE=r.exlate||{};return true;}}catch(e){}return false;}
+  /* THE BUG THIS FIXES, so nobody reintroduces it:
+     load() used to refuse the saved data unless `r.idx===curIdx()` -- unless
+     the pay period the data was WRITTEN in was still the pay period we are in
+     NOW. Pay periods roll every 14 days, so on the first day of every new
+     period load() returned false, the caller ran seed(), and seed() emptied
+     every punch and immediately saved the empty version over the top. Two
+     weeks of hours, gone, silently, on a fortnightly clock.
+
+     The stored `idx` is a note of when the file was written. It is not a
+     reason to throw the file away. Punches carry their own dates and every
+     total is worked out from those, so data from any period loads fine. */
+  function load(){
+    try{
+      var r=JSON.parse(localStorage.getItem(TC_KEY)||'null');
+      if(r&&r.punches&&typeof r.punches==='object'){
+        TC_PUNCHES=r.punches; TC_NOSHOW=r.noshow||{}; TC_EXCUSED=r.excused||{}; TC_EXLATE=r.exlate||{};
+        /* Anyone hired since the last save needs their empty lists, or the
+           first write against them throws. */
+        TC_STUDENTS.forEach(function(n){
+          TC_PUNCHES[n]=TC_PUNCHES[n]||[]; TC_NOSHOW[n]=TC_NOSHOW[n]||[];
+          TC_EXCUSED[n]=TC_EXCUSED[n]||[]; TC_EXLATE[n]=TC_EXLATE[n]||[];
+        });
+        tcStampIds();
+        return true;
+      }
+    }catch(e){}
+    return false;
+  }
+  /* Every punch needs an id of its own before it can be a row in a shared
+     database -- without one there is nothing to update, and the same shift
+     would land twice. Stamped on load so punches written by earlier builds
+     get one too. */
+  function tcStampIds(){
+    var seen={},dirty=false;
+    Object.keys(TC_PUNCHES).forEach(function(n){
+      (TC_PUNCHES[n]||[]).forEach(function(p){
+        if(!p) return;
+        if(!p.pid){ p.pid=n; dirty=true; }
+        if(!p.id||seen[p.id]){ p.id=newId('pu'); dirty=true; }
+        seen[p.id]=1;
+      });
+    });
+    return dirty;
+  }
   if(!load()){seed();save();}
   tcIdx=curIdx();
 
@@ -10599,7 +11069,7 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
       el.textContent=Math.floor(s/3600)+':'+pad(Math.floor(s%3600/60))+':'+pad(s%60);}
     upd();tcTimer=setInterval(upd,1000);
   }
-  function clockIn(name){var punch={date:todayISO(),in:nowHM(),out:null,locOk:true,note:'',editedBy:''};TC_PUNCHES[name]=TC_PUNCHES[name]||[];TC_PUNCHES[name].push(punch);save();toast('Clocked in · '+t12(punch.in));tcEnter();
+  function clockIn(name){var punch={id:newId('pu'),pid:name,date:todayISO(),in:nowHM(),out:null,locOk:true,note:'',editedBy:''};TC_PUNCHES[name]=TC_PUNCHES[name]||[];TC_PUNCHES[name].push(punch);save();toast('Clocked in · '+t12(punch.in));tcEnter();
     geoCheck(function(res,mi){if(res==='outside'){punch.locOk=false;notifyBillOffsite(name,punch,mi);save();if(currentRole!=='undergrad')tcEnter();}});}
   function clockOut(name){var op=openPunch(name);if(!op)return;op.out=nowHM();save();toast('Clocked out · '+fh(dur(op.in,op.out))+' h');tcEnter();}
 
@@ -10695,7 +11165,7 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
       html+='</div>';
     }
     html+='<div style="font:800 13px \'Public Sans\';color:var(--ink);margin:16px 16px 4px">Daily punches</div><div style="font:600 11.5px \'Public Sans\';color:var(--muted);margin:0 16px 8px">Tap a time to change it with the time wheel.</div><div style="margin:0 12px 16px">';
-    for(var k=0;k<14;k++){var d=new Date(s);d.setDate(s.getDate()+k);var di=iso(d),ps=punchesFor(name,di),scheduled=TC_SCHED[name].days.indexOf(d.getDay())>=0,future=d>today;
+    for(var k=0;k<14;k++){var d=new Date(s);d.setDate(s.getDate()+k);var di=iso(d),ps=punchesFor(name,di),scheduled=!!tcSchedOn(name,d),future=d>today;
       if(!ps.length&&!scheduled&&!isNoShow(name,di))continue;
       if(future&&!ps.length)continue;
       html+=dayCard(name,di,d,ps,scheduled,future,today);}
@@ -10712,7 +11182,7 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
   function delPunch(key){var a=key.split('|'),name=a[0],di=a[1],p=punchesFor(name,di)[+a[2]];if(!p)return;if(!confirm('Delete this punch?'))return;var arr=TC_PUNCHES[name],pos=arr.indexOf(p);if(pos>=0)arr.splice(pos,1);save();toast('Punch removed');tcRenderPerson();}
   function addPunch(key){var a=key.split('|'),name=a[0],di=a[1],d=parseISO(di);
     openTimePicker('Clock-in time',name+' · new punch · '+dow(d)+' '+mdd(d),'08:00',function(val){
-      TC_PUNCHES[name]=TC_PUNCHES[name]||[];TC_PUNCHES[name].push({date:di,in:val,out:null,locOk:true,note:'',editedBy:'Bill'});
+      TC_PUNCHES[name]=TC_PUNCHES[name]||[];TC_PUNCHES[name].push({id:newId('pu'),pid:name,date:di,in:val,out:null,locOk:true,note:'',editedBy:'Bill'});
       var arr=TC_NOSHOW[name]||[],pos=arr.indexOf(di);if(pos>=0)arr.splice(pos,1);save();toast('Punch added · set the clock-out next');tcRenderPerson();});}
 
   /* ---- scroll-wheel time picker ---- */
@@ -10810,12 +11280,12 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
   /* The home-screen shift banner punches in place, so it needs both the current
      state and a way to flip it without opening the Time Clock screen. */
   window.tcShift=function(name){
-    var n=pidOf(name)||SESSION.pid,op=openPunch(n),sch=TC_SCHED[n],i=curIdx();
+    var n=pidOf(name)||SESSION.pid,op=openPunch(n),sh=tcSchedToday(n),i=curIdx();
     return {on:!!op, since:op?t12(op.in):'',
             elapsed:op?fh(dur(op.in,nowHM())):'0.0',
             hours:hoursForPeriod(n,i),
-            span:sch?t12(sch.pairs[0][0])+' – '+t12(sch.pairs[sch.pairs.length-1][1]):'',
-            scheduledToday:sch?sch.days.indexOf(new Date().getDay())>=0:false};
+            span:sh?(t12(sh.start)+' – '+t12(sh.end)):'',
+            scheduledToday:!!sh};
   };
   window.tcToggleClock=function(name){
     var n=pidOf(name)||SESSION.pid;
@@ -10825,17 +11295,82 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
   /* Upcoming shifts off the usual weekly pattern — what the undergrad's
      "My schedule" widget needs, without exposing the punch data. */
   window.tcNextShifts=function(name,n){
-    var out=[],sch=TC_SCHED[name],d=midnight(new Date());
-    if(!sch)return out;
+    var out=[],d=midnight(new Date());
     for(var k=0;k<21&&out.length<(n||3);k++){
-      if(sch.days.indexOf(d.getDay())>=0)
+      var sh=tcSchedOn(name,d);
+      if(sh)
         out.push({off:k,dow:d.getDay(),date:iso(d),
-                  span:sch.pairs[0][0]+'–'+sch.pairs[sch.pairs.length-1][1],
+                  span:sh.start+'–'+sh.end,
                   noshow:isNoShow(name,iso(d))});
       d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1);
     }
     return out;
   };
+  /* ---- the three doors the shared-database module comes in through ----
+     Every punch lives in this closure. Rather than let the sync module keep a
+     second copy -- two copies of a payroll record is how hours go missing --
+     it asks through these and nothing else. */
+  window.tcPunchDocs=function(){
+    tcStampIds();
+    var out=[];
+    Object.keys(TC_PUNCHES).forEach(function(n){
+      (TC_PUNCHES[n]||[]).forEach(function(p){ if(p&&p.id) out.push(p); });
+    });
+    return out;
+  };
+  /* Incoming punches, matched on id: the same shift never lands twice, and a
+     time Bill corrected on his phone replaces the old one instead of sitting
+     beside it. A punch that arrives filed under a different person than the
+     copy here (somebody's roster id changed) is moved, not duplicated. */
+  window.tcApplyRemote=function(list){
+    if(!list||!list.length) return false;
+    var touched=false;
+    list.forEach(function(d){
+      if(!d||!d.id||!d.pid) return;
+      var id=String(d.id), n=String(d.pid), existing=null;
+      Object.keys(TC_PUNCHES).forEach(function(k){
+        var arr=TC_PUNCHES[k]||[];
+        for(var i=arr.length-1;i>=0;i--){
+          if(!arr[i]||String(arr[i].id)!==id) continue;
+          if(k===n&&!existing) existing=arr[i];
+          else { arr.splice(i,1); touched=true; }
+        }
+      });
+      if(existing){
+        if(JSON.stringify(existing)!==JSON.stringify(d)){
+          Object.keys(existing).forEach(function(k){ if(!(k in d)) delete existing[k]; });
+          Object.keys(d).forEach(function(k){ existing[k]=d[k]; });
+          touched=true;
+        }
+        return;
+      }
+      TC_PUNCHES[n]=TC_PUNCHES[n]||[]; TC_NOSHOW[n]=TC_NOSHOW[n]||[];
+      TC_EXCUSED[n]=TC_EXCUSED[n]||[]; TC_EXLATE[n]=TC_EXLATE[n]||[];
+      TC_PUNCHES[n].push(d); touched=true;
+    });
+    if(touched){ save(); tcRepaintOpen(); }
+    return touched;
+  };
+  window.tcDropRemote=function(ids){
+    if(!ids||!ids.length) return false;
+    var kill={}, touched=false;
+    ids.forEach(function(i){ kill[String(i)]=1; });
+    Object.keys(TC_PUNCHES).forEach(function(n){
+      var arr=TC_PUNCHES[n]||[], before=arr.length;
+      TC_PUNCHES[n]=arr.filter(function(p){ return !(p&&kill[String(p.id)]); });
+      if(TC_PUNCHES[n].length!==before) touched=true;
+    });
+    if(touched){ save(); tcRepaintOpen(); }
+    return touched;
+  };
+  function tcRepaintOpen(){
+    try{
+      var a=document.getElementById('s-timeclock');
+      if(a&&a.classList.contains('active')){ tcEnter(); return; }
+      var b=document.getElementById('s-tcperson');
+      if(b&&b.classList.contains('active')) tcRenderPerson();
+    }catch(e){}
+  }
   window.tcEnter=function(){
     var body=document.getElementById('tc-body'),bk=document.getElementById('tc-back');
     if(currentRole==='undergrad'){renderWorker(body);if(bk)bk.style.display='none';}
@@ -11646,6 +12181,142 @@ function mowCanEdit(){ return (typeof flCanChem==='function'&&flCanChem())||(typ
 function labsCanEdit(){ return currentRole==='manager'||(typeof rstIsAdmin==='function'&&rstIsAdmin()); }
 function farmCanSee(){ return mowCanEdit()||labsCanEdit()||currentRole==='faculty'; }
 
+
+/* ========================= SEMESTER DATES =========================
+   Term start and end dates, owned by the farm rather than by whoever wrote
+   the app. They used to be three bare strings with no dates at all, which
+   meant the app could not answer the one question the day board depends on:
+   which term is today in?
+
+   Nothing here is cosmetic. semForDate() reads these to decide which weekly
+   schedule applies, so a term with the wrong dates is a crew that does not
+   show up on Bill's board -- and a date range that covers a break is a crew
+   that shows up for days the farm is shut.
+   ================================================================== */
+function semCanEdit(){ return currentRole==='manager'||(typeof rstIsAdmin==='function'&&rstIsAdmin()); }
+
+/* Two terms covering the same day would make "which term is it" a coin toss.
+   Report it rather than picking one silently. */
+function semOverlaps(){
+  var list=semSorted(), out=[];
+  for(var i=1;i<list.length;i++)
+    if(semOrd(list[i].start)<=semOrd(list[i-1].end)) out.push(list[i-1].name+' and '+list[i].name);
+  return out;
+}
+
+function smsRender(){
+  var body=document.getElementById('sms-body'); if(!body) return;
+  var edit=semCanEdit(), list=semSorted(), now=semForDate(new Date());
+
+  var rows=list.map(function(sm,i){
+    var last=(i===list.length-1);
+    var isNow=!!(now&&now.name===sm.name);
+    var head='<div style="display:flex;align-items:center;gap:9px">'
+      +'<div style="flex:1;min-width:0"><div class="rt">'+esc(sm.name)
+      +(isNow?' <span class="pill" style="background:#eafaef;color:#2f7d3a;margin-left:5px">This term</span>':'')+'</div>'
+      +'<div class="rs">'+esc(semDateLabel(sm.start))+' &ndash; '+esc(semDateLabel(sm.end))+'</div></div>'
+      +((edit&&list.length>1)?('<span class="tap" data-sm-del="'+esc(sm.id)+'" style="color:#c0392b;font-size:15px;flex:none;padding:0 4px">✕</span>'):'')
+      +'</div>';
+    var fields = edit
+      ? '<div class="fld" style="margin-top:8px"><span class="fl">Name</span><input class="inv-in" data-sm-name="'+esc(sm.id)+'" value="'+esc(sm.name)+'" style="max-width:180px"></div>'
+       +'<div class="fld"><span class="fl">First day</span><input type="date" class="inv-in" data-sm-start="'+esc(sm.id)+'" value="'+esc(sm.start)+'" style="max-width:170px"></div>'
+       +'<div class="fld" style="border-bottom:none"><span class="fl">Last day</span><input type="date" class="inv-in" data-sm-end="'+esc(sm.id)+'" value="'+esc(sm.end)+'" style="max-width:170px"></div>'
+      : '';
+    return '<div class="row" style="display:block'+((last&&!edit)?';border-bottom:none':'')+'">'+head+fields+'</div>';
+  }).join('');
+
+  var add='';
+  if(edit){
+    add = window._smAdding
+      ? '<div style="padding:11px 15px;border-top:1px solid var(--line)">'
+        +'<div class="fld"><span class="fl">Name</span><input class="inv-in" id="sm-n-name" placeholder="Fall 2027" style="max-width:180px"></div>'
+        +'<div class="fld"><span class="fl">First day</span><input type="date" class="inv-in" id="sm-n-start" style="max-width:170px"></div>'
+        +'<div class="fld" style="border-bottom:none"><span class="fl">Last day</span><input type="date" class="inv-in" id="sm-n-end" style="max-width:170px"></div>'
+        +'<div style="display:flex;gap:8px;margin-top:10px">'
+        +'<div class="action tap" data-sm="addsave" style="flex:1">Add this term</div>'
+        +'<div class="action tap" data-sm="addcancel" style="flex:none;background:#e7e9e6;color:#2f3133;padding:0 16px">Cancel</div></div></div>'
+      : '<div class="row tap" data-sm="addopen" style="border-bottom:none"><div style="flex:1"><div class="rt">Add a semester</div>'
+        +'<div class="rs">A new term, once the university sets the dates</div></div>'
+        +'<span style="color:#c2c7cd;font-size:18px;flex:none">›</span></div>';
+  }
+
+  var ov=semOverlaps();
+  var warn = ov.length
+    ? '<div style="margin:12px 16px 0;padding:10px 12px;background:#fdeceb;border-radius:10px;'
+      +'font:700 11px \'Public Sans\';color:#c0392b;line-height:1.45">'
+      +esc(ov.join('; '))+' cover some of the same days. Until that is fixed the app cannot tell '
+      +'which term those days belong to, so the wrong hours may show on the day board.</div>'
+    : '';
+  var gap = (!now)
+    ? '<div style="margin:12px 16px 0;padding:10px 12px;background:#fff4e2;border-radius:10px;'
+      +'font:700 11px \'Public Sans\';color:#9a5b00;line-height:1.45">'
+      +'Today is not inside any term on this list, so nobody shows as scheduled. That is right '
+      +'during a break — if it is not a break, the dates below need fixing.</div>'
+    : '';
+
+  body.innerHTML=
+     '<div style="margin:14px 16px 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px">'
+    +'<div style="font:800 13px \'Archivo\';color:var(--ink)">Why the dates matter</div>'
+    +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:3px;line-height:1.45">'
+    +'Undergrads set their standing weekly hours per semester on their own profile. These dates are '
+    +'how the app works out which set of hours applies today, and therefore who it shows as coming in '
+    +'when work is handed out. Outside every term nobody is scheduled, which is what you want over a break.'
+    +'</div></div>'
+    +warn+gap
+    +'<div class="list" style="margin-top:12px">'+rows+add+'</div>'
+    +(edit?'':'<div style="margin:12px 16px 0;font:600 11px \'Public Sans\';color:var(--muted);line-height:1.45">'
+      +'Only Bill, or whoever holds the App Manager post, can change these.</div>')
+    +'<div style="height:22px"></div>';
+}
+
+function smsFind(id){ for(var i=0;i<FARM_SEMS.length;i++) if(FARM_SEMS[i]&&FARM_SEMS[i].id===id) return FARM_SEMS[i]; return null; }
+
+document.getElementById('s-semsettings').addEventListener('change',function(e){
+  if(!semCanEdit()) return;
+  var t=e.target, id, sm;
+  if((id=t.getAttribute('data-sm-name'))){
+    sm=smsFind(id); if(!sm) return;
+    var v=(t.value||'').trim(); if(!v){ smsRender(); return; }
+    sm.name=v; storeTouch(); smsRender(); return;
+  }
+  if((id=t.getAttribute('data-sm-start'))||(id=t.getAttribute('data-sm-end'))){
+    var which=t.getAttribute('data-sm-start')?'start':'end';
+    sm=smsFind(id); if(!sm) return;
+    if(!SEM_ISO.test(t.value||'')){ smsRender(); return; }
+    var was=sm[which]; sm[which]=t.value;
+    /* A term that ends before it starts covers no days at all, which would
+       quietly empty the day board rather than announce itself. */
+    if(semOrd(sm.end)<semOrd(sm.start)){ sm[which]=was; toast('The last day has to come after the first'); }
+    storeTouch(); smsRender(); return;
+  }
+});
+
+document.getElementById('s-semsettings').addEventListener('click',function(e){
+  if(!semCanEdit()) return;
+  var d=e.target.closest('[data-sm-del]');
+  if(d){
+    var sm=smsFind(d.getAttribute('data-sm-del')); if(!sm) return;
+    if(!confirm('Remove '+sm.name+'? Hours anybody set for that term stop being used.')) return;
+    var i=FARM_SEMS.indexOf(sm); if(i>=0) FARM_SEMS.splice(i,1);
+    storeTouch(); smsRender(); toast('Term removed'); return;
+  }
+  var a=e.target.closest('[data-sm]'); if(!a) return;
+  var k=a.getAttribute('data-sm');
+  if(k==='addopen'){ window._smAdding=true; smsRender(); return; }
+  if(k==='addcancel'){ window._smAdding=false; smsRender(); return; }
+  if(k==='addsave'){
+    var n=(document.getElementById('sm-n-name').value||'').trim();
+    var st=document.getElementById('sm-n-start').value||'';
+    var en=document.getElementById('sm-n-end').value||'';
+    if(!n){ toast('Give the term a name'); return; }
+    if(semFind(n)){ toast('There is already a term called that'); return; }
+    if(!SEM_ISO.test(st)||!SEM_ISO.test(en)){ toast('Set both dates'); return; }
+    if(semOrd(en)<semOrd(st)){ toast('The last day has to come after the first'); return; }
+    FARM_SEMS.push({id:newId('sem'),name:n,start:st,end:en});
+    window._smAdding=false; storeTouch(); smsRender(); toast('Term added ✓'); return;
+  }
+});
+
 /* ============================= FARM SETTINGS =============================
    One place for the reference lists the farm owns — the numbers and names
    that used to be constants in this file. Adding a category is a row here
@@ -11662,6 +12333,10 @@ var FARM_CATS=[
  {go:'labsettings', t:'Labs', d:function(){
     var u=labsUnlisted().length, pi=FARM_LABS.filter(function(l){return l.pi;}).length;
     return FARM_LABS.length+' labs · '+pi+' in trials'+(u?(' · '+u+' unlisted in use'):'');
+  }},
+ {go:'semsettings', t:'Semester dates', d:function(){
+    var n=semSorted().length, now=semForDate(new Date());
+    return n+' term'+(n===1?'':'s')+' · '+(now?('in '+now.name):'between terms');
   }},
  {go:'sharedb', t:'Shared database', d:function(){
     if(!dbConfigured()) return 'The database code did not load on this device';
@@ -11854,7 +12529,30 @@ function sdbTasksBlock(){
     explain:'Turning this on sends this phone\'s tasks up to the shared copy and starts showing '
            +'everybody else\'s. Nothing is deleted by turning it on, and turning it off again puts '
            +'this phone back to keeping its own copy.'
-  })+sdbMapBlock()+sdbCrewBlock()+sdbLogBlock()+sdbInvBlock();
+  })+sdbMapBlock()+sdbCrewBlock()+sdbLogBlock()+sdbInvBlock()+sdbSchedBlock()+sdbClockBlock();
+}
+
+function sdbSchedBlock(){
+  return sdbSwitchBlock({
+    on:SCHSYNC.on, failed:SCHSYNC.failed, summary:schsyncSummary(), btnId:'sdb-sched',
+    title:'Share the weekly schedules',
+    offLabel:'Off — hours set on this phone stay on it',
+    explain:'The hours each undergrad says they will be here, set on their own profile. With this '
+           +'off, filling it in changes nothing anybody else can see. With it on, whoever is handing '
+           +'out work sees who is in on the day they are looking at, and how long for. Everybody '
+           +'still only edits their own — Bill can fix one, faculty can fix their own lab\'s.'
+  });
+}
+function sdbClockBlock(){
+  return sdbSwitchBlock({
+    on:TCSYNC.on, failed:TCSYNC.failed, summary:tcsyncSummary(), btnId:'sdb-clock',
+    title:'Share the time clock',
+    offLabel:'Off — hours clocked here stay on this phone',
+    explain:'Clocking in and out already works with this off, but the hours never leave the phone '
+           +'that made them, so every total on Bill\'s and the faculty\'s screens reads as zero. '
+           +'With it on, a punch made in the field reaches the people who sign the timesheet. '
+           +'Everybody clocks themselves; correcting somebody else\'s times stays Bill\'s.'
+  });
 }
 
 function sdbLogBlock(){
@@ -11942,6 +12640,20 @@ function sdbPush(){
       var logOn=!FLSYNC.on;
       flsyncSetWanted(logOn);
       toast(logOn?'Sharing the field log':'The log stays on this phone');
+      sdbRender();
+      return;
+    }
+    if(e.target.closest('#sdb-sched')){
+      var schOn=!SCHSYNC.on;
+      schsyncSetWanted(schOn);
+      toast(schOn?'Sharing the weekly schedules':'Schedules stay on this phone');
+      sdbRender();
+      return;
+    }
+    if(e.target.closest('#sdb-clock')){
+      var clkOn=!TCSYNC.on;
+      tcsyncSetWanted(clkOn);
+      toast(clkOn?'Sharing the time clock':'Hours stay on this phone');
       sdbRender();
       return;
     }
@@ -15661,7 +16373,14 @@ var STORE_DEFS=[
   /* The stock ledger. Registered like everything else, so it is saved, backed
      up and restored with the rest - losing it would leave every product back
      at its April opening balance with no record of what moved. */
-  {name:'invmoves',   key:'ut_invmoves_v1',   label:'Stock movements',    get:function(){return INVMOVES;}}
+  {name:'invmoves',   key:'ut_invmoves_v1',   label:'Stock movements',    get:function(){return INVMOVES;}},
+  /* The farm's term dates. Only a few rows, but they are what tells the app
+     which semester today falls in, and therefore which weekly schedule to
+     read - so they have to survive a reload like anything else. */
+  {name:'semesters',  key:'ut_semesters_v1',  label:'Semester dates',     get:function(){return FARM_SEMS;}},
+  /* One record per undergrad per term. Bill's day board is drawn from these,
+     so a lost schedule is a person who silently stops showing as available. */
+  {name:'schedules',  key:'ut_schedules_v1',  label:'Weekly schedules',   get:function(){return SCHEDULES;}}
 ];
 var STORE_LAST_EXPORT_KEY='ut_last_export';
 var STORE_SCAN_MS=2000;
@@ -15708,6 +16427,8 @@ function storeScan(){
   try{ csyncTick(); }catch(e){}
   try{ flsyncTick(); }catch(e){}
   try{ invsyncTick(); }catch(e){}
+  try{ schsyncTick(); }catch(e){}
+  try{ tcsyncTick(); }catch(e){}
 }
 function storeFlush(){ storeScan(); }
 function storeTouch(){ storeScan(); }   /* callers that want an immediate write */
@@ -15737,6 +16458,8 @@ function storeHydrate(){
   try{ csyncHydrate(); }catch(e){}
   try{ flsyncHydrate(); }catch(e){}
   try{ invsyncHydrate(); }catch(e){}
+  try{ schsyncHydrate(); }catch(e){}
+  try{ tcsyncHydrate(); }catch(e){}
   _storeOn=true;
   try{ setInterval(storeScan,STORE_SCAN_MS); }catch(e){}
 }

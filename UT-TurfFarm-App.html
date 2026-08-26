@@ -13331,7 +13331,7 @@ var _parents=null,_children=null,_parentLabels=null,_childLabels=null;
 var _mower=null,_mowerOn=false;
 var _cutLabels=null,_childCutLabels=null,_cutOn=false;
 function cutText(c){ return (''+c)+'″'; }
-var LABEL_MIN_ZOOM=15, SPLIT_ZOOM=17;
+var LABEL_MIN_ZOOM=17, SPLIT_ZOOM=17;
 var CHILD_RE=/^(.+?\d+)[a-c]$/;
 function uni2(a,b){ if(!a)return b; if(!b)return a; try{return turf.union(turf.featureCollection([a,b]));}catch(e){try{return turf.union(a,b);}catch(e2){return a;}} }
 /* ---- Facilities -----------------------------------------------------------

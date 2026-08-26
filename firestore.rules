@@ -546,12 +546,156 @@ service cloud.firestore {
     }
 
     /* ------------------------------------------------------------------
+       TRIALS AND RESTRICTIONS
+
+       Two collections, and the split is the whole point.
+
+       Reading is open to everyone signed in, like tasks and the field log. The
+       app still shows an undergraduate only the ACTIVE studies, and still keeps
+       one lab's planned work off another lab's screen -- but that is a tidy
+       screen, not a lock, and it is written down here so nobody mistakes it for
+       one. Anything on the shared copy is on every signed-in phone.
+
+       WRITING splits in two, because Dillon's rule has two halves that the
+       database has to be able to tell apart:
+
+         trials/{id}       a study. Only that study's own lab may write it --
+                           the protocol, the stage, the plots, the restrictions
+                           it carries. Bill may not.
+         triallifts/{rid}  one small record saying a restriction has been
+                           lifted. That study's lab may write one, and so may
+                           whoever runs the farm.
+
+       If the lift lived inside the study document, "Bill may lift a restriction
+       but may not change the study" would be unenforceable: a rule that lets
+       him write the document to lift one restriction lets him rewrite every
+       other word in it in the same breath, and nothing here could tell the
+       difference. Split out, the rule is exactly as narrow as the sentence.
+       ------------------------------------------------------------------ */
+
+    /* App: trCanEditLab() -- the person's own lab off the roster, plus any lab
+       carried as a 'trials:<Lab>' grant (Dr. Stier also edits Sorochan). The
+       undergraduates get none: doing the work and deciding what the study IS
+       are two different things, the same line canEditTaskList() draws. */
+    function canEditTrialLab(lab) {
+      return actor()
+        && roleOf(me()) != 'Undergraduate Student'
+        /* The Farm Manager edits no study at all -- he lifts, and that is the
+           whole of it. He carries the lab the pooled undergraduates hang on,
+           which without this line would read as a lab he could file under. */
+        && roleOf(me()) != 'Farm Manager'
+        && lab is string && lab != '' && lab != '—'
+        && (labOf(me()) == lab || grantsOf(me()).hasAny(['trials:' + lab]));
+    }
+
+    /* App: trCanLiftAny() -- the Farm Manager, or whoever is holding that job
+       while he is away. A role plus a movable grant, for the same reason
+       assignsUndergrads() is one: ground fenced off by a study nobody is
+       running any more has to be freeable without a code change. */
+    function liftsRestrictions() {
+      return actor()
+        && (roleOf(me()) == 'Farm Manager' || grantsOf(me()).hasAny(['lift_restrictions']));
+    }
+
+    match /trials/{trialId} {
+      allow read: if actor();
+
+      allow create: if canEditTrialLab(request.resource.data.lab)
+        && request.resource.data.id == trialId;
+
+      /* Both labs have to be yours: the one the study is in, and the one it
+         would be in afterwards. Otherwise a study could be walked out of a lab
+         one save at a time. */
+      allow update: if canEditTrialLab(request.resource.data.lab)
+        && canEditTrialLab(resource.data.lab)
+        && request.resource.data.id == trialId;
+
+      /* Removing a study is an UPDATE that sets removed:true, never a deleted
+         document -- the same tombstone the task list uses, and for the same
+         reason. A phone that was switched off still holds its own copy of every
+         study; on reconnecting it offers up whatever the shared copy lacks, and
+         a genuinely deleted study would come straight back. */
+      allow delete: if false;
+    }
+
+    match /triallifts/{restrictionId} {
+      allow read: if actor();
+
+      /* The lab lifts its own; whoever runs the farm lifts anybody's. There is
+         nothing else in this document to abuse: it carries the restriction id,
+         which study and lab it belongs to, the date, and who lifted it. */
+      allow create, update: if (canEditTrialLab(request.resource.data.lab) || liftsRestrictions())
+        && request.resource.data.id == restrictionId
+        && request.resource.data.lifted is string
+        && request.resource.data.lifted != '';
+
+      /* Un-lifting is not a thing the app does. A restriction that should be
+         back on is a new restriction, with its own dates and its own author. */
+      allow delete: if false;
+    }
+
+    /* ------------------------------------------------------------------
+       FARM SETTINGS
+
+       Four small things rather than a list of records, so this block is shaped
+       differently: ONE DOCUMENT PER GROUP, and the group's name IS the document
+       id. `farmsettings/spray`, `/mowers`, `/labs`, `/semesters`.
+
+       `v` carries the value, and `v: null` means "back to the built-in
+       defaults" -- a real answer, not an absence. A reset that travelled as a
+       deleted document would be undone by the next phone to connect, which
+       still holds its own copy.
+
+       Reading is open to everyone signed in. It has to be: the sprayer numbers
+       feed the mix calculator on the phone of whoever is spraying, and the
+       semester dates decide whose weekly hours count today.
+       ------------------------------------------------------------------ */
+
+    /* App: fstCanEditKit() -- the sprayer numbers and the mower list. The
+       people who spray and mow are the people who know them, so this is
+       everybody but the undergraduates, the same line canEditTaskList() draws.
+       Dillon added faculty to the whole of Farm settings on 2026-08-26. */
+    function canEditFarmKit() {
+      return isAppManager() || (actor() && roleOf(me()) != 'Undergraduate Student');
+    }
+
+    /* App: fstCanEditLists() -- the labs list and the semester dates. These two
+       decide who belongs where and when the farm is running, and renaming a lab
+       moves people and studies with it. Bill, faculty, or the App Manager. */
+    function canEditFarmLists() {
+      return isAppManager()
+        || (actor() && (roleOf(me()) == 'Farm Manager' || roleOf(me()) == 'Faculty'));
+    }
+
+    /* The App Manager post is the one thing here that is NOT on the roster: it
+       rides on the sign-in token as its own claim, stamped by
+       tools/create-accounts.js, exactly like `pid`. That is why a rule can ask
+       about it directly. App: rstIsAdmin(). */
+    function isAppManager() {
+      return request.auth != null && request.auth.token.app_admin == true;
+    }
+
+    match /farmsettings/{group} {
+      allow read: if actor();
+
+      allow create, update: if request.resource.data.id == group
+        && (
+             ((group == 'spray' || group == 'mowers') && canEditFarmKit())
+          || ((group == 'labs'  || group == 'semesters') && canEditFarmLists())
+        );
+
+      /* A group that is not one of the four is not a settings group. Anything
+         else here would be a document nothing reads and nothing maintains. */
+      allow delete: if false;
+    }
+
+    /* ------------------------------------------------------------------
        EVERYTHING ELSE IS CLOSED.
 
        Calendar and equipment get their own blocks here as each drawer is
        built. Tasks, the map, crew claims, the field log, inventory, the
-       weekly schedules, the time clock and the task list already have
-       theirs. Until then the database
+       weekly schedules, the time clock, the task list, the trials and farm
+       settings already have theirs. Until then the database
        refuses them, which is what we want: an empty drawer nobody can
        write into beats an open one nobody is watching.
        ------------------------------------------------------------------ */

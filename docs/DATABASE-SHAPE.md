@@ -393,6 +393,156 @@ the correction counts in the totals.
 
 ---
 
+## Trials and restrictions — built 2026-08-26
+
+Two collections, and the split is the whole design rather than a detail of it.
+
+Dillon's rule, in his words: *trials sync to everyone; a trial can only be
+edited by the people in that lab; Bill can remove restrictions on anyone's trial
+but is not able to edit any details about the trial.*
+
+### `trials/{trialId}` — one document per study
+
+The whole study: title, lab, PI, stage, dates, plots, treatments, and the
+restrictions it carries. **With one thing deliberately stripped out on the way
+up — whether a restriction has been lifted.** That answer lives in
+`triallifts` and nowhere else; a second copy inside the study would be a second
+source of truth, and the two would disagree the first time Bill lifted something
+while the lab was editing.
+
+Writing is scoped to the study's own lab, off the roster. Reading is open to
+everyone signed in.
+
+### `triallifts/{restrictionId}` — one small record per lifted restriction
+
+`{id, trialId, lab, lifted, liftedBy, liftedByPid}`. That is all of it. The
+study's lab may write one; so may whoever runs the farm.
+
+### Why two documents and not one
+
+Because "Bill may lift a restriction but may not change the study" is
+unenforceable inside a single document. A rule that lets him write the study to
+lift one restriction lets him rewrite every other word in it in the same breath,
+and Firestore rules cannot practically inspect what changed inside an array to
+tell the difference. Split out, the rule is exactly as narrow as the sentence.
+
+Two smaller things fall out of the split for free: a lab saving its study can
+never wipe a lift, and a lift can never overwrite an edit the lab made a second
+earlier. Nobody has to win a race nobody knew they were in.
+
+### Who may do what
+
+| Action | Who |
+|---|---|
+| read any study | everybody signed in |
+| create / edit a study, its stage, its plots, its restrictions | that study's **lab** — faculty, grads and technicians in it. Not the undergraduates, and **not Bill** |
+| lift a restriction | that study's lab, **or the Farm Manager** |
+| delete anything | nobody, ever |
+
+The app still shows an undergraduate only the active studies, and keeps one
+lab's planned and finished work off another lab's screen. **That is a tidy
+screen, not a lock** — every study on the shared copy is physically on every
+signed-in phone — and it is written down in the rules file as such so the two
+never get confused for each other.
+
+### The second lab is a roster grant now
+
+Dr. Stier edits Sorochan studies as well as his own. That used to be a hardcoded
+map inside the app (`TR_EXTRA_LABS`), which the database could not read. It is
+`grants: ['trials:Sorochan']` on his roster record now — one source, read
+identically by `trCanEditLab()` and by `canEditTrialLab()` in the rules.
+**The roster has to be sent up again for it to take effect.**
+
+Lifting is a role plus a movable grant — Farm Manager, or anyone carrying
+`lift_restrictions` — for the same reason `assignsUndergrads` is one: ground
+fenced off by a study nobody is running any more has to be freeable while Bill
+is away, without anybody editing code.
+
+### Removals travel as records
+
+Removing a study writes `removed:true`, never a deleted document, and the id is
+kept on the phone in a short list of its own (`ut_trials_gone_v1`) rather than
+as a flag on the study — so the twenty-odd screens that read `TRIALS` carry on
+seeing exactly what they saw before: a removed study is simply not in the array.
+
+Proven by `tools/test-trials.js` — 79 checks. Section 4 is the one that matters:
+Bill lifts, and cannot write the study document at all.
+
+---
+
+## Farm settings — built 2026-08-26
+
+Four small things rather than a list of records, so this drawer is shaped
+differently from every other one, in two ways that both matter.
+
+### `farmsettings/{group}` — one document per GROUP, not per record
+
+`spray` · `mowers` · `labs` · `semesters`. The group's name is the document id.
+
+`{ id, v, updatedAt, updatedBy, updatedByPid }`, where **`v: null` means "the
+built-in defaults"** — a real answer, not an absence. A reset that travelled as a
+deleted document would be undone by the next phone to connect, which still holds
+its own copy.
+
+### THE SHARED COPY WINS ON ARRIVAL
+
+Everywhere else in this app, a phone that has been switched off pushes up
+whatever the shared copy is missing. That is right for a list of jobs and wrong
+here: each of these four has exactly one value, so a phone still holding the
+built-in defaults would not be *adding* anything — it would be overwriting the
+farm's real settings with them.
+
+So: turning the switch on **takes** the farm's settings, and the phone then
+sends up only a value it changes itself. Two guards make that safe:
+
+1. `fstsyncSeed()` only seeds a group **the shared copy has never held**.
+2. It only seeds a group **this phone has actually changed** — `read()` returning
+   `null` (still on the built-ins) is skipped. Without this second guard, the
+   first phone to connect could seed `labs: null` and reset the farm for
+   everybody the moment somebody who had set the labs up properly connected.
+
+Each group is a row in `FST_GROUPS` with four functions: `read` (what this phone
+would send, `null` for the built-ins), `apply`, `restore`, `can`. The sprayer,
+mowers and labs already had a `xxxDiff()`/`xxxApply()` pair and a captured
+baseline; the semester dates did not, so `_semBase` was added at the declaration
+— captured there because `storeHydrate()` later fills `FARM_SEMS` in place from
+the phone's saved copy, and by then the built-in list would be gone.
+
+### Who may do what
+
+| Group | Who |
+|---|---|
+| `spray`, `mowers` | everybody but the undergraduates — `canEditFarmKit()` |
+| `labs`, `semesters` | the Farm Manager, faculty, or the App Manager — `canEditFarmLists()` |
+| read any of them | everybody signed in |
+| delete | nobody, ever |
+
+Faculty were added to all four by Dillon on 2026-08-26.
+
+**All four gates used to read `currentRole`** — `sprCanEdit()` and `mowCanEdit()`
+via `flCanChem()`, `labsCanEdit()` and `semCanEdit()` directly — which is why
+they could not be transcribed into rules at all until this pass. They read the
+roster now.
+
+**The App Manager post is the one thing here that is not on the roster.** It
+rides on the sign-in token as its own claim (`app_admin`), stamped by
+`tools/create-accounts.js` exactly like `pid` — which is precisely why a rule is
+allowed to ask about it: the database can see it for itself.
+
+### Renaming moves records that ride a different drawer
+
+Renaming a mower moves every plot booked on it; renaming a lab moves the people
+and studies in it. Those records travel through the **map** and **trials**
+collections, not through this one. `fstRenameOk()` says so and lets the rename
+go ahead — Dillon's call, 2026-08-26 — and the orphans it can leave behind are
+already visible in the "in use but not on the list" section on both screens.
+
+Proven by `tools/test-farmsettings.js` — 75 checks. Section 4 is the one that
+matters: a phone on the defaults never seeds, and an arriving value replaces
+rather than merges.
+
+---
+
 ## How the two copies of the rule are kept honest
 
 `taskCan()` in the app and `firestore.rules` are the same organisation chart

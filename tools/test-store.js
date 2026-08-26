@@ -92,13 +92,13 @@ section('0. the app still boots');
 const store = {};
 const first = boot(store);
 ok('no jsdom errors on load', first.errs.length === 0, first.errs[0]);
-ok('the store module is present', Array.isArray(first.p.STORE_DEFS) && first.p.STORE_DEFS.length === 13,
+ok('the store module is present', Array.isArray(first.p.STORE_DEFS) && first.p.STORE_DEFS.length === 15,
    String(first.p.STORE_DEFS && first.p.STORE_DEFS.length));
 /* Named rather than counted: a collection that silently drops off the registry
    loses its persistence, its export and its restore all at once, and a bare
    length check cannot say which one went. */
 {
-  const want = ["tasks","inventory","equip","eqmaint","eqproblems","eqcheckout","eqsched","events","bugs","invmoves","templates","semesters","schedules"];
+  const want = ["tasks","inventory","equip","eqmaint","eqproblems","eqcheckout","eqsched","events","bugs","invmoves","templates","semesters","schedules","trials","trialsgone"];
   const got  = (first.p.STORE_DEFS||[]).map(d => d.name);
   want.forEach(function(n){ ok("  "+n+" is registered", got.indexOf(n) >= 0, got.join(",")); });
 }

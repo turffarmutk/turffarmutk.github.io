@@ -282,3 +282,120 @@ marked removed stays removed.
 Each drawer we build adds a block to the same file. When it does, I will tell
 you, and the job is the same: pull in GitHub Desktop, open the file, copy,
 paste over what is in the box, Publish. Same ten minutes.
+
+---
+
+## And again on 2026-08-26 — trials and restrictions
+
+**Publish again**, the same eight steps. Two new blocks this time, and one
+extra thing to press afterwards — see the last paragraph.
+
+**What this is:** the studies running on the farm, and the restrictions they put
+on the ground. No mow. No spray. No irrigate. Until now those lived on the phone
+of whoever typed them in, which means the person who turned up with the mower
+saw nothing at all. Of everything still unshared, this was the one with the
+biggest bill attached to getting it wrong.
+
+**Everybody sees them.** Reading is open to everyone signed in, the same as
+tasks and the field log. The app still tidies the screen — an undergraduate is
+shown the active studies rather than every plan and every finished study, and
+one lab's planned work stays off another lab's list — but that is a tidy screen,
+not a locked drawer. Anything on the shared copy is on every signed-in phone,
+and it is written that way in the rules file so nobody mistakes one for the
+other.
+
+**A study can only be changed by its own lab.** Its protocol, its stage, its
+plots, the restrictions it carries. Sorochan's studies are Sorochan's. The
+undergraduates change none of it — the same line the inventory and the task list
+already draw.
+
+**Bill can lift a restriction on anybody's study, and change nothing else about
+it.** That sentence is why there are *two* blocks in the rules rather than one.
+A lift is its own little record, stored separately from the study. If it lived
+inside the study, then letting Bill write the study to lift one restriction
+would let him rewrite everything else in it at the same moment, and the database
+would have no way to tell the two apart. Split out, the rule is exactly as
+narrow as the sentence: Bill's name only ever appears on the lift.
+
+It also means nobody has to win a race: a lab saving its study cannot wipe a
+lift, and Bill lifting cannot overwrite an edit the lab made a second earlier.
+
+**A lift is not a delete.** The restriction stays on the study, marked
+"Lifted 26 Aug by Bill Czekai". A year from now, anybody wondering why that plot
+got mown can see exactly what happened and who decided it.
+
+**Nothing here is ever really deleted.** Removing a study marks it removed
+rather than destroying it, for the same reason the task list works that way — a
+phone that has had sharing switched off still holds its own copy, and a properly
+deleted study would come straight back from that phone the moment it
+reconnected.
+
+### One extra press this time
+
+After you publish, go to **More → Admin → Shared database** and press **Send the
+roster** again, even if you sent it recently.
+
+The reason: Dr. Stier edits Sorochan studies as well as his own. That used to be
+written into the app's code, where the database could not see it. It is on his
+roster record now, like everything else about a person — so until the roster is
+sent up again, the database does not know about it and will refuse his Sorochan
+edits.
+
+---
+
+## And again on 2026-08-26 — farm settings
+
+**Publish again**, the same eight steps. One new block.
+
+**What this is:** the four things on More → Farm settings — the sprayer numbers,
+the mower list, the labs list, and the semester dates. These are the figures the
+rest of the app does its arithmetic with. Fixing a nozzle rate on your phone
+left everybody else spraying the old number; fixing a semester date on your
+phone left everybody else's weekly hours counting against the wrong term.
+
+**Who can change what stays as it was, plus faculty.** Your call, 26 August:
+faculty now have the run of the whole page.
+
+- **Sprayer numbers and the mower list** — everybody but the undergraduates.
+  The people who spray and mow are the people who know these.
+- **Labs and semester dates** — Bill, faculty, or whoever is holding the App
+  Manager post. These two decide who belongs where and when the farm is running,
+  and renaming a lab moves people and studies with it.
+
+### Read this bit before you switch it on
+
+**This switch behaves differently from every other one, on purpose.**
+
+Every other switch sends this phone's records up and pulls everybody else's
+down; nothing is lost either way, because a job is a job and a log entry is a
+log entry. These four are not like that — each is a single value, so two phones
+holding different answers cannot both be right.
+
+So turning this on **takes the farm's settings.** Anything set differently on
+this phone is replaced by the shared copy, and from then on this phone sends up
+only what it changes itself. The switch says so before you press it.
+
+The practical consequence: **whoever has the farm's real settings should turn it
+on first.** If your phone has the labs set up properly and somebody else's is
+still on the built-in list, you want yours going up first, not theirs coming
+down. After the first day this stops mattering — there is only one copy.
+
+A phone still on the built-in values never sends them up at all, so it cannot
+quietly reset the farm.
+
+### Putting something back to the built-in values
+
+That travels too, as a proper "back to defaults" record rather than as a hole.
+If it were a hole, the next phone to connect would fill it back in from its own
+copy and the reset would undo itself.
+
+### One thing to watch when renaming
+
+Renaming a mower moves every plot booked on it — 43 plots for the first mower.
+Renaming a lab moves the people and the studies in it. Those moved records
+travel through the **map** and the **trials** switches, not through this one.
+
+If the relevant switch is off on your phone when you rename, the app now stops
+and tells you so, and lets you go ahead if you want to. Other phones would show
+the new name with the old records still attached to the old one — visible in the
+"in use but not on the list" section on both screens, rather than silently wrong.

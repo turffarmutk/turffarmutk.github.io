@@ -1603,7 +1603,7 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
 
 <section class="screen" id="s-tasknew">
 <div class="app field">
-            <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" id="tn-title" style="flex:1">New Task</div></div>
+            <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" id="tn-title" style="flex:1">New Task</div><span class="tap" id="tn-save" style="display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 16px;margin:-4px 0;border-radius:11px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.26);font:700 13px 'Public Sans';color:#fff;flex:none;box-shadow:0 1px 2px rgba(0,0,0,.15)">Save Task</span></div>
             <div style="flex:1;overflow:auto">
             <div class="sec">Task details</div>
             <div class="list">
@@ -1631,9 +1631,9 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
             <div class="sec">Months active</div>
             <div class="monthgrid" id="tn-months"></div>
             </div>
-            <div style="height:10px"></div>
+            <div id="tn-delwrap" style="display:none;margin:18px 16px 0"><div class="tap" id="tn-del" style="border:1px solid #e6c6c2;border-radius:12px;padding:13px;text-align:center;font:800 13px 'Archivo';color:#c0392b;background:#fdf3f2">Delete task</div><div style="font:600 11px 'Public Sans';color:var(--muted);line-height:1.45;margin:7px 2px 0;text-align:center">It stops showing when anybody assigns work. You can put it back from the bottom of the task list.</div></div>
+            <div style="height:16px"></div>
             </div>
-            <div class="actionbar"><div class="action" id="tn-save">Save Task</div></div>
           </div>
 <div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab on"><span class="te">📋</span>Tasks</div><div class="tab"><span class="te">🗺️</span>Map</div><div class="tab"><span class="te">📦</span>Inventory</div><div class="tab"><span class="te">•••</span>More</div></div>
 </section>
@@ -4723,6 +4723,563 @@ function tplsyncSummary(){
   return TPLSYNC.up+' sent · '+TPLSYNC.down+' received'+(f?(' · '+f+' refused'):'');
 }
 
+/* ================= TRIALS AND RESTRICTIONS ================= */
+/* The studies running on the farm, and the restrictions they put on the
+   ground: no mow, no spray, no irrigate. With this off, a restriction saved on
+   one phone is invisible to the person who turns up with the mower -- which is
+   the single most expensive thing in this app to get wrong.
+
+   TWO collections, on purpose, and this is the whole design:
+
+     trials/{id}      the study itself. Only that study's lab may write it.
+     triallifts/{rid} one tiny record per LIFTED restriction. The lab may write
+                      one, and so may Bill.
+
+   Dillon, 2026-08-26: Bill can take a restriction off anybody's study and can
+   change nothing else about it. If the lift lived inside the study document,
+   that sentence would be unenforceable -- letting Bill write the study to lift
+   one restriction lets him write everything else in it at the same time, and
+   the database has no way to tell the difference. Splitting the lift out makes
+   the rule exactly as narrow as the sentence: the study document stays
+   lab-only, and Bill's name only ever appears on the lift.
+
+   It also means a lab saving its study can never wipe a lift, and Bill lifting
+   can never overwrite an edit the lab made a second earlier. Nobody has to win
+   a race that nobody knew they were in.
+
+   Removals travel as records (see trMarkGone), never as missing documents. */
+var TRSYNC_KEY='ut_trials_shared_v1';
+var TRSYNC_COLL='trials';
+var TRSYNC_LIFTS='triallifts';
+var TRSYNC_RETRY_MS=10000;
+var TRSYNC={ on:false, live:false, liveLifts:false, ready:false, readyLifts:false,
+             seen:{}, liftSeen:{}, lifts:{}, err:null, up:0, down:0, failed:{} };
+var _trsyncNextTry=0;
+
+function trsyncWanted(){ try{ return localStorage.getItem(TRSYNC_KEY)==='1'; }catch(e){ return false; } }
+function trsyncHydrate(){ TRSYNC.on=trsyncWanted(); }
+function trsyncSetWanted(on){
+  try{ localStorage.setItem(TRSYNC_KEY,on?'1':'0'); }catch(e){}
+  TRSYNC.on=!!on;
+  if(on){ _trsyncNextTry=0; trsyncStart(); } else trsyncStop();
+}
+
+/* ---- what goes up ----
+   The study, with every trace of lift state stripped out of its restrictions.
+   Whether a restriction is lifted is answered by triallifts and by nothing
+   else; a copy of the answer inside the study document would be a second
+   source of truth, and the two would disagree the first time Bill lifted
+   something while the lab was editing. */
+function trTrialDoc(t){
+  var out; try{ out=JSON.parse(JSON.stringify(t||{})); }catch(e){ return null; }
+  if(!out||!out.id||typeof out.title!=='string') return null;
+  out.id=String(out.id);
+  out.lab=String(out.lab||'');
+  if(!out.lab) return null;
+  out.removed=false;
+  (out.restrictions||[]).forEach(function(r){
+    if(!r) return;
+    delete r.lifted; delete r.liftedBy; delete r.liftedByPid;
+  });
+  return out;
+}
+function trGoneDoc(g){
+  if(!g||!g.id||!g.lab) return null;
+  return { id:String(g.id), lab:String(g.lab), title:String(g.title||''), removed:true,
+           removedBy:String(g.removedBy||''), removedByPid:String(g.removedByPid||''),
+           removedAt:String(g.removedAt||'') };
+}
+function trLiftDoc(t,r){
+  if(!t||!r||!r.id||!r.lifted) return null;
+  return { id:String(r.id), trialId:String(t.id), lab:String(t.lab||''),
+           lifted:String(r.lifted), liftedBy:String(r.liftedBy||''),
+           liftedByPid:String(r.liftedByPid||'') };
+}
+function trTrialJson(t){ var d=trTrialDoc(t); return d?JSON.stringify(d):null; }
+function trLiftJson(t,r){ var d=trLiftDoc(t,r); return d?JSON.stringify(d):null; }
+
+/* ---- what this phone is allowed to offer ----
+   Never offer a write that is going to be refused: every phone holds a copy of
+   every study, and pushing back the ones this person cannot edit would log a
+   pile of refusals nobody caused. */
+function trsyncCanPushTrial(t){ return !!t && trCanEditLab(t.lab); }
+function trsyncCanPushLift(t){ return !!t && (trCanEditLab(t.lab)||trCanLiftAny()); }
+
+function trsyncStart(){
+  if(TRSYNC.live&&TRSYNC.liveLifts) return true;
+  if(Date.now()<_trsyncNextTry) return false;
+  var db=fbDb();
+  if(!db||!SESSION.pid){
+    TRSYNC.err=db?'Nobody is signed in yet':'The database code did not load on this device';
+    _trsyncNextTry=Date.now()+TRSYNC_RETRY_MS; return false;
+  }
+  try{
+    if(!TRSYNC.live){
+      TRSYNC.unsub=db.collection(TRSYNC_COLL).onSnapshot(trsyncOnTrials,function(e){ trsyncDown(e); });
+      TRSYNC.live=true;
+    }
+    if(!TRSYNC.liveLifts){
+      TRSYNC.unsubLifts=db.collection(TRSYNC_LIFTS).onSnapshot(trsyncOnLifts,function(e){ trsyncDown(e); });
+      TRSYNC.liveLifts=true;
+    }
+    TRSYNC.err=null; return true;
+  }catch(e){
+    trsyncDown(e); return false;
+  }
+}
+function trsyncDown(e){
+  TRSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+  TRSYNC.live=false; TRSYNC.liveLifts=false; TRSYNC.ready=false; TRSYNC.readyLifts=false;
+  try{ if(TRSYNC.unsub) TRSYNC.unsub(); }catch(_e){}
+  try{ if(TRSYNC.unsubLifts) TRSYNC.unsubLifts(); }catch(_e){}
+  TRSYNC.unsub=null; TRSYNC.unsubLifts=null;
+  _trsyncNextTry=Date.now()+TRSYNC_RETRY_MS;
+}
+function trsyncStop(){
+  try{ if(TRSYNC.unsub) TRSYNC.unsub(); }catch(e){}
+  try{ if(TRSYNC.unsubLifts) TRSYNC.unsubLifts(); }catch(e){}
+  TRSYNC.unsub=null; TRSYNC.unsubLifts=null;
+  TRSYNC.live=false; TRSYNC.liveLifts=false; TRSYNC.ready=false; TRSYNC.readyLifts=false;
+  TRSYNC.seen={}; TRSYNC.liftSeen={}; TRSYNC.lifts={}; TRSYNC.failed={};
+}
+
+/* Stamp whatever lifts we know about onto a study's restrictions. Called after
+   anything replaces a study's contents, so an incoming edit from the lab never
+   quietly un-lifts something Bill lifted. */
+function trsyncApplyLifts(t){
+  if(!t) return false;
+  var touched=false;
+  (t.restrictions||[]).forEach(function(r){
+    if(!r||!r.id) return;
+    var L=TRSYNC.lifts[String(r.id)];
+    if(!L) return;
+    if(r.lifted!==L.lifted||r.liftedBy!==L.liftedBy){
+      r.lifted=L.lifted; r.liftedBy=L.liftedBy; r.liftedByPid=L.liftedByPid||''; touched=true;
+    }
+  });
+  return touched;
+}
+
+function trsyncOnTrials(snap){
+  var changes; try{ changes=snap.docChanges(); }catch(e){ return; }
+  var touched=false;
+  changes.forEach(function(ch){
+    var id=String(ch.doc.id);
+    if(ch.type==='removed'){
+      /* Somebody deleted the document outright rather than marking it removed --
+         not something this app does, but the Firebase console can. Treat it as
+         a removal rather than pretending the study is still running. */
+      delete TRSYNC.seen[id];
+      var had=trById(id);
+      if(had&&trMarkGone(had,'','','')) touched=true;
+      return;
+    }
+    var data; try{ data=ch.doc.data(); }catch(e){ return; }
+    if(!data) return;
+    data.id=id;
+    TRSYNC.seen[id]=JSON.stringify(data);
+    delete TRSYNC.failed[id];
+    TRSYNC.down++;
+    if(data.removed===true){
+      var t0=trById(id);
+      if(t0){ trMarkGone(t0,data.removedBy||'',data.removedByPid||'',data.removedAt||''); touched=true; }
+      else if(!trIsGone(id)){
+        TR_GONE.push({id:id,lab:data.lab||'',title:data.title||'',
+                      removedBy:data.removedBy||'',removedByPid:data.removedByPid||'',
+                      removedAt:data.removedAt||''});
+        touched=true;
+      }
+      return;
+    }
+    if(trIsGone(id)) return;               /* removed here; our tombstone goes up */
+    if(typeof data.title!=='string') return;
+    var have=trById(id);
+    if(have){
+      var mine=JSON.stringify(trTrialDoc(have));
+      if(mine!==JSON.stringify(data)){
+        Object.keys(have).forEach(function(k){ if(!(k in data)) delete have[k]; });
+        Object.keys(data).forEach(function(k){ have[k]=data[k]; });
+        trsyncApplyLifts(have);
+        touched=true;
+      }
+      return;
+    }
+    TRIALS.unshift(data);
+    trsyncApplyLifts(data);
+    touched=true;
+  });
+  var fromCache=true;
+  try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
+  if(!TRSYNC.ready&&!fromCache){ TRSYNC.ready=true; trsyncUploadNew(); }
+  if(touched) trsyncTouched();
+}
+
+function trsyncOnLifts(snap){
+  var changes; try{ changes=snap.docChanges(); }catch(e){ return; }
+  var touched=false;
+  changes.forEach(function(ch){
+    var rid=String(ch.doc.id);
+    if(ch.type==='removed'){ delete TRSYNC.liftSeen[rid]; delete TRSYNC.lifts[rid]; return; }
+    var data; try{ data=ch.doc.data(); }catch(e){ return; }
+    if(!data||!data.lifted) return;
+    data.id=rid;
+    TRSYNC.liftSeen[rid]=JSON.stringify(data);
+    delete TRSYNC.failed[rid];
+    TRSYNC.down++;
+    TRSYNC.lifts[rid]={lifted:String(data.lifted),liftedBy:String(data.liftedBy||''),
+                       liftedByPid:String(data.liftedByPid||'')};
+    TRIALS.forEach(function(t){ if(trsyncApplyLifts(t)) touched=true; });
+  });
+  var fromCache=true;
+  try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
+  if(!TRSYNC.readyLifts&&!fromCache){ TRSYNC.readyLifts=true; trsyncUploadNew(); }
+  if(touched) trsyncTouched();
+}
+
+function trsyncTouched(){
+  try{ storeTouch(); }catch(e){}
+  try{ if(document.getElementById('s-trial').classList.contains('active')&&typeof trRender==='function') trRender(); }catch(e){}
+  try{ if(document.getElementById('s-trialdetail').classList.contains('active')&&typeof trRenderDetail==='function') trRenderDetail(); }catch(e){}
+  try{ trsyncRepaint(); }catch(e){}
+}
+
+function trsyncFail(id,e){
+  TRSYNC.failed[id]=(typeof sdbError==='function')?sdbError(e):String((e&&e.message)||e);
+}
+
+/* First connection: offer up everything the shared copy has never seen. */
+function trsyncUploadNew(){
+  if(!TRSYNC.ready||!TRSYNC.readyLifts) return 0;
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  TRIALS.slice().forEach(function(t){
+    if(!t||!t.id||!trsyncCanPushTrial(t)) return;
+    var id=String(t.id);
+    if(TRSYNC.seen[id]===undefined){
+      var doc=trTrialDoc(t); if(!doc) return;
+      TRSYNC.seen[id]=JSON.stringify(doc); n++; TRSYNC.up++;
+      try{ db.collection(TRSYNC_COLL).doc(id).set(doc).catch(function(e){ trsyncFail(id,e); }); }
+      catch(e){ trsyncFail(id,e); }
+    }
+  });
+  TR_GONE.slice().forEach(function(g){
+    var doc=trGoneDoc(g); if(!doc||!trCanEditLab(doc.lab)) return;
+    if(TRSYNC.seen[doc.id]!==undefined) return;
+    TRSYNC.seen[doc.id]=JSON.stringify(doc); n++; TRSYNC.up++;
+    try{ db.collection(TRSYNC_COLL).doc(doc.id).set(doc).catch(function(e){ trsyncFail(doc.id,e); }); }
+    catch(e){ trsyncFail(doc.id,e); }
+  });
+  trsyncPushLifts(db);
+  if(n){ try{ toast(n+' stud'+(n===1?'y':'ies')+' from this phone sent up'); }catch(e){} }
+  return n;
+}
+
+function trsyncPushLifts(db){
+  var n=0;
+  TRIALS.forEach(function(t){
+    if(!t||!trsyncCanPushLift(t)) return;
+    (t.restrictions||[]).forEach(function(r){
+      if(!r||!r.id||!r.lifted) return;
+      var rid=String(r.id), json=trLiftJson(t,r);
+      if(json===null||TRSYNC.liftSeen[rid]===json) return;
+      TRSYNC.liftSeen[rid]=json; n++; TRSYNC.up++;
+      try{ db.collection(TRSYNC_LIFTS).doc(rid).set(JSON.parse(json)).catch(function(e){ trsyncFail(rid,e); }); }
+      catch(e){ trsyncFail(rid,e); }
+    });
+  });
+  return n;
+}
+
+/* The two-second scan. Sends what changed, and nothing else. */
+function trsyncPush(){
+  if(!TRSYNC.on||!TRSYNC.live||!TRSYNC.ready||!TRSYNC.readyLifts) return 0;
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  TRIALS.forEach(function(t){
+    if(!t||!t.id||!trsyncCanPushTrial(t)) return;
+    var id=String(t.id), json=trTrialJson(t);
+    if(json===null||TRSYNC.seen[id]===json) return;
+    TRSYNC.seen[id]=json; n++; TRSYNC.up++;
+    try{ db.collection(TRSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ trsyncFail(id,e); }); }
+    catch(e){ trsyncFail(id,e); }
+  });
+  TR_GONE.forEach(function(g){
+    var doc=trGoneDoc(g); if(!doc||!trCanEditLab(doc.lab)) return;
+    var json=JSON.stringify(doc);
+    if(TRSYNC.seen[doc.id]===json) return;
+    TRSYNC.seen[doc.id]=json; n++; TRSYNC.up++;
+    try{ db.collection(TRSYNC_COLL).doc(doc.id).set(doc).catch(function(e){ trsyncFail(doc.id,e); }); }
+    catch(e){ trsyncFail(doc.id,e); }
+  });
+  n+=trsyncPushLifts(db);
+  return n;
+}
+function trsyncTick(){
+  if(!TRSYNC.on) return;
+  if(!TRSYNC.live||!TRSYNC.liveLifts){ trsyncStart(); return; }
+  trsyncPush();
+}
+function trsyncRepaint(){
+  try{
+    var d=document.getElementById('s-sharedb');
+    if(d&&d.classList.contains('active')&&typeof sdbRender==='function') sdbRender();
+  }catch(e){}
+}
+function trsyncSummary(){
+  if(!TRSYNC.on) return 'Off — studies and restrictions stay on this phone';
+  if(TRSYNC.err) return TRSYNC.err;
+  if(!TRSYNC.live||!TRSYNC.liveLifts) return 'Connecting…';
+  if(!TRSYNC.ready||!TRSYNC.readyLifts) return 'Connected — waiting for the shared copy';
+  var f=Object.keys(TRSYNC.failed).length;
+  return TRSYNC.up+' sent · '+TRSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+}
+
+/* ================= FARM SETTINGS ================= */
+/* The sprayer numbers, the mower list, the labs list and the semester dates.
+   Four small things rather than a list of records, so this drawer is shaped
+   differently from every other one, in two ways that matter.
+
+   ONE DOCUMENT PER GROUP, not per record. `farmsettings/spray`,
+   `farmsettings/mowers`, `farmsettings/labs`, `farmsettings/semesters`.
+
+   AND THE SHARED COPY WINS ON ARRIVAL. Everywhere else a phone that has been
+   switched off pushes up whatever the shared copy is missing. That is right for
+   a list of jobs and wrong here: these four each have exactly one value, so a
+   phone still holding the built-in defaults would not be adding anything, it
+   would be overwriting the farm's real settings with them. So: turning the
+   switch on TAKES the farm's settings, and this phone only sends a value it
+   changes afterwards. The only exception is a group the shared copy has never
+   held at all, which the first phone that may edit it seeds.
+
+   "Back to the built-in defaults" travels as a VALUE (`v:null`), never as a
+   missing document -- same reasoning as every tombstone in this app. A document
+   that simply vanished would be re-seeded from the next phone that connected,
+   and the reset would undo itself. */
+var FSTSYNC_KEY='ut_farmsettings_shared_v1';
+var FSTSYNC_COLL='farmsettings';
+var FSTSYNC_RETRY_MS=10000;
+var FSTSYNC={ on:false, live:false, ready:false, seen:{}, err:null, up:0, down:0, failed:{} };
+var _fstsyncNextTry=0;
+
+/* One row per group. `read` gives what this phone would send (null meaning the
+   built-in defaults), `apply` takes what arrived, `restore` puts the built-in
+   values back, and `can` is the same gate the screen uses. */
+var FST_GROUPS=[
+ {id:'spray', label:'the sprayer numbers',
+  can:function(){ return (typeof sprCanEdit==='function')&&sprCanEdit(); },
+  read:function(){ var d=sprayDiff(); return (d&&Object.keys(d).length)?d:null; },
+  apply:function(v){ sprayApply(v); },
+  restore:function(){
+    if(!_sprayBase) return;
+    var n=null; try{ n=JSON.parse(_sprayBase.nozzles); }catch(e){ n=null; }
+    sprayApply({nozzles:n,charge:_sprayBase.charge,over:_sprayBase.over});
+  },
+  repaint:function(){ _fstRepaint('s-spraysettings','sprRender'); }},
+
+ {id:'mowers', label:'the mower list',
+  can:function(){ return (typeof mowCanEdit==='function')&&mowCanEdit(); },
+  read:function(){ return mowersDiff(); },
+  apply:function(v){ mowersApply(v); },
+  restore:function(){ if(_mowersBase){ try{ mowersApply(JSON.parse(_mowersBase)); }catch(e){} } },
+  repaint:function(){ _fstRepaint('s-mowersettings','mwsRender'); }},
+
+ {id:'labs', label:'the labs list',
+  can:function(){ return (typeof labsCanEdit==='function')&&labsCanEdit(); },
+  read:function(){ return labsDiff(); },
+  /* labsApply() calls labsRebuild(), which is what carries a lab change into
+     the roster dropdown, the calendar filter and the trials legend. */
+  apply:function(v){ labsApply(v); },
+  restore:function(){ if(_labsBase){ try{ labsApply(JSON.parse(_labsBase)); }catch(e){} } },
+  repaint:function(){ _fstRepaint('s-labsettings','lbsRender'); }},
+
+ {id:'semesters', label:'the semester dates',
+  can:function(){ return (typeof semCanEdit==='function')&&semCanEdit(); },
+  /* Not a diff -- the whole list travels -- but still null while nobody has
+     touched it, so an untouched phone never seeds the shared copy. */
+  read:function(){ return semIsDefault()?null:FARM_SEMS.slice(); },
+  apply:function(v){
+    if(!Array.isArray(v)) return;
+    var good=v.filter(function(x){ return (typeof semValid==='function')&&semValid(x); });
+    if(!good.length) return;
+    FARM_SEMS.length=0;
+    good.forEach(function(x){ FARM_SEMS.push(x); });
+    try{ storeTouch(); }catch(e){}
+  },
+  restore:function(){
+    var b=null; try{ b=JSON.parse(_semBase); }catch(e){ b=null; }
+    if(!Array.isArray(b)) return;
+    FARM_SEMS.length=0;
+    b.forEach(function(x){ FARM_SEMS.push(x); });
+    try{ storeTouch(); }catch(e){}
+  },
+  repaint:function(){ _fstRepaint('s-semsettings','smsRender'); }}
+];
+function fstGroup(id){
+  for(var i=0;i<FST_GROUPS.length;i++) if(FST_GROUPS[i].id===id) return FST_GROUPS[i];
+  return null;
+}
+function _fstRepaint(screenId,fn){
+  try{
+    var d=document.getElementById(screenId);
+    if(d&&d.classList.contains('active')&&typeof window[fn]==='function') window[fn]();
+  }catch(e){}
+  try{
+    var f=document.getElementById('s-farmsettings');
+    if(f&&f.classList.contains('active')&&typeof fstRender==='function') fstRender();
+  }catch(e){}
+}
+
+function fstsyncWanted(){ try{ return localStorage.getItem(FSTSYNC_KEY)==='1'; }catch(e){ return false; } }
+function fstsyncHydrate(){ FSTSYNC.on=fstsyncWanted(); }
+function fstsyncSetWanted(on){
+  try{ localStorage.setItem(FSTSYNC_KEY,on?'1':'0'); }catch(e){}
+  FSTSYNC.on=!!on;
+  if(on){ _fstsyncNextTry=0; fstsyncStart(); } else fstsyncStop();
+}
+function fstDoc(g){
+  var v=null; try{ v=g.read(); }catch(e){ v=null; }
+  if(v===undefined) v=null;
+  return { id:g.id, v:v,
+           updatedAt:new Date().toISOString(),
+           updatedBy:(typeof meName==='function'?meName():'')||'',
+           updatedByPid:SESSION.pid||'' };
+}
+/* The comparison ignores who and when — otherwise every phone would send the
+   same value back and forth forever, each stamping its own name on it. */
+function fstValueJson(g){
+  var v=null; try{ v=g.read(); }catch(e){ v=null; }
+  if(v===undefined) v=null;
+  try{ return JSON.stringify(v===null?null:v); }catch(e){ return null; }
+}
+
+function fstsyncStart(){
+  if(FSTSYNC.live) return true;
+  if(Date.now()<_fstsyncNextTry) return false;
+  var db=fbDb();
+  if(!db||!SESSION.pid){
+    FSTSYNC.err=db?'Nobody is signed in yet':'The database code did not load on this device';
+    _fstsyncNextTry=Date.now()+FSTSYNC_RETRY_MS; return false;
+  }
+  try{
+    FSTSYNC.unsub=db.collection(FSTSYNC_COLL).onSnapshot(fstsyncOnSnapshot,function(e){
+      FSTSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+      FSTSYNC.live=false; FSTSYNC.ready=false; _fstsyncNextTry=Date.now()+FSTSYNC_RETRY_MS;
+    });
+    FSTSYNC.live=true; FSTSYNC.err=null; return true;
+  }catch(e){
+    FSTSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+    _fstsyncNextTry=Date.now()+FSTSYNC_RETRY_MS; return false;
+  }
+}
+function fstsyncStop(){
+  try{ if(FSTSYNC.unsub) FSTSYNC.unsub(); }catch(e){}
+  FSTSYNC.unsub=null; FSTSYNC.live=false; FSTSYNC.ready=false;
+  FSTSYNC.seen={}; FSTSYNC.failed={};
+}
+/* Take what arrived. This is the half that makes the shared copy authoritative. */
+function fstsyncApplyDoc(id,data){
+  var g=fstGroup(id); if(!g) return false;
+  var v=(data&&('v' in data))?data.v:null;
+  var mine=fstValueJson(g);
+  var theirs; try{ theirs=JSON.stringify(v===undefined?null:v); }catch(e){ return false; }
+  FSTSYNC.seen[id]=theirs;
+  if(mine===theirs) return false;
+  try{
+    if(v===null||v===undefined) g.restore();
+    else g.apply(v);
+  }catch(e){ return false; }
+  try{ g.repaint(); }catch(e){}
+  return true;
+}
+function fstsyncOnSnapshot(snap){
+  var changes; try{ changes=snap.docChanges(); }catch(e){ return; }
+  var touched=false;
+  changes.forEach(function(ch){
+    var id=String(ch.doc.id);
+    if(!fstGroup(id)) return;                    /* a group this version does not know */
+    if(ch.type==='removed'){
+      /* Not something this app does — the console can. Treat a vanished
+         document as "nobody has set this", not as "go back to defaults". */
+      delete FSTSYNC.seen[id];
+      return;
+    }
+    var data; try{ data=ch.doc.data(); }catch(e){ return; }
+    FSTSYNC.down++;
+    delete FSTSYNC.failed[id];
+    if(fstsyncApplyDoc(id,data)) touched=true;
+  });
+  var fromCache=true;
+  try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
+  if(!FSTSYNC.ready&&!fromCache){ FSTSYNC.ready=true; fstsyncSeed(); }
+  if(touched){
+    try{ storeTouch(); }catch(e){}
+    try{ fstsyncRepaint(); }catch(e){}
+  }
+}
+/* Only groups the shared copy has NEVER held. Anything already up there is the
+   farm's answer and this phone does not argue with it. */
+function fstsyncSeed(){
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  FST_GROUPS.forEach(function(g){
+    if(FSTSYNC.seen[g.id]!==undefined) return;
+    /* Only a group this phone has actually CHANGED. A phone still on the
+       built-in values has nothing to contribute, and seeding "defaults" from it
+       would reset the farm for everybody the moment somebody who had set the
+       labs up properly connected afterwards. */
+    if(fstValueJson(g)==='null') return;
+    var may=false; try{ may=!!g.can(); }catch(e){ may=false; }
+    if(!may) return;
+    var doc=fstDoc(g);
+    FSTSYNC.seen[g.id]=fstValueJson(g);
+    n++; FSTSYNC.up++;
+    try{ db.collection(FSTSYNC_COLL).doc(g.id).set(doc).catch(function(e){ fstsyncFail(g.id,e); }); }
+    catch(e){ fstsyncFail(g.id,e); }
+  });
+  return n;
+}
+function fstsyncFail(id,e){
+  FSTSYNC.failed[id]=(typeof sdbError==='function')?sdbError(e):String((e&&e.message)||e);
+}
+/* The two-second scan. A group is sent only when what this phone holds has
+   moved away from what it last saw on the shared copy. */
+function fstsyncPush(){
+  if(!FSTSYNC.on||!FSTSYNC.live||!FSTSYNC.ready) return 0;
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  FST_GROUPS.forEach(function(g){
+    var json=fstValueJson(g);
+    if(json===null&&FSTSYNC.seen[g.id]===undefined) return;
+    if(FSTSYNC.seen[g.id]===json) return;
+    var may=false; try{ may=!!g.can(); }catch(e){ may=false; }
+    if(!may) return;                              /* never offer a refused write */
+    FSTSYNC.seen[g.id]=json;
+    n++; FSTSYNC.up++;
+    try{ db.collection(FSTSYNC_COLL).doc(g.id).set(fstDoc(g)).catch(function(e){ fstsyncFail(g.id,e); }); }
+    catch(e){ fstsyncFail(g.id,e); }
+  });
+  return n;
+}
+function fstsyncTick(){
+  if(!FSTSYNC.on) return;
+  if(!FSTSYNC.live){ fstsyncStart(); return; }
+  fstsyncPush();
+}
+function fstsyncRepaint(){
+  try{
+    var d=document.getElementById('s-sharedb');
+    if(d&&d.classList.contains('active')&&typeof sdbRender==='function') sdbRender();
+  }catch(e){}
+}
+function fstsyncSummary(){
+  if(!FSTSYNC.on) return 'Off — settings changed here stay on this phone';
+  if(FSTSYNC.err) return FSTSYNC.err;
+  if(!FSTSYNC.live) return 'Connecting…';
+  if(!FSTSYNC.ready) return 'Connected — waiting for the shared copy';
+  var f=Object.keys(FSTSYNC.failed).length;
+  return FSTSYNC.up+' sent · '+FSTSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+}
+
 /* ---- the correction sheet ----
    Small on purpose. It offers the things that actually go wrong — the plot,
    the date, the time, and on a chemical entry the product and the amounts —
@@ -5720,7 +6277,7 @@ var RST_SEED=[
  {id:'p14',first:'Brandon',last:'Horvath',pron:'he/him/his',role:'Faculty',lab:'Horvath',email:'',active:true},
  {id:'p15',first:'Becky',last:'Bowling',pron:'she/her/hers',role:'Faculty',lab:'Bowling',email:'',active:true},
  {id:'p16',first:'John',last:'Sorochan',pron:'he/him/his',role:'Faculty',lab:'Sorochan',email:'',active:true},
- {id:'p17',first:'John',last:'Stier',pron:'he/him/his',role:'Faculty',lab:'Stier',email:'',active:true},
+ {id:'p17',first:'John',last:'Stier',pron:'he/him/his',role:'Faculty',lab:'Stier',email:'',active:true,grants:['trials:Sorochan']},
  {id:'p18',first:'Garrett',last:'Willard',pron:'he/him/his',role:'Undergraduate Student',lab:'Bill',email:'',active:true},
  {id:'p19',first:'Barrett',last:'Smith',pron:'he/him/his',role:'Undergraduate Student',lab:'Bill',email:'',active:true},
  {id:'p20',first:'Taryn',last:'Breeden',pron:'she/her/hers',role:'Undergraduate Student',lab:'Bill',email:'',active:true},
@@ -5731,6 +6288,25 @@ var RST_SEED=[
 var PEOPLE=RST_SEED.map(function(p){var c={};for(var k in p)c[k]=p[k];return c;});
 try{var _rp=localStorage.getItem(RST_KEY);if(_rp){var _pp=JSON.parse(_rp);if(_pp&&_pp.length)PEOPLE=_pp;}}catch(e){}
 function rstSave(){try{localStorage.setItem(RST_KEY,JSON.stringify(PEOPLE));}catch(e){}}
+/* ---- one-time: Dr. Stier's second lab moves onto the roster --------------
+   It used to be a hardcoded map inside the trials module (TR_EXTRA_LABS), which
+   the database could not read. It is a grant on his roster record now. A phone
+   that already had a saved roster would never see the new seed, so it is
+   stamped on once here, behind a flag, so that clearing it later sticks.
+   Safe to delete this whole block once every phone has opened the app once. */
+(function(){
+  var FLAG='ut_trials_grant_v1';
+  try{ if(localStorage.getItem(FLAG)==='1') return; }catch(e){}
+  try{
+    var p17=null;
+    PEOPLE.forEach(function(p){ if(p&&p.id==='p17') p17=p; });
+    if(p17){
+      p17.grants=p17.grants||[];
+      if(p17.grants.indexOf('trials:Sorochan')<0){ p17.grants.push('trials:Sorochan'); rstSave(); }
+    }
+    localStorage.setItem(FLAG,'1');
+  }catch(e){}
+})();
 function pName(p){return ((p.first||'')+' '+(p.last||'')).replace(/\s+/g,' ').trim();}
 function pInit(p){return (((p.first||'')[0]||'')+((p.last||'')[0]||'')).toUpperCase()||'?';}
 /* ============================================================
@@ -6333,6 +6909,17 @@ var FARM_SEMS=[
  {id:'sem-s27', name:'Spring 2027', start:'2027-01-13', end:'2027-05-07'},
  {id:'sem-u27', name:'Summer 2027', start:'2027-05-17', end:'2027-08-07'}
 ];
+/* The terms as they ship. Captured here, at the declaration, because
+   storeHydrate() later fills FARM_SEMS in place from this phone's saved copy --
+   so by the time anything else runs, the built-in list is gone unless it was
+   kept. Farm settings sync needs it for the same reason the sprayer, mowers and
+   labs need theirs: to tell "nobody has changed this" apart from "somebody set
+   it to exactly this", which is the difference between seeding the shared copy
+   and quietly overwriting it with defaults. */
+var _semBase=JSON.stringify(FARM_SEMS);
+function semIsDefault(){
+  try{ return JSON.stringify(FARM_SEMS)===_semBase; }catch(e){ return false; }
+}
 function semOrd(v){ if(typeof v!=='string'||!SEM_ISO.test(v)) return 0; var p=v.split('-'); return (+p[0])*10000+(+p[1])*100+(+p[2]); }
 function semDateOrd(d){ d=d||new Date(); return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate(); }
 function semValid(x){ return !!(x&&typeof x==='object'&&typeof x.name==='string'&&x.name.trim()&&semOrd(x.start)&&semOrd(x.end)&&semOrd(x.end)>=semOrd(x.start)); }
@@ -6639,6 +7226,40 @@ function personActive(x){ var p=personOf(x); return !!(p&&p.active!==false); }
 function personHas(x,grant){
   var p=personOf(x);
   return !!(p&&p.grants&&p.grants.indexOf(grant)>=0);
+}
+
+/* ---- who may change Farm settings -----------------------------------------
+   Two lines, both read off the ROSTER rather than currentRole. currentRole is
+   screen state the database cannot see, so any gate that consults it is
+   guaranteed to drift from its transcription in firestore.rules -- the bug
+   already caught in schedCanEdit() and trAccess().
+
+   The App Manager post rides on the sign-in TOKEN (`app_admin`), not on the
+   roster, which is the one thing here the database can also see for itself.
+   That is why it is allowed to sit beside a roster question.
+
+   Dillon, 2026-08-26: faculty get the run of Farm settings, on top of the
+   lines that were already there.
+
+     fstCanEditKit()   the sprayer numbers and the mower list -- the people who
+                       actually spray and mow. Everybody but the undergraduates.
+     fstCanEditLists() the labs and the semester dates -- the two lists that
+                       decide who belongs where and when the farm is running.
+                       Bill, faculty, or the App Manager. */
+function fstRole(){
+  if(!SESSION.pid) return null;
+  if(typeof personActive==='function'&&!personActive(SESSION.pid)) return null;
+  return (typeof personRole==='function')?personRole(SESSION.pid):null;
+}
+function fstCanEditKit(){
+  if((typeof rstIsAdmin==='function')&&rstIsAdmin()) return true;
+  var r=fstRole();
+  return !!r && r!=='Undergraduate Student';
+}
+function fstCanEditLists(){
+  if((typeof rstIsAdmin==='function')&&rstIsAdmin()) return true;
+  var r=fstRole();
+  return r==='Farm Manager' || r==='Faculty';
 }
 function assignsUndergrads(x){
   return personRole(x)==='Farm Manager' || personHas(x,GRANT_ASSIGN_UNDERGRADS);
@@ -7005,7 +7626,9 @@ function sprayResetDefaults(){
 
 /* ---- the screen ---- */
 var sprAdding=false;
-function sprCanEdit(){ return (typeof flCanChem==='function'&&flCanChem())||(typeof rstIsAdmin==='function'&&rstIsAdmin()); }
+/* Was flCanChem()||admin, which read currentRole. flCanChem() still governs
+   logging a CHEMICAL in the field log -- a different question, left alone. */
+function sprCanEdit(){ return fstCanEditKit(); }
 function sprNum(v){ var n=parseFloat(String(v==null?'':v).trim()); return isFinite(n)?n:null; }
 
 function sprRender(){
@@ -10068,6 +10691,13 @@ function syncForm(){
  var wrow=document.getElementById('tn-whenrow'), wsel=document.getElementById('tn-when');
  if(wrow&&wsel){ if(asg){ wrow.style.display=''; wsel.innerHTML=asDateOptions(FORM.dueOrd||asTodayOrd()); } else { wrow.style.display='none'; } }
  document.getElementById('tn-schedule').style.display=(req||asg)?'none':'';
+ /* Delete belongs to an existing job on the task list, and nowhere else: not
+    on a new one (there is nothing to delete), not on an assignment, and not on
+    a request. Undergrads never see it because they cannot open this form to
+    edit in the first place, but the check is here too -- a hidden control is a
+    courtesy, not a lock. */
+ var dw=document.getElementById('tn-delwrap');
+ if(dw) dw.style.display=(!req&&!asg&&!!FORM.id&&(typeof tplCanEdit!=='function'||tplCanEdit()))?'':'none';
  document.getElementById('tn-repeat').value=FORM.repeat;
  var custom=FORM.repeat==='Custom';
  document.getElementById('tn-custom-sec').style.display=custom?'':'none';
@@ -10146,6 +10776,13 @@ document.getElementById('tn-months').addEventListener('click',function(e){var c=
 document.getElementById('tn-plots-row').addEventListener('click',function(){openPlotPick();});
 document.getElementById('tn-target').addEventListener('click',function(e){var p=e.target.closest('[data-target]');if(!p)return;FORM.target=p.getAttribute('data-target');document.querySelectorAll('#tn-target .ppill').forEach(function(x){x.classList.remove('on');});p.classList.add('on');});
 document.getElementById('tn-save').addEventListener('click',saveForm);
+document.getElementById('tn-del').addEventListener('click',function(){
+  if(!FORM.id||!tplCanEdit()) return;
+  var t=tplFind(FORM.id); if(!t) return;
+  if(!confirm('Delete “'+t.name+'”?\n\nIt stops showing when anybody assigns work. You can put it back from the bottom of the task list.')) return;
+  var nm=t.name;
+  if(tplRemove(FORM.id)){ toast('Deleted “'+nm+'”'); back(); }
+});
 
 /* ---- Plot picker (real farm map) ---- */
 let PICK=[];
@@ -10243,11 +10880,14 @@ function renderTemplates(){
 
  el.innerHTML=cats.map(function(c){
    return '<div class="sec">'+esc(c)+'</div><div class="list">'+byCat[c].map(function(t){
-     var rm=edit?'<span class="tap" data-tplrm="'+esc(t.id)+'" title="Remove from the list" style="color:#c0392b;font-size:15px;flex:none;padding:0 6px">✕</span>':'';
+     /* The ✕ used to sit here, right-aligned on every row. Deleting now lives
+        at the bottom of the job's own edit form, where the thing itself is in
+        front of you -- rather than a small red cross a thumb can catch while
+        scrolling past forty of them. */
      var chev=edit?'<span style="color:#c2c7cd;font-size:17px;flex:none">›</span>':'';
      return '<div class="row'+(edit?' tap':'')+'" data-tpl="'+esc(t.id)+'">'
        +'<div style="flex:1;min-width:0"><div class="rt">'+esc(t.name)+'</div>'
-       +'<div class="rs">'+tplSummary(t)+'</div></div>'+rm+chev+'</div>';
+       +'<div class="rs">'+tplSummary(t)+'</div></div>'+chev+'</div>';
    }).join('')+'</div>';
  }).join('')
  /* Removed jobs are kept, not destroyed, so somebody who takes one off by
@@ -10268,15 +10908,6 @@ function renderTemplates(){
 }
 document.getElementById('tpl-add').addEventListener('click',function(){ if(tplCanEdit()) openForm(null); });
 document.getElementById('tpl-list').addEventListener('click',function(e){
- var rm=e.target.closest('[data-tplrm]');
- if(rm){
-   e.stopPropagation();
-   var rid=rm.getAttribute('data-tplrm'), rt=tplFind(rid);
-   if(!rt) return;
-   if(!confirm('Take “'+rt.name+'” off the task list?\n\nIt stops showing when anybody assigns work. You can put it back from the bottom of this screen.')) return;
-   if(tplRemove(rid)){ toast('Removed from the list'); renderTemplates(); }
-   return;
- }
  var bk=e.target.closest('[data-tplback]');
  if(bk){ e.stopPropagation(); if(tplRestore(bk.getAttribute('data-tplback'))){ toast('Back on the list ✓'); renderTemplates(); } return; }
  var r=e.target.closest('[data-tpl]');
@@ -12467,9 +13098,12 @@ function mowersUnlisted(){
 }
 
 /* ---- who may change what ---- */
-function mowCanEdit(){ return (typeof flCanChem==='function'&&flCanChem())||(typeof rstIsAdmin==='function'&&rstIsAdmin()); }
-function labsCanEdit(){ return currentRole==='manager'||(typeof rstIsAdmin==='function'&&rstIsAdmin()); }
-function farmCanSee(){ return mowCanEdit()||labsCanEdit()||currentRole==='faculty'; }
+function mowCanEdit(){ return fstCanEditKit(); }
+function labsCanEdit(){ return fstCanEditLists(); }
+/* Faculty now EDIT all four, so the old currentRole==='faculty' special case
+   for merely seeing the page is redundant -- fstCanEditKit() already says yes
+   to them, off the roster. */
+function farmCanSee(){ return fstCanEditKit()||fstCanEditLists(); }
 
 
 /* ========================= SEMESTER DATES =========================
@@ -12483,7 +13117,7 @@ function farmCanSee(){ return mowCanEdit()||labsCanEdit()||currentRole==='facult
    show up on Bill's board -- and a date range that covers a break is a crew
    that shows up for days the farm is shut.
    ================================================================== */
-function semCanEdit(){ return currentRole==='manager'||(typeof rstIsAdmin==='function'&&rstIsAdmin()); }
+function semCanEdit(){ return fstCanEditLists(); }
 
 /* Two terms covering the same day would make "which term is it" a coin toss.
    Report it rather than picking one silently. */
@@ -12819,7 +13453,34 @@ function sdbTasksBlock(){
     explain:'Turning this on sends this phone\'s tasks up to the shared copy and starts showing '
            +'everybody else\'s. Nothing is deleted by turning it on, and turning it off again puts '
            +'this phone back to keeping its own copy.'
-  })+sdbMapBlock()+sdbCrewBlock()+sdbLogBlock()+sdbInvBlock()+sdbSchedBlock()+sdbClockBlock()+sdbTplBlock();
+  })+sdbMapBlock()+sdbCrewBlock()+sdbLogBlock()+sdbInvBlock()+sdbSchedBlock()+sdbClockBlock()+sdbTplBlock()+sdbTrialsBlock()+sdbFarmBlock();
+}
+
+function sdbFarmBlock(){
+  return sdbSwitchBlock({
+    on:FSTSYNC.on, failed:FSTSYNC.failed, summary:fstsyncSummary(), btnId:'sdb-farm',
+    title:'Share farm settings',
+    offLabel:'Off — settings changed here stay on this phone',
+    explain:'The sprayer numbers, the mower list, the labs list and the semester dates. '
+           +'With this off, fixing a nozzle rate fixes it on one phone and the rest of the farm '
+           +'keeps spraying the old figure. Read it before you switch it on: unlike the other '
+           +'switches, this one TAKES the farm\'s settings — anything set differently on this '
+           +'phone is replaced by the shared copy, and from then on this phone sends only what '
+           +'it changes itself.'
+  });
+}
+
+function sdbTrialsBlock(){
+  return sdbSwitchBlock({
+    on:TRSYNC.on, failed:TRSYNC.failed, summary:trsyncSummary(), btnId:'sdb-trials',
+    title:'Share trials and restrictions',
+    offLabel:'Off — studies and restrictions stay on this phone',
+    explain:'The studies running on the farm, and the no-mow, no-spray and no-irrigate '
+           +'restrictions they put on the ground. With this off, a restriction set on one phone '
+           +'is invisible to whoever turns up with the mower. With it on, everybody sees it. '
+           +'A study can still only be changed by its own lab; Bill can lift a restriction on '
+           +'anybody\'s study, and nothing else about it.'
+  });
 }
 
 function sdbTplBlock(){
@@ -12942,6 +13603,20 @@ function sdbPush(){
       var logOn=!FLSYNC.on;
       flsyncSetWanted(logOn);
       toast(logOn?'Sharing the field log':'The log stays on this phone');
+      sdbRender();
+      return;
+    }
+    if(e.target.closest('#sdb-farm')){
+      var fOn=!FSTSYNC.on;
+      fstsyncSetWanted(fOn);
+      toast(fOn?'Taking the farm\'s settings':'Settings stay on this phone');
+      sdbRender();
+      return;
+    }
+    if(e.target.closest('#sdb-trials')){
+      var trOn=!TRSYNC.on;
+      trsyncSetWanted(trOn);
+      toast(trOn?'Sharing trials and restrictions':'Trials stay on this phone');
       sdbRender();
       return;
     }
@@ -13081,6 +13756,7 @@ document.getElementById('s-mowersettings').addEventListener('change',function(e)
     var nv=(mc.value||'').trim();
     if(!nv){ toast('The machine record cannot be blank'); mwsRender(); return; }
     if(nv===m[0]) return;
+    if(!fstRenameOk('mower',m[0])){ mwsRender(); return; }
     var moved=mowersRename(m[0],nv);
     m[0]=nv; mowersScan(); mapRepaintMowers(); mwsRender();
     toast(moved?(moved+' plot'+(moved===1?'':'s')+' moved to '+nv+' ✓'):('Machine renamed ✓'));
@@ -13218,6 +13894,47 @@ function labsRename(from,to){
   try{ if(typeof trSave==='function') trSave(); }catch(e){}
   return n;
 }
+function labsRecordCount(name){
+  var n=0;
+  try{ PEOPLE.forEach(function(p){ if(p&&p.lab===name) n++; }); }catch(e){}
+  try{ TRIALS.forEach(function(t){ if(t&&t.lab===name) n++; }); }catch(e){}
+  return n;
+}
+
+/* ---- the rename warning — Dillon's call, 2026-08-26: warn, then allow -------
+   A rename here moves records that do NOT travel through this drawer. The new
+   NAME goes up with farm settings; the records it moved go up with the map (for
+   a mower) or with the roster and the trials (for a lab). If the drawer that
+   carries them is switched off on this phone, everybody else gets the new name
+   attached to nothing, and their plots or studies still say the old one.
+
+   That failure is visible rather than silent — both screens already have an
+   "in use but not on the list" section, which is exactly where the orphans turn
+   up — so this warns and lets you go ahead. It says nothing at all when farm
+   settings are not being shared, because then nothing is travelling anyway. */
+function fstRenameOk(kind,from){
+  if(!FSTSYNC.on) return true;
+  var moved=0, carrier='', what='';
+  if(kind==='mower'){
+    moved=(typeof mowersPlotCount==='function')?mowersPlotCount(from):0;
+    if(!moved) return true;
+    if(typeof MSYNC!=='undefined'&&MSYNC.on) return true;
+    carrier='Share map corrections';
+    what=moved+' plot'+(moved===1?' is':'s are')+' booked on this machine, and plot records '
+        +'travel with the map.';
+  } else {
+    moved=(typeof labsRecordCount==='function')?labsRecordCount(from):0;
+    if(!moved) return true;
+    if(typeof TRSYNC!=='undefined'&&TRSYNC.on) return true;
+    carrier='Share trials and restrictions';
+    what=moved+' person or study '+(moved===1?'is':'are')+' filed under this lab, and studies '
+        +'travel with the trials.';
+  }
+  return confirm(
+    what+'\n\n"'+carrier+'" is off on this phone, so the new name will reach everybody but '
+    +'those records will not — other phones will keep showing the old one.\n\n'
+    +'Rename anyway?');
+}
 
 document.getElementById('s-labsettings').addEventListener('change',function(e){
   if(!labsCanEdit()) return;
@@ -13228,6 +13945,7 @@ document.getElementById('s-labsettings').addEventListener('change',function(e){
     if(!v){ toast('The lab needs a name'); lbsRender(); return; }
     if(v===l.name) return;
     if(labFind(v)){ toast('There is already a lab called '+v); lbsRender(); return; }
+    if(!fstRenameOk('lab',l.name)){ lbsRender(); return; }
     var moved=labsRename(l.name,v);
     l.name=v; labsRebuild(); labsScan(); lbsRender();
     toast(moved?(v+' · '+moved+' record'+(moved===1?'':'s')+' moved ✓'):('Renamed to '+v+' ✓'));
@@ -13675,8 +14393,16 @@ var TR_SEED_V=5;                       /* bump when the demo studies change */
    anything but that original seed. */
 var TRIALS_STRIPPED_SEED_IDS=['s1','r1','r2','s2','r3','r4','r12','s3','r5','r13','s4','r6','r7','s5','r8','r14','r15','s6','r9','s7','r10','s8','r11'];
 function trLoad(){
-  try{var r=JSON.parse(localStorage.getItem(TR_KEY)||'null'); if(r&&r.length){TRIALS=r;trReseed();trMigrate();return;}}catch(e){}
-  TRIALS=JSON.parse(JSON.stringify(TRIALS_SEED)); trSave();
+  /* Filled in place rather than reassigned: STORE_DEFS, TRSYNC and a dozen
+     closures all hold this one array, and swapping it for a new one would
+     leave every one of them pointing at the old contents. */
+  try{
+    var r=JSON.parse(localStorage.getItem(TR_KEY)||'null');
+    if(r&&r.length){ TRIALS.length=0; r.forEach(function(x){ if(x) TRIALS.push(x); }); trReseed(); trMigrate(); return; }
+  }catch(e){}
+  TRIALS.length=0;
+  JSON.parse(JSON.stringify(TRIALS_SEED)).forEach(function(x){ TRIALS.push(x); });
+  trSave();
   try{localStorage.setItem(TR_KEY+'_v',TR_SEED_V);}catch(e){}
 }
 /* Demo studies are refreshed in place when the seed changes; anything the user
@@ -13687,7 +14413,8 @@ function trReseed(){
   var seedIds={}; TRIALS_SEED.forEach(function(x){ seedIds[x.id]=x; });
   TRIALS_STRIPPED_SEED_IDS.forEach(function(id){ seedIds[id]=true; });
   var kept=TRIALS.filter(function(t){ return !seedIds[t.id]; });
-  TRIALS=JSON.parse(JSON.stringify(TRIALS_SEED)).concat(kept);
+  var fresh=JSON.parse(JSON.stringify(TRIALS_SEED)).concat(kept);
+  TRIALS.length=0; fresh.forEach(function(x){ TRIALS.push(x); });
   trSave();
   try{localStorage.setItem(TR_KEY+'_v',TR_SEED_V);}catch(e){}
 }
@@ -13711,7 +14438,43 @@ function trMigrate(){
   });
   if(changed) trSave();
 }
-function trSave(){ try{localStorage.setItem(TR_KEY,JSON.stringify(TRIALS));}catch(e){} }
+/* The studies used to save themselves with their own localStorage write, which
+   is why they were the last farm-wide list that never left the phone that made
+   them. TRIALS is a registered store now (see STORE_DEFS), so the same
+   two-second scan that persists tasks, stock and the field log persists this,
+   and TRSYNC can carry it to everybody else. */
+function trSave(){ try{ storeTouch(); }catch(e){} }
+
+/* ---- removed studies ----
+   A removal has to travel as a RECORD, never as a missing one. A phone that was
+   switched off still holds its own copy of every study, and on being switched
+   on it pushes up whatever the shared copy lacks -- against a genuine deletion
+   that puts the study straight back. Against a tombstone it does not.
+
+   Kept as a separate short list rather than a `removed` flag on the study
+   itself, so that the twenty-odd places that read TRIALS carry on seeing
+   exactly what they see today: a deleted study is simply not in the array. */
+var TR_GONE_KEY='ut_trials_gone_v1';
+var TR_GONE=[];
+function trIsGone(id){
+  id=String(id);
+  for(var i=0;i<TR_GONE.length;i++){ if(TR_GONE[i]&&String(TR_GONE[i].id)===id) return true; }
+  return false;
+}
+function trDropLocal(id){
+  id=String(id); var hit=false;
+  for(var i=TRIALS.length-1;i>=0;i--){ if(String(TRIALS[i].id)===id){ TRIALS.splice(i,1); hit=true; } }
+  return hit;
+}
+function trMarkGone(t,byName,byPid,at){
+  var id=String(t&&t.id||''); if(!id) return false;
+  trDropLocal(id);
+  if(trIsGone(id)) return false;
+  TR_GONE.push({id:id,lab:(t&&t.lab)||'',title:(t&&t.title)||'',
+                removedBy:byName||'',removedByPid:byPid||'',
+                removedAt:at||new Date().toISOString()});
+  return true;
+}
 trLoad();
 
 /* ---- helpers ---- */
@@ -13793,34 +14556,96 @@ function trLabColor(lab){ return TR_LABS[lab]||'#8a8f98'; }
    is the exception list rather than a column, and it stays small. In Postgres
    this is a person_lab join table; keeping it keyed by pid here means it ports
    as rows rather than needing a rethink. */
-var TR_EXTRA_LABS={ p17:['Sorochan'] };   /* Dr. Stier also edits Sorochan */
+/* ---- who may edit which lab's studies -------------------------------------
+   Read off the ROSTER, never off currentRole. currentRole is screen state the
+   database cannot see, so a rule that consults it is guaranteed to drift from
+   its transcription in firestore.rules -- the same bug that was caught in
+   schedCanEdit(). Transcribed there as canEditTrialLab() and liftsRestrictions().
 
-var TR_ACCESS={
-  manager:  {seeAll:true },
-  faculty:  {seeAll:false},
-  grad:     {seeAll:false},
-  tech:     {seeAll:false},
-  undergrad:{seeAll:false, noEdit:true}
-};
-function trAccess(){
-  var base=TR_ACCESS[currentRole]||TR_ACCESS.undergrad;
-  var labs=[];
-  if(!base.noEdit){
-    var lab=myLab();
-    if(lab&&lab!=='—') labs.push(lab);
-    (TR_EXTRA_LABS[SESSION.pid]||[]).forEach(function(l){ if(labs.indexOf(l)<0)labs.push(l); });
-  }
-  return {seeAll:!!base.seeAll, editLabs:labs};
+   The second lab (Dr. Stier also editing Sorochan) used to live in a hardcoded
+   map right here. It is a roster GRANT now -- 'trials:Sorochan' on his roster
+   record -- so the app and the database read one source instead of two, and it
+   travels with the roster like every other fact about a person. */
+function trGrantLabs(pid){
+  var p=(typeof personOf==='function')?personOf(pid):null;
+  var out=[];
+  ((p&&p.grants)||[]).forEach(function(g){
+    if(typeof g==='string'&&g.indexOf('trials:')===0){
+      var l=g.slice(7); if(l&&out.indexOf(l)<0) out.push(l);
+    }
+  });
+  return out;
 }
+/* The labs whose protocols, stages and restrictions this person may change:
+   their own, plus any carried as a grant. Undergraduates get none -- doing the
+   work and deciding what the study IS are two different things, the same line
+   invCanEdit() and tplCanEdit() draw. */
+function trEditLabs(pid){
+  if(pid===undefined) pid=SESSION.pid;
+  if(!pid) return [];
+  if(typeof personActive==='function'&&!personActive(pid)) return [];
+  var role=(typeof personRole==='function')?personRole(pid):null;
+  if(!role||role==='Undergraduate Student') return [];
+  /* The Farm Manager edits NO study, and that is Dillon's sentence, 2026-08-26:
+     Bill takes restrictions off, and changes nothing else. He carries a lab on
+     the roster ("Bill") because that is where the pooled undergraduates hang,
+     not because it is a research group -- without this line that pool would
+     read as a lab he could file studies under. */
+  if(role==='Farm Manager') return [];
+  var out=[];
+  var lab=(typeof personLab==='function')?personLab(pid):null;
+  if(lab) out.push(lab);
+  trGrantLabs(pid).forEach(function(l){ if(out.indexOf(l)<0) out.push(l); });
+  return out;
+}
+function trCanEditLab(lab,pid){
+  return !!lab && lab!=='\u2014' && trEditLabs(pid).indexOf(lab)>=0;
+}
+/* ---- lifting -------------------------------------------------------------
+   Dillon, 2026-08-26: Bill can take a restriction off anybody's study, and can
+   change nothing else about it. Lifting is the one thing in this module that
+   reaches across labs, and it belongs to whoever runs the farm rather than to a
+   lab: ground that is fenced off by a study nobody is running any more has to
+   be freeable without chasing a faculty member.
+
+   A role PLUS a movable grant, for the same reason assignsUndergrads() is one:
+   the job has to be handable to somebody while Bill is away, without anybody
+   editing code. Today only the Farm Manager holds it. */
+function trCanLiftAny(pid){
+  if(pid===undefined) pid=SESSION.pid;
+  if(!pid) return false;
+  if(typeof personActive==='function'&&!personActive(pid)) return false;
+  if((typeof personRole==='function')&&personRole(pid)==='Farm Manager') return true;
+  return (typeof personHas==='function')&&personHas(pid,'lift_restrictions');
+}
+/* seeAll is a property of the JOB, not of a lab: Bill runs the whole farm, so
+   he sees every lab's work at every stage. Everybody else sees their own lab's
+   studies plus anything ACTIVE anywhere, because the crew has to know what is
+   on the ground they have been sent to work. */
+function trSeesAll(pid){
+  if(pid===undefined) pid=SESSION.pid;
+  if(!pid) return false;
+  if(typeof personActive==='function'&&!personActive(pid)) return false;
+  return ((typeof personRole==='function')&&personRole(pid)==='Farm Manager')||trCanLiftAny(pid);
+}
+function trAccess(){ return {seeAll:trSeesAll(), editLabs:trEditLabs()}; }
 function trMe(){ return me().n||'Someone'; }
-function trMyLabs(){ return trAccess().editLabs||[]; }
+function trMyLabs(){ return trEditLabs(); }
 function trMyLab(){ return trMyLabs()[0]||''; }
 function trCanCreate(){ return trMyLabs().length>0; }
-function trCanEdit(t){ return !!t && trMyLabs().indexOf(t.lab)>=0; }
-function trCanLift(r){
+function trCanEdit(t){ return !!t && trCanEditLab(t.lab); }
+function trTrialOfRes(r){
   var t=null;
   TRIALS.forEach(function(x){ if((x.restrictions||[]).indexOf(r)>=0) t=x; });
-  return trCanEdit(t);
+  return t;
+}
+/* The lab lifts its own; Bill lifts anybody's. Note what this does NOT say:
+   nothing here lets Bill add a restriction, rename a study, move its plots or
+   change its stage. Those stay lab-only, in trCanEdit(). */
+function trCanLift(r){
+  var t=trTrialOfRes(r);
+  if(!t) return false;
+  return trCanEdit(t) || trCanLiftAny();
 }
 /* Everyone sees active studies. Own-lab and the manager see every stage. */
 function trVisible(t){
@@ -14162,7 +14987,7 @@ function trRenderDetail(){
   if(!body._wired){ body._wired=1; body.addEventListener('click',function(e){
     var st=e.target.closest('[data-stage]');
     if(st){ var tt=trById(trCur); if(!tt)return;
-      if(!trCanEdit(tt)){ toast('Only '+esc(tt.lab)+' lab or Bill can change the stage'); return; }
+      if(!trCanEdit(tt)){ toast('Only the '+esc(tt.lab)+' lab can change the stage'); return; }
       tt.stage=st.getAttribute('data-stage'); trSave(); trRenderDetail();
       toast('Stage → '+TR_STAGE[tt.stage].label); return; }
     var lf=e.target.closest('[data-lift]');
@@ -14180,15 +15005,22 @@ function trRenderDetail(){
 function trLift(rid){
   var t=trById(trCur); if(!t) return;
   var r=(t.restrictions||[]).filter(function(x){return x.id===rid;})[0]; if(!r) return;
-  if(!trCanLift(r)){ toast('Only Bill or '+(nameOf(r.by)||r.by)+' can lift this'); return; }
-  r.lifted=trTodayISO(); r.liftedBy=trMe(); trSave(); trRenderDetail();
+  if(!trCanLift(r)){ toast('Only Bill or the '+esc(t.lab)+' lab can lift this'); return; }
+  /* liftedByPid is what TRLIFTS travels on -- the name is for reading, the id
+     is what the shared copy is keyed and checked against. */
+  r.lifted=trTodayISO(); r.liftedBy=trMe(); r.liftedByPid=SESSION.pid||'';
+  trSave(); trRenderDetail();
   toast('Restriction lifted ✓');
   trNotifyBill('Restriction lifted · '+r.scope,trRType(r.type).label+' · '+esc(t.title)+' · '+trMe());
 }
 function trDelete(){
   var t=trById(trCur); if(!t) return;
+  /* The button is only drawn for the lab, but the check lives here as well --
+     and in the rules -- because a hidden button is a courtesy, not a lock. */
+  if(!trCanEdit(t)){ toast('Only the '+esc(t.lab)+' lab can remove this study'); return; }
   if(!confirm('Delete "'+esc(t.title)+'"? This removes its restrictions too.')) return;
-  TRIALS=TRIALS.filter(function(x){return x.id!==t.id;}); trSave();
+  trMarkGone(t,trMe(),SESSION.pid||'');
+  trSave();
   toast('Study deleted'); show('trial',false); trRender();
 }
 
@@ -16693,7 +17525,15 @@ var STORE_DEFS=[
   {name:'semesters',  key:'ut_semesters_v1',  label:'Semester dates',     get:function(){return FARM_SEMS;}},
   /* One record per undergrad per term. Bill's day board is drawn from these,
      so a lost schedule is a person who silently stops showing as available. */
-  {name:'schedules',  key:'ut_schedules_v1',  label:'Weekly schedules',   get:function(){return SCHEDULES;}}
+  {name:'schedules',  key:'ut_schedules_v1',  label:'Weekly schedules',   get:function(){return SCHEDULES;}},
+  /* The studies. They were saving themselves by hand, which is why they were
+     the last farm-wide list that could not leave the phone that made them --
+     and a restriction nobody else can see is the one that gets mown through. */
+  {name:'trials',     key:'ut_trials_v1',     label:'Trials',             get:function(){return TRIALS;}},
+  /* Studies that were removed. Kept as a short list of ids rather than a flag
+     on the study, so every screen that reads TRIALS carries on seeing exactly
+     what it sees today. See trMarkGone(). */
+  {name:'trialsgone', key:'ut_trials_gone_v1',label:'Removed trials',     get:function(){return TR_GONE;}}
 ];
 var STORE_LAST_EXPORT_KEY='ut_last_export';
 var STORE_SCAN_MS=2000;
@@ -16743,6 +17583,8 @@ function storeScan(){
   try{ schsyncTick(); }catch(e){}
   try{ tcsyncTick(); }catch(e){}
   try{ tplsyncTick(); }catch(e){}
+  try{ trsyncTick(); }catch(e){}
+  try{ fstsyncTick(); }catch(e){}
 }
 function storeFlush(){ storeScan(); }
 function storeTouch(){ storeScan(); }   /* callers that want an immediate write */
@@ -16775,6 +17617,8 @@ function storeHydrate(){
   try{ schsyncHydrate(); }catch(e){}
   try{ tcsyncHydrate(); }catch(e){}
   try{ tplsyncHydrate(); }catch(e){}
+  try{ trsyncHydrate(); }catch(e){}
+  try{ fstsyncHydrate(); }catch(e){}
   _storeOn=true;
   try{ setInterval(storeScan,STORE_SCAN_MS); }catch(e){}
 }

@@ -76,8 +76,18 @@ function boot(store) {
       + '\n;window.__p={' + EX.map(n => n + ':(typeof ' + n + '!=="undefined"?' + n + ':undefined)').join(',') + '};'
       /* currentRole is a `let`, so it lives in this eval's own scope and a later
          win.eval('currentRole=...') would create an unrelated global instead.
-         The setter has to be minted in here, with the binding. */
-      + '\n;window.__setRole=function(r){currentRole=r;};window.__role=function(){return currentRole;};');
+         The setter has to be minted in here, with the binding.
+
+         It signs a real person in now rather than just assigning the screen's
+         idea of a role: sprCanEdit() reads the ROSTER since 2026-08-26, which is
+         what lets it be transcribed into firestore.rules at all. */
+      + '\n;window.__setRole=function(r){'
+      + '  var want={manager:"Farm Manager",faculty:"Faculty",grad:"Graduate Student",'
+      + '            tech:"Technician",undergrad:"Undergraduate Student"}[r]||r;'
+      + '  var who=PEOPLE.filter(function(x){return x.role===want&&x.active!==false;})[0];'
+      + '  if(who) sessionSet(who.id); else { SESSION.pid=null; currentRole=r; }'
+      + '  return who&&who.id;};'
+      + '\n;window.__role=function(){return currentRole;};');
   } catch (e) { console.log('app script threw: ' + e.message + '\n' + (e.stack || '').split('\n')[1]); fail++; }
   return { win, doc: win.document, p: win.__p || {}, errs, store };
 }
@@ -240,7 +250,11 @@ section('6. the screen');
   ok('the last tip has no delete', !/data-spr-del/.test(b.doc.getElementById('spr-body').innerHTML));
 }
 
-section('7. only the roles that can log a chemical can edit');
+/* Was "only the roles that can log a chemical" -- sprCanEdit() delegated to
+   flCanChem(), which reads currentRole. It is its own roster-read line now
+   (fstCanEditKit), and Dillon added faculty to Farm settings on 2026-08-26.
+   Logging a chemical is still flCanChem() and still a separate question. */
+section('7. everybody but the undergraduates can edit the sprayer');
 {
   const b = boot({});
   b.win.__setRole('tech');
@@ -249,6 +263,8 @@ section('7. only the roles that can log a chemical can edit');
   ok('so can a grad student', b.p.sprCanEdit() === true);
   b.win.__setRole('manager');
   ok('so can the manager', b.p.sprCanEdit() === true);
+  b.win.__setRole('faculty');
+  ok('and so can faculty now', b.p.sprCanEdit() === true);
 
   b.win.__setRole('undergrad');
   ok('an undergrad cannot', b.p.sprCanEdit() === false);

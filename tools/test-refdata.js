@@ -80,7 +80,16 @@ function boot(store) {
       + '\n;window.__p={' + EX.map(n => n + ':(typeof ' + n + '!=="undefined"?' + n + ':undefined)').join(',') + '};'
       /* currentRole is a `let` and the four derived lists get reassigned, so
          both need a hook minted inside this eval's scope. */
-      + '\n;window.__setRole=function(r){currentRole=r;};'
+      /* Was `currentRole=r`. The Farm settings gates read the ROSTER now, so
+         assigning the screen's idea of your role proves nothing -- it is the
+         exact drift the move off currentRole was meant to end. Sign a real
+         person in instead, picked off the roster by role. */
+      + '\n;window.__setRole=function(r){'
+      + '  var want={manager:"Farm Manager",faculty:"Faculty",grad:"Graduate Student",'
+      + '            tech:"Technician",undergrad:"Undergraduate Student"}[r]||r;'
+      + '  var who=PEOPLE.filter(function(x){return x.role===want&&x.active!==false;})[0];'
+      + '  if(who) sessionSet(who.id); else { SESSION.pid=null; currentRole=r; }'
+      + '  return who&&who.id;};'
       + '\n;window.__lists=function(){return {rst:RST_LABS,cal:CAL_LABS,tr:TR_LABS,ab:TR_LAB_AB};};');
   } catch (e) { console.log('app script threw: ' + e.message + '\n' + (e.stack || '').split('\n')[1]); fail++; }
   return { win, doc: win.document, p: win.__p || {}, errs, store };
@@ -285,7 +294,11 @@ section('9. the screens');
   ok('a duplicate name is refused', b.p.FARM_LABS[2].name === kept, b.p.FARM_LABS[2].name);
 }
 
-section('10. labs are the manager\'s, mowers are the tech\'s');
+/* Two lines, not four, and both read off the roster — see fstCanEditKit() and
+   fstCanEditLists(). Dillon added faculty to the whole page on 2026-08-26; the
+   rest of the grid is as it was. tools/test-farmsettings.js compares both lines
+   against firestore.rules person by person. */
+section('10. the sprayer and mowers are the crew\'s, the labs are Bill\'s and faculty\'s');
 {
   const b = boot({});
   b.win.__setRole('tech');
@@ -297,11 +310,15 @@ section('10. labs are the manager\'s, mowers are the tech\'s');
   ok('an undergrad edits neither', b.p.mowCanEdit() === false && b.p.labsCanEdit() === false);
   ok('and cannot even see the hub', b.p.farmCanSee() === false);
   b.win.__setRole('faculty');
-  ok('faculty can look without editing', b.p.farmCanSee() === true && b.p.labsCanEdit() === false);
+  ok('faculty edit the whole page now', b.p.mowCanEdit() === true && b.p.labsCanEdit() === true);
+  ok('including the semester dates', b.win.eval('semCanEdit()') === true);
 
+  /* A technician is the read-only case on the labs screen. */
+  b.win.__setRole('tech');
   b.p.lbsRender();
   const ro = b.doc.getElementById('lbs-body').innerHTML;
-  ok('the labs screen is read-only for them', !/data-lb-name/.test(ro) && /Read-only for your role/.test(ro));
+  ok('the labs screen is read-only for a technician',
+     !/data-lb-name/.test(ro) && /Read-only for your role/.test(ro));
 
   /* The handler is the fence, not the markup. */
   b.win.__setRole('manager'); b.p.lbsRender();

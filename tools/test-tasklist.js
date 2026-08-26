@@ -106,6 +106,15 @@ ok('the Task Board header opens the list',
    /id="s-taskboard"[\s\S]{0,600}?data-go="templates"/.test(HTML));
 ok('the list has its own Add button', HTML.indexOf('id="tpl-add"') > 0);
 ok('the screen is called the task list', /id="s-templates"[\s\S]{0,400}?>Task list</.test(HTML));
+/* Deleting moved off the rows and onto the job's own form, where the thing is
+   in front of you — a red cross right-aligned on forty scrolling rows is a
+   mis-tap waiting to happen. */
+ok('no ✕ on the rows any more', HTML.indexOf('data-tplrm') < 0);
+ok('the edit form carries the delete', HTML.indexOf('id="tn-del"') > 0);
+ok('Save sits in the form header, right-aligned',
+   /id="s-tasknew"[\s\S]{0,400}?<div class="hdr">[\s\S]{0,600}?id="tn-save"/.test(HTML));
+ok('and no longer in a bar at the bottom',
+   HTML.indexOf('<div class="actionbar"><div class="action" id="tn-save">') < 0);
 
 section('2. undergraduates read it; everybody else writes it');
 {
@@ -130,9 +139,27 @@ section('2. undergraduates read it; everybody else writes it');
   ok('and it never deletes', /match \/templates[\s\S]*?allow delete: if false;/.test(RULES));
 }
 
+section('2b. the delete button appears only where deleting means something');
+{
+  const wrap = () => w.document.getElementById('tn-delwrap').style.display !== 'none';
+  w.eval("sessionSet('p05');");                 // a technician
+  w.eval("openForm(null);");
+  ok('hidden on a brand-new job', !wrap());
+  w.eval("openForm(tplLive()[0]);");
+  ok('shown when editing one that exists', wrap());
+  w.eval("openReqForm(true);");
+  ok('hidden on a labour request', !wrap());
+  w.eval("openCrewReq();");
+  ok('hidden on a request to a grad or tech', !wrap());
+  w.eval("sessionSet('p18');");                 // an undergrad
+  w.eval("openForm(tplLive()[0]);");
+  ok('hidden from an undergrad even on an existing job', !wrap());
+  w.eval("sessionSet('p05');");
+}
+
 section('3. a removal is a tombstone, not a hole');
 {
-  w.eval("SESSION.pid='p05';");                       // a technician
+  w.eval("sessionSet('p05');");                       // a technician
   const before = w.eval("tplLive().length");
   const id = w.eval("tplLive()[0].id");
   const name = w.eval("tplLive()[0].name");
@@ -157,17 +184,17 @@ section('3. a removal is a tombstone, not a hole');
   ok('the job kept its name through all that', w.eval("tplFind(" + JSON.stringify(id) + ").name") === name);
 
   /* An undergrad must not be able to remove one even by calling it directly. */
-  w.eval("SESSION.pid='p18';");
+  w.eval("sessionSet('p18');");
   ok('an undergrad cannot remove', w.eval("tplRemove(" + JSON.stringify(id) + ")") === false);
   ok('nor put one back', w.eval("tplRestore(" + JSON.stringify(id) + ")") === false);
-  w.eval("SESSION.pid='p05';");
+  w.eval("sessionSet('p05');");
 }
 
 section('4. it survives a reload and reaches the backup');
 {
-  w.eval("storeTouch();");
+  w.eval("sessionSet('p05'); storeTouch();");
   ok('the store key was written', typeof store['ut_task_templates_v2'] === 'string');
-  w.eval("SESSION.pid='p05'; openForm(null);");
+  w.eval("sessionSet('p05'); openForm(null);");
   /* The form opens on the first category, which is Mow, and a mow will not
      save without a direction — so drive the category picker the way a person
      would rather than fighting that rule. */

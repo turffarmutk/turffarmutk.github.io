@@ -42,6 +42,15 @@ function shellFiles() {
 }
 function shellVersion(files) {
   const h = crypto.createHash('sha256');
+  /* THIS FILE COUNTS TOO — added 2026-08-27.
+     The version used to be a hash of the precached files alone, so a change to
+     the WORKER'S OWN behaviour (the fetch handler, what it leaves alone)
+     shipped under the old version number. The new worker still installs, but
+     nobody could look at a phone and tell which one it was running — which is
+     exactly the question that mattered the day the shared database would not
+     connect. The worker is generated from this file, so hashing this file
+     covers it. test-pwa.js calls this same function, so the two cannot drift. */
+  h.update(fs.readFileSync(__filename));
   (files || shellFiles()).forEach(f => {
     h.update(f);
     h.update(fs.readFileSync(path.join(ROOT, f)));

@@ -145,26 +145,29 @@ day-to-day value. Everything after it is steady improvement rather than a leap.
 
 ## What happens for each drawer
 
-The same four things, every time:
+**There is no switch any more.** There used to be one per drawer, kept on each
+phone and starting off — and the screen holding them is the App Manager's, so
+nobody else's phone could ever have been turned on anyway. They were taken out
+on 26 August 2026. Sharing is simply on, for everybody, from the moment the app
+opens. What is left is:
 
 **1. I build it.** I write the shape of the drawer and the rules about who can
-open it. You see nothing yet; the app carries on as normal.
+open it. Nothing changes on anybody's phone until the new version ships.
 
-**2. Everyone opens the app once, on wifi.** This is the step that needs you.
-Whatever is on each person's phone gets copied up into the shared drawer. Until
-that happens, their records exist only on their phone — so **anyone who skips
-this loses what they entered.** Five minutes per person, and it has to happen
-before I flip the switch.
+**2. The new version ships.** Each phone picks it up the next time it opens the
+app with signal, and starts sharing that drawer straight away.
 
-**3. I flip the switch.** The shared copy becomes the real one. From here,
-everyone sees the same thing.
+**3. Everyone opens the app once, on wifi.** This is the step that needs you.
+Whatever is already on somebody's phone goes up the first time the app reaches
+the database — so until they open it, their records are still only on their
+phone. Nothing is lost by waiting; it is lost if that phone is wiped, replaced,
+or reinstalled before they ever open it. Five minutes per person.
 
 **4. We watch it for a week.** Then the next drawer.
 
-Step 2 is the only one that can actually lose data. I will make it as obvious as
-I can inside the app — a banner, a nudge — but I cannot make somebody open their
-phone. A message from Bill the week before each switch-over is worth more than
-anything I can build.
+Step 3 is the only one that can lose anything. I will make it as obvious as I
+can inside the app — a banner, a nudge — but I cannot make somebody open their
+phone. A message from Bill is worth more than anything I can build.
 
 ---
 
@@ -206,8 +209,10 @@ before.
 ## What could go wrong, honestly
 
 **Someone's phone records don't get uploaded.** The main risk, and the reason
-for the wifi step. If someone has been logging work for weeks and never opens
-the app before we switch over, that work is gone.
+for the wifi step. Records go up on their own the first time that phone reaches
+the database — but if somebody has been logging work for weeks and their phone
+is wiped or replaced before they ever open the app with signal, that work is
+gone.
 
 **Two people change the same thing at once.** Today this cannot happen because
 the phones never talk. I will handle each case deliberately — first one wins,
@@ -251,7 +256,8 @@ the rest is steady progress you can watch happen.
 2. Agree with Bill **who presses Export and how often**, and put it in a
    calendar.
 3. Think about the questions above; ask Bill the ones that are his call.
-4. Before **each** switch-over: get everybody to open the app once on wifi.
+4. After **each** new version: get everybody to open the app once on wifi, so
+   what is on their phone goes up.
 5. Answer my farm questions as they come up. That is the part only you can do.
 
 Everything else on this page is mine.

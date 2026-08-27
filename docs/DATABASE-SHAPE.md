@@ -226,18 +226,25 @@ remembered.
 3. **Echo.** A record arriving from the server is written into `TSYNC.seen`
    *before* anything else reads it, so the next scan sees no difference.
 
-### The switch is per device, and starts off
+### THERE IS NO SWITCH — removed 26 August 2026
 
-`ut_tasks_shared_v1` in localStorage, flipped on the Shared database screen
-(More → Farm settings → Shared database). This matches the rollout: build it,
-everyone opens the app once on wifi so their records go up, then flip. Dillon
-can turn it on for himself and watch it for a week without changing anybody
-else's phone.
+Sharing is on, on every phone, from the moment the app opens. `tsyncWanted()`
+returns `true` and nothing on any screen can change it; the full reasoning is in
+the comment over `flsyncWanted()` in the app.
 
-**Making the flip farm-wide is the next step and it needs a rules change** — a
-`refdata/config` document with the same write permission as `refdata/roster`,
-read at boot. Worth doing before the crew are switched over, so the flip is one
-decision rather than twenty-three.
+What was there before: `ut_tasks_shared_v1` in localStorage, one key per drawer,
+all starting off, all flipped on **More → Admin → Shared database**. Two things
+were wrong with it. That screen is the App Manager's, so no other phone could
+ever have been switched on at all — the staged rollout it was built for could
+not actually have happened. And a farm where one phone shares and the next does
+not is worse than either answer on its own.
+
+The `refdata/config` document this section used to call the next step is
+therefore **not needed** and was never built. Turning sharing off again now
+means editing the app.
+
+Each drawer still attaches on its own, so one drawer failing does not take the
+other nine with it.
 
 ### Proven by
 
@@ -312,14 +319,15 @@ Writing is gated on being **on that job** — assignee, helper, or the
 undergrad-job holder sorting it out from the shed. Not on rank: undergrads claim
 ground, and being out on the mow is exactly who this is for. A task with no
 record in the database yet is not a reason to refuse, since tasks and the map are
-separate drawers and either may be switched over first.
+separate drawers and either may reach the database first.
 
-### Three switches, one screen
+### Ten read-outs, one screen, no switches
 
-`ut_tasks_shared_v1`, `ut_map_shared_v1`, `ut_crew_shared_v1` — all per device,
-all starting off, all on **More → Farm settings → Shared database**. One per
-drawer on purpose: the rollout is one drawer at a time, and a single switch for
-everything would mean the first thing that went wrong took the rest with it.
+**More → Admin → Shared database** shows one line per drawer — connecting, so
+many sent and received, or what went wrong in words — and the roster button.
+Nothing on it can be turned off; see "THERE IS NO SWITCH" above. The drawers
+still connect separately, so a fault shows up as one red line rather than taking
+the other nine with it.
 
 Proven by `tools/test-mapsync.js` — 49 checks, including that clearing one phone
 deletes nothing, that a correction coming down is not sent straight back, and
@@ -486,14 +494,14 @@ its own copy.
 
 ### THE SHARED COPY WINS ON ARRIVAL
 
-Everywhere else in this app, a phone that has been switched off pushes up
-whatever the shared copy is missing. That is right for a list of jobs and wrong
+Everywhere else in this app, a phone pushes up whatever the shared copy is
+missing. That is right for a list of jobs and wrong
 here: each of these four has exactly one value, so a phone still holding the
 built-in defaults would not be *adding* anything — it would be overwriting the
 farm's real settings with them.
 
-So: turning the switch on **takes** the farm's settings, and the phone then
-sends up only a value it changes itself. Two guards make that safe:
+So: farm settings **takes** rather than sends — the farm's copy wins the moment
+it arrives, and the phone then sends up only a value it changes itself. Two guards make that safe:
 
 1. `fstsyncSeed()` only seeds a group **the shared copy has never held**.
 2. It only seeds a group **this phone has actually changed** — `read()` returning

@@ -256,9 +256,11 @@ section('5. what goes up says who, when, and what');
 section('6. renaming warns when the records it moves cannot follow');
 {
   const src = w.eval("fstRenameOk.toString()");
-  ok('it says nothing when farm settings are not shared', src.indexOf('if(!FSTSYNC.on) return true;') > 0);
-  ok('a mower rename checks map sharing', src.indexOf('MSYNC.on') > 0);
-  ok('a lab rename checks trials sharing', src.indexOf('TRSYNC.on') > 0);
+  /* Every drawer is shared now, so the question is not whether a switch is on
+     -- it is whether this phone has actually REACHED that drawer. */
+  ok('it says nothing while farm settings have not connected', src.indexOf('if(!FSTSYNC.live) return true;') > 0);
+  ok('a mower rename checks the map has connected', src.indexOf('MSYNC.live') > 0);
+  ok('a lab rename checks the trials have connected', src.indexOf('TRSYNC.live') > 0);
   ok('it warns and allows rather than blocking', src.indexOf('return confirm(') > 0);
   ok('the mower rename asks first', HTML.indexOf("fstRenameOk('mower'") > 0);
   ok('and so does the lab rename', HTML.indexOf("fstRenameOk('lab'") > 0);
@@ -288,14 +290,14 @@ section('7. the rules file says all of it');
 }
 
 /* ---------------------------------------------------------------- */
-section('8. the switch, and the wiring');
+section('8. sharing, and the wiring');
 {
-  ok('the switch starts off', p.FSTSYNC && p.FSTSYNC.on === false);
-  ok('it is per device, in localStorage', HTML.indexOf("FSTSYNC_KEY='ut_farmsettings_shared_v1'") > 0);
+  ok('it is on from the moment the app opens', p.FSTSYNC && p.FSTSYNC.on === true);
+  ok('nothing on this phone decides it', HTML.indexOf('ut_farmsettings_shared_v1') < 0);
   ok('one collection, four documents', HTML.indexOf("FSTSYNC_COLL='farmsettings'") > 0);
-  ok('it has a block on the Shared database screen', HTML.indexOf("btnId:'sdb-farm'") > 0);
-  ok('the block is in the chain', HTML.indexOf('+sdbFarmBlock();') > 0);
-  ok('the button is wired', HTML.indexOf("closest('#sdb-farm')") > 0);
+  ok('it has a read-out on the Shared database screen', /st:FSTSYNC,\s*summary:fstsyncSummary\(\)/.test(HTML));
+  ok('the read-out is in the list', /st:TRSYNC[\s\S]{0,900}st:FSTSYNC/.test(HTML));
+  ok('and there is no button to turn it off', HTML.indexOf("closest('#sdb-farm')") < 0);
   ok('it rides the two-second scan', HTML.indexOf('fstsyncTick();') > 0);
   ok('and is hydrated at startup', HTML.indexOf('fstsyncHydrate();') > 0);
   /* Switching this one on REPLACES what is on the phone. Nowhere else does

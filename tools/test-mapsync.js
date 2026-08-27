@@ -187,29 +187,29 @@ section('5. A correction from somebody else lands here');
 }
 
 /* ------------------------------------------- 6. crew claims, off/on ---- */
-section('6. Crew claims — off by default, and only tabs see each other');
-ok('the switch starts off', win.CSYNC.on === false);
+section('6. Crew claims — no switch, so they travel on their own');
+ok('sharing is on with nothing to press', win.CSYNC.on === true);
+ok('and it attached itself once somebody was signed in', win.CSYNC.live === true);
 {
   reset();
   win.crewTake('job1', 'AZ06', 'p18');
-  ok('a claim still works with sharing off', !!win.crewClaim('job1', 'AZ06'));
-  ok('but nothing left this machine', wrote('crew').length === 0);
+  ok('the claim is held here', !!win.crewClaim('job1', 'AZ06'));
+  const w = wrote('crew');
+  ok('and it left this machine without anybody switching anything on',
+     w.length === 1 && w[0].id === 'job1', JSON.stringify(w.map(x => x.id)));
 }
 
-section('7. Turned on, a claim reaches the other people on the job');
-win.csyncSetWanted(true);
-ok('a listener is attached', win.CSYNC.live === true);
+section('7. A claim reaches the other people on the job');
 {
   reset();
   win.crewTake('job1', 'AZ11', 'p18');
   const w = wrote('crew');
   ok('one write, for that job', w.length === 1 && w[0].id === 'job1', JSON.stringify(w.map(x => x.id)));
   ok('it is a merge, so it cannot clobber the rest of the job', w[0].merge === true);
-  /* AZ06 was claimed on this machine BEFORE sharing was switched on, so the
-     first write carries it too — a claim somebody is already holding must not
-     be invisible to everyone else just because the switch came later. */
-  ok('the claim made before the switch goes up as well',
-     Object.keys(w[0].data.claims).sort().join(',') === 'AZ06,AZ11', Object.keys(w[0].data.claims).join(','));
+  /* Only what actually changed is named, so two people claiming different
+     zones on the same job cannot overwrite each other. */
+  ok('and it names only the zone that changed',
+     Object.keys(w[0].data.claims).join(',') === 'AZ11', Object.keys(w[0].data.claims).join(','));
 }
 {
   /* From here on, only what actually changed is named. */
@@ -242,19 +242,19 @@ ok('a listener is attached', win.CSYNC.live === true);
   ok('the heartbeat slows down when it costs a write each time',
      win.crewBeatMs() === win.CREW_BEAT_SHARED_MS && win.CREW_BEAT_SHARED_MS > win.CREW_BEAT_MS);
   win.csyncSetWanted(false);
-  ok('and goes back to the quick beat when it is free again', win.crewBeatMs() === win.CREW_BEAT_MS);
+  ok('and goes back to the quick beat while nothing is attached, when it is free again',
+     win.crewBeatMs() === win.CREW_BEAT_MS);
 }
 
 /* --------------------------------------------------- 8. the screen ----- */
-section('8. All three switches are on one screen');
+section('8. All three are read-outs on one screen');
 {
   win.sdbRender();
   const html = win.document.getElementById('sdb-body').innerHTML;
-  ok('tasks', /Share tasks with everyone/.test(html));
-  ok('the map', /Share map corrections/.test(html));
-  ok('who is working where', /Share who is working where/.test(html));
-  ok('each has its own button',
-     /id="sdb-tasks"/.test(html) && /id="sdb-map"/.test(html) && /id="sdb-crew"/.test(html));
+  ok('tasks', />Tasks</.test(html));
+  ok('the map', />Map corrections</.test(html));
+  ok('who is working where', />Who is working where</.test(html));
+  ok('and not one of them can be switched off', !/Turn off|Turn on/.test(html));
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

@@ -3843,7 +3843,6 @@ document.getElementById('s-fldetail').addEventListener('click',function(e){
    a window onto it.
    ============================================================ */
 
-var FLSYNC_KEY='ut_fieldlog_shared_v1';
 var FLSYNC_COLL='fieldlog';
 var FLSYNC_RETRY_MS=10000;
 
@@ -3851,12 +3850,20 @@ var FLSYNC={ on:false, live:false, ready:false, seen:{}, err:null,
              up:0, down:0, failed:{} };
 var _flsyncNextTry=0;
 
-function flsyncWanted(){
-  try{ return localStorage.getItem(FLSYNC_KEY)==='1'; }catch(e){ return false; }
-}
+/* SHARING IS NOT OPTIONAL — 2026-08-26.
+   Every drawer used to have its own on/off switch, kept in this phone's own
+   storage and starting OFF. Two things were wrong with that. The screen the
+   switches lived on is the App Manager's, so nobody else's phone could ever
+   have been switched on at all; and a farm where one phone shares and the next
+   one does not is worse than either answer on its own. So sharing is simply on,
+   everywhere, always: every *syncWanted() below answers yes and nothing on any
+   screen can change it. Each drawer still connects on its own, so one drawer
+   failing still does not take the rest with it.
+   The *syncSetWanted() functions are kept ONLY so the tests can drive the
+   stop path. Nothing the crew can touch calls them. */
+function flsyncWanted(){ return true; }
 function flsyncHydrate(){ FLSYNC.on=flsyncWanted(); }
 function flsyncSetWanted(on){
-  try{ localStorage.setItem(FLSYNC_KEY,on?'1':'0'); }catch(e){}
   FLSYNC.on=!!on;
   if(on){ _flsyncNextTry=0; flsyncStart(); } else flsyncStop();
 }
@@ -4037,7 +4044,6 @@ function flsyncSummary(){
    built before the sync was.
    =========================================================== */
 
-var INVSYNC_KEY='ut_inventory_shared_v1';
 var INVSYNC_MOVES='invmoves';
 var INVSYNC_ITEMS='invitems';
 var INVSYNC_RETRY_MS=10000;
@@ -4046,12 +4052,10 @@ var INVSYNC={ on:false, live:false, ready:false, seen:{}, itemSeen:{}, err:null,
               up:0, down:0, failed:{} };
 var _invsyncNextTry=0;
 
-function invsyncWanted(){
-  try{ return localStorage.getItem(INVSYNC_KEY)==='1'; }catch(e){ return false; }
-}
+/* On, always — see "SHARING IS NOT OPTIONAL" over flsyncWanted(). */
+function invsyncWanted(){ return true; }
 function invsyncHydrate(){ INVSYNC.on=invsyncWanted(); }
 function invsyncSetWanted(on){
-  try{ localStorage.setItem(INVSYNC_KEY,on?'1':'0'); }catch(e){}
   INVSYNC.on=!!on;
   if(on){ _invsyncNextTry=0; invsyncStart(); } else invsyncStop();
 }
@@ -4292,16 +4296,15 @@ function tcCanEditPunches(){
 }
 
 /* ================= SCHEDULES ================= */
-var SCHSYNC_KEY='ut_schedules_shared_v1';
 var SCHSYNC_COLL='schedules';
 var SCHSYNC_RETRY_MS=10000;
 var SCHSYNC={ on:false, live:false, ready:false, seen:{}, err:null, up:0, down:0, failed:{} };
 var _schsyncNextTry=0;
 
-function schsyncWanted(){ try{ return localStorage.getItem(SCHSYNC_KEY)==='1'; }catch(e){ return false; } }
+/* On, always — see "SHARING IS NOT OPTIONAL" over flsyncWanted(). */
+function schsyncWanted(){ return true; }
 function schsyncHydrate(){ SCHSYNC.on=schsyncWanted(); }
 function schsyncSetWanted(on){
-  try{ localStorage.setItem(SCHSYNC_KEY,on?'1':'0'); }catch(e){}
   SCHSYNC.on=!!on;
   if(on){ _schsyncNextTry=0; schsyncStart(); } else schsyncStop();
 }
@@ -4442,16 +4445,15 @@ function schsyncSummary(){
    to them through the three doors it opens: tcPunchDocs(), tcApplyRemote()
    and tcDropRemote(). Reaching in any other way would mean a second copy of
    the punch list, and two copies of a payroll record is how hours go missing. */
-var TCSYNC_KEY='ut_timeclock_shared_v1';
 var TCSYNC_COLL='punches';
 var TCSYNC_RETRY_MS=10000;
 var TCSYNC={ on:false, live:false, ready:false, seen:{}, err:null, up:0, down:0, failed:{} };
 var _tcsyncNextTry=0;
 
-function tcsyncWanted(){ try{ return localStorage.getItem(TCSYNC_KEY)==='1'; }catch(e){ return false; } }
+/* On, always — see "SHARING IS NOT OPTIONAL" over flsyncWanted(). */
+function tcsyncWanted(){ return true; }
 function tcsyncHydrate(){ TCSYNC.on=tcsyncWanted(); }
 function tcsyncSetWanted(on){
-  try{ localStorage.setItem(TCSYNC_KEY,on?'1':'0'); }catch(e){}
   TCSYNC.on=!!on;
   if(on){ _tcsyncNextTry=0; tcsyncStart(); } else tcsyncStop();
 }
@@ -4579,16 +4581,15 @@ function tcsyncSummary(){
    copy of the list, and on being switched on it pushes up everything the
    shared copy lacks. Against a real deletion that resurrects the job. Against
    a tombstone it does not. */
-var TPLSYNC_KEY='ut_tasklist_shared_v1';
 var TPLSYNC_COLL='templates';
 var TPLSYNC_RETRY_MS=10000;
 var TPLSYNC={ on:false, live:false, ready:false, seen:{}, err:null, up:0, down:0, failed:{} };
 var _tplsyncNextTry=0;
 
-function tplsyncWanted(){ try{ return localStorage.getItem(TPLSYNC_KEY)==='1'; }catch(e){ return false; } }
+/* On, always — see "SHARING IS NOT OPTIONAL" over flsyncWanted(). */
+function tplsyncWanted(){ return true; }
 function tplsyncHydrate(){ TPLSYNC.on=tplsyncWanted(); }
 function tplsyncSetWanted(on){
-  try{ localStorage.setItem(TPLSYNC_KEY,on?'1':'0'); }catch(e){}
   TPLSYNC.on=!!on;
   if(on){ _tplsyncNextTry=0; tplsyncStart(); } else tplsyncStop();
 }
@@ -4748,7 +4749,6 @@ function tplsyncSummary(){
    a race that nobody knew they were in.
 
    Removals travel as records (see trMarkGone), never as missing documents. */
-var TRSYNC_KEY='ut_trials_shared_v1';
 var TRSYNC_COLL='trials';
 var TRSYNC_LIFTS='triallifts';
 var TRSYNC_RETRY_MS=10000;
@@ -4756,10 +4756,10 @@ var TRSYNC={ on:false, live:false, liveLifts:false, ready:false, readyLifts:fals
              seen:{}, liftSeen:{}, lifts:{}, err:null, up:0, down:0, failed:{} };
 var _trsyncNextTry=0;
 
-function trsyncWanted(){ try{ return localStorage.getItem(TRSYNC_KEY)==='1'; }catch(e){ return false; } }
+/* On, always — see "SHARING IS NOT OPTIONAL" over flsyncWanted(). */
+function trsyncWanted(){ return true; }
 function trsyncHydrate(){ TRSYNC.on=trsyncWanted(); }
 function trsyncSetWanted(on){
-  try{ localStorage.setItem(TRSYNC_KEY,on?'1':'0'); }catch(e){}
   TRSYNC.on=!!on;
   if(on){ _trsyncNextTry=0; trsyncStart(); } else trsyncStop();
 }
@@ -5055,7 +5055,6 @@ function trsyncSummary(){
    missing document -- same reasoning as every tombstone in this app. A document
    that simply vanished would be re-seeded from the next phone that connected,
    and the reset would undo itself. */
-var FSTSYNC_KEY='ut_farmsettings_shared_v1';
 var FSTSYNC_COLL='farmsettings';
 var FSTSYNC_RETRY_MS=10000;
 var FSTSYNC={ on:false, live:false, ready:false, seen:{}, err:null, up:0, down:0, failed:{} };
@@ -5129,10 +5128,10 @@ function _fstRepaint(screenId,fn){
   }catch(e){}
 }
 
-function fstsyncWanted(){ try{ return localStorage.getItem(FSTSYNC_KEY)==='1'; }catch(e){ return false; } }
+/* On, always — see "SHARING IS NOT OPTIONAL" over flsyncWanted(). */
+function fstsyncWanted(){ return true; }
 function fstsyncHydrate(){ FSTSYNC.on=fstsyncWanted(); }
 function fstsyncSetWanted(on){
-  try{ localStorage.setItem(FSTSYNC_KEY,on?'1':'0'); }catch(e){}
   FSTSYNC.on=!!on;
   if(on){ _fstsyncNextTry=0; fstsyncStart(); } else fstsyncStop();
 }
@@ -13358,7 +13357,12 @@ function admRender(){
 
 /* ---- Shared database screen ----
    The one screen in the app that talks about the database as a thing. Everybody
-   else's screens should never have to mention it. */
+   else's screens should never have to mention it.
+
+   It used to hold ten switches. It holds none: sharing is on for everybody,
+   always (the note over flsyncWanted() says why). What is left is the roster
+   button and a read-out per drawer, so a fault can be SEEN by whoever holds the
+   App Manager post without anybody reading code. */
 var _sdbBusy=false;
 
 function sdbStatusRow(label,value,good){
@@ -13393,6 +13397,10 @@ function sdbRender(){
      '<div style="margin:14px 16px 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px">'
     +'<div style="font:800 13px \'Archivo\';color:var(--ink)">What this page is for</div>'
     +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:3px;line-height:1.45">'
+    +'Everything below is shared with the whole farm, on every phone, all the time — there is '
+    +'nothing here to switch on. This page is where you check that it is working, and it is the '
+    +'one screen in the app that talks about the database at all.'
+    +'<br><br>'
     +'The database decides who may do what by reading a copy of the roster — who is a technician, '
     +'who is in which lab, who holds the undergrad job. That copy has to be sent up before anything '
     +'else can save. Send it again whenever somebody joins, leaves, or changes lab in More → People.'
@@ -13402,165 +13410,82 @@ function sdbRender(){
     +'<div style="margin:12px 16px 0;font:600 11px \'Public Sans\';color:var(--muted);line-height:1.45">'
     +'Sending it is safe to repeat. It replaces the copy rather than adding to it, so pressing it '
     +'twice does exactly the same as pressing it once.</div>'
-    +sdbTasksBlock()
+    +sdbShareBlocks()
     +'<div style="height:22px"></div>';
 }
 
-/* ---- the drawer switches ----
-   Off on every phone until somebody turns one on, and each says plainly what
-   turning it on does. "Off" here does not mean broken: it means this phone is
-   still keeping its own copy, which is exactly what it did before.
+/* ---- what each drawer is sharing ----
+   These used to be ten on/off switches. Sharing is on for everybody now, always
+   (see the note over flsyncWanted()), so the only question left is whether it
+   is WORKING — and that is what these read-outs answer. Nothing here can be
+   turned off; there is no button.
 
-   One switch per drawer, on purpose. The whole rollout is one drawer at a
-   time, and a single switch for everything would mean the first thing that
-   went wrong took the rest with it. */
-function sdbSwitchBlock(o){
-  var on=o.on;
+   Each drawer still connects on its own, so one of them failing shows up as one
+   red line here instead of taking the other nine with it. */
+function sdbShareBlock(o){
+  var st=o.st||{};
   var sent=rosterSentAt();
-  var failed=Object.keys(o.failed||{});
+  var failed=Object.keys(st.failed||{});
+  var good = !st.err && !!st.live && !failed.length;
 
   var warn = sent ? '' :
       '<div style="margin-top:9px;padding:9px 11px;background:#fdeceb;border-radius:9px;'
      +'font:700 11px \'Public Sans\';color:#c0392b;line-height:1.45">'
      +'Send the roster first. Until it is up there, the database refuses everything.</div>';
 
-  var detail = on
-    ? '<div style="margin-top:9px;font:600 11px \'Public Sans\';color:var(--muted);line-height:1.45">'
-      +esc(o.summary)
-      +(failed.length?('<br>'+failed.length+' record'+(failed.length===1?'':'s')+' the database would not take.'):'')
-      +'</div>'
-    : '<div style="margin-top:9px;font:600 11px \'Public Sans\';color:var(--muted);line-height:1.45">'
-      +esc(o.explain)+'</div>';
+  var line = (typeof o.summary==='string')?o.summary:'';
+  if(failed.length) line += ' · '+failed.length+' record'+(failed.length===1?'':'s')+' the database would not take';
 
   return '<div style="margin:18px 16px 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px">'
-    +'<div style="display:flex;align-items:center;gap:10px">'
-    +'<div style="flex:1;min-width:0">'
     +'<div style="font:800 13px \'Archivo\';color:var(--ink)">'+esc(o.title)+'</div>'
-    +'<div style="font:600 11px \'Public Sans\';color:'+(on?'#2f9e4f':'var(--muted)')+';margin-top:2px">'
-    +(on?'On for this phone':esc(o.offLabel))+'</div></div>'
-    +'<div class="tap" id="'+o.btnId+'" style="flex:none;padding:7px 14px;border-radius:9px;'
-    +'font:800 11.5px \'Public Sans\';'
-    +(on?'background:#e7e9e6;color:#2f3133':'background:var(--acc);color:#fff')+'">'
-    +(on?'Turn off':'Turn on')+'</div></div>'
-    +warn+detail+'</div>';
+    +'<div style="font:600 11px \'Public Sans\';color:'+(good?'#2f9e4f':'#c0392b')+';margin-top:2px">'
+    +esc(line)+'</div>'
+    +'<div style="margin-top:9px;font:600 11px \'Public Sans\';color:var(--muted);line-height:1.45">'
+    +esc(o.what)+'</div>'
+    +warn+'</div>';
 }
 
-function sdbTasksBlock(){
-  return sdbSwitchBlock({
-    on:TSYNC.on, failed:TSYNC.failed, summary:tsyncSummary(), btnId:'sdb-tasks',
-    title:'Share tasks with everyone',
-    offLabel:'Off — this phone keeps its own copy',
-    explain:'Turning this on sends this phone\'s tasks up to the shared copy and starts showing '
-           +'everybody else\'s. Nothing is deleted by turning it on, and turning it off again puts '
-           +'this phone back to keeping its own copy.'
-  })+sdbMapBlock()+sdbCrewBlock()+sdbLogBlock()+sdbInvBlock()+sdbSchedBlock()+sdbClockBlock()+sdbTplBlock()+sdbTrialsBlock()+sdbFarmBlock();
-}
-
-function sdbFarmBlock(){
-  return sdbSwitchBlock({
-    on:FSTSYNC.on, failed:FSTSYNC.failed, summary:fstsyncSummary(), btnId:'sdb-farm',
-    title:'Share farm settings',
-    offLabel:'Off — settings changed here stay on this phone',
-    explain:'The sprayer numbers, the mower list, the labs list and the semester dates. '
-           +'With this off, fixing a nozzle rate fixes it on one phone and the rest of the farm '
-           +'keeps spraying the old figure. Read it before you switch it on: unlike the other '
-           +'switches, this one TAKES the farm\'s settings — anything set differently on this '
-           +'phone is replaced by the shared copy, and from then on this phone sends only what '
-           +'it changes itself.'
-  });
-}
-
-function sdbTrialsBlock(){
-  return sdbSwitchBlock({
-    on:TRSYNC.on, failed:TRSYNC.failed, summary:trsyncSummary(), btnId:'sdb-trials',
-    title:'Share trials and restrictions',
-    offLabel:'Off — studies and restrictions stay on this phone',
-    explain:'The studies running on the farm, and the no-mow, no-spray and no-irrigate '
-           +'restrictions they put on the ground. With this off, a restriction set on one phone '
-           +'is invisible to whoever turns up with the mower. With it on, everybody sees it. '
-           +'A study can still only be changed by its own lab; Bill can lift a restriction on '
-           +'anybody\'s study, and nothing else about it.'
-  });
-}
-
-function sdbTplBlock(){
-  return sdbSwitchBlock({
-    on:TPLSYNC.on, failed:TPLSYNC.failed, summary:tplsyncSummary(), btnId:'sdb-tpl',
-    title:'Share the task list',
-    offLabel:'Off — the list on this phone stays on it',
-    explain:'The jobs the farm does — the list the assign screen is built from. With this off, a '
-           +'job added on one phone can only ever be handed out from that phone. With it on, the '
-           +'whole farm works from one list. Everybody but the undergraduates can add to it and '
-           +'change it; they can read it.'
-  });
-}
-
-function sdbSchedBlock(){
-  return sdbSwitchBlock({
-    on:SCHSYNC.on, failed:SCHSYNC.failed, summary:schsyncSummary(), btnId:'sdb-sched',
-    title:'Share the weekly schedules',
-    offLabel:'Off — hours set on this phone stay on it',
-    explain:'The hours each undergrad says they will be here, set on their own profile. With this '
-           +'off, filling it in changes nothing anybody else can see. With it on, whoever is handing '
-           +'out work sees who is in on the day they are looking at, and how long for. Everybody '
-           +'still only edits their own — Bill can fix one, faculty can fix their own lab\'s.'
-  });
-}
-function sdbClockBlock(){
-  return sdbSwitchBlock({
-    on:TCSYNC.on, failed:TCSYNC.failed, summary:tcsyncSummary(), btnId:'sdb-clock',
-    title:'Share the time clock',
-    offLabel:'Off — hours clocked here stay on this phone',
-    explain:'Clocking in and out already works with this off, but the hours never leave the phone '
-           +'that made them, so every total on Bill\'s and the faculty\'s screens reads as zero. '
-           +'With it on, a punch made in the field reaches the people who sign the timesheet. '
-           +'Everybody clocks themselves; correcting somebody else\'s times stays Bill\'s.'
-  });
-}
-
-function sdbLogBlock(){
-  return sdbSwitchBlock({
-    on:FLSYNC.on, failed:FLSYNC.failed, summary:flsyncSummary(), btnId:'sdb-log',
-    title:'Share the field log',
-    offLabel:'Off — this phone keeps its own log',
-    explain:'Every mow, spray and application, in one place, readable by whoever writes the '
-           +'reports. Nothing in the log is ever deleted — a correction writes a new entry and '
-           +'keeps the old one — so turning this on can only ever add to the record.'
-  });
-}
-
-function sdbInvBlock(){
-  return sdbSwitchBlock({
-    on:INVSYNC.on, failed:INVSYNC.failed, summary:invsyncSummary(), btnId:'sdb-inv',
-    title:'Share what is on the shelf',
-    offLabel:'Off — this phone keeps its own stock figures',
-    explain:'Every delivery booked in and every amount taken out, in one place, so the number on '
-           +'your phone is the number in the chemical building. Stock is kept as a list of what '
-           +'moved rather than one running total, so two people booking a delivery at the same '
-           +'moment both count and neither is lost. Nothing here is ever deleted.'
-  });
-}
-
-function sdbCrewBlock(){
-  return sdbSwitchBlock({
-    on:CSYNC.on, failed:{}, summary:csyncSummary(), btnId:'sdb-crew',
-    title:'Share who is working where',
-    offLabel:'Off — only tabs on this machine see each other',
-    explain:'When two or three people share a mow, each claims a zone so the same ground is not '
-           +'worked twice. With this off, those claims never leave the phone that made them. With '
-           +'it on, the other people on the job see them.'
-  });
-}
-
-function sdbMapBlock(){
-  return sdbSwitchBlock({
-    on:MSYNC.on, failed:MSYNC.failed, summary:msyncSummary(), btnId:'sdb-map',
-    title:'Share map corrections',
-    offLabel:'Off — corrections stay on this phone',
-    explain:'Reshaping a plot, fixing an area, changing a mower or cut height. With this off, '
-           +'those save on this phone only. With it on, a correction reaches everybody — no code '
-           +'change and no new download.'
-  });
+/* All ten, in the order they were built. Anchored on the pair, never the tail —
+   appending an eleventh must not need anything else changed. */
+function sdbShareBlocks(){
+  return [
+   {st:TSYNC,   summary:tsyncSummary(),   title:'Tasks',
+    what:'Every job handed out or picked up, on one list the whole farm reads.'},
+   {st:MSYNC,   summary:msyncSummary(),   title:'Map corrections',
+    what:'Reshaping a plot, fixing an area, changing a mower or cut height. A correction '
+        +'reaches everybody without a code change and without a new download.'},
+   {st:CSYNC,   summary:csyncSummary(),   title:'Who is working where',
+    what:'When two or three people share a mow, each claims a zone so the same ground is '
+        +'not worked twice. The others on the job see the claims.'},
+   {st:FLSYNC,  summary:flsyncSummary(),  title:'The field log',
+    what:'Every mow, spray and application in one place, readable by whoever writes the '
+        +'reports. Nothing in the log is ever deleted — a correction writes a new entry '
+        +'and keeps the old one.'},
+   {st:INVSYNC, summary:invsyncSummary(), title:'What is on the shelf',
+    what:'Every delivery booked in and every amount taken out, so the number on your phone '
+        +'is the number in the chemical building. Stock is kept as a list of what moved '
+        +'rather than one running total, so two people booking a delivery at the same '
+        +'moment both count.'},
+   {st:SCHSYNC, summary:schsyncSummary(), title:'The weekly schedules',
+    what:'The hours each undergrad says they will be here. Whoever is handing out work '
+        +'sees who is in on the day they are looking at, and for how long. Everybody edits '
+        +'their own — Bill can fix one, faculty can fix their own lab\'s.'},
+   {st:TCSYNC,  summary:tcsyncSummary(),  title:'The time clock',
+    what:'A punch made in the field reaches the people who sign the timesheet. Everybody '
+        +'clocks themselves; correcting somebody else\'s times stays Bill\'s.'},
+   {st:TPLSYNC, summary:tplsyncSummary(), title:'The task list',
+    what:'The jobs the farm does — the list the assign screen is built from. Everybody '
+        +'but the undergraduates can add to it and change it; they can read it.'},
+   {st:TRSYNC,  summary:trsyncSummary(),  title:'Trials and restrictions',
+    what:'The studies running on the farm and the no-mow, no-spray and no-irrigate '
+        +'restrictions they put on the ground, so a restriction is visible to whoever turns '
+        +'up with the mower. A study is still only changed by its own lab; Bill can lift a '
+        +'restriction on anybody\'s study and nothing else about it.'},
+   {st:FSTSYNC, summary:fstsyncSummary(), title:'Farm settings',
+    what:'The sprayer numbers, the mower list, the labs list and the semester dates. This '
+        +'is the one that TAKES rather than sends: the farm\'s copy wins on arrival, and '
+        +'from then on this phone sends only what it changes itself.'}
+  ].map(sdbShareBlock).join('');
 }
 
 /* Plain words for every way this can fail. A code nobody can act on is the
@@ -13597,78 +13522,10 @@ function sdbPush(){
 
 (function(){
   var scr=document.getElementById('s-sharedb'); if(!scr) return;
+  /* One button on this screen now. The ten sharing switches were removed on
+     2026-08-26 — see the note over flsyncWanted(). */
   scr.addEventListener('click',function(e){
     if(e.target.closest('#sdb-push')){ sdbPush(); return; }
-    if(e.target.closest('#sdb-log')){
-      var logOn=!FLSYNC.on;
-      flsyncSetWanted(logOn);
-      toast(logOn?'Sharing the field log':'The log stays on this phone');
-      sdbRender();
-      return;
-    }
-    if(e.target.closest('#sdb-farm')){
-      var fOn=!FSTSYNC.on;
-      fstsyncSetWanted(fOn);
-      toast(fOn?'Taking the farm\'s settings':'Settings stay on this phone');
-      sdbRender();
-      return;
-    }
-    if(e.target.closest('#sdb-trials')){
-      var trOn=!TRSYNC.on;
-      trsyncSetWanted(trOn);
-      toast(trOn?'Sharing trials and restrictions':'Trials stay on this phone');
-      sdbRender();
-      return;
-    }
-    if(e.target.closest('#sdb-tpl')){
-      var tplOn=!TPLSYNC.on;
-      tplsyncSetWanted(tplOn);
-      toast(tplOn?'Sharing the task list':'The task list stays on this phone');
-      sdbRender();
-      return;
-    }
-    if(e.target.closest('#sdb-sched')){
-      var schOn=!SCHSYNC.on;
-      schsyncSetWanted(schOn);
-      toast(schOn?'Sharing the weekly schedules':'Schedules stay on this phone');
-      sdbRender();
-      return;
-    }
-    if(e.target.closest('#sdb-clock')){
-      var clkOn=!TCSYNC.on;
-      tcsyncSetWanted(clkOn);
-      toast(clkOn?'Sharing the time clock':'Hours stay on this phone');
-      sdbRender();
-      return;
-    }
-    if(e.target.closest('#sdb-inv')){
-      var invOn=!INVSYNC.on;
-      invsyncSetWanted(invOn);
-      toast(invOn?'Sharing the shelf':'Stock figures stay on this phone');
-      sdbRender();
-      return;
-    }
-    if(e.target.closest('#sdb-crew')){
-      var crewOn=!CSYNC.on;
-      csyncSetWanted(crewOn);
-      toast(crewOn?'Sharing claims with everyone on the job':'Claims stay on this machine');
-      sdbRender();
-      return;
-    }
-    if(e.target.closest('#sdb-map')){
-      var mapOn=!MSYNC.on;
-      msyncSetWanted(mapOn);
-      toast(mapOn?'Sharing map corrections':'Map corrections stay on this phone');
-      sdbRender();
-      return;
-    }
-    if(e.target.closest('#sdb-tasks')){
-      var turningOn=!TSYNC.on;
-      tsyncSetWanted(turningOn);
-      toast(turningOn?'Sharing tasks — sending this phone\'s records up':'This phone is back to its own copy');
-      sdbRender();
-      return;
-    }
   });
 })();
 
@@ -13904,35 +13761,39 @@ function labsRecordCount(name){
 /* ---- the rename warning — Dillon's call, 2026-08-26: warn, then allow -------
    A rename here moves records that do NOT travel through this drawer. The new
    NAME goes up with farm settings; the records it moved go up with the map (for
-   a mower) or with the roster and the trials (for a lab). If the drawer that
-   carries them is switched off on this phone, everybody else gets the new name
-   attached to nothing, and their plots or studies still say the old one.
+   a mower) or with the roster and the trials (for a lab). Every drawer is shared
+   now, so this is no longer a question of a switch — it is a question of what
+   this phone has actually REACHED. Drawers attach one at a time and any of them
+   can be failing on its own, so a phone that has farm settings connected but not
+   the map really can send the new name while the plots it moved sit here
+   waiting.
 
    That failure is visible rather than silent — both screens already have an
    "in use but not on the list" section, which is exactly where the orphans turn
-   up — so this warns and lets you go ahead. It says nothing at all when farm
-   settings are not being shared, because then nothing is travelling anyway. */
+   up — so this warns and lets you go ahead. It says nothing when farm settings
+   are not connected either, because then nothing is travelling anyway. */
 function fstRenameOk(kind,from){
-  if(!FSTSYNC.on) return true;
+  if(!FSTSYNC.live) return true;
   var moved=0, carrier='', what='';
   if(kind==='mower'){
     moved=(typeof mowersPlotCount==='function')?mowersPlotCount(from):0;
     if(!moved) return true;
-    if(typeof MSYNC!=='undefined'&&MSYNC.on) return true;
-    carrier='Share map corrections';
+    if(typeof MSYNC!=='undefined'&&MSYNC.live) return true;
+    carrier='Map corrections';
     what=moved+' plot'+(moved===1?' is':'s are')+' booked on this machine, and plot records '
         +'travel with the map.';
   } else {
     moved=(typeof labsRecordCount==='function')?labsRecordCount(from):0;
     if(!moved) return true;
-    if(typeof TRSYNC!=='undefined'&&TRSYNC.on) return true;
-    carrier='Share trials and restrictions';
+    if(typeof TRSYNC!=='undefined'&&TRSYNC.live) return true;
+    carrier='Trials and restrictions';
     what=moved+' person or study '+(moved===1?'is':'are')+' filed under this lab, and studies '
         +'travel with the trials.';
   }
   return confirm(
-    what+'\n\n"'+carrier+'" is off on this phone, so the new name will reach everybody but '
-    +'those records will not — other phones will keep showing the old one.\n\n'
+    what+'\n\n"'+carrier+'" has not reached the database from this phone yet, so the new name '
+    +'will go up and those records will not — other phones will keep showing the old one until '
+    +'this phone catches up.\n\n'
     +'Rename anyway?');
 }
 
@@ -16252,7 +16113,6 @@ function crewSend(db) {
    eight minutes without one, so that is still four chances to miss.
    ============================================================ */
 
-var CSYNC_KEY='ut_crew_shared_v1';
 var CSYNC_COLL='crew';
 var CSYNC_RETRY_MS=10000;
 var CREW_BEAT_SHARED_MS=120000;
@@ -16260,16 +16120,17 @@ var CREW_BEAT_SHARED_MS=120000;
 var CSYNC={ on:false, live:false, seen:{}, err:null, up:0, down:0 };
 var _csyncNextTry=0;
 
-function csyncWanted(){
-  try{ return localStorage.getItem(CSYNC_KEY)==='1'; }catch(e){ return false; }
-}
+/* On, always — see "SHARING IS NOT OPTIONAL" over flsyncWanted(). */
+function csyncWanted(){ return true; }
 function csyncHydrate(){ CSYNC.on=csyncWanted(); }
 function csyncSetWanted(on){
-  try{ localStorage.setItem(CSYNC_KEY,on?'1':'0'); }catch(e){}
   CSYNC.on=!!on;
   if(on){ _csyncNextTry=0; csyncStart(); } else csyncStop();
 }
-function crewBeatMs(){ return CSYNC.on?CREW_BEAT_SHARED_MS:CREW_BEAT_MS; }
+/* The slow beat is the price of a write per beat, so ask whether a listener
+   is actually attached — CSYNC.on is true on every phone now and answers
+   nothing. A phone with no signal beats at the quick rate, for free. */
+function crewBeatMs(){ return CSYNC.live?CREW_BEAT_SHARED_MS:CREW_BEAT_MS; }
 
 function csyncStart(){
   if(CSYNC.live) return true;
@@ -16465,7 +16326,7 @@ function crewHeartbeat(taskId, on) {
     });
     /* A beat that never leaves the phone lets a live claim read as abandoned
        on everybody else's, which is how the same ground gets mown twice. */
-    if (touched) { if (CSYNC.on) crewSend(db); else crewSave(db); }
+    if (touched) { if (CSYNC.live) crewSend(db); else crewSave(db); }
   }, crewBeatMs());
 }
 
@@ -17661,21 +17522,18 @@ try{
    3. ECHO. A record that arrives from the server is recorded as agreed before
       anything else looks at it, so the scan does not immediately send it back.
 
-   THE SWITCH IS PER DEVICE AND STARTS OFF. That is deliberate and it matches
-   the rollout in docs/BACKEND-STEPS.md: build it, everyone opens the app once
-   on wifi so their records go up, then flip. Dillon can turn it on for himself
-   and watch it for a week without anybody else's phone changing behaviour.
-   Making the flip farm-wide needs a config document and another rules publish;
-   it is written down in docs/DATABASE-SHAPE.md as the next step.
+   THERE IS NO SWITCH. Sharing is on for everybody, always — see the note over
+   flsyncWanted(). It used to be one switch per phone, starting off, on a screen
+   only the App Manager can open, which meant nobody else's phone could ever
+   have been turned on. Removed 2026-08-26.
    ============================================================ */
 
-var TSYNC_KEY='ut_tasks_shared_v1';
 var TSYNC_COLL='tasks';
 var TSYNC_RETRY_MS=10000;      /* how often to re-try attaching, if it failed */
 var TSYNC_MAX_DELETE=5;        /* more than this at once reads as a fault */
 
 var TSYNC={
-  on:false,        /* the switch on this device */
+  on:false,        /* set true at boot by tsyncHydrate(); there is no switch */
   live:false,      /* a listener is attached */
   ready:false,     /* a snapshot has come from the SERVER, not just the cache */
   seen:{},         /* id -> the record this device and the server last agreed on */
@@ -17685,14 +17543,12 @@ var TSYNC={
 };
 var _tsyncNextTry=0;
 
-function tsyncWanted(){
-  try{ return localStorage.getItem(TSYNC_KEY)==='1'; }catch(e){ return false; }
-}
+/* On, always — see "SHARING IS NOT OPTIONAL" over flsyncWanted(). */
+function tsyncWanted(){ return true; }
 function tsyncHydrate(){
   TSYNC.on=tsyncWanted();
 }
 function tsyncSetWanted(on){
-  try{ localStorage.setItem(TSYNC_KEY,on?'1':'0'); }catch(e){}
   TSYNC.on=!!on;
   if(on){ _tsyncNextTry=0; tsyncStart(); } else tsyncStop();
 }
@@ -18043,7 +17899,6 @@ function mapScan(){
    shared map.
    ============================================================ */
 
-var MSYNC_KEY='ut_map_shared_v1';
 var MSYNC_COLL='mapplaces';
 var MSYNC_RETRY_MS=10000;
 
@@ -18051,12 +17906,10 @@ var MSYNC={ on:false, live:false, ready:false, seen:{}, err:null,
             up:0, down:0, failed:{} };
 var _msyncNextTry=0;
 
-function msyncWanted(){
-  try{ return localStorage.getItem(MSYNC_KEY)==='1'; }catch(e){ return false; }
-}
+/* On, always — see "SHARING IS NOT OPTIONAL" over flsyncWanted(). */
+function msyncWanted(){ return true; }
 function msyncHydrate(){ MSYNC.on=msyncWanted(); }
 function msyncSetWanted(on){
-  try{ localStorage.setItem(MSYNC_KEY,on?'1':'0'); }catch(e){}
   MSYNC.on=!!on;
   if(on){ _msyncNextTry=0; msyncStart(); } else msyncStop();
 }
@@ -18249,9 +18102,9 @@ function msyncSummary(){
    the honest way to do it — the overrides are already sitting in ~160 live
    objects that half the app is holding references to. */
 function mapClearOverrides(){
-  /* With the map shared, this button no longer means what it says: the farm's
-     corrections come straight back down on the next load. Say so rather than
-     letting somebody press it expecting a clean slate. */
+  /* The map is shared on every phone, so this button no longer means what it
+     says: the farm's corrections come straight back down on the next load. Say
+     so rather than letting somebody press it expecting a clean slate. */
   if(MSYNC.on){
     toast('The map is shared — the farm\'s corrections will come back on reload');
   }

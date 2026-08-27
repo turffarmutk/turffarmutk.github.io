@@ -317,14 +317,15 @@ section('6. the app and the rules agree about who may write');
      /match \/punches[\s\S]*?allow delete: if actor\(\) && assignsUndergrads\(me\(\)\);/.test(RULES));
 }
 
-section('7. the two switches exist and start off');
+section('7. both are shared, and neither can be turned off');
 {
-  ok('schedules have a shared-database switch', HTML.indexOf("btnId:'sdb-sched'") > 0);
-  ok('the time clock has one', HTML.indexOf("btnId:'sdb-clock'") > 0);
-  ok('schedules start off on a fresh phone', p.SCHSYNC && p.SCHSYNC.on === false);
-  ok('so does the clock', p.TCSYNC && p.TCSYNC.on === false);
-  ok('both are per device, like the others',
-     HTML.indexOf("ut_schedules_shared_v1") > 0 && HTML.indexOf("ut_timeclock_shared_v1") > 0);
+  ok('schedules have a read-out on the Shared database screen',
+     /st:SCHSYNC,\s*summary:schsyncSummary\(\)/.test(HTML));
+  ok('the time clock has one', /st:TCSYNC,\s*summary:tcsyncSummary\(\)/.test(HTML));
+  ok('schedules are on from the moment the app opens', p.SCHSYNC && p.SCHSYNC.on === true);
+  ok('so is the clock', p.TCSYNC && p.TCSYNC.on === true);
+  ok('and nothing on the phone decides either',
+     HTML.indexOf("ut_schedules_shared_v1") < 0 && HTML.indexOf("ut_timeclock_shared_v1") < 0);
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

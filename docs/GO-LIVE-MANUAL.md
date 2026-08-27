@@ -407,12 +407,14 @@ field log, inventory, and the map last.
 
 For each drawer:
 
-1. **I build it** — the drawer and the rules about who can open it. You see
-   nothing yet; the app carries on as normal
-2. **YOU: everybody opens the app once, on wifi.** Whatever is on each person's
-   phone gets copied up. **Anyone who skips this loses what they entered.** This
-   is the step that can actually lose data
-3. **I flip the switch** — the shared copy becomes the real one
+1. **I build it** — the drawer and the rules about who can open it. Nothing
+   changes on anybody's phone until the new version ships
+2. **The new version ships** — each phone starts sharing that drawer the next
+   time it opens the app with signal. There is no switch to flip; the ten
+   per-phone switches were removed on 26 August 2026
+3. **YOU: everybody opens the app once, on wifi.** Whatever is on each person's
+   phone gets copied up the first time it reaches the database. Nothing is lost
+   by waiting — it is lost if a phone is wiped or replaced before that happens
 4. **We watch it for a week**
 
 ---
@@ -475,4 +477,4 @@ Manager → Roster → Hand off the app → Data & backup.
 | 8 | Tell the crew to do the same; nothing to hand out | YOU |
 | 9 | Decide backups and budget with Bill | YOU |
 | 10 | Shared database, one drawer at a time | CLAUDE |
-| 11 | Everyone opens the app on wifi before each switch-over | YOU |
+| 11 | Everyone opens the app on wifi after each new version, so their records go up | YOU |

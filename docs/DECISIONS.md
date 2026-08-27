@@ -28,6 +28,26 @@ down.
 
 ## Process & project
 
+### Sharing has no switch, and no way to turn it off — 2026-08-26
+**Decision:** the ten per-phone sharing switches were deleted. Every drawer
+shares with the whole farm from the moment the app opens, on every phone, and
+nothing on any screen can stop it. Dillon was offered a farm-wide pause button
+and chose not to have one.
+**Why:** the switches were on **More → Admin → Shared database**, which only the
+App Manager can open — so no other phone could ever have been switched on, and
+the staged one-drawer-at-a-time rollout they were built for could not actually
+have happened. A farm where one phone shares and the next does not is also worse
+than either answer on its own: half the crew looking at a day board the other
+half cannot see is how two people mow the same ground. The cost of having no
+off switch is real and was accepted knowingly: if sharing ever misbehaves,
+stopping it means editing the app.
+**Don't:** add a switch back as a "safety valve" without saying where it lives
+and who can reach it — a switch nobody but the App Manager can see is the exact
+mistake this removed. And don't read `X.on` as a question any more: it is `true`
+on every phone forever. The honest question is `X.live` — has this phone
+actually reached that drawer — and that is what `crewBeatMs()` and
+`fstRenameOk()` now ask.
+
 ### The app ships with no login, on purpose and with eyes open — 2026-08-17
 **Decision:** publish to the crew without authentication. The sign-in screen
 stays a person picker; a real password login is the next piece of work, not a

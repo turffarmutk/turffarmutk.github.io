@@ -28,22 +28,36 @@ const section = s => console.log('\n' + s);
 
 /* ------------------------------------------------------- the fake db ---- */
 const state = { docs: {}, writes: [], deletes: [], listeners: [], persistence: 0 };
-function docRef(id) {
-  return {
+/* Every drawer shares now, and any snapshot arriving runs the two-second scan,
+   which attaches the other nine. So this double answers for the TASKS
+   collection only: the rest get a listener that never fires and writes that go
+   nowhere, and what this file measures stays tasks and nothing else. */
+function docRef(coll) {
+  return id => ({
     id: String(id),
-    set(data) { state.writes.push({ id: String(id), data }); state.docs[String(id)] = data; return Promise.resolve(); },
-    delete() { state.deletes.push(String(id)); delete state.docs[String(id)]; return Promise.resolve(); }
-  };
+    set(data) {
+      if (coll === 'tasks') { state.writes.push({ id: String(id), data }); state.docs[String(id)] = data; }
+      return Promise.resolve();
+    },
+    delete() {
+      if (coll === 'tasks') { state.deletes.push(String(id)); delete state.docs[String(id)]; }
+      return Promise.resolve();
+    }
+  });
 }
 const fakeDb = {
   enablePersistence() { state.persistence++; return Promise.resolve(); },
-  collection() {
+  collection(name) {
     return {
-      doc: docRef,
-      onSnapshot(next, err) { state.listeners.push({ next, err }); return () => { state.listeners = []; }; }
+      doc: docRef(name),
+      onSnapshot(next, err) {
+        if (name !== 'tasks') return () => {};
+        state.listeners.push({ next, err });
+        return () => { state.listeners = []; };
+      }
     };
   },
-  doc: docRef
+  doc: docRef('tasks')
 };
 const fakeFirebase = {
   apps: [],
@@ -101,24 +115,26 @@ const setTasks = arr => { T().length = 0; arr.forEach(x => T().push(x)); };
 const job = (id, extra) => Object.assign({ id, title: 'Mow ' + id, area: 'B12', assignee: 'p18',
                                            status: 'todo', kind: 'task', createdBy: 'p07' }, extra || {});
 
-/* ------------------------------------------------ 1. off by default ----- */
-section('1. It is off until somebody turns it on');
-ok('the switch starts off', win.TSYNC.on === false);
-ok('nothing is attached', win.TSYNC.live === false);
+/* --------------------------------------------- 1. on, with no switch ---- */
+section('1. Sharing is on from the moment the app opens');
+ok('it is on with nobody having pressed anything', win.TSYNC.on === true);
+ok('and nothing on this phone decides it', !('ut_tasks_shared_v1' in store));
+ok('nothing is attached until somebody signs in', win.TSYNC.live === false);
 {
   setTasks([job('t1')]);
   reset();
   win.tsyncTick();
-  ok('a scan sends nothing while it is off', state.writes.length === 0 && state.deletes.length === 0);
+  ok('a scan sends nothing with nobody signed in', state.writes.length === 0 && state.deletes.length === 0);
+  ok('and the status line says which of the two it is waiting for',
+     /signed in/i.test(win.tsyncSummary()), win.tsyncSummary());
 }
-ok('the status line says so in plain words', /own copy/i.test(win.tsyncSummary()));
 
-/* -------------------------------------------------- 2. turning it on --- */
-section('2. Turning it on');
+/* ------------------------------------------ 2. it attaches on sign-in --- */
+section('2. Signing in attaches it, with nobody pressing anything');
 win.sessionSet('p07');
 ok('somebody is signed in', win.SESSION.pid === 'p07');
-win.tsyncSetWanted(true);
-ok('the switch is remembered on this device', store['ut_tasks_shared_v1'] === '1');
+win._tsyncNextTry = 0;          /* the attempt above set a ten-second retry delay */
+win.tsyncTick();
 ok('a listener is attached', win.TSYNC.live === true && state.listeners.length === 1);
 ok('the local copy was switched on before anything was read', state.persistence === 1);
 ok('it has not gone live until the server has been heard from', win.TSYNC.ready === false);
@@ -252,11 +268,13 @@ section('8. A removal for something this phone was still sending up');
   ok('but one the shared copy really did have is removed', !T().some(t => t.id === 'g1'));
 }
 
-/* ----------------------------------------------- 9. turning it off ----- */
-section('9. Turning it off puts the phone back as it was');
+/* -------------------------------------------------- 9. the stop path --- */
+section('9. Stopping still cleans up properly');
+/* Nothing on any screen can reach this any more -- the switches were removed
+   on 2026-08-26. It is kept because the code is still here, and code that can
+   still run is code that still has to be right. */
 {
   win.tsyncSetWanted(false);
-  ok('the switch is remembered as off', store['ut_tasks_shared_v1'] === '0');
   ok('nothing is attached', win.TSYNC.live === false);
   ok('what was agreed is forgotten', Object.keys(win.TSYNC.seen).length === 0);
   setTasks([job('h1')]);

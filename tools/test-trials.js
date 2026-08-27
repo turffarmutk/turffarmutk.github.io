@@ -299,20 +299,21 @@ section('7. the rules file says all of it');
 }
 
 /* ---------------------------------------------------------------- */
-section('8. the switch, and the wiring');
+section('8. sharing, and the wiring');
 {
-  ok('the switch starts off', p.TRSYNC && p.TRSYNC.on === false);
-  ok('it is per device, in localStorage', HTML.indexOf("TRSYNC_KEY='ut_trials_shared_v1'") > 0);
-  ok('it has a block on the Shared database screen', HTML.indexOf("btnId:'sdb-trials'") > 0);
-  /* Anchored to the chain, not to being LAST in it -- the next drawer adds
-     itself after this one. */
-  ok('the block is in the chain', /sdbTplBlock\(\)\+sdbTrialsBlock\(\)/.test(HTML));
-  ok('the button is wired', HTML.indexOf("closest('#sdb-trials')") > 0);
+  ok('it is on from the moment the app opens', p.TRSYNC && p.TRSYNC.on === true);
+  ok('nothing on this phone decides it', HTML.indexOf('ut_trials_shared_v1') < 0);
+  ok('it has a read-out on the Shared database screen', /st:TRSYNC,\s*summary:trsyncSummary\(\)/.test(HTML));
+  /* Anchored to the PAIR, not to being last in the list -- the next drawer
+     adds itself after this one. */
+  ok('the read-out is in the list', /st:TPLSYNC[\s\S]{0,900}st:TRSYNC/.test(HTML));
+  ok('and there is no button to turn it off', HTML.indexOf("closest('#sdb-trials')") < 0);
   ok('it rides the two-second scan', HTML.indexOf('trsyncTick();') > 0);
   ok('and is hydrated at startup', HTML.indexOf('trsyncHydrate();') > 0);
   ok('two collections, named', HTML.indexOf("TRSYNC_COLL='trials'") > 0
      && HTML.indexOf("TRSYNC_LIFTS='triallifts'") > 0);
-  ok('off says plainly what off means', /offLabel:'Off — studies and restrictions stay on this phone'/.test(HTML));
+  ok('the read-out says in plain words what is being shared',
+     /restrictions they put on the ground/.test(HTML));
   ok('the summary reads in plain words', typeof w.eval("trsyncSummary()") === 'string');
 }
 

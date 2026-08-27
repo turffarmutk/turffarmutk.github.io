@@ -430,19 +430,16 @@ const snapOf = (docs, fromCache) => ({
   metadata: { fromCache: fromCache !== false }
 });
 
-section('16. sharing the shelf — the switch');
+section('16. sharing the shelf — on, with no switch');
 {
   const b = boot();
-  ok('it starts OFF, like every other drawer', b.p.INVSYNC.on === false);
-  ok('and off is what the device says', b.p.invsyncWanted() === false);
-  ok('the summary says so in plain words', /own stock figures/i.test(b.p.invsyncSummary()),
-     b.p.invsyncSummary());
+  ok('it is ON from the moment the app opens, like every other drawer', b.p.INVSYNC.on === true);
+  ok('and nothing can answer otherwise', b.p.invsyncWanted() === true);
 
   const store = {};
-  const c = boot(store);
-  c.p.invsyncSetWanted(true);
-  ok('turning it on is remembered on THIS device', store['ut_inventory_shared_v1'] === '1');
-  ok('and it is per device, not per person', /_v1$/.test('ut_inventory_shared_v1'));
+  boot(store);
+  ok('no key on this phone decides it', !('ut_inventory_shared_v1' in store));
+  ok('and no screen offers a way to turn it off', HTML.indexOf("btnId:'sdb-inv'") < 0);
 }
 
 section('17. movements arriving from another phone');

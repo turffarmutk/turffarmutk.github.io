@@ -139,7 +139,7 @@ do what is driven by the roster inside the app, which you already edit through
 The file grew two new sections — one for map corrections, one for who is
 working which piece of ground. **Publish it again**, same eight steps. Nothing
 in the farm's day changes when you do; it just means the database will accept
-those two things once the switches are turned on.
+those two things.
 
 Both are governed by one rule you set: **anyone but an undergrad may correct
 the map.** Reshaping a plot, fixing an area, changing a mower or a cut height.
@@ -237,10 +237,10 @@ So the database allows changes here, narrowly:
 
 ### After you publish
 
-Both drawers have their own switch under **More → Admin → Shared database**,
-and both start **off on every phone**, like the others. Turning the schedule
-one on first is the sensible order: the day board is the thing you will
-actually see change.
+Both drawers share on their own — there is nothing to switch on. **More → Admin
+→ Shared database** shows a line per drawer saying whether it is working, and
+the schedule is the one where you will actually see the change: it drives the
+green day board.
 
 ---
 
@@ -270,10 +270,10 @@ having a list at all.
 **Nothing on it is ever really deleted.** Taking a job off marks it as removed
 rather than destroying the record, and the bottom of the Task list screen has a
 "Removed · tap to put back" section. This is not caution for its own sake: a
-phone that has had sharing switched off still holds its own copy of the list,
-and when it reconnects it sends up anything the shared copy is missing. A job
-that had been properly deleted would come straight back from that phone. A job
-marked removed stays removed.
+phone that has been out of signal still holds its own copy of the list, and when
+it reconnects it sends up anything the shared copy is missing. A job that had
+been properly deleted would come straight back from that phone. A job marked
+removed stays removed.
 
 ---
 
@@ -326,7 +326,7 @@ got mown can see exactly what happened and who decided it.
 
 **Nothing here is ever really deleted.** Removing a study marks it removed
 rather than destroying it, for the same reason the task list works that way — a
-phone that has had sharing switched off still holds its own copy, and a properly
+phone that has been out of signal still holds its own copy, and a properly
 deleted study would come straight back from that phone the moment it
 reconnected.
 
@@ -362,23 +362,24 @@ faculty now have the run of the whole page.
   Manager post. These two decide who belongs where and when the farm is running,
   and renaming a lab moves people and studies with it.
 
-### Read this bit before you switch it on
+### Read this bit before you publish
 
-**This switch behaves differently from every other one, on purpose.**
+**This drawer behaves differently from every other one, on purpose.**
 
-Every other switch sends this phone's records up and pulls everybody else's
+Every other drawer sends this phone's records up and pulls everybody else's
 down; nothing is lost either way, because a job is a job and a log entry is a
 log entry. These four are not like that — each is a single value, so two phones
 holding different answers cannot both be right.
 
-So turning this on **takes the farm's settings.** Anything set differently on
-this phone is replaced by the shared copy, and from then on this phone sends up
-only what it changes itself. The switch says so before you press it.
+So farm settings **takes the farm's copy.** Anything set differently on a phone
+is replaced by the shared copy the moment it arrives, and from then on that
+phone sends up only what it changes itself.
 
-The practical consequence: **whoever has the farm's real settings should turn it
-on first.** If your phone has the labs set up properly and somebody else's is
-still on the built-in list, you want yours going up first, not theirs coming
-down. After the first day this stops mattering — there is only one copy.
+The practical consequence: **the phone with the farm's real settings should
+reach the database first.** If your phone has the labs set up properly and
+somebody else's is still on the built-in list, you want yours going up first,
+not theirs coming down — so open the app on wifi yourself before you tell the
+crew to. After the first day this stops mattering: there is only one copy.
 
 A phone still on the built-in values never sends them up at all, so it cannot
 quietly reset the farm.
@@ -393,9 +394,11 @@ copy and the reset would undo itself.
 
 Renaming a mower moves every plot booked on it — 43 plots for the first mower.
 Renaming a lab moves the people and the studies in it. Those moved records
-travel through the **map** and the **trials** switches, not through this one.
+travel through the **map** and the **trials**, not through farm settings.
 
-If the relevant switch is off on your phone when you rename, the app now stops
-and tells you so, and lets you go ahead if you want to. Other phones would show
-the new name with the old records still attached to the old one — visible in the
-"in use but not on the list" section on both screens, rather than silently wrong.
+Those are shared too, so normally they follow. But drawers connect one at a
+time, and if the map or the trials have not reached the database from your phone
+yet when you rename, the app stops and tells you so, and lets you go ahead if
+you want to. Other phones would show the new name with the old records still
+attached to the old one — visible in the "in use but not on the list" section on
+both screens, rather than silently wrong — until your phone catches up.

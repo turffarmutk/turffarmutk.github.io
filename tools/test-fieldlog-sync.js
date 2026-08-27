@@ -264,18 +264,16 @@ clearLog();
      /This entry was corrected/.test(appText) && /This is a correction/.test(appText));
 }
 
-/* --------------------------------------------------- 7. the switch ------ */
-section('7. Four switches, one screen');
+/* ------------------------------------------------- 7. the read-out ------ */
+section('7. Ten read-outs, one screen, no switches');
 {
   win.sdbRender();
   const html = win.document.getElementById('sdb-body').innerHTML;
-  ['sdb-tasks', 'sdb-map', 'sdb-crew', 'sdb-log'].forEach(id => ok(id, html.indexOf('id="' + id + '"') >= 0));
-  /* The explanation shows while a switch is OFF — that is when somebody is
-     deciding whether to press it. */
-  win.flsyncSetWanted(false);
-  win.sdbRender();
-  ok('the log switch says nothing is ever deleted',
-     /is ever deleted/i.test(win.document.getElementById('sdb-body').innerHTML));
+  ['Tasks', 'Map corrections', 'Who is working where', 'The field log']
+    .forEach(t => ok(t, html.indexOf('>' + t + '<') >= 0));
+  ok('nothing on the screen can be switched off', !/Turn off|Turn on/.test(html));
+  ok('the only button left is the roster', (html.match(/class="action tap"/g) || []).length <= 1);
+  ok('the log read-out still says nothing is ever deleted', /is ever deleted/i.test(html));
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

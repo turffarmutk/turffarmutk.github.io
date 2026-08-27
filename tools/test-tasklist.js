@@ -212,10 +212,11 @@ section('4. it survives a reload and reaches the backup');
      String(again.p.TEMPLATES.length));
 }
 
-section('5. the switch exists and starts off');
-ok('the task list has a shared-database switch', HTML.indexOf("btnId:'sdb-tpl'") > 0);
-ok('it starts off on a fresh phone', p.TPLSYNC && p.TPLSYNC.on === false);
-ok('it is per device like the rest', HTML.indexOf('ut_tasklist_shared_v1') > 0);
+section('5. it is shared, and cannot be turned off');
+ok('the task list has a read-out on the Shared database screen',
+   /st:TPLSYNC,\s*summary:tplsyncSummary\(\)/.test(HTML));
+ok('it is on from the moment the app opens', p.TPLSYNC && p.TPLSYNC.on === true);
+ok('and nothing on the phone decides it', HTML.indexOf('ut_tasklist_shared_v1') < 0);
 ok('the publish notes cover it',
    fs.readFileSync(path.join(ROOT, 'docs', 'PUBLISH-THE-RULES.md'), 'utf8').indexOf('the task list') > 0);
 

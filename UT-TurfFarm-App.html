@@ -13406,7 +13406,17 @@ function sdbRender(){
     +'Sending it is safe to repeat. It replaces the copy rather than adding to it, so pressing it '
     +'twice does exactly the same as pressing it once.</div>'
     +sdbShareBlocks()
-    +'<div class="action tap" id="sdb-copy" style="margin:16px 16px 0;background:#fff;'
+    +'<div class="action tap" id="sdb-test" style="margin:16px 16px 0">'
+    +(SDBTEST.state==='running'?'Asking...':'Test the connection now')+'</div>'
+    +(SDBTEST.text
+      ? '<div style="margin:8px 16px 0;padding:10px 12px;border-radius:10px;line-height:1.45;'
+        +'font:700 11.5px \'Public Sans\';'
+        +(SDBTEST.ok===true?'background:#eaf3ea;color:#2f7a43':'background:#fdeceb;color:#c0392b')
+        +'">'+esc(SDBTEST.text)+'</div>'
+      : '<div style="margin:8px 16px 0;font:600 11px \'Public Sans\';color:var(--muted);line-height:1.45">'
+        +'Demands an answer from the database itself rather than the copy saved on this phone. '
+        +'This is the one to press when a drawer above says it has not heard back.</div>')
+    +'<div class="action tap" id="sdb-copy" style="margin:12px 16px 0;background:#fff;'
     +'border:1px solid var(--line);color:var(--ink)">Copy these details</div>'
     +'<div style="margin:8px 16px 0;font:600 11px \'Public Sans\';color:var(--muted);line-height:1.45">'
     +'Puts everything on this page on the clipboard as plain text, so it can be pasted into a '
@@ -13535,6 +13545,43 @@ function sdbPush(){
   });
 }
 
+/* ASK THE DATABASE, RIGHT NOW, AND SAY WHAT HAPPENED
+   ------------------------------------------------------------------
+   Every other read-out on this screen watches the listeners, which serve
+   the saved copy when there is no connection and therefore look calm when
+   there is nothing there. This one is deliberately different: it demands
+   an answer from the SERVER, refuses the saved copy, and reports what came
+   back and how long it took. It is the difference between "this phone
+   cannot reach the database" and "this phone reaches it but something else
+   is wrong", which no other line here can tell you. */
+var SDBTEST={state:'idle',ok:null,text:''};
+function sdbTestNow(){
+  var db=fbDb();
+  if(!db){ SDBTEST={state:'done',ok:false,text:'The database code did not load on this device.'}; sdbRender(); return; }
+  SDBTEST={state:'running',ok:null,text:'Asking the database...'};
+  sdbRender();
+  var t0=Date.now();
+  var done=function(ok,text){
+    if(SDBTEST.state!=='running') return;
+    SDBTEST={state:'done',ok:ok,text:text};
+    try{ sdbRender(); }catch(e){}
+  };
+  setTimeout(function(){
+    done(false,'No answer at all after 20 seconds. This phone cannot reach the database on '
+              +'this connection. Try it on cellular instead of wifi — if it works there, the '
+              +'wifi is blocking it.');
+  },20000);
+  try{
+    db.collection(TSYNC_COLL).get({source:'server'}).then(function(s){
+      done(true,'The database answered in '+(Date.now()-t0)+' milliseconds. It is holding '
+               +s.size+' task'+(s.size===1?'':'s')+'.');
+    }).catch(function(e){
+      done(false,'It answered in '+(Date.now()-t0)+' milliseconds, and refused: '
+               +sdbError(e)+' ['+String((e&&e.code)||'no code')+']');
+    });
+  }catch(e){ done(false,String((e&&e.message)||e)); }
+}
+
 /* EVERYTHING THIS SCREEN KNOWS, AS TEXT YOU CAN SEND SOMEBODY
    ------------------------------------------------------------------
    Diagnosing a phone by asking somebody to read one line back at a time
@@ -13553,6 +13600,7 @@ function sdbDetails(){
   L.push('signed in to the app as: '+(SESSION.pid||'nobody'));
   L.push('the database sees you as: '+sdbWhoLine());
   L.push('roster last sent: '+(rosterSentAt()||'never'));
+  L.push('connection test: '+(SDBTEST.text||'not run'));
   L.push('');
   sdbShareBlocks_raw().forEach(function(o){
     var st=o.st||{}, f=Object.keys(st.failed||{});
@@ -13573,6 +13621,7 @@ function sdbDetails(){
      2026-08-26 — see the note over flsyncWanted(). */
   scr.addEventListener('click',function(e){
     if(e.target.closest('#sdb-push')){ sdbPush(); return; }
+    if(e.target.closest('#sdb-test')){ sdbTestNow(); return; }
     if(e.target.closest('#sdb-copy')){
       var txt=sdbDetails();
       var show=function(){
@@ -19034,6 +19083,33 @@ function fbDb(){
     if(!fbAuth()) return null;                              /* also initialises the app */
     if(typeof firebase.firestore!=='function') return null;  /* library missing */
     _fbDb=firebase.firestore();
+    /* TALK TO GOOGLE THE PLAIN WAY — 2026-08-27.
+       -----------------------------------------------------------------
+       By default this library opens ONE connection to Google and holds it
+       open, and Google pushes changes down it as they happen. It is the
+       efficient way. On a managed network — a campus, a farm office,
+       anything with a filter or a proxy in the middle — that kind of
+       held-open connection is very often dropped, and the library does not
+       treat that as an error. It quietly serves everything out of the copy
+       on the phone instead, forever, and every screen looks normal.
+
+       That is precisely the state a phone was found in: every drawer
+       reporting records received (out of the saved copy) while not one of
+       them had heard from the database since the app opened, nothing red,
+       nothing refused, and nothing ever sent up — because a phone will not
+       send anything until it has heard back once.
+
+       The library has a detector for this and the detector was wrong here.
+       Forcing it means the app asks Google in ordinary short requests
+       instead, the same kind any web page makes. Slightly more chatter for
+       a much better chance of working on whatever network somebody is
+       standing on. For 23 phones on a farm that trade is not close.
+
+       Must be set BEFORE anything else touches the database, which is why
+       it is here and not at a call site. Its own try/catch so that a
+       future version of the library dropping the setting cannot take the
+       whole app down with it. */
+    try{ _fbDb.settings({experimentalForceLongPolling:true}); }catch(e){}
     try{
       /* synchronizeTabs so two open tabs on one machine share the copy rather
          than one of them silently losing it. */

@@ -13406,6 +13406,14 @@ function sdbRender(){
     +'Sending it is safe to repeat. It replaces the copy rather than adding to it, so pressing it '
     +'twice does exactly the same as pressing it once.</div>'
     +sdbShareBlocks()
+    +'<div class="action tap" id="sdb-copy" style="margin:16px 16px 0;background:#fff;'
+    +'border:1px solid var(--line);color:var(--ink)">Copy these details</div>'
+    +'<div style="margin:8px 16px 0;font:600 11px \'Public Sans\';color:var(--muted);line-height:1.45">'
+    +'Puts everything on this page on the clipboard as plain text, so it can be pasted into a '
+    +'message to whoever is looking after the app. No names and no work details are included.</div>'
+    +'<textarea id="sdb-dump" readonly style="display:none;width:calc(100% - 32px);margin:10px 16px 0;'
+    +'height:200px;font:500 11px ui-monospace,monospace;border:1px solid var(--line);border-radius:10px;'
+    +'padding:9px"></textarea>'
     +'<div style="height:22px"></div>';
 }
 
@@ -13453,7 +13461,8 @@ function sdbShareBlock(o){
 
 /* All ten, in the order they were built. Anchored on the pair, never the tail —
    appending an eleventh must not need anything else changed. */
-function sdbShareBlocks(){
+function sdbShareBlocks(){ return sdbShareBlocks_raw().map(sdbShareBlock).join(''); }
+function sdbShareBlocks_raw(){
   return [
    {st:TSYNC,   summary:tsyncSummary(),   title:'Tasks',
     what:'Every job handed out or picked up, on one list the whole farm reads.'},
@@ -13491,7 +13500,7 @@ function sdbShareBlocks(){
     what:'The sprayer numbers, the mower list, the labs list and the semester dates. This '
         +'is the one that TAKES rather than sends: the farm\'s copy wins on arrival, and '
         +'from then on this phone sends only what it changes itself.'}
-  ].map(sdbShareBlock).join('');
+  ];
 }
 
 /* Plain words for every way this can fail. A code nobody can act on is the
@@ -13526,12 +13535,60 @@ function sdbPush(){
   });
 }
 
+/* EVERYTHING THIS SCREEN KNOWS, AS TEXT YOU CAN SEND SOMEBODY
+   ------------------------------------------------------------------
+   Diagnosing a phone by asking somebody to read one line back at a time
+   costs a round trip per line and loses the one line that mattered. This
+   builds the whole picture in one go -- every drawer, whether it has
+   heard back, what it was refused and why -- so it can be pasted into a
+   message. It contains no names, no emails beyond the account you are
+   signed in as, and nothing about the work itself. */
+function sdbDetails(){
+  var L=[];
+  L.push('UT Turf Farm - shared database details');
+  L.push('when: '+new Date().toString());
+  L.push('app version: '+((typeof UT_SW_VERSION!=='undefined'&&UT_SW_VERSION)||'unknown'));
+  L.push('database code loaded: '+(dbConfigured()?'yes':'NO'));
+  L.push('working copy on this phone: '+DB_CACHE);
+  L.push('signed in to the app as: '+(SESSION.pid||'nobody'));
+  L.push('the database sees you as: '+sdbWhoLine());
+  L.push('roster last sent: '+(rosterSentAt()||'never'));
+  L.push('');
+  sdbShareBlocks_raw().forEach(function(o){
+    var st=o.st||{}, f=Object.keys(st.failed||{});
+    L.push(o.title);
+    L.push('   asked to listen: '+(st.live?'yes':'NO')
+          +' | heard back: '+(st.ready?'yes':'NO')
+          +' | sent: '+(st.up||0)+' | received: '+(st.down||0)
+          +' | refused: '+f.length);
+    if(st.err) L.push('   last problem: '+st.err);
+    if(f.length) L.push('   first refusal: '+String(st.failed[f[0]]));
+  });
+  return L.join('\n');
+}
+
 (function(){
   var scr=document.getElementById('s-sharedb'); if(!scr) return;
   /* One button on this screen now. The ten sharing switches were removed on
      2026-08-26 — see the note over flsyncWanted(). */
   scr.addEventListener('click',function(e){
     if(e.target.closest('#sdb-push')){ sdbPush(); return; }
+    if(e.target.closest('#sdb-copy')){
+      var txt=sdbDetails();
+      var show=function(){
+        var ta=document.getElementById('sdb-dump');
+        if(!ta) return;
+        ta.value=txt; ta.style.display='block';
+        try{ ta.focus(); ta.setSelectionRange(0,txt.length); }catch(err){}
+        toast('Select it all and copy');
+      };
+      try{
+        if(navigator.clipboard&&navigator.clipboard.writeText){
+          navigator.clipboard.writeText(txt).then(function(){ toast('Copied \u2713'); }).catch(show);
+        } else show();
+      }catch(err){ show(); }
+      return;
+    }
   });
 })();
 

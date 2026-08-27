@@ -13322,8 +13322,52 @@ function sdbStatusRow(label,value,good){
     +'<div class="rs" style="color:'+col+'">'+esc(value)+'</div></div></div>';
 }
 
+/* WHO THE DATABASE THINKS YOU ARE
+   ------------------------------------------------------------------
+   The app has its own idea of who is signed in (SESSION.pid, off the
+   roster) and the DATABASE has its own, taken from the roster id stamped
+   on the sign-in itself. They are normally the same and nobody has to
+   think about it. When they are NOT the same -- signed in to the app but
+   not to Google, or an account with no roster id stamped on it -- every
+   read and write is refused and no screen in the app says so. That state
+   cost a day on 2026-08-27, so it is now printed here in words. */
+var SDBWHO={state:'checking',uid:null,pid:null,detail:''};
+function sdbWhoRefresh(){
+  var a=null; try{ a=(typeof fbAuth==='function')?fbAuth():null; }catch(e){}
+  if(!a){ SDBWHO={state:'nolib',uid:null,pid:null,detail:''}; return; }
+  var u=null; try{ u=a.currentUser; }catch(e){}
+  if(!u){ SDBWHO={state:'nouser',uid:null,pid:null,detail:''}; return; }
+  if(SDBWHO.uid===u.uid&&(SDBWHO.state==='ok'||SDBWHO.state==='err')) return;
+  SDBWHO={state:'checking',uid:u.uid,pid:null,detail:''};
+  var again=function(){ try{ var d=document.getElementById('s-sharedb');
+    if(d&&d.classList.contains('active')) sdbRender(); }catch(e){} };
+  try{
+    u.getIdTokenResult().then(function(r){
+      SDBWHO={state:'ok',uid:u.uid,pid:(r&&r.claims&&r.claims.pid)||null,detail:u.email||''};
+      again();
+    }).catch(function(e){
+      SDBWHO={state:'err',uid:u.uid,pid:null,detail:String((e&&e.message)||e)};
+      again();
+    });
+  }catch(e){ SDBWHO={state:'err',uid:u.uid,pid:null,detail:String((e&&e.message)||e)}; }
+}
+function sdbWhoLine(){
+  if(SDBWHO.state==='nolib')    return 'The database code did not load on this device';
+  if(SDBWHO.state==='nouser')   return 'NOBODY. This phone is signed in to the app but not to the database, so everything it tries to save is refused. Sign out and sign in again.';
+  if(SDBWHO.state==='checking') return 'Checking...';
+  if(SDBWHO.state==='err')      return 'Could not tell: '+SDBWHO.detail;
+  if(!SDBWHO.pid)               return 'Signed in, but this account has no roster id on it, so the database does not know who you are. It refuses everything. Fix: node tools/create-accounts.js';
+  if(SESSION.pid&&SDBWHO.pid!==SESSION.pid)
+                                return SDBWHO.pid+' -- but the app thinks you are '+SESSION.pid+'. These two must match.';
+  return SDBWHO.pid+(SDBWHO.detail?(' - '+SDBWHO.detail):'');
+}
+function sdbWhoOk(){
+  return SDBWHO.state==='ok'&&!!SDBWHO.pid&&(!SESSION.pid||SDBWHO.pid===SESSION.pid);
+}
+
 function sdbRender(){
   var body=document.getElementById('sdb-body'); if(!body) return;
+  sdbWhoRefresh();
   var loaded=dbConfigured();
   var can=rosterCanPush();
   var at=rosterSentAt();
@@ -13333,6 +13377,7 @@ function sdbRender(){
 
   var rows=sdbStatusRow('The database code', loaded?'Loaded on this device':'Did not load — the app still works on its own', loaded)
     +sdbStatusRow('Signed in as', SESSION.pid?(meName()+' · '+SESSION.pid):'Nobody', !!SESSION.pid)
+    +sdbStatusRow('The database sees you as', sdbWhoLine(), sdbWhoOk()?true:(SDBWHO.state==='checking'?null:false))
     +sdbStatusRow('Working copy on this phone', cache, DB_CACHE==='on'?true:null)
     +sdbStatusRow('Roster last sent', at?(at.slice(0,10)+' at '+at.slice(11,16)):'Never', at?true:false);
 
@@ -13376,7 +13421,11 @@ function sdbShareBlock(o){
   var st=o.st||{};
   var sent=rosterSentAt();
   var failed=Object.keys(st.failed||{});
-  var good = !st.err && !!st.live && !failed.length;
+  /* GREEN MEANS IT IS WORKING, and `live` alone does not mean that -- it is
+     set the moment the app ASKS to listen. `ready` is the honest one: the
+     shared copy has answered at least once. A drawer that never hears back
+     used to show green while sending nothing. 2026-08-27. */
+  var good = !st.err && !!st.live && !!st.ready && !failed.length;
 
   var warn = sent ? '' :
       '<div style="margin-top:9px;padding:9px 11px;background:#fdeceb;border-radius:9px;'
@@ -13385,11 +13434,18 @@ function sdbShareBlock(o){
 
   var line = (typeof o.summary==='string')?o.summary:'';
   if(failed.length) line += ' · '+failed.length+' record'+(failed.length===1?'':'s')+' the database would not take';
+  /* And the reason, in the database's own words. A count on its own tells
+     nobody what to do about it. */
+  var why = failed.length ? String((st.failed||{})[failed[0]]||'') : '';
+  var whyBlock = why
+    ? '<div style="margin-top:7px;font:700 11px \'Public Sans\';color:#c0392b;line-height:1.45">Why: '+esc(why)+'</div>'
+    : '';
 
   return '<div style="margin:18px 16px 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px">'
     +'<div style="font:800 13px \'Archivo\';color:var(--ink)">'+esc(o.title)+'</div>'
     +'<div style="font:600 11px \'Public Sans\';color:'+(good?'#2f9e4f':'#c0392b')+';margin-top:2px">'
     +esc(line)+'</div>'
+    +whyBlock
     +'<div style="margin-top:9px;font:600 11px \'Public Sans\';color:var(--muted);line-height:1.45">'
     +esc(o.what)+'</div>'
     +warn+'</div>';

@@ -21,6 +21,7 @@
     "test:pwa": "node tools/test-pwa.js",
     "sw": "node tools/build-sw.js",
     "check": "node tools/check-database.js",
+    "check:rules": "node tools/check-rules-live.js",
     "test:bug": "node tools/test-bugreport.js",
     "test:auth": "node tools/test-auth.js",
     "test:taskmut": "node tools/test-task-mutation.js",

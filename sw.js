@@ -83,6 +83,15 @@ const isTile = u => /server\.arcgisonline\.com/.test(u);
 /* The radar loop is a live picture; a cached one is a lie about the weather. */
 const isLive = u => /radar\.weather\.gov/.test(u);
 
+/* Is this a request for one of OUR OWN files? Anything else belongs to another
+   website and this worker must not stand in front of it -- see the fetch
+   handler below. A URL we cannot even parse is treated as ours, because that
+   keeps the old behaviour for anything we might have precached. */
+const isOurs = u => {
+  try { return new URL(u, self.location.href).origin === self.location.origin; }
+  catch (err) { return true; }
+};
+
 async function tilePut(req, res) {
   const c = await caches.open(TILES);
   await c.put(req, res.clone());
@@ -109,6 +118,29 @@ self.addEventListener('fetch', e => {
     return;
   }
 
+  /* SOMEBODY ELSE'S WEBSITE: hands off, straight to the network.
+     -------------------------------------------------------------------
+     This line is load-bearing and it was missing until 2026-08-27.
+
+     The shared database does not fetch a page and finish. It holds ONE
+     long request open to Google and Google pushes changes down it as they
+     happen. Answering that request through e.respondWith() below breaks
+     it: the reply is collected here and handed over in one piece at the
+     end, and there is no end, so the app waits forever. It never errors --
+     it just never hears back.
+
+     The symptom, and it cost a day: every drawer stuck on "Connected --
+     waiting for the shared copy", nothing red, and nothing ever uploaded,
+     because a phone deliberately sends nothing up until it has heard from
+     the shared copy once. Signing in still worked, which made the
+     connection look fine -- sign-in is a POST, and POSTs never reach this
+     handler at all (see the first line above).
+
+     Map imagery is the one deliberate exception and it is handled above,
+     before this line. Everything else off this site -- Google, the
+     weather -- goes straight out. */
+  if (!isOurs(url)) return;
+
   /* A navigation always lands on the app, even offline. */
   if (req.mode === 'navigate') {
     e.respondWith((async () => {
@@ -118,8 +150,8 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  /* Everything else: the cache is the source of truth for this version, since
-     the shell is versioned as a set and cannot be half-old. */
+  /* Everything else on this site: the cache is the source of truth for this
+     version, since the shell is versioned as a set and cannot be half-old. */
   e.respondWith((async () => {
     const hit = await caches.match(req, { ignoreSearch: false });
     if (hit) return hit;

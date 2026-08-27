@@ -123,6 +123,22 @@ section('4. the service worker is not stale');
      /const isTile[^\n]*arcgisonline/.test(sw) && sw.indexOf('"https://server') < 0);
   ok('the tile cache is capped', /TILE_MAX\s*=\s*\d+/.test(sw));
 
+  /* THE ONE THAT COST A DAY, 2026-08-27.
+     The shared database works by holding one long request open to Google and
+     being pushed changes down it. If this worker answers that request through
+     respondWith(), the reply is collected here and handed over in one piece at
+     the end -- and there is no end, so every drawer sits on "Connected --
+     waiting for the shared copy" forever, with nothing red to show for it and
+     nothing ever sent up. Map imagery is the single deliberate exception and
+     its branch has to come FIRST, or tiles stop being cached. */
+  ok('other websites are left alone entirely',
+     /const isOurs[^\n]*=/.test(sw) &&
+     /new URL\([^)]*\)\.origin === self\.location\.origin/.test(sw) &&
+     /if \(!isOurs\(url\)\) return;/.test(sw));
+  ok('and the tile branch still runs before that bail-out',
+     sw.indexOf('if (isTile(url))') > 0 &&
+     sw.indexOf('if (isTile(url))') < sw.indexOf('if (!isOurs(url)) return;'));
+
   /* An update must be offered, not forced — see the note in the app. */
   ok('it waits to be told before taking over', sw.indexOf("'SKIP_WAITING'") > 0 && !/self\.skipWaiting\(\)\s*;?\s*\n[\s\S]{0,40}install/.test(sw));
   ok('old versions are cleaned up on activate', /caches\.delete/.test(sw));

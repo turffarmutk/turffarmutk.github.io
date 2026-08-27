@@ -540,6 +540,15 @@
   .mfsug .mfn{font:800 12.5px 'Archivo';color:var(--ink)}
   .mfsug .mfs{font:700 10.5px 'Public Sans';color:var(--muted);text-align:right}
   .mfsug .mfnone{padding:10px 12px;font:700 11.5px 'Public Sans';color:var(--muted)}
+  /* Search box floated over the two plot-PICKER maps (Choose Plots / assign
+     wizard) -- added 2026-08-27 alongside removing their plot-name labels,
+     so finding a specific plot in a crowded cluster does not depend on
+     reading tiny overlapping labels. */
+  .pickfind{position:absolute;left:9px;right:9px;top:9px;z-index:6}
+  .pickfind input{width:100%;box-sizing:border-box;border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.94);border-radius:10px;padding:9px 12px;font:700 12px 'Public Sans';color:var(--ink);outline:none;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+  .pickfind input::placeholder{color:#9aa1a9;font-weight:700}
+  .pickfind input:focus{background:#fff}
+  .mfsug-down{bottom:auto;top:calc(100% + 6px)}
 
   /* role-home fit (turn 2) */
   #t2 .field .row{padding:11px 15px}
@@ -1246,7 +1255,7 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
 
 <section class="screen" id="s-taskdetail">
 <div class="app field">
-            <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Task</div></div>
+            <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Task</div><span class="tap" id="td-edit" style="display:none;align-items:center;justify-content:center;height:34px;padding:0 14px;margin:-4px 0;border-radius:11px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.26);font:700 13px 'Public Sans';color:#fff;flex:none;box-shadow:0 1px 2px rgba(0,0,0,.15)">Edit</span></div>
             <div style="flex:1;overflow:auto" id="td-body"></div>
             <div class="actionbar" id="td-actions"></div>
           </div>
@@ -1667,6 +1676,7 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
             <div class="mapchips"><span class="on" id="pp-kind">Plots</span><span id="pp-count">0 selected</span><span class="tap" id="pp-all" style="display:none;margin-left:auto;background:#2f3133;color:#fff">Select all</span></div>
             <div class="mapvp" style="position:relative;flex:1;min-height:0;background:#6f8a5f">
               <div id="ppmap"></div>
+              <div class="pickfind"><input id="pp-find" type="text" autocomplete="off" spellcheck="false" placeholder="Find a plot — B14, O5, CAFS17…"><div class="mfsug mfsug-down" id="pp-find-sug"></div></div>
               <div class="maphint">Tap plots to select · red ground is closed to mowing</div>
             </div>
           </div>
@@ -1697,6 +1707,7 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
       <div class="mapchips"><span class="on" id="wz-kind">Plots</span><span id="wz-count">0 selected</span><span class="tap" id="wz-all" style="display:none;margin-left:auto;background:#2f3133;color:#fff">Select all</span></div>
       <div class="mapvp" style="position:relative;flex:1;min-height:0;background:#6f8a5f">
         <div id="wzmap"></div>
+        <div class="pickfind"><input id="wz-find" type="text" autocomplete="off" spellcheck="false" placeholder="Find a plot — B14, O5, CAFS17…"><div class="mfsug mfsug-down" id="wz-find-sug"></div></div>
         <div class="maphint">Tap plots to add / remove · red ground is closed to mowing</div>
       </div>
     </div>
@@ -7141,7 +7152,11 @@ let TASKS=[
 let tbTab='board';
 var WEEKDAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 var WEEKDAYS_FULL=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-var boardDay=new Date().getDay();
+/* Weekends are never on the board -- nobody works Saturday or Sunday, so
+   opening the board then shows Monday instead of a day with no chip to
+   match it. */
+function boardDefaultDay(){var d=new Date().getDay();return (d===0||d===6)?1:d;}
+var boardDay=boardDefaultDay();
 function boardDayOrd(){var t=asToday0();for(var i=0;i<7;i++){var d=new Date(t);d.setDate(d.getDate()+i);if(d.getDay()===boardDay)return asOrd(d);}return asTodayOrd();}
 /* The day a task belongs to, as YYYYMMDD. dueAt is the stored field; dueOrd is
    kept because the assign wizard and the day chips do plain integer comparison
@@ -7151,7 +7166,7 @@ function taskOnDay(t){var o=taskOrd(t); if(o)return o===boardDayOrd(); return bo
 /* Both spellings ship in the markup and CSS picks one. The board is re-rendered
    on navigation, not on resize, so a JS choice made at render time would stay
    wrong until you left the screen and came back. */
-function boardDayChips(){var todayDow=new Date().getDay();return '<div class="chiprow" id="tb-days" style="padding:8px 12px 2px">'+WEEKDAYS.map(function(w,i){var isToday=(i===todayDow);return '<span class="chip'+(boardDay===i?' on':'')+(isToday?' today':'')+'" data-bday="'+i+'"'+(isToday?' title="Today"':'')+'><span class="dl-s">'+w+'</span><span class="dl-f">'+WEEKDAYS_FULL[i]+'</span>'+(isToday?'<span class="todot"></span>':'')+'</span>';}).join('')+'</div>';}
+function boardDayChips(){var todayDow=new Date().getDay();return '<div class="chiprow" id="tb-days" style="padding:8px 12px 2px">'+[1,2,3,4,5].map(function(i){var w=WEEKDAYS[i];var isToday=(i===todayDow);return '<span class="chip'+(boardDay===i?' on':'')+(isToday?' today':'')+'" data-bday="'+i+'"'+(isToday?' title="Today"':'')+'><span class="dl-s">'+w+'</span><span class="dl-f">'+WEEKDAYS_FULL[i]+'</span>'+(isToday?'<span class="todot"></span>':'')+'</span>';}).join('')+'</div>';}
 function tbTaskRow(t,n,isFirst){
  var num=n?'<span style="width:22px;height:22px;border-radius:7px;background:#2f3133;color:#fff;font:800 12px \'Archivo\';display:flex;align-items:center;justify-content:center;flex:none;align-self:flex-start;margin-top:1px">'+n+'</span>':'';
  var note=t.desc?'<div class="rs" style="margin-top:4px;color:#7b828d;line-height:1.4">'+esc(t.desc)+'</div>':'';
@@ -7159,10 +7174,10 @@ function tbTaskRow(t,n,isFirst){
  return '<div class="row" style="align-items:flex-start">'+num+'<div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+areaWithDue(t)+'</div>'+note+'</div>'+start+'</div>';
 }
 function tbPoolRow(t){
- return '<div class="row"><div class="tap" data-task="'+t.id+'" style="flex:1"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+esc(t.area)+'</div></div><span class="pill tap" data-claim="'+t.id+'" style="background:var(--acc);color:#fff;padding:5px 12px;font-size:10.5px">Claim</span></div>';
+ return '<div class="row"><div class="tap" data-task="'+t.id+'" style="flex:1"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+esc(taskBoardSub(t))+'</div></div><span class="pill tap" data-claim="'+t.id+'" style="background:var(--acc);color:#fff;padding:5px 12px;font-size:10.5px">Claim</span></div>';
 }
 function tbDoneRow(t){
- return '<div class="row tap" data-task="'+t.id+'"><span style="color:#2f9e4f;font-size:16px;flex:none">✓</span><div style="flex:1"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+esc(t.area)+' · '+t.completedBy+' · '+t.completedAt+'</div></div></div>';
+ return '<div class="row tap" data-task="'+t.id+'"><span style="color:#2f9e4f;font-size:16px;flex:none">✓</span><div style="flex:1"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+esc(taskBoardSub(t))+' · '+t.completedBy+' · '+t.completedAt+'</div></div></div>';
 }
 function tbReqRow(t){
  var needs=(t.students&&t.students>1)?' · needs '+t.students:'';
@@ -7375,10 +7390,10 @@ function renderBoard(){
     thing left down here is the one that actually gives somebody work. */
  if(ab)ab.innerHTML=mgr?'<div class="boardbtns"><div class="action tap" data-board="assign" style="background:#2f3133">Assign Tasks</div></div>'
    :(viewer?'<div class="boardbtns"><div class="action tap" data-board="assignlab" style="background:#2f3133">Assign to my lab</div><div class="action tap" data-req="undergrad">＋ Request labor from Bill</div></div>'
-   :(requester?'<div class="boardbtns"><div class="action tap" data-board="selftask" style="background:#2f3133">＋ New task · assign to me</div><div class="action tap" data-req="undergrad">＋ Request labor from Bill</div></div>':''));
+   :(requester?'<div class="boardbtns"><div class="action tap" data-board="selftask" style="background:#2f3133">＋ Assign task to me</div><div class="action tap" data-req="undergrad">＋ Request labor from Bill</div></div>':''));
  renderTasks();
 }
-function boardEnter(){ tbTab=(currentRole==='manager'||currentRole==='faculty')?'board':'mine'; boardDay=new Date().getDay(); renderBoard(); }
+function boardEnter(){ tbTab=(currentRole==='manager'||currentRole==='faculty')?'board':'mine'; boardDay=boardDefaultDay(); renderBoard(); }
 function simpleTaskRow(t){var note=t.desc?'<div class="rs" style="margin-top:4px;color:#7b828d;line-height:1.4">'+esc(t.desc)+'</div>':'';return '<div class="row tap" data-task="'+t.id+'" style="align-items:flex-start"><div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+areaWithDue(t)+'</div>'+note+'</div><span style="color:#c2c7cd;font-size:17px;flex:none;align-self:center">›</span></div>';}
 function gradReqRow(t){var done=t.status==='done';var pending=(t.kind==='request'&&!t.assignee);var pill=done?'<span class="pill" style="background:#eaf3ea;color:#2f9e4f;flex:none">✓ Done</span>':(pending?'<span class="pill" style="background:#fff4e0;color:#9a5b00;flex:none">Pending</span>':'<span class="pill" style="background:#489FDF;color:#fff;flex:none">→ '+t.assignee+'</span>');return '<div class="row"><div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+(t.area||'')+'</div></div>'+pill+'</div>';}
 function openGradReq(){var a=document.getElementById('gr-name');if(a)a.value='';var b=document.getElementById('gr-area');if(b)b.value='';var c=document.getElementById('gr-note');if(c)c.value='';go('gradreq');}
@@ -7477,7 +7492,7 @@ function renderTasks(){
    var ro2=currentRole!=='manager';
    var done=TASKS.filter(function(t){return t.status==='done';});
    html+='<div class="sec">Completed today · '+done.length+'</div>';
-   html+= done.length? '<div class="list">'+done.map(function(t){return ro2?roRow('<span style="color:#2f9e4f;font-size:16px;flex:none;align-self:flex-start;margin-top:1px">✓</span>',t.title,t.area+' · '+t.completedBy+' · '+t.completedAt):tbDoneRow(t);}).join('')+'</div>'
+   html+= done.length? '<div class="list">'+done.map(function(t){return ro2?roRow('<span style="color:#2f9e4f;font-size:16px;flex:none;align-self:flex-start;margin-top:1px">✓</span>',t.title,taskBoardSub(t)+' · '+t.completedBy+' · '+t.completedAt):tbDoneRow(t);}).join('')+'</div>'
         : '<div class="sec" style="text-align:center;margin-top:20px">Nothing completed yet</div>';
  } else if(tbTab==='requests'){
    if(currentRole==='manager'){
@@ -8267,6 +8282,8 @@ function openTask(id){
  else if(isReq) act.innerHTML='<div class="action tap" data-assign="'+t.id+'">Assign Task</div>';
  else if(!t.assignee) act.innerHTML='<div class="action tap" data-claim="'+t.id+'">Claim Task</div>';
  else act.innerHTML='<div class="action tap" data-complete="'+t.id+'">Mark Complete</div>';
+ var edtBtn=document.getElementById('td-edit');
+ if(edtBtn) edtBtn.style.display=(currentRole==='manager'&&!isReq)?'inline-flex':'none';
  show('taskdetail',true);
  /* read-only preview of the ground this task covers */
  if(document.getElementById('tdmap')){
@@ -8337,6 +8354,7 @@ document.getElementById('td-actions').addEventListener('click',function(e){
  var r=e.target.closest('[data-reopen]'); if(r){var t4=TASKS.find(function(x){return x.id===r.getAttribute('data-reopen');});if(t4){t4.status='todo';t4.completedBy=null;toast('Task reopened');renderBoard();back();}return;}
 });
 document.getElementById('td-body').addEventListener('click',function(e){var p=e.target.closest('#td-people [data-person]');if(!p)return;document.querySelectorAll('#td-people .ppill').forEach(function(x){x.classList.remove('on');});p.classList.add('on');});
+document.getElementById('td-edit').addEventListener('click',function(){if(tdCur)openEditTask(tdCur);});
 /* ---- Undergrad task work mode (check plots off) ---- */
 var workTaskId=null;
 function openTaskWork(id){var t=TASKS.find(function(x){return x.id===id;});if(!t)return;if(!t.donePlots)t.donePlots=[];workTaskId=id;
@@ -8553,6 +8571,7 @@ function renderTaskWork(){
  if(brief)brief.style.display='none';
  if(wrap)wrap.style.display='';
  if(chips)chips.style.display='';
+ var hintEl=document.getElementById('tw-hint');
  /* Trial dots: the targets are the studies, not the plots. Every active trial
     is drawn — footprint and pin — and each one gets ticked off as its dots go
     down, so the job is only finished when no study was missed. */
@@ -10582,9 +10601,18 @@ function initFormChrome(){
  var fr=document.getElementById('tn-freq');
  if(fr)fr.innerHTML=FREQS.map(function(n){return '<span class="fchip" data-freq="'+n+'">'+n+'× / wk</span>';}).join('');
 }
+function editAssigneePool(){
+ var pool=CREW.slice();
+ if(FORM.target&&!pool.some(function(c){return c.pid===FORM.target;})){
+   var p=rstFind(FORM.target);
+   if(p) pool.unshift({pid:p.id,name:pName(p),role:p.role,lab:p.lab||'—'});
+ }
+ return pool;
+}
 function syncForm(){
  var req=FORM.mode==='request';
  var asg=FORM.mode==='assign';
+ var edt=FORM.mode==='edit';
  document.getElementById('tn-name').value=FORM.name;
  document.getElementById('tn-cat').value=FORM.category;var _mm=document.getElementById('tn-machine');if(_mm){_mm.innerHTML='<option value="">— None —</option>'+tplMachineList(FORM.machines).map(function(e){return '<option value="'+e.id+'">'+esc(e.name)+'</option>';}).join('');_mm.value=FORM.machine||'';}
  document.getElementById('tn-plots').textContent=plotsLabel(FORM.plots);
@@ -10592,38 +10620,43 @@ function syncForm(){
  document.getElementById('tn-students').value=FORM.students||1;
  var toCrew=req&&FORM.reqType==='toCrew';
  var toLab=asg&&FORM.scope==='lab';
- var showTarget=toCrew||toLab;
+ var showTarget=toCrew||toLab||edt;
  var secEl=document.getElementById('tn-target-sec');
  secEl.style.display=showTarget?'':'none';
- secEl.textContent=asg?'Assign to (your lab)':'Request to';
+ secEl.textContent=edt?'Assigned to':(asg?'Assign to (your lab)':'Request to');
  document.getElementById('tn-target').style.display=showTarget?'':'none';
- if(showTarget){var pool=toLab?labMembers():CREW; var el=document.getElementById('tn-target'); el.innerHTML=pool.length?pool.map(function(c){return crewPill(c,FORM.target===c.pid);}).join(''):'<div class="rs" style="padding:4px 4px">No grad students or technicians in your lab yet.</div>';}
+ if(showTarget){var pool=edt?editAssigneePool():(toLab?labMembers():CREW); var el=document.getElementById('tn-target'); el.innerHTML=pool.length?pool.map(function(c){return crewPill(c,FORM.target===c.pid);}).join(''):'<div class="rs" style="padding:4px 4px">No grad students or technicians in your lab yet.</div>';}
  var selfRow=document.getElementById('tn-selfrow');
  if(selfRow)selfRow.style.display=(asg&&FORM.scope==='self')?'':'none';
  var mrow=document.getElementById('tn-machine-row'); if(mrow)mrow.style.display=wantsMachineRow()?'':'none';
  var enote=document.getElementById('tn-eqnote');
  if(enote){enote.style.display=FORM.eqNote?'':'none';enote.textContent=FORM.eqNote?('Equipment on file: '+FORM.eqNote+' — not in the equipment roster yet.'):'';}
  var wrow=document.getElementById('tn-whenrow'), wsel=document.getElementById('tn-when');
- if(wrow&&wsel){ if(asg){ wrow.style.display=''; wsel.innerHTML=asDateOptions(FORM.dueOrd||asTodayOrd()); } else { wrow.style.display='none'; } }
- document.getElementById('tn-schedule').style.display=(req||asg)?'none':'';
+ if(wrow&&wsel){ if(asg||edt){ wrow.style.display=''; wsel.innerHTML=asDateOptions(FORM.dueOrd||asTodayOrd()); } else { wrow.style.display='none'; } }
+ document.getElementById('tn-schedule').style.display=(req||asg||edt)?'none':'';
  /* Delete belongs to an existing job on the task list, and nowhere else: not
     on a new one (there is nothing to delete), not on an assignment, and not on
     a request. Undergrads never see it because they cannot open this form to
     edit in the first place, but the check is here too -- a hidden control is a
     courtesy, not a lock. */
  var dw=document.getElementById('tn-delwrap');
- if(dw) dw.style.display=(!req&&!asg&&!!FORM.id&&(typeof tplCanEdit!=='function'||tplCanEdit()))?'':'none';
+ if(dw) dw.style.display=(!req&&!asg&&!edt&&!!FORM.id&&(typeof tplCanEdit!=='function'||tplCanEdit()))?'':'none';
  document.getElementById('tn-repeat').value=FORM.repeat;
  var custom=FORM.repeat==='Custom';
  document.getElementById('tn-custom-sec').style.display=custom?'':'none';
  document.getElementById('tn-freq').style.display=custom?'':'none';
  document.querySelectorAll('#tn-freq .fchip').forEach(function(c){c.classList.toggle('on',+c.getAttribute('data-freq')===+FORM.freq);});
  document.querySelectorAll('#tn-months .mchip').forEach(function(c){c.classList.toggle('on',FORM.months.indexOf(c.getAttribute('data-month'))>=0);});
- document.getElementById('tn-title').textContent=req?(FORM.reqType==='toCrew'?'Request grad / tech':(FORM.showStudents?'Request an undergrad':'Request a task')):(asg?(FORM.scope==='self'?'New task · assign to me':'Assign to my lab'):(FORM.id?'Edit this job':'Add to the task list'));
- document.getElementById('tn-save').textContent=(req?'Submit request':(asg?'Assign task':'Save Task'));
+ document.getElementById('tn-title').textContent=req?(FORM.reqType==='toCrew'?'Request grad / tech':(FORM.showStudents?'Request an undergrad':'Request a task')):(asg?(FORM.scope==='self'?'Assign task to me':'Assign to my lab'):(edt?'Edit task':(FORM.id?'Edit this job':'Add to the task list')));
+ document.getElementById('tn-save').textContent=(req?'Submit request':(asg?'Assign task':(edt?'Save changes':'Save Task')));
 }
-function openAssignForm(){FORM={id:null,mode:'assign',scope:'lab',target:(labMembers()[0]||{}).name||'',name:'',category:CATEGORIES[0],plots:[],repeat:'None',freq:3,months:[],dueOrd:asTodayOrd()};syncForm();go('tasknew');}
+function openAssignForm(){FORM={id:null,mode:'assign',scope:'lab',target:(labMembers()[0]||{}).pid||null,name:'',category:CATEGORIES[0],plots:[],repeat:'None',freq:3,months:[],dueOrd:asTodayOrd()};syncForm();go('tasknew');}
 function openSelfTask(){FORM={id:null,mode:'assign',scope:'self',target:SESSION.pid,name:'',category:CATEGORIES[0],plots:[],repeat:'None',freq:3,months:[],dueOrd:asTodayOrd()};syncForm();go('tasknew');}
+function openEditTask(id){
+ var t=TASKS.find(function(x){return x.id===id;}); if(!t) return;
+ FORM={id:t.id,mode:'edit',name:t.title,category:t.type,plots:(t.plots||[]).slice(),machine:t.machine||'',machines:[],repeat:'None',freq:3,months:[],dueOrd:t.dueOrd||asTodayOrd(),target:t.assignee||null};
+ syncForm(); go('tasknew');
+}
 function openForm(tpl){
  if(tpl){FORM={id:tpl.id,mode:'template',students:1,name:tpl.name,category:tpl.category,plots:(tpl.plots||[]).slice(),repeat:tpl.repeat,freq:tpl.freq||3,months:(tpl.months||[]).slice(),machine:tpl.machine||'',machines:(tpl.machines||[]).slice(),eqNote:tpl.eqNote||''};}
  else{FORM={id:null,mode:'template',students:1,name:'',category:CATEGORIES[0],plots:[],repeat:'As needed',freq:3,months:[],machines:[],eqNote:''};}
@@ -10645,9 +10678,27 @@ function saveForm(){
    if(FORM.scope==='lab'&&!who){toast('Pick a lab member to assign');return;}
    var _ws=document.getElementById('tn-when'); var _do=(_ws&&parseInt(_ws.value,10))||FORM.dueOrd||asTodayOrd();
    TASKS.push({createdBy:SESSION.pid,id:newId('a'),title:FORM.name,area:FORM.plots.length?areaLabel(FORM.plots):'—',plots:FORM.plots.slice(),assignee:who,status:'todo',kind:'task',badge:null,type:FORM.category,machine:FORM.machine||null,dueAt:isoFromOrd(_do),dueOrd:_do,repeat:'None',freq:null,months:[],assignedBy:SESSION.pid,desc:''});
-   toast(FORM.scope==='self'?'Added to your tasks ✓':'Assigned to '+who+' ✓');
+   toast(FORM.scope==='self'?'Added to your tasks ✓':'Assigned to '+(nameOf(who)||who)+' ✓');
    back();
    tbTab=(FORM.scope==='self')?'mine':'board';
+   renderBoard();
+   return;
+ }
+ if(FORM.mode==='edit'){
+   if(!FORM.name){toast('Enter a task name');return;}
+   var _et=TASKS.find(function(x){return x.id===FORM.id;});
+   if(!_et){toast('That task no longer exists');back();return;}
+   var _ews=document.getElementById('tn-when'); var _edo=(_ews&&parseInt(_ews.value,10))||FORM.dueOrd||asTodayOrd();
+   _et.title=FORM.name;
+   _et.type=FORM.category;
+   _et.plots=FORM.plots.slice();
+   _et.area=FORM.plots.length?areaLabel(FORM.plots):'—';
+   _et.machine=FORM.machine||null;
+   _et.dueOrd=_edo;
+   _et.dueAt=isoFromOrd(_edo);
+   if(FORM.target) _et.assignee=FORM.target;
+   toast('Task updated ✓');
+   back();
    renderBoard();
    return;
  }
@@ -10685,7 +10736,7 @@ document.getElementById('tn-repeat').addEventListener('change',function(e){FORM.
 document.getElementById('tn-freq').addEventListener('click',function(e){var c=e.target.closest('[data-freq]');if(!c)return;FORM.freq=+c.getAttribute('data-freq');syncForm();});
 document.getElementById('tn-months').addEventListener('click',function(e){var c=e.target.closest('[data-month]');if(!c)return;var m=c.getAttribute('data-month');var i=FORM.months.indexOf(m);if(i>=0)FORM.months.splice(i,1);else FORM.months.push(m);syncForm();});
 document.getElementById('tn-plots-row').addEventListener('click',function(){openPlotPick();});
-document.getElementById('tn-target').addEventListener('click',function(e){var p=e.target.closest('[data-target]');if(!p)return;FORM.target=p.getAttribute('data-target');document.querySelectorAll('#tn-target .ppill').forEach(function(x){x.classList.remove('on');});p.classList.add('on');});
+document.getElementById('tn-target').addEventListener('click',function(e){var p=e.target.closest('[data-person]');if(!p)return;FORM.target=p.getAttribute('data-person');document.querySelectorAll('#tn-target .ppill').forEach(function(x){x.classList.remove('on');});p.classList.add('on');});
 document.getElementById('tn-save').addEventListener('click',saveForm);
 document.getElementById('tn-del').addEventListener('click',function(){
   if(!FORM.id||!tplCanEdit()) return;
@@ -10707,6 +10758,9 @@ function renderPlotPick(){
    jobTapSelect(PICK,n,info);
    renderPlotPick();
  }});
+ pickFindWire('pp-find','pp-find-sug',function(){return PICKCTX.targets;},function(n){
+   if(pickSelectByName(PICK,n,PICKCTX.type,PICKCTX.name)) renderPlotPick();
+ });
  var k=document.getElementById('pp-kind'); if(k)k.textContent=jobKindLabel(PICKCTX.type,PICKCTX.name)||'Plots';
  var c=document.getElementById('pp-count'); if(c)c.textContent=PICK.length+' of '+targets.length+' selected';
  jobSyncAllChip('pp-all',PICK,targets,PICKCTX.type,PICKCTX.name);
@@ -10846,7 +10900,15 @@ function asDateLabel(o){var t=asToday0();var to=asOrd(t);if(o===to)return 'Today
 function asDateOptions(selOrd){var t=asToday0();var arr=[];for(var i=0;i<15;i++){var d=new Date(t);d.setDate(d.getDate()+i);arr.push(asOrd(d));}if(selOrd&&arr.indexOf(selOrd)<0)arr.unshift(selOrd);return arr.map(function(o){return '<option value="'+o+'"'+(o===selOrd?' selected':'')+'>'+asDateLabel(o)+'</option>';}).join('');}
 function evSprayOrd(e){return evOrd(e)||asTodayOrd();}
 function isFutureTask(t){var o=taskOrd(t); return !!o&&o>asTodayOrd();}
-function areaWithDue(t){return (t.area||'')+(isFutureTask(t)?' · 📅 '+dueLabel(t):'');}
+/* Bill reads the board to know what to grab on the way out the door -- which
+   machine matters more there than which plots, so a task that names one shows
+   the machine instead of the plot list. Jobs with no machine (paint, hand
+   watering, ...) still show the plot/area text. */
+function taskBoardSub(t){
+ var m=(t&&t.machine&&typeof EQUIP!=='undefined')?EQUIP.find(function(e){return e.id===t.machine;}):null;
+ return m?m.name:(t.area||'');
+}
+function areaWithDue(t){return taskBoardSub(t)+(isFutureTask(t)?' · 📅 '+dueLabel(t):'');}
 /* ---- who is in, on any given day ----------------------------------
    This used to be three tables of made-up demo data: WEEKCREW (a hand-built
    Mon-Fri roster), SHIFT (invented hours per person) and ROSTER (a third,
@@ -11042,6 +11104,9 @@ function renderWizMap(){
    jobTapSelect(WIZ.plots,n,info);
    renderWizMap();
  }});
+ pickFindWire('wz-find','wz-find-sug',function(){return WIZ.targets;},function(n){
+   if(pickSelectByName(WIZ.plots,n,WIZ.cat,WIZ.name)) renderWizMap();
+ });
  var k=document.getElementById('wz-kind'); if(k)k.textContent=jobKindLabel(WIZ.cat,WIZ.name)||'Plots';
  document.getElementById('wz-count').textContent=WIZ.plots.length+' of '+targets.length+' selected';
  jobSyncAllChip('wz-all',WIZ.plots,targets,WIZ.cat,WIZ.name);
@@ -16545,6 +16610,67 @@ function jobToggleAll(list,targets,type,name){
   }
   return {on:on,n:sel.length,skipped:(targets||[]).length-sel.length};
 }
+/* ---- "Find a plot" search for the picker maps (Choose Plots / assign wizard)
+   Added 2026-08-27 alongside removing those maps' plot-name labels -- Bill
+   picks by where a plot sits on the farm, not by its label, so this is for
+   the rare case he wants one specific plot without hunting a crowded cluster
+   for it. Matches are limited to this job's own selectable targets, and
+   picking a result applies the exact same restriction check + toggle a real
+   tap on the plot would. */
+function pickMatches(targets,q){
+ q=(q||'').trim().toLowerCase(); if(!q||!targets||!targets.length) return [];
+ var tset={}; targets.forEach(function(n){tset[n]=1;});
+ var starts=[],has=[];
+ PLOTS_DATA.features.forEach(function(f){
+  var n=(f.properties||{}).number; if(!n||!tset[n]) return;
+  var l=n.toLowerCase(); if(l.indexOf(q)<0) return;
+  (l.indexOf(q)===0?starts:has).push(n);
+ });
+ function byName(a,b){return (a+'').localeCompare(b+'',undefined,{numeric:true});}
+ return starts.sort(byName).concat(has.sort(byName)).slice(0,8);
+}
+function pickFindRender(inpId,boxId,targets){
+ var inp=document.getElementById(inpId),box=document.getElementById(boxId);
+ if(!inp||!box) return;
+ var q=inp.value;
+ if(!(q||'').trim()){ box.style.display='none'; box.innerHTML=''; return; }
+ var m=pickMatches(targets,q);
+ box.innerHTML=m.length
+  ? m.map(function(n){return '<div class="mfrow" data-pfgo="'+esc(n)+'"><span class="mfn">'+esc(n)+'</span></div>';}).join('')
+  : '<div class="mfnone">No plot matches \u201c'+esc(q)+'\u201d</div>';
+ box.style.display='block';
+}
+/* Same accept/blocked logic jobMapDraw wires onto a plain (non cut-height-
+   block) plot's own click handler -- see the o.onTap call inside the per-
+   plot forEach there. */
+function pickSelectByName(list,n,type,name){
+ var res=jobRes(n,type,name);
+ var info={blocked:res.full.length>0,partial:res.pin.length>0,res:res};
+ if(info.blocked){ toast(resStopMsg(info,n)); return false; }
+ if(info.partial) toast(resAroundMsg(info,n));
+ jobTapSelect(list,n,info);
+ return true;
+}
+/* Wired once per input (guarded by _pfWired) even though the render function
+   that calls this runs on every selection change. */
+function pickFindWire(inpId,boxId,getTargets,onPick){
+ var inp=document.getElementById(inpId),box=document.getElementById(boxId);
+ if(!inp||!box||inp._pfWired) return; inp._pfWired=true;
+ inp.addEventListener('input',function(){ pickFindRender(inpId,boxId,getTargets()); });
+ inp.addEventListener('focus',function(){ if(inp.value.trim()) pickFindRender(inpId,boxId,getTargets()); });
+ inp.addEventListener('keydown',function(e){
+  if(e.key==='Enter'){ var m=pickMatches(getTargets(),inp.value); if(m.length){ onPick(m[0]); inp.value=''; box.style.display='none'; box.innerHTML=''; inp.blur(); } }
+  if(e.key==='Escape'){ inp.value=''; box.style.display='none'; box.innerHTML=''; inp.blur(); }
+ });
+ box.addEventListener('click',function(e){
+  var r=e.target.closest('[data-pfgo]'); if(!r) return;
+  onPick(r.getAttribute('data-pfgo')); inp.value=''; box.style.display='none'; box.innerHTML='';
+ });
+ document.addEventListener('click',function(e){
+  if(e.target.closest('#'+inpId)||e.target.closest('#'+boxId)) return;
+  box.style.display='none';
+ });
+}
 function jobTapSelect(list,n,info){
   var names=jobTapNames(n,info);
   var on=(info&&info.plots)?!info.allSelected:(list.indexOf(n)<0);
@@ -16800,11 +16926,11 @@ function jobMapDraw(st,o){
     }
     if(!inJob) return;
     var pos=labelPos(f); if(!pos) return;
-    /* Working a task, the ground itself is the instruction — the shape you are
-       standing on and whether it is closed. Plot numbers add nothing there, so
-       the name pill is picking only. The check and restriction chips always
-       show. Mow jobs label by cut height, drawn with the block below. */
-    if(o.mode==='pick'&&!hit&&(!mowJob||plotCut(n)==null)) addLabel(st.lg,pos,esc(n),'applbl',n);
+    /* Plot-name pills used to show here in pick mode, but a crowded cluster
+       like the CAFS block made it hard to tell one tiny plot from the next —
+       removed 2026-08-27 for the "Find a plot" search box instead, which
+       does not run out of room. The check and restriction chips still show,
+       and mow jobs still label by cut height, drawn with the block below. */
     var chips='';
     if(hit)              chips+='<b class="ck">✓</b>';
     if(blocked||partial){ var rc=res.cfg||JOB_RES.mow; chips+='<b>'+esc(blocked?rc.stop:rc.around)+'</b>'; }

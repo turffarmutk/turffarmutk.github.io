@@ -523,11 +523,6 @@
   .zoomctl{position:absolute;right:9px;bottom:9px;display:flex;flex-direction:column;gap:6px;z-index:5}
   .zbtn{width:34px;height:34px;border-radius:10px;background:rgba(23,24,26,.84);color:#fff;font:700 21px 'Archivo';display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.32)}
   .maphint{position:absolute;left:9px;bottom:11px;background:rgba(23,24,26,.74);color:#fff;font:700 9px 'Public Sans';padding:4px 9px;border-radius:20px;pointer-events:none;z-index:5}
-  /* Mow direction, top-left of the work map — the operator lines up on it
-     before the first pass, so it sits where the thumb never covers it. */
-  .mowbadge{position:absolute;left:9px;top:9px;z-index:6;display:flex;align-items:center;gap:8px;background:rgba(23,24,26,.78);padding:6px 11px 6px 9px;border-radius:13px;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.25)}
-  .mowbadge b{display:block;color:#fff;font:800 13px 'Archivo';line-height:1.1;white-space:nowrap}
-  .mowbadge i{display:block;color:#fff;opacity:.72;font:700 8.5px 'Public Sans';font-style:normal;letter-spacing:.5px;text-transform:uppercase;margin-top:2px;white-space:nowrap}
   .maplegend{background:#fff;border-top:1px solid var(--line);padding:11px 16px 13px}
   .maplegend .lg{display:flex;gap:12px;flex-wrap:wrap;align-items:center;font:700 10.5px 'Public Sans';color:#6b7280;padding-bottom:9px;margin-bottom:9px;border-bottom:1px solid #eef0f2}
   .maplegend .lg span{display:flex;align-items:center;gap:4px}
@@ -735,7 +730,7 @@ select.tn-input{-webkit-appearance:none;appearance:none;text-align-last:right;di
 #aswiz{position:absolute;inset:0;display:none;z-index:70}
 #aswiz.show{display:block}
 #aswiz .wz-card{position:absolute;inset:0;background:#f3f4f2;display:flex;flex-direction:column}
-.wz-head{display:flex;align-items:center;gap:10px;background:#2f3133;padding:14px 16px;flex:none}
+.wz-head{display:flex;align-items:center;gap:10px;background:#2f3133;padding:calc(14px + env(safe-area-inset-top)) 16px 14px;flex:none}
 .wz-x{color:#fff;font-size:18px;width:34px;flex:none}
 .wz-title{flex:1;color:#fff;font:800 16px 'Archivo';text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wz-next{color:#fff;font:800 15px 'Public Sans';min-width:46px;text-align:right;flex:none}
@@ -1612,9 +1607,6 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
               <div class="fld" id="tn-machine-row" style="display:none"><span class="fl">Machine</span><select id="tn-machine" class="inv-sel" style="max-width:180px"></select></div>
               <div id="tn-eqnote" style="display:none;padding:2px 16px 8px;font:600 11px 'Public Sans';color:#b26a00"></div>
               <div class="fld tap" id="tn-plots-row"><span class="fl">Plot / area</span><span class="fv" id="tn-plots">Tap to choose ›</span></div>
-              <div class="fld" id="tn-mowdir-row" style="display:none;flex-wrap:wrap"><span class="fl" style="width:100%;margin-bottom:7px">Mow direction</span><span class="chiprow" id="tn-mowdir" style="padding:0;width:100%"></span></div>
-              <div class="fld" id="tn-mowdbl-row" style="display:none;flex-wrap:wrap"><span class="fl" style="width:100%;margin-bottom:7px">Passes</span><span class="chiprow" id="tn-mowdbl" style="padding:0;width:100%"></span></div>
-              <div class="fld" id="tn-mowdbl2-row" style="display:none;flex-wrap:wrap"><span class="fl" style="width:100%;margin-bottom:7px">Second pass</span><span class="chiprow" id="tn-mowdbl2" style="padding:0;width:100%"></span></div>
               <div class="fld" id="tn-whenrow" style="display:none"><span class="fl">When</span><select id="tn-when" class="inv-sel" style="max-width:180px"></select></div>
               <div class="fld" id="tn-students-row" style="border-bottom:none;display:none"><span class="fl">Students needed</span><select id="tn-students" class="inv-sel" style="max-width:120px"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
             </div>
@@ -1645,7 +1637,6 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
             <div id="tw-brief" style="flex:1;min-height:0;overflow:auto;display:none"></div>
             <div class="mapvp" id="tw-mapwrap" style="position:relative;flex:1;min-height:0;background:#6f8a5f">
               <div id="twmap"></div>
-              <div class="mowbadge" id="tw-mowdir" style="display:none"></div>
               <div class="locbtn tap" id="tw-locate" role="button" aria-label="Show my location" title="Show my location"><svg viewBox="0 0 24 24" aria-hidden="true"><circle class="lb-ring" cx="12" cy="12" r="6.4"/><circle class="lb-core" cx="12" cy="12" r="2.6"/><path class="lb-tick" d="M12 1.4v3.2M12 19.4v3.2M1.4 12h3.2M19.4 12h3.2"/></svg></div>
               <div class="gpspaused tap" id="tw-gpspaused" style="display:none">GPS paused to save battery · tap to resume</div>
               <div class="maphint" id="tw-hint">Tap a plot when you finish it · red ground is closed to mowing</div>
@@ -1710,16 +1701,6 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
       </div>
     </div>
     <div id="wz-note-step" class="wz-step">
-      <div id="wz-mow" style="display:none">
-        <div class="sec">Mow direction</div>
-        <div class="chiprow" id="wz-dir"></div>
-        <div class="sec">Passes</div>
-        <div class="chiprow" id="wz-dbl"></div>
-        <div id="wz-dbl2wrap" style="display:none">
-          <div class="sec">Second pass</div>
-          <div class="chiprow" id="wz-dbl2"></div>
-        </div>
-      </div>
       <div id="wz-spray" style="display:none">
         <div class="sec">Products in the tank</div>
         <div id="wz-prods"></div>
@@ -8268,8 +8249,6 @@ function openTask(id){
  var rows='';
  rows+=fldRow('Task type',t.type);
  rows+=fldRow('Plot / area',t.area);
- if(t.mowDir){ rows+=fldRow('Mow direction',esc(t.mowDir));
-   rows+=fldRow('Passes',t.dblMow?('Double · '+esc(t.dblPass||MOW_PASSES[0])):'Single'); }
  if(t.status==='done'){ rows+=fldRow('Completed by',nameOf(t.completedBy)); rows+=fldRow('Time',fmtTime(t.completedAt)||t.completedAt); }
  else if(isReq){ rows+=fldRow('Requested by',reqByLabel(t.requestedBy)); rows+=fldRow('Students needed',t.students||1); }
  else { rows+=fldRow('Assigned to',taskCrewLabel(t)); rows+=fldRow('When',(isFutureTask(t)?'📅 ':'')+(dueLabel(t)||'Today')); }
@@ -8393,11 +8372,6 @@ function renderTaskBrief(t){
    +'<div style="flex:1"><div class="rt">'+esc(t.title)+'</div>'
    +'<div class="rs">'+esc(t.area||'—')+(dueLabel(t)?(' · '+esc(dueLabel(t))):'')+'</div></div>'
    +'</div></div>';
-  /* Direction is the first thing the operator needs off the brief — it sets
-     how they line up before the first pass. */
-  if(t.mowDir) h+='<div class="sec">Mow direction</div><div class="list"><div class="row">'
-   +'<div style="flex:1"><div class="rt">'+esc(t.mowDir)+'</div>'
-   +'<div class="rs">'+(t.dblMow?('Double mow · second pass '+esc((t.dblPass||MOW_PASSES[0]).toLowerCase())):'Single pass')+'</div></div></div></div>';
   var mach=(t.machine&&typeof EQUIP!=='undefined')?EQUIP.filter(function(e){return e.id===t.machine;})[0]:null;
   if(mach) h+='<div class="sec">Equipment</div><div class="list"><div class="row"><div style="flex:1">'
    +'<div class="rt">'+esc(mach.name)+'</div><div class="rs">'+esc(mach.location||'')+'</div></div></div></div>';
@@ -8579,17 +8553,6 @@ function renderTaskWork(){
  if(brief)brief.style.display='none';
  if(wrap)wrap.style.display='';
  if(chips)chips.style.display='';
- /* Direction rides on the map itself, not just the brief — the operator is
-    looking at the ground, not scrolling back to read the job again. */
- var mdEl=document.getElementById('tw-mowdir');
- if(mdEl){
-   if(t.mowDir){
-     mdEl.style.display='';
-     mdEl.innerHTML=mowDial(t.mowDir,!!(t.dblMow&&/90/.test(t.dblPass||'')),19)
-      +'<span><b>'+esc(t.mowDir)+'</b><i>'+(t.dblMow?('Double · '+esc(t.dblPass||MOW_PASSES[0])):'Single pass')+'</i></span>';
-   } else mdEl.style.display='none';
- }
- var hintEl=document.getElementById('tw-hint');
  /* Trial dots: the targets are the studies, not the plots. Every active trial
     is drawn — footprint and pin — and each one gets ticked off as its dots go
     down, so the job is only finished when no study was missed. */
@@ -10480,40 +10443,7 @@ app.addEventListener('click',function(e){var m=e.target.closest('[data-mode]');i
 renderBoard();
 /* ---- Task templates: Add / Edit form ---- */
 const CATEGORIES=['Mow','Paint','Spray','Fertilize','Aeration','Cultivation','Irrigation','Maintenance','Miscellaneous'];
-/* ---- Mow direction ------------------------------------------------------
-   Direction is called off the clock face — the operator lines the machine up
-   on the hands, which is how the crew already talks about it and how the
-   stripe pattern gets rotated between mowings. A double mow adds a second
-   pass: back down the same lines to tighten the cut, or crossed at 90° for
-   the checkerboard. Only mow-category work carries these. */
-const MOW_DIRS=['12–6','3–9','1:30–7:30','4:30–10:30'];
-const MOW_PASSES=['Same pass','90°'];
 function isMowCat(cat){ return /mow/i.test(cat||''); }
-/* Little clock face for the direction badge. The hands are read off the first
-   half of the label — "1:30–7:30" is the 1:30 hand and its opposite — and the
-   line is drawn straight through the middle, which is the line the operator
-   drives. A double mow crossed at 90° gets its second pass dashed. */
-function mowDial(dir,cross,px){
- px=px||18;
- var c=px/2, r=c-1.4;
- var head=(dir||'12').split(/[-–]/)[0];
- var h=parseFloat(head)||12, mm=/:(\d+)/.exec(head);
- if(mm) h=Math.floor(h)+(+mm[1])/60;
- var a=(h%12)/12*2*Math.PI, dx=Math.sin(a)*r, dy=-Math.cos(a)*r;
- function line(x,y,dash){
-   return '<line x1="'+(c-x).toFixed(2)+'" y1="'+(c-y).toFixed(2)+'" x2="'+(c+x).toFixed(2)+'" y2="'+(c+y).toFixed(2)
-    +'" stroke="#fff" stroke-width="1.9" stroke-linecap="round"'+(dash?' stroke-dasharray="2.2 2.2" stroke-opacity=".7"':'')+'/>';
- }
- return '<svg width="'+px+'" height="'+px+'" viewBox="0 0 '+px+' '+px+'" style="flex:none;display:block">'
-  +'<circle cx="'+c+'" cy="'+c+'" r="'+r.toFixed(2)+'" fill="none" stroke="#fff" stroke-opacity=".42" stroke-width="1"/>'
-  +(cross?line(-dy,dx,true):'')+line(dx,dy)+'</svg>';
-}
-/* Chip row builder shared by the assign wizard and the New Task form. */
-function mowChips(opts,cur,attr){
- return opts.map(function(o){
-   return '<span class="fchip tap'+(cur===o?' on':'')+'" '+attr+'="'+o+'">'+o+'</span>';
- }).join('');
-}
 const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const FREQS=[2,3,4,5,6];
 const PLOTS=[
@@ -10644,19 +10574,6 @@ function wantsMachineRow(){
  if(FORM.machines&&FORM.machines.length)return true;
  return /mow|spray|fertiliz|aerat|cultivat|paint|maintenance/i.test(FORM.category||'');
 }
-/* The mow rows appear and disappear with the category, the same way the
-   machine row does. Second pass only matters once Double is picked. */
-function syncMowRows(){
- var on=isMowCat(FORM.category), q=function(x){return document.getElementById(x);};
- if(!q('tn-mowdir-row'))return;
- q('tn-mowdir-row').style.display=on?'':'none';
- q('tn-mowdbl-row').style.display=on?'':'none';
- q('tn-mowdbl2-row').style.display=(on&&FORM.dblMow)?'':'none';
- if(!on)return;
- q('tn-mowdir').innerHTML=mowChips(MOW_DIRS,FORM.mowDir,'data-tnmowdir');
- q('tn-mowdbl').innerHTML=mowChips(['Single','Double'],FORM.dblMow?'Double':'Single','data-tnmowdbl');
- if(FORM.dblMow)q('tn-mowdbl2').innerHTML=mowChips(MOW_PASSES,FORM.dblPass||MOW_PASSES[0],'data-tnmowdbl2');
-}
 function initFormChrome(){
  var cat=document.getElementById('tn-cat');
  if(cat&&!cat.options.length)cat.innerHTML=CATEGORIES.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join('');
@@ -10671,7 +10588,6 @@ function syncForm(){
  document.getElementById('tn-name').value=FORM.name;
  document.getElementById('tn-cat').value=FORM.category;var _mm=document.getElementById('tn-machine');if(_mm){_mm.innerHTML='<option value="">— None —</option>'+tplMachineList(FORM.machines).map(function(e){return '<option value="'+e.id+'">'+esc(e.name)+'</option>';}).join('');_mm.value=FORM.machine||'';}
  document.getElementById('tn-plots').textContent=plotsLabel(FORM.plots);
- syncMowRows();
  document.getElementById('tn-students-row').style.display=(req&&FORM.showStudents)?'':'none';
  document.getElementById('tn-students').value=FORM.students||1;
  var toCrew=req&&FORM.reqType==='toCrew';
@@ -10709,7 +10625,7 @@ function syncForm(){
 function openAssignForm(){FORM={id:null,mode:'assign',scope:'lab',target:(labMembers()[0]||{}).name||'',name:'',category:CATEGORIES[0],plots:[],repeat:'None',freq:3,months:[],dueOrd:asTodayOrd()};syncForm();go('tasknew');}
 function openSelfTask(){FORM={id:null,mode:'assign',scope:'self',target:SESSION.pid,name:'',category:CATEGORIES[0],plots:[],repeat:'None',freq:3,months:[],dueOrd:asTodayOrd()};syncForm();go('tasknew');}
 function openForm(tpl){
- if(tpl){FORM={id:tpl.id,mode:'template',students:1,name:tpl.name,category:tpl.category,plots:(tpl.plots||[]).slice(),mowDir:tpl.mowDir||null,dblMow:!!tpl.dblMow,dblPass:tpl.dblPass||null,repeat:tpl.repeat,freq:tpl.freq||3,months:(tpl.months||[]).slice(),machine:tpl.machine||'',machines:(tpl.machines||[]).slice(),eqNote:tpl.eqNote||''};}
+ if(tpl){FORM={id:tpl.id,mode:'template',students:1,name:tpl.name,category:tpl.category,plots:(tpl.plots||[]).slice(),repeat:tpl.repeat,freq:tpl.freq||3,months:(tpl.months||[]).slice(),machine:tpl.machine||'',machines:(tpl.machines||[]).slice(),eqNote:tpl.eqNote||''};}
  else{FORM={id:null,mode:'template',students:1,name:'',category:CATEGORIES[0],plots:[],repeat:'As needed',freq:3,months:[],machines:[],eqNote:''};}
  syncForm(); go('tasknew');
 }
@@ -10723,13 +10639,12 @@ function openCrewReq(){
 }
 function saveForm(){
  FORM.name=document.getElementById('tn-name').value.trim();
- if(isMowCat(FORM.category)&&!FORM.mowDir){toast('Pick a mow direction');return;}
  if(FORM.mode==='assign'){
    if(!FORM.name){toast('Enter a task name');return;}
    var who=(FORM.scope==='self')?SESSION.pid:FORM.target;
    if(FORM.scope==='lab'&&!who){toast('Pick a lab member to assign');return;}
    var _ws=document.getElementById('tn-when'); var _do=(_ws&&parseInt(_ws.value,10))||FORM.dueOrd||asTodayOrd();
-   TASKS.push({createdBy:SESSION.pid,id:newId('a'),title:FORM.name,area:FORM.plots.length?areaLabel(FORM.plots):'—',plots:FORM.plots.slice(),assignee:who,status:'todo',kind:'task',badge:null,mowDir:FORM.mowDir||null,dblMow:!!FORM.dblMow,dblPass:FORM.dblMow?(FORM.dblPass||MOW_PASSES[0]):null,type:FORM.category,machine:FORM.machine||null,dueAt:isoFromOrd(_do),dueOrd:_do,repeat:'None',freq:null,months:[],assignedBy:SESSION.pid,desc:''});
+   TASKS.push({createdBy:SESSION.pid,id:newId('a'),title:FORM.name,area:FORM.plots.length?areaLabel(FORM.plots):'—',plots:FORM.plots.slice(),assignee:who,status:'todo',kind:'task',badge:null,type:FORM.category,machine:FORM.machine||null,dueAt:isoFromOrd(_do),dueOrd:_do,repeat:'None',freq:null,months:[],assignedBy:SESSION.pid,desc:''});
    toast(FORM.scope==='self'?'Added to your tasks ✓':'Assigned to '+who+' ✓');
    back();
    tbTab=(FORM.scope==='self')?'mine':'board';
@@ -10740,10 +10655,10 @@ function saveForm(){
    if(!FORM.name){toast(FORM.reqType==='toCrew'?'Enter the task':'Enter what you need');return;}
    if(FORM.reqType==='toCrew'){
      if(!FORM.target){toast('Pick who to request');return;}
-     TASKS.push({createdBy:SESSION.pid,id:newId('r'),title:FORM.name,area:FORM.plots.length?areaLabel(FORM.plots):'—',plots:FORM.plots.slice(),assignee:null,status:'todo',kind:'request',origin:'manager',target:FORM.target,badge:null,mowDir:FORM.mowDir||null,dblMow:!!FORM.dblMow,dblPass:FORM.dblMow?(FORM.dblPass||MOW_PASSES[0]):null,type:FORM.category,machine:FORM.machine||null,dueAt:atToday(null),repeat:'None',freq:null,months:[],requestedBy:SESSION.pid,desc:''});
+     TASKS.push({createdBy:SESSION.pid,id:newId('r'),title:FORM.name,area:FORM.plots.length?areaLabel(FORM.plots):'—',plots:FORM.plots.slice(),assignee:null,status:'todo',kind:'request',origin:'manager',target:FORM.target,badge:null,type:FORM.category,machine:FORM.machine||null,dueAt:atToday(null),repeat:'None',freq:null,months:[],requestedBy:SESSION.pid,desc:''});
      toast('Request sent to '+nameOf(FORM.target)+' ✓'); back(); tbTab='requests'; renderBoard(); return;
    }
-   TASKS.push({createdBy:SESSION.pid,id:newId('r'),title:FORM.name,area:FORM.plots.length?areaLabel(FORM.plots):'—',plots:FORM.plots.slice(),assignee:null,status:'todo',kind:'request',origin:'crew',badge:null,mowDir:FORM.mowDir||null,dblMow:!!FORM.dblMow,dblPass:FORM.dblMow?(FORM.dblPass||MOW_PASSES[0]):null,type:FORM.category,machine:FORM.machine||null,dueAt:atToday(null),repeat:'None',freq:null,months:[],students:FORM.showStudents?(+FORM.students||1):1,requestedBy:SESSION.pid,desc:''});
+   TASKS.push({createdBy:SESSION.pid,id:newId('r'),title:FORM.name,area:FORM.plots.length?areaLabel(FORM.plots):'—',plots:FORM.plots.slice(),assignee:null,status:'todo',kind:'request',origin:'crew',badge:null,type:FORM.category,machine:FORM.machine||null,dueAt:atToday(null),repeat:'None',freq:null,months:[],students:FORM.showStudents?(+FORM.students||1):1,requestedBy:SESSION.pid,desc:''});
    toast('Request submitted ✓'); back(); tbTab='requests'; renderBoard(); return;
  }
  if(!FORM.name){toast('Enter a task name');return;}
@@ -10752,7 +10667,7 @@ function saveForm(){
     refuses this write too -- see canEditTaskList() in firestore.rules. */
  if(!tplCanEdit()){ toast('Only staff can change the task list'); return; }
  var editing=!!FORM.id;
- var t={id:FORM.id||(newId('tpl')),updatedAt:isoLocal(new Date(),true),updatedBy:SESSION.pid||null,name:FORM.name,category:FORM.category,plots:FORM.plots.slice(),mowDir:FORM.mowDir||null,dblMow:!!FORM.dblMow,dblPass:FORM.dblMow?(FORM.dblPass||MOW_PASSES[0]):null,repeat:FORM.repeat,freq:FORM.repeat==='Custom'?FORM.freq:null,months:FORM.months.slice(),machine:FORM.machine||null,machines:(FORM.machines||[]).slice(),eqNote:FORM.eqNote||''};
+ var t={id:FORM.id||(newId('tpl')),updatedAt:isoLocal(new Date(),true),updatedBy:SESSION.pid||null,name:FORM.name,category:FORM.category,plots:FORM.plots.slice(),repeat:FORM.repeat,freq:FORM.repeat==='Custom'?FORM.freq:null,months:FORM.months.slice(),machine:FORM.machine||null,machines:(FORM.machines||[]).slice(),eqNote:FORM.eqNote||''};
  var idx=TEMPLATES.findIndex(function(x){return x.id===t.id;});
  if(idx>=0)TEMPLATES[idx]=t; else TEMPLATES.push(t);
  saveTemplates();
@@ -10762,11 +10677,8 @@ function saveForm(){
 // form field events
 document.getElementById('tn-name').addEventListener('input',function(e){FORM.name=e.target.value;});
 document.getElementById('tn-students').addEventListener('change',function(e){FORM.students=+e.target.value;});
-document.getElementById('tn-cat').addEventListener('change',function(e){FORM.category=e.target.value;var mrow=document.getElementById('tn-machine-row');if(mrow)mrow.style.display=wantsMachineRow()?'':'none';syncMowRows();});
+document.getElementById('tn-cat').addEventListener('change',function(e){FORM.category=e.target.value;var mrow=document.getElementById('tn-machine-row');if(mrow)mrow.style.display=wantsMachineRow()?'':'none';});
 document.getElementById('s-tasknew').addEventListener('click',function(e){
- var md=e.target.closest('[data-tnmowdir]'); if(md){FORM.mowDir=md.getAttribute('data-tnmowdir');syncMowRows();return;}
- var db=e.target.closest('[data-tnmowdbl]'); if(db){FORM.dblMow=db.getAttribute('data-tnmowdbl')==='Double';if(FORM.dblMow&&!FORM.dblPass)FORM.dblPass=MOW_PASSES[0];syncMowRows();return;}
- var d2=e.target.closest('[data-tnmowdbl2]'); if(d2){FORM.dblPass=d2.getAttribute('data-tnmowdbl2');syncMowRows();return;}
 });document.getElementById('tn-machine').addEventListener('change',function(e){FORM.machine=e.target.value;});
 document.getElementById('tn-when')&&document.getElementById('tn-when').addEventListener('change',function(e){FORM.dueOrd=parseInt(e.target.value,10)||FORM.dueOrd;});
 document.getElementById('tn-repeat').addEventListener('change',function(e){FORM.repeat=e.target.value;syncForm();});
@@ -11017,10 +10929,6 @@ function asRepeatLabel(t){return t.repeat==='Custom'?(t.freq+'×/wk'):t.repeat;}
 function getPick(kind,id){return PICKS.find(function(p){return p.kind===kind&&p.id===id;});}
 function assignRow(kind,id,title,sub){
  var r=pickRank(kind,id);
- /* Once a mow is picked, its direction shows on the row so Bill can read the
-    whole day's pattern down the list without reopening each job. */
- var pk=getPick(kind,id);
- if(pk&&pk.mowDir) sub+=' · '+esc(pk.mowDir)+(pk.dblMow?' double':'');
  var pill;
  if(r){ pill = isUndergrad(asPerson)
    ? '<span class="rankpill tap" data-unpick="'+kind+':'+id+'" title="Remove">'+r+'</span>'
@@ -11106,13 +11014,7 @@ function openWiz(kind,id){
  else if(kind==='ev'){var ev=EVENTS.find(function(x){return x.id===id;});if(!ev)return;cat='spray';name=ev.title;defPlots=parsePlots({area:ev.title});defDue=evSprayOrd(ev);}
  else{var tk=TASKS.find(function(x){return x.id===id;});if(!tk)return;cat=tk.type;name=tk.title;defPlots=parsePlots(tk);defMow=tk;defMach=tk.machine||'';}
  var pk=getPick(kind,id);
- WIZ={kind:kind,id:id,name:name,cat:cat,map:needsMap(cat,name),plots:(pk&&pk.plots?pk.plots:defPlots).slice(),note:pk?pk.note:'',dueOrd:(pk&&pk.dueOrd)?pk.dueOrd:defDue,
-      mow:isMowCat(cat),
-      /* A saved pick wins; otherwise fall back to whatever the template or the
-         source task already carries, so a recurring mow keeps its direction. */
-      mowDir:(pk&&pk.mowDir)||(defMow&&defMow.mowDir)||null,
-      dbl:pk?!!pk.dblMow:!!(defMow&&defMow.dblMow),
-      dbl2:(pk&&pk.dblPass)||(defMow&&defMow.dblPass)||MOW_PASSES[0]};
+ WIZ={kind:kind,id:id,name:name,cat:cat,map:needsMap(cat,name),plots:(pk&&pk.plots?pk.plots:defPlots).slice(),note:pk?pk.note:'',dueOrd:(pk&&pk.dueOrd)?pk.dueOrd:defDue};
  /* A boom spray is planned here, not in the field: what is going in the tank
     and at what rate is Bill's call, and it rides out with the job so the crew
     only has to work out the volumes. */
@@ -11151,7 +11053,7 @@ function renderWiz(){
  document.getElementById('wz-next').textContent=WIZ.step==='map'?'Next':'✓';
  document.getElementById('wz-x').textContent=(WIZ.step==='note'&&WIZ.map)?'‹':'✕';
  if(WIZ.step==='map')renderWizMap();
- if(WIZ.step==='note'){document.getElementById('wz-note').value=WIZ.note||'';var ws=document.getElementById('wz-when');if(ws)ws.innerHTML=asDateOptions(WIZ.dueOrd||asTodayOrd());renderWizMow();renderWizSpray();}
+ if(WIZ.step==='note'){document.getElementById('wz-note').value=WIZ.note||'';var ws=document.getElementById('wz-when');if(ws)ws.innerHTML=asDateOptions(WIZ.dueOrd||asTodayOrd());renderWizSpray();}
 }
 /* Same product cards as the mix sheet, redrawn only when one is added or
    dropped so typing is never interrupted. */
@@ -11161,21 +11063,9 @@ function renderWizSpray(){
  if(!WIZ.spray)return;
  document.getElementById('wz-prods').innerHTML=mixProductRowsHtml(WIZ.products,'wzp');
 }
-/* Redrawn on its own so picking a chip never wipes what has been typed into
-   the note box. */
-function renderWizMow(){
- var box=document.getElementById('wz-mow'); if(!box||!WIZ)return;
- box.style.display=WIZ.mow?'':'none';
- if(!WIZ.mow)return;
- document.getElementById('wz-dir').innerHTML=mowChips(MOW_DIRS,WIZ.mowDir,'data-mowdir');
- document.getElementById('wz-dbl').innerHTML=mowChips(['Single','Double'],WIZ.dbl?'Double':'Single','data-mowdbl');
- var w2=document.getElementById('wz-dbl2wrap'); w2.style.display=WIZ.dbl?'':'none';
- if(WIZ.dbl)document.getElementById('wz-dbl2').innerHTML=mowChips(MOW_PASSES,WIZ.dbl2,'data-mowdbl2');
-}
 function closeWiz(){var el=document.getElementById('aswiz');if(el)el.classList.remove('show');WIZ=null;}
 function confirmWiz(){
  if(!WIZ)return;
- if(WIZ.mow&&!WIZ.mowDir){ toast('Pick a mow direction'); return; }
  /* A spray goes out naming something the farm actually stocks, or it does not
     go out — a rate against a product nobody can find is not a work order. */
  if(WIZ.spray){ var pb=mixProductsProblem(WIZ.products); if(pb){ toast(pb); return; } }
@@ -11184,8 +11074,7 @@ function confirmWiz(){
  var i=PICKS.findIndex(function(p){return p.kind===WIZ.kind&&p.id===WIZ.id;});
  var entry={kind:WIZ.kind,id:WIZ.id,note:WIZ.note,plots:WIZ.plots.slice(),dueOrd:WIZ.dueOrd,
             machine:WIZ.machine||null,
-            products:WIZ.spray?WIZ.products.map(function(p){return {id:p.id,name:p.name,rate:p.rate,unit:p.unit};}):null,
-            mowDir:WIZ.mow?WIZ.mowDir:null,dblMow:WIZ.mow?!!WIZ.dbl:false,dblPass:(WIZ.mow&&WIZ.dbl)?WIZ.dbl2:null};
+            products:WIZ.spray?WIZ.products.map(function(p){return {id:p.id,name:p.name,rate:p.rate,unit:p.unit};}):null};
  if(i>=0)PICKS[i]=entry; else PICKS.push(entry);
  closeWiz(); renderAssignList(); updateSaveBtn();
 }
@@ -11201,9 +11090,6 @@ document.getElementById('aswiz').addEventListener('click',function(e){
    toast(r.on?('Selected '+r.n+(r.skipped?(' · skipped '+r.skipped+' restricted'):'')):'Cleared');
    renderWizMap(); return;
  }
- var md=e.target.closest('[data-mowdir]'); if(md){ WIZ.mowDir=md.getAttribute('data-mowdir'); renderWizMow(); return; }
- var db=e.target.closest('[data-mowdbl]'); if(db){ WIZ.dbl=db.getAttribute('data-mowdbl')==='Double'; if(WIZ.dbl&&!WIZ.dbl2)WIZ.dbl2=MOW_PASSES[0]; renderWizMow(); return; }
- var d2=e.target.closest('[data-mowdbl2]'); if(d2){ WIZ.dbl2=d2.getAttribute('data-mowdbl2'); renderWizMow(); return; }
 });
 /* Product fields write straight into the pick — no redraw, so the caret and
    the keyboard stay put while a rate is being typed. */
@@ -11230,7 +11116,6 @@ function togglePick(kind,id){
 function pushAssign(o){
  var dueOrd=o.dueOrd||asTodayOrd();
  var base={createdBy:SESSION.pid,id:newId('t'),title:o.title,area:o.area,plots:o.plots,badge:o.badge||null,type:o.type,dueAt:isoFromOrd(dueOrd),dueOrd:dueOrd,repeat:o.repeat||'None',status:'todo',desc:o.note||''};
- if(o.mow&&o.mow.mowDir){ base.mowDir=o.mow.mowDir; base.dblMow=!!o.mow.dblMow; base.dblPass=base.dblMow?(o.mow.dblPass||MOW_PASSES[0]):null; }
  if(o.mow&&o.mow.machine) base.machine=o.mow.machine;
  /* Whatever Bill wrote into the tank rides out on the job. The nozzle and the
     area are left for the field — the nozzle is whatever is on the rig that
@@ -14032,7 +13917,7 @@ var _meDot=null;   /* live GPS dot on the farm map, created by the locate button
 
 /* Every map in the app wears the same furniture: zoom in the bottom-right with
    the attribution credit tucked under it, and the top corners left clear for
-   the locate button and the mow-direction badge. Call this instead of letting
+   the locate button. Call this instead of letting
    L.map() install its own control and no view can drift out of line.
 
    Build the map with zoomControl:false — Leaflet's built-in one lands top-left

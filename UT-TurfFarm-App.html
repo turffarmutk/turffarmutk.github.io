@@ -3889,7 +3889,7 @@ function flsyncStart(){
     _flsyncNextTry=Date.now()+FLSYNC_RETRY_MS; return false;
   }
   try{
-    FLSYNC.unsub=db.collection(FLSYNC_COLL).onSnapshot(flsyncOnSnapshot,function(e){
+    FLSYNC.unsub=db.collection(FLSYNC_COLL).onSnapshot(snapOpts(),flsyncOnSnapshot,function(e){
       FLSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
       FLSYNC.live=false; FLSYNC.ready=false; _flsyncNextTry=Date.now()+FLSYNC_RETRY_MS;
     });
@@ -4080,11 +4080,11 @@ function invsyncStart(){
     _invsyncNextTry=Date.now()+INVSYNC_RETRY_MS; return false;
   }
   try{
-    INVSYNC.unsubM=db.collection(INVSYNC_MOVES).onSnapshot(invsyncOnMoves,function(e){
+    INVSYNC.unsubM=db.collection(INVSYNC_MOVES).onSnapshot(snapOpts(),invsyncOnMoves,function(e){
       INVSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
       INVSYNC.live=false; INVSYNC.ready=false; _invsyncNextTry=Date.now()+INVSYNC_RETRY_MS;
     });
-    INVSYNC.unsubI=db.collection(INVSYNC_ITEMS).onSnapshot(invsyncOnItems,function(e){
+    INVSYNC.unsubI=db.collection(INVSYNC_ITEMS).onSnapshot(snapOpts(),invsyncOnItems,function(e){
       /* The products failing is not fatal - the ledger is still right, the
          phone just may not know a name yet. Do not tear the whole thing down. */
       INVSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
@@ -4319,7 +4319,7 @@ function schsyncStart(){
     _schsyncNextTry=Date.now()+SCHSYNC_RETRY_MS; return false;
   }
   try{
-    SCHSYNC.unsub=db.collection(SCHSYNC_COLL).onSnapshot(schsyncOnSnapshot,function(e){
+    SCHSYNC.unsub=db.collection(SCHSYNC_COLL).onSnapshot(snapOpts(),schsyncOnSnapshot,function(e){
       SCHSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
       SCHSYNC.live=false; SCHSYNC.ready=false; _schsyncNextTry=Date.now()+SCHSYNC_RETRY_MS;
     });
@@ -4471,7 +4471,7 @@ function tcsyncStart(){
     _tcsyncNextTry=Date.now()+TCSYNC_RETRY_MS; return false;
   }
   try{
-    TCSYNC.unsub=db.collection(TCSYNC_COLL).onSnapshot(tcsyncOnSnapshot,function(e){
+    TCSYNC.unsub=db.collection(TCSYNC_COLL).onSnapshot(snapOpts(),tcsyncOnSnapshot,function(e){
       TCSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
       TCSYNC.live=false; TCSYNC.ready=false; _tcsyncNextTry=Date.now()+TCSYNC_RETRY_MS;
     });
@@ -4603,7 +4603,7 @@ function tplsyncStart(){
     _tplsyncNextTry=Date.now()+TPLSYNC_RETRY_MS; return false;
   }
   try{
-    TPLSYNC.unsub=db.collection(TPLSYNC_COLL).onSnapshot(tplsyncOnSnapshot,function(e){
+    TPLSYNC.unsub=db.collection(TPLSYNC_COLL).onSnapshot(snapOpts(),tplsyncOnSnapshot,function(e){
       TPLSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
       TPLSYNC.live=false; TPLSYNC.ready=false; _tplsyncNextTry=Date.now()+TPLSYNC_RETRY_MS;
     });
@@ -4807,11 +4807,11 @@ function trsyncStart(){
   }
   try{
     if(!TRSYNC.live){
-      TRSYNC.unsub=db.collection(TRSYNC_COLL).onSnapshot(trsyncOnTrials,function(e){ trsyncDown(e); });
+      TRSYNC.unsub=db.collection(TRSYNC_COLL).onSnapshot(snapOpts(),trsyncOnTrials,function(e){ trsyncDown(e); });
       TRSYNC.live=true;
     }
     if(!TRSYNC.liveLifts){
-      TRSYNC.unsubLifts=db.collection(TRSYNC_LIFTS).onSnapshot(trsyncOnLifts,function(e){ trsyncDown(e); });
+      TRSYNC.unsubLifts=db.collection(TRSYNC_LIFTS).onSnapshot(snapOpts(),trsyncOnLifts,function(e){ trsyncDown(e); });
       TRSYNC.liveLifts=true;
     }
     TRSYNC.err=null; return true;
@@ -5152,7 +5152,7 @@ function fstsyncStart(){
     _fstsyncNextTry=Date.now()+FSTSYNC_RETRY_MS; return false;
   }
   try{
-    FSTSYNC.unsub=db.collection(FSTSYNC_COLL).onSnapshot(fstsyncOnSnapshot,function(e){
+    FSTSYNC.unsub=db.collection(FSTSYNC_COLL).onSnapshot(snapOpts(),fstsyncOnSnapshot,function(e){
       FSTSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
       FSTSYNC.live=false; FSTSYNC.ready=false; _fstsyncNextTry=Date.now()+FSTSYNC_RETRY_MS;
     });
@@ -16253,7 +16253,7 @@ function csyncStart(){
     _csyncNextTry=Date.now()+CSYNC_RETRY_MS; return false;
   }
   try{
-    CSYNC.unsub=db.collection(CSYNC_COLL).onSnapshot(csyncOnSnapshot,function(e){
+    CSYNC.unsub=db.collection(CSYNC_COLL).onSnapshot(snapOpts(),csyncOnSnapshot,function(e){
       CSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
       CSYNC.live=false; _csyncNextTry=Date.now()+CSYNC_RETRY_MS;
     });
@@ -17754,7 +17754,7 @@ function tsyncStart(){
   if(!db){ TSYNC.err='The database code did not load on this device'; _tsyncNextTry=Date.now()+TSYNC_RETRY_MS; return false; }
   if(!SESSION.pid){ TSYNC.err='Nobody is signed in yet'; _tsyncNextTry=Date.now()+TSYNC_RETRY_MS; return false; }
   try{
-    TSYNC.unsub=db.collection(TSYNC_COLL).onSnapshot(tsyncOnSnapshot,tsyncOnError);
+    TSYNC.unsub=db.collection(TSYNC_COLL).onSnapshot(snapOpts(),tsyncOnSnapshot,tsyncOnError);
     TSYNC.live=true; TSYNC.err=null;
     return true;
   }catch(e){
@@ -18166,7 +18166,7 @@ function msyncStart(){
   if(!db){ MSYNC.err='The database code did not load on this device'; _msyncNextTry=Date.now()+MSYNC_RETRY_MS; return false; }
   if(!SESSION.pid){ MSYNC.err='Nobody is signed in yet'; _msyncNextTry=Date.now()+MSYNC_RETRY_MS; return false; }
   try{
-    MSYNC.unsub=db.collection(MSYNC_COLL).onSnapshot(msyncOnSnapshot,msyncOnError);
+    MSYNC.unsub=db.collection(MSYNC_COLL).onSnapshot(snapOpts(),msyncOnSnapshot,msyncOnError);
     MSYNC.live=true; MSYNC.err=null;
     return true;
   }catch(e){
@@ -19075,6 +19075,29 @@ function authConfigured(){ return !!fbAuth(); }
 
 var _fbDb=null, _fbDbTried=false;
 var DB_CACHE='unknown';           /* 'on' | 'off' | the reason it could not */
+
+/* WHY EVERY LISTENER BELOW PASSES THIS
+   ------------------------------------------------------------------
+   By default a listener is only told when a RECORD changes. It is not
+   told when the connection comes up. That sounds like a detail and it is
+   not: this app decides it may start sending by watching for the first
+   answer that came from the database rather than from the copy on the
+   phone, and that answer only ever arrives attached to a snapshot.
+
+   So a drawer whose records have not changed since the app opened is
+   never told anything, sits on "waiting for the shared copy" forever,
+   and — because a phone sends nothing until it has heard back once —
+   never uploads. An EMPTY drawer is the worst case and it is a deadlock:
+   nothing can arrive to wake it, and it will not send the very records
+   that would. That is exactly what happened to Tasks on 2026-08-27,
+   while the time clock a few lines below it worked perfectly, because
+   punches happened to be arriving and each one carried the answer with
+   it.
+
+   `includeMetadataChanges` makes the connection coming up an event in
+   its own right. `docChanges()` still leaves metadata-only changes out,
+   so nothing downstream sees a record twice. */
+function snapOpts(){ return {includeMetadataChanges:true}; }
 
 function fbDb(){
   if(_fbDbTried) return _fbDb;

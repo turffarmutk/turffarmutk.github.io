@@ -39,7 +39,7 @@ const fakeDb = {
   enablePersistence() { return Promise.resolve(); },
   collection(name) {
     return { doc: id => docRef(name, id),
-             onSnapshot(next, err) { (state.listeners[name] = state.listeners[name] || []).push({ next, err }); return () => { state.listeners[name] = []; }; } };
+             onSnapshot(opts, next, err) { state.snapOpts = (state.snapOpts||[]).concat([opts]); (state.listeners[name] = state.listeners[name] || []).push({ next, err }); return () => { state.listeners[name] = []; }; } };
   },
   doc: p => docRef('_', p)
 };
@@ -272,7 +272,17 @@ section('7. Ten read-outs, one screen, no switches');
   ['Tasks', 'Map corrections', 'Who is working where', 'The field log']
     .forEach(t => ok(t, html.indexOf('>' + t + '<') >= 0));
   ok('nothing on the screen can be switched off', !/Turn off|Turn on/.test(html));
-  ok('the only button left is the roster', (html.match(/class="action tap"/g) || []).length <= 1);
+  /* This counted buttons as a stand-in for "the ten switches are gone". Two
+     diagnostic buttons were added on 2026-08-27, so count them by NAME
+     instead -- the thing that actually must never come back is a per-drawer
+     switch, and a bare count cannot tell one from the other. */
+  ok('no per-drawer switch has come back',
+     (html.match(/id="sdb-(?!push|copy|test|dump)/g) || []).length === 0);
+  ok('the roster button, the connection test and the copy button, and nothing else',
+     html.indexOf('id="sdb-push"') >= 0 &&
+     html.indexOf('id="sdb-test"') >= 0 &&
+     html.indexOf('id="sdb-copy"') >= 0 &&
+     (html.match(/class="action tap"/g) || []).length === 3);
   ok('the log read-out still says nothing is ever deleted', /is ever deleted/i.test(html));
 }
 

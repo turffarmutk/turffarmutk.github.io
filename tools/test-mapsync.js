@@ -43,7 +43,7 @@ const fakeDb = {
   collection(name) {
     return {
       doc: id => docRef(name, id),
-      onSnapshot(next, err) { (state.listeners[name] = state.listeners[name] || []).push({ next, err }); return () => { state.listeners[name] = []; }; }
+      onSnapshot(opts, next, err) { state.snapOpts = (state.snapOpts||[]).concat([opts]); (state.listeners[name] = state.listeners[name] || []).push({ next, err }); return () => { state.listeners[name] = []; }; }
     };
   },
   doc: p => docRef('_', p)

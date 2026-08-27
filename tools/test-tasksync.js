@@ -27,7 +27,7 @@ const ok = (n, c, x) => { c ? (pass++, console.log('  PASS  ' + n)) : (fail++, c
 const section = s => console.log('\n' + s);
 
 /* ------------------------------------------------------- the fake db ---- */
-const state = { docs: {}, writes: [], deletes: [], listeners: [], persistence: 0 };
+const state = { docs: {}, writes: [], deletes: [], listeners: [], persistence: 0, snapOpts: [] };
 /* Every drawer shares now, and any snapshot arriving runs the two-second scan,
    which attaches the other nine. So this double answers for the TASKS
    collection only: the rest get a listener that never fires and writes that go
@@ -50,7 +50,12 @@ const fakeDb = {
   collection(name) {
     return {
       doc: docRef(name),
-      onSnapshot(next, err) {
+      onSnapshot(opts, next, err) {
+        /* Real signature is (options, onNext, onError). A listener that does
+           NOT pass options is never told the connection came up, and an empty
+           collection then deadlocks -- 2026-08-27. Recorded so section 3 can
+           assert on it. */
+        state.snapOpts.push(opts);
         if (name !== 'tasks') return () => {};
         state.listeners.push({ next, err });
         return () => { state.listeners = []; };
@@ -147,6 +152,19 @@ section('3. A cached answer is not the server answering');
   ok('the record still lands on the phone', T().some(t => t.id === 's1'));
   ok('but nothing is uploaded yet', state.writes.length === 0);
   ok('and it is still not ready', win.TSYNC.ready === false);
+
+  /* THE DEADLOCK GUARD -- 2026-08-27.
+     A listener is told about a RECORD changing. It is only told the
+     connection came up if it asked to be, and this app cannot start
+     sending until it has been told. A drawer whose records are not
+     changing -- an EMPTY one above all -- then waits forever and never
+     uploads the very records that would have woken it. Tasks sat in
+     exactly that deadlock for a day while the time clock beside it
+     worked, because punches were arriving and carried the news along.
+     Every listener in the app, all twelve, must ask. */
+  ok('every listener asks to be told when the connection comes up',
+     state.snapOpts.length > 0 &&
+     state.snapOpts.every(o => o && o.includeMetadataChanges === true));
 }
 
 /* ------------------------------------ 4. a day's work must reach it ---- */

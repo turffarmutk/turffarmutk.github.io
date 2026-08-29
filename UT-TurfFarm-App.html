@@ -10459,7 +10459,6 @@ document.getElementById('s-lowstock').addEventListener('click',function(e){var r
 /* capture log mode/item before global data-go navigation fires */
 app.addEventListener('click',function(e){var m=e.target.closest('[data-mode]');if(m){window.ilMode=m.getAttribute('data-mode');window.ilItem=m.getAttribute('data-item')||null;}var ed=e.target.closest('[data-edit]');if(ed){window.aiEdit=ed.getAttribute('data-edit');return;}var addNav=e.target.closest('[data-go="additem"]');if(addNav)window.aiEdit=null;},true);
 
-renderBoard();
 /* ---- Task templates: Add / Edit form ---- */
 const CATEGORIES=['Mow','Paint','Spray','Fertilize','Aeration','Cultivation','Irrigation','Maintenance','Miscellaneous'];
 function isMowCat(cat){ return /mow/i.test(cat||''); }
@@ -12671,6 +12670,21 @@ function wxEnter(){ WXH=wxHours(); if(wxhSel>=WXH.length) wxhSel=0; wxRenderHour
   load(); render();
   window.rnRender=render;
 })();
+
+/* The task board's first paint. This MUST stay at the end of the block.
+
+   It used to sit up in the inventory section, ~400 lines above the ASMON/ASDOW
+   month and day-name arrays it ends up reading through asDateLabel(). `var`
+   declarations hoist but their VALUES do not, so those arrays were still
+   undefined when the board drew, and reading one threw. This is all one
+   <script>, so that throw killed every line below it -- the calendar, the time
+   clock, semester dates, farm settings and admin all silently stopped
+   existing, while the page still rendered and looked fine. It shipped that way
+   on 2026-08-27 and nobody could have seen it without opening the console.
+
+   Anything that draws a screen belongs down here, below every definition it
+   could possibly reach. tools/test-boot.js fails if this rule is broken. */
+renderBoard();
 
 </script>
 <script>

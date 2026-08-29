@@ -66,7 +66,7 @@ function boot(store) {
               'dueLabel','fmtDay','fmtTime','fmtDateTime','isoLocal','parseISO','atToday','atOffset','ordOfISO',
               'taskOrd','isFutureTask','newId','flNewId','esc','pidOf','nameOf','isMe','initOf','titleOf',
               'sessionSet','SESSION','rstFind','PEOPLE','renderBoard','renderTasks','eventsOnDate','calSeedDate',
-              'go','taskCrew','taskCrewLabel','taskIsFor','PP_ACTIONS'];
+              'go','taskCrew','taskCrewLabel','taskIsFor','PP_ACTIONS','boardDayOrd','isoFromOrd'];
   try {
     win.eval(scripts.join('\n;\n')
       + '\n;window.__p={' + EX.map(n => n + ':(typeof ' + n + '!=="undefined"?' + n + ':undefined)').join(',') + '};');
@@ -263,15 +263,24 @@ section('5. a typed value cannot become markup');
 
   /* End to end: a task title full of markup renders as text, not as elements. */
   const t = p.TASKS.find(x => x.id === 't1');
-  const title = t.title;
+  const title = t.title, due = t.dueAt;
   t.title = nasty;
+  /* Put it on the day the board is actually SHOWING, not on today.
+     The board opens on a weekday — since 2026-08-27 it shows Monday when
+     today is a Saturday or Sunday, because nobody works the weekend and a
+     day with no chip to match it is worse than no day. This fixture was due
+     `today`, so on a Saturday the board correctly filtered it out and this
+     check failed — a test that passed Monday to Friday and failed at the
+     weekend. Anchoring to the board's own day makes it the same test every
+     day of the year. */
+  t.dueAt = p.isoFromOrd(p.boardDayOrd());
   p.sessionSet('p07');
   p.go('taskboard');
   const board = doc.getElementById('tb-body');
   ok('the board renders it', board && board.innerHTML.length > 0);
   ok('and injects no element', !board.querySelector('img[onerror]'));
   ok('the text is still there, escaped', board.innerHTML.indexOf('&lt;img') >= 0);
-  t.title = title;
+  t.title = title; t.dueAt = due;
 }
 
 section('5b. map popups use delegated handlers');

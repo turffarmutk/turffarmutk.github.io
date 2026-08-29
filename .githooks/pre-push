@@ -1,0 +1,63 @@
+#!/bin/bash
+#
+# Refuses a push that has not been checked.
+#
+# Pushing publishes the app straight to the crew's phones -- there is no
+# practice version in between. This is the wall that makes "I'll run the tests
+# after" impossible. It costs about ten seconds.
+#
+# It does two things:
+#   1. Rebuilds sw.js, the file that tells each phone the app has changed.
+#      Forgetting it is silent: every phone keeps showing the OLD version with
+#      no error at all. If rebuilding changes it, the push stops so the new
+#      sw.js can be committed too -- pushing without it is the bug.
+#   2. Runs the whole test suite. Any failure stops the push.
+#
+# To push anyway in a genuine emergency:  git push --no-verify
+# If you use that, the app is going out unchecked. Know that you chose it.
+
+set -u
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+echo "pre-push: checking before this goes to the crew's phones..."
+
+if [ ! -d node_modules ]; then
+  echo "  ! node_modules is missing -- run 'npm install' first."
+  exit 1
+fi
+
+before=$(shasum sw.js 2>/dev/null | cut -d' ' -f1)
+npm run sw --silent >/dev/null 2>&1 || { echo "  ! 'npm run sw' failed."; exit 1; }
+after=$(shasum sw.js 2>/dev/null | cut -d' ' -f1)
+
+if [ "$before" != "$after" ]; then
+  cat <<'MSG'
+
+  ! STOPPED: sw.js was out of date and has just been rebuilt.
+
+    sw.js is what tells each phone that the app changed. It was not rebuilt
+    after the last edit, so every phone that already has the app would have
+    kept showing the OLD version -- with no error and nothing to see.
+
+    It is fixed now. Commit it and push again:
+
+        git add sw.js && git commit -m "Rebuild the offline file" && git push
+
+MSG
+  exit 1
+fi
+
+if ! npm test >/tmp/ut-prepush.log 2>&1; then
+  echo
+  echo "  ! STOPPED: the checks did not pass. Nothing was pushed."
+  echo
+  grep -E "FAIL|app script threw" /tmp/ut-prepush.log | head -8 | sed 's/^/    /'
+  echo
+  echo "    Full output: /tmp/ut-prepush.log"
+  echo "    Fix these, then push again."
+  echo
+  exit 1
+fi
+
+echo "pre-push: all checks passed. Pushing."
+exit 0

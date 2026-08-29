@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "permissions": {
+    "deny": [
+      "Read(./archive/**)",
+      "Read(./_to_delete/**)",
+      "Read(./node_modules/**)",
+      "Read(./turffarmutk.github.io/**)",
+      "Read(./package-lock.json)",
+      "Read(./vendor/**/*.js)",
+      "Read(./vendor/**/*.css)",
+      "Read(./docs/*.html)",
+      "Read(./.fuse_hidden*)",
+      "Read(./ziajuYl3)",
+      "Read(./**/*.bak)",
+      "Read(./**/.DS_Store)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/check.sh\"",
+            "timeout": 120,
+            "statusMessage": "Running the app's checks..."
+          }
+        ]
+      }
+    ]
+  }
+}

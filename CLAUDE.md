@@ -125,6 +125,18 @@ Only then commit. **Never push unless Dillon asks you to.** After a push, wait
 ten minutes before judging it — the website holds files for ten minutes, so a
 change is not visible instantly.
 
+**Two things now check this automatically**, so a broken push is hard rather
+than easy:
+
+- `.githooks/pre-push` **refuses the push** if `sw.js` is out of date or any
+  check fails. It needs one command per computer, once:
+  `git config core.hooksPath .githooks`
+- `.github/workflows/checks.yml` runs everything on GitHub after each push and
+  shows a red X on the commit. Nothing to install, nothing to skip.
+
+Neither replaces step 3. **No automated check opens the app and looks at it** —
+that is still yours to do.
+
 ---
 
 ## Before you "fix" something that looks wrong

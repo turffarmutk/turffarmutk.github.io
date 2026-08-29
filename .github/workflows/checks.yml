@@ -1,0 +1,46 @@
+# Runs the app's checks on GitHub every time anything is pushed.
+#
+# The pre-push hook in .githooks/ is the first line of defence, but it only
+# works on a machine where somebody ran `git config core.hooksPath .githooks`,
+# and it can be skipped with --no-verify. This cannot be skipped and needs
+# nothing installed anywhere.
+#
+# A failure shows as a red X next to the commit on github.com, and GitHub
+# emails the person who pushed. That turns a silent breakage -- the kind that
+# was live for two days in August 2026 -- into something that finds you.
+name: Checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:      # lets you run it by hand from the Actions tab
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install the dev tools
+        run: npm install --no-audit --no-fund
+
+      - name: Does the offline file match the app?
+        # sw.js is generated. If rebuilding it changes it, it was not rebuilt
+        # after the last edit -- and every phone that already has the app would
+        # keep showing the old version, silently. Fail loudly instead.
+        run: |
+          before=$(shasum sw.js | cut -d' ' -f1)
+          npm run sw --silent
+          after=$(shasum sw.js | cut -d' ' -f1)
+          if [ "$before" != "$after" ]; then
+            echo "::error::sw.js is out of date. Run 'npm run sw' and commit the result."
+            exit 1
+          fi
+          echo "sw.js is current."
+
+      - name: Run every check
+        run: npm test

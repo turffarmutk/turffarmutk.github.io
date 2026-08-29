@@ -60,12 +60,20 @@ versions). Both are git-ignored on purpose — see `docs/DECISIONS.md`.
 ## Making a change
 
 ```bash
-npm install          # first time only
+npm install                              # first time only
+git config core.hooksPath .githooks      # first time only - turns on the push check
 # edit UT-TurfFarm-App.html or farm-geo.js
 npm run sw           # REQUIRED — regenerates the service worker
-npm test             # 14 harnesses, 796 checks
+npm test             # 29 harnesses, 1,698 checks
 git add -A && git commit -m "what changed and why" && git push
 ```
+
+**`git config core.hooksPath .githooks` is the line people forget.** It is what
+switches on the check that refuses a push when the tests fail or `sw.js` is
+stale. Git does not copy hooks when you clone, so a fresh clone has no
+protection until somebody runs it. GitHub also runs the same checks after every
+push (`.github/workflows/checks.yml`) and marks the commit with a red X, which
+is the backstop for exactly this.
 
 **`npm run sw` is not optional.** The service worker's version is a hash of the
 files it caches. Skip it and every phone that already installed the app keeps

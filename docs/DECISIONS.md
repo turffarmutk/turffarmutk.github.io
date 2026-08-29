@@ -611,3 +611,27 @@ vanish on mouseover. Desktop only, since the rule lives inside
 **Don't:** remove the override, or reach for `filter`/`transform` on these cards.
 The cards carry inline `background` and `box-shadow`, so a stylesheet hover can't
 override those anyway — `outline` is the only free lever.
+
+### The checks run several at a time, capped by memory — 2026-08-29
+**Decision:** `npm test` runs `tools/run-tests.js`, which starts several test
+files at once instead of running all 29 one after another. How many at once is
+worked out from the machine's memory (`totalmem / 2.5 GB`), **not** from the
+number of processor cores. `npm run test:serial` keeps the old one-at-a-time
+chain for when interleaved output gets in the way.
+**Why:** one after another took about three minutes on the farm laptop. Pushing
+runs the checks first, and GitHub Desktop shows a bare spinner the whole time
+with no output at all — so a push that is working perfectly looks frozen. On
+2026-08-29 that misread cost three consecutive push attempts: each one was
+quit and restarted part-way through the checks, and nothing ever reached the
+crew. Several at a time brings it to about a minute, which is short enough to
+sit through. The test files themselves were not touched — each still runs as
+its own separate `node`, and they are safe to overlap only because every one of
+them just *reads* the app file and none of them writes anything.
+**Don't:** raise the limit to the core count. Each file loads the whole
+19,500-line app into a fake browser and can reach 1.6 GB on its own, so 16 at
+once on a 16 GB laptop means swapping, which is slower than not doing it at
+all. Measured there: 4 at a time 72s, 6 at a time 65s, 8 at a time 60s but
+600 MB more swap — the five seconds are not worth it. Also don't try to cap it
+with node's `--max-old-space-size`: at 512 MB `test-auth.js` runs out of memory
+and aborts part-way through, which looks like a passing run right up until you
+read the exit code.

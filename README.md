@@ -64,7 +64,7 @@ npm install                              # first time only
 git config core.hooksPath .githooks      # first time only - turns on the push check
 # edit UT-TurfFarm-App.html or farm-geo.js
 npm run sw           # REQUIRED — regenerates the service worker
-npm test             # 29 harnesses, 1,698 checks
+npm test             # 29 harnesses, 1,698 checks, about a minute
 git add -A && git commit -m "what changed and why" && git push
 ```
 
@@ -74,6 +74,11 @@ stale. Git does not copy hooks when you clone, so a fresh clone has no
 protection until somebody runs it. GitHub also runs the same checks after every
 push (`.github/workflows/checks.yml`) and marks the commit with a red X, which
 is the backstop for exactly this.
+
+**Pushing takes about a minute, and looks like nothing is happening.** The
+push runs every check first, and GitHub Desktop shows a bare spinner with no
+output while it does. That is normal. Do not quit or restart the app — that
+kills the check part-way and nothing gets pushed at all.
 
 **`npm run sw` is not optional.** The service worker's version is a hash of the
 files it caches. Skip it and every phone that already installed the app keeps

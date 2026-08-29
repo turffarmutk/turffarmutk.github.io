@@ -10,7 +10,10 @@ cd "${CLAUDE_PROJECT_DIR:-$(dirname "$0")/../..}" || exit 0
 
 out=$(npm test 2>&1)
 if [ $? -eq 0 ]; then
-  n=$(printf '%s' "$out" | awk -F'[ ,]' '/passed,/{s+=$1} END{print s+0}')
+  # The runner prints a grand total on its last "passed," line, so take that
+  # rather than adding the lines up -- summing would count every check twice,
+  # once in its own file's total and again in the grand total.
+  n=$(printf '%s' "$out" | awk -F'[ ,]' '/passed,/{last=$1} END{print last+0}')
   msg="✅ All checks passed ($n) — safe to push."
 else
   first=$(printf '%s' "$out" | grep -m1 -E "FAIL|app script threw" | sed 's/^ *//' | cut -c1-160)

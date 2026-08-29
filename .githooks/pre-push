@@ -4,7 +4,7 @@
 #
 # Pushing publishes the app straight to the crew's phones -- there is no
 # practice version in between. This is the wall that makes "I'll run the tests
-# after" impossible. It costs about ten seconds.
+# after" impossible. It costs about a minute.
 #
 # It does two things:
 #   1. Rebuilds sw.js, the file that tells each phone the app has changed.
@@ -20,6 +20,8 @@ set -u
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
 echo "pre-push: checking before this goes to the crew's phones..."
+echo "          this takes about a minute. GitHub Desktop shows no progress"
+echo "          while it runs -- that spinner is normal, let it finish."
 
 if [ ! -d node_modules ]; then
   echo "  ! node_modules is missing -- run 'npm install' first."

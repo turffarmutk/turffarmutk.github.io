@@ -79,7 +79,10 @@ show up." Never edit `sw.js` by hand; this command writes it.
 npm test
 ```
 
-29 sets of automated checks, about 1,700 in total, in roughly ten seconds.
+29 sets of automated checks, about 1,700 in total, in roughly a minute. They
+run several at a time (`tools/run-tests.js`); `npm run test:serial` runs them
+one after another instead, which is slower but easier to read when two of them
+disagree.
 They all have to pass. Two things to watch for:
 
 - The words **`app script threw`** anywhere in the output mean the app crashed

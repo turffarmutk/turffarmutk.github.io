@@ -2,7 +2,7 @@
   "private": true,
   "description": "Dev-only tooling for the UT Turf Farm app. The app is UT-TurfFarm-App.html plus farm-geo.js, which must sit beside it; neither needs any of this to run.",
   "scripts": {
-    "test": "node tools/test-boot.js && node tools/test-field-position.js && node tools/test-mowing-setup.js && node tools/test-back-nav.js && node tools/test-responsive.js && node tools/test-gps-power.js && node tools/test-prefs.js && node tools/test-session.js && node tools/test-phase0.js && node tools/test-store.js && node tools/test-inventory.js && node tools/test-places.js && node tools/test-task-permissions.js && node tools/test-rules.js && node tools/test-db.js && node tools/test-tasksync.js && node tools/test-mapsync.js && node tools/test-fieldlog-sync.js && node tools/test-spray.js && node tools/test-refdata.js && node tools/test-offline.js && node tools/test-pwa.js && node tools/test-bugreport.js && node tools/test-auth.js && node tools/test-task-mutation.js && node tools/test-schedule.js && node tools/test-tasklist.js && node tools/test-trials.js && node tools/test-farmsettings.js",
+    "test": "node tools/run-tests.js",
     "test:boot": "node tools/test-boot.js",
     "test:field": "node tools/test-field-position.js",
     "test:mowing": "node tools/test-mowing-setup.js",
@@ -36,7 +36,8 @@
     "test:db": "node tools/test-db.js",
     "test:tasksync": "node tools/test-tasksync.js",
     "test:mapsync": "node tools/test-mapsync.js",
-    "test:flsync": "node tools/test-fieldlog-sync.js"
+    "test:flsync": "node tools/test-fieldlog-sync.js",
+    "test:serial": "node tools/test-boot.js && node tools/test-field-position.js && node tools/test-mowing-setup.js && node tools/test-back-nav.js && node tools/test-responsive.js && node tools/test-gps-power.js && node tools/test-prefs.js && node tools/test-session.js && node tools/test-phase0.js && node tools/test-store.js && node tools/test-inventory.js && node tools/test-places.js && node tools/test-task-permissions.js && node tools/test-rules.js && node tools/test-db.js && node tools/test-tasksync.js && node tools/test-mapsync.js && node tools/test-fieldlog-sync.js && node tools/test-spray.js && node tools/test-refdata.js && node tools/test-offline.js && node tools/test-pwa.js && node tools/test-bugreport.js && node tools/test-auth.js && node tools/test-task-mutation.js && node tools/test-schedule.js && node tools/test-tasklist.js && node tools/test-trials.js && node tools/test-farmsettings.js"
   },
   "devDependencies": {
     "@turf/turf": "^7.4.0",

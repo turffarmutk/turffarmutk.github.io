@@ -196,8 +196,14 @@ function renderTabs(){
    PAGE_DEST/NAV_OPTIONS shows up in both places with no extra wiring, wearing
    the same icon in both. The difference is how much fits: the bar has five
    slots, so it shows the three chosen favourites. The rail has a whole column,
-   so it shows every page the role can reach and, on desktop, the account rows
-   too. Nothing on a monitor needs to hide behind "More". */
+   so it shows every page the role can reach, plus More.
+
+   More is on the rail even though every page already is, because More is not
+   only a page list. It is the ONLY door in the app to Report a technical bug,
+   Farm settings and Admin. Leaving it off — on the reasoning that a monitor has
+   room for every page, so nothing needs hiding behind More — made those three
+   unreachable on every iPad and laptop, with nothing on screen to say so. The
+   rule this restores: the rail is navMap, whole. See docs/DECISIONS.md. */
 
 /* The rail's account block belonged to the retired desktop band. Profile,
    notifications, roster, preferences and log out are reached the same way they
@@ -205,10 +211,18 @@ function renderTabs(){
 
 /* SCREEN_DEST rolls the page screens up to their tab; the account screens need
    the same treatment so the rail stays lit while you're three levels into
-   Preferences or editing a roster entry. */
+   Preferences or editing a roster entry.
+
+   The farm-settings and admin screens roll up to More for the same reason: they
+   are reached through it, so the rail should stay lit on More rather than going
+   dark the moment you open one. They belong HERE and not in SCREEN_DEST —
+   SCREEN_DEST is shared with the phone's bottom bar, and adding them there
+   would change what lights up on the crew's phones. */
 var RAIL_ROLLUP={profedit:'profile',rosteredit:'roster',adminxfer:'roster',
   navtabs:'navsettings',homescreen:'navsettings',notifsettings:'navsettings',theme:'navsettings',
-  powersettings:'navsettings'};
+  powersettings:'navsettings',
+  farmsettings:'more',admin:'more',spraysettings:'more',mowersettings:'more',
+  labsettings:'more',semsettings:'more',sharedb:'more'};
 
 function railIcon(l){ return (typeof TAB_EMOJI!=='undefined' && TAB_EMOJI[l]) || '•'; }
 
@@ -248,11 +262,25 @@ function renderRail(){
     }).join('');
   h+='<div class="rl-spacer"></div><div class="rl-sep"></div>';
 
-  /* 82px can't carry the whole account block, and More is redundant now that
-     every page is on the rail — Profile and the bell still reach the rest.
-     The "Switch" slot (switch-role/switch-user) was demo-only and was
-     removed 2026-08-25 -- nothing replaces it, the rail is just one item
-     shorter now. */
+  /* More, below the divider, wearing the same ••• and the same word it wears on
+     the phone's bottom bar — a page must not change its face between the two.
+     It carries the utility rows (Report a technical bug, Farm settings, Admin,
+     Log out), and it is the only thing that reaches them. Built through the
+     same item() as the pages above, so it needs no wiring of its own: the rail
+     click handler already routes data-dest through goRoot(), and show('more')
+     already calls moreEnter() to decide which rows that role may see.
+
+     Adding it here rather than three separate rail rows is deliberate. More
+     builds its own list, so anything added to it in future turns up on a big
+     screen too, instead of quietly existing only on phones.
+
+     82px still can't carry the whole account block, and it doesn't have to:
+     Profile, notifications, preferences, roster and log out are behind the
+     avatar and the bell. The "Switch" slot (switch-role/switch-user) was
+     demo-only and was removed 2026-08-25 -- nothing replaces it. */
+  if(nm.More) h+=item({k:'More',ic:railIcon('More'),dest:nm.More,
+                       on:nm.More===dest,label:'More'});
+
   rail.innerHTML=h;
   /* The bell badge paints itself onto anything carrying .bellwrap. */
   try{updateBellBadges();}catch(e){}

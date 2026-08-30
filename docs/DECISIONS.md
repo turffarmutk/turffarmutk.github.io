@@ -760,6 +760,37 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### More is on the wide-screen rail, even though every page already is — 2026-08-30
+**Decision:** the left rail that replaces the bottom tab bar at 820px and up now
+ends with a **More** item, below the divider, wearing the same ••• and the same
+word it wears on the phone's bottom bar. The rule behind it: the rail is
+`navMap`, whole — every page the role can reach, *plus* More.
+**Why:** the rail was built to list pages only, on the reasoning that a monitor
+has room for all of them so nothing needs hiding behind More. That is true of
+pages and wrong about More, because More is not only a page list. It is the
+**only** door in the app to *Report a technical bug*, *Farm settings* (sprayer,
+mowers, labs, semester dates, shared database, bug-report settings) and *Admin*
+(roster and accounts). Each is linked from exactly one place in the whole
+codebase — a row on the More screen — and nothing anywhere linked to More except
+the bottom bar, which is hidden on the wide shell. So on every iPad, laptop and
+monitor those screens were **unreachable**, and nothing on screen said so: the
+rail simply did not have them, and the app looked complete. Adding More rather
+than three separate rail rows fixes the class rather than the three examples —
+More builds its own rows from the role and its permissions, so anything added to
+it later shows up on a big screen automatically instead of being phone-only
+again. `RAIL_ROLLUP` also gained `farmsettings`, `admin`, `spraysettings`,
+`mowersettings`, `labsettings`, `semsettings` and `sharedb` → `more`, so the
+rail stays lit on More while you are inside one of them.
+**Don't:** tidy More off the rail again as "redundant on a monitor" — that is
+the exact reasoning that caused this, and the comment in `renderRail()` used to
+say it out loud. It is not a page list. Before touching it, search the source
+for what links to `s-more`: the answer is still nothing else. And put those
+roll-ups in `RAIL_ROLLUP`, never in `SCREEN_DEST` — `SCREEN_DEST` is read by the
+phone's bottom bar too, so adding them there changes what lights up on the
+crew's phones. `tools/test-responsive.js` section 6b walks rail → More → each
+row and asserts you land on the screen; if it goes red, something is stranded on
+big screens again.
+
 ### The App Manager post is a hat, not a job — 2026-08-25
 **Decision:** holding the App Manager post no longer sets `currentRole`. It is
 its own flag, `IS_APP_ADMIN`, read off the `app_admin` claim on the sign-in

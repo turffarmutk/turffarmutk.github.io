@@ -121,10 +121,20 @@ Two traps when you do this:
 - **The console keeps old messages** from before your fix. Confirm an error is
   really still happening rather than reading history.
 
-**4. Use the thing you changed.** Click it. If it was a bug, make the old
-problem happen again and confirm it is gone. If it is something people touch
-in the field, look at it at phone width — that is the only screen that
-matters here.
+**4. Use the thing you changed, at BOTH widths.** Click it. If it was a bug,
+make the old problem happen again and confirm it is gone.
+
+Then look at it narrow (a phone, under 820px) **and** wide (a laptop, 820px and
+up). This is not tidiness. Those are two different shells — the narrow one has
+a bottom bar, the wide one hides that bar and puts a rail down the left — and a
+change can land in one and not the other. That is not hypothetical: More was
+left off the rail, and because More is the only thing that links to Report a
+bug, Farm settings and Admin, all three were unreachable on every laptop and
+iPad from the day the rail shipped until 2026-08-30. Nothing looked wrong. The
+rail just didn't have them.
+
+The crew are on phones in the fields, so narrow still decides how a thing should
+look. Wide decides whether it is there at all.
 
 **5. Say honestly what you did.** Report what you ran and what you saw. If you
 skipped a step, say which and why. If something is still failing, say so. Do
@@ -196,6 +206,18 @@ The app is about 19,500 lines spread over the page and five files beside it.
 Within a file, navigate by the `/* ===== SECTION ===== */` headings and by
 function name — **not** by line number, which changes the moment either of you
 edits the file.
+
+**The app has two shells, and a screen can go missing from one of them.**
+Under 820px wide it is the phone: a bottom bar with Home, three chosen pages and
+More. At 820px and up — iPad, laptop, monitor — that bottom bar is hidden and a
+rail down the left side takes over. Same markup, same code, different furniture.
+
+The trap is that a screen reached from only one of those two is **invisible in
+the other, with nothing on screen to say so**. It does not error, it does not
+look broken, it is simply not there. So before you add a screen, or move where
+one is reached from, ask: *what links to this?* — and check that link exists at
+both widths. `tools/test-responsive.js` section 6b does this for everything
+behind More; the rest is yours to check by opening the app twice.
 
 - Make small, targeted edits. Most things that break here break because
   something was rewritten wholesale rather than adjusted.

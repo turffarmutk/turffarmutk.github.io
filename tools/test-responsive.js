@@ -177,13 +177,22 @@ section('3. rail is built from navMap');
      rail, and Profile plus the bell still reach everything else, so nothing
      took its place. */
   ok('no Switch entry', !labels.includes('Switch'), labels.join(','));
-  ok('no More entry', !labels.includes('More'), labels.join(','));
 
-  /* The point of the rail: every page the role can reach, not the three
-     favourites the phone bar has room for. */
-  const reachable = NAV.NAV_OPTIONS.manager.filter(l => NAV.navMap.manager[l]);
-  const missing = reachable.filter(l => !labels.includes(l));
-  ok('the rail exposes every manager page', missing.length === 0, 'missing ' + missing.join(','));
+  /* More IS on the rail, and this assertion used to say the opposite. The old
+     reasoning was that a monitor has room for every page so nothing needs
+     hiding behind More. True of pages, and wrong about More, which is also the
+     only door to Report a technical bug, Farm settings and Admin. Leaving it
+     off put those three out of reach on every iPad and laptop. Do not flip this
+     back -- see section 3e and docs/DECISIONS.md. */
+  ok('More is on the rail', labels.includes('More'), labels.join(','));
+
+  /* The rule, stated once: the rail is navMap, whole. navMap is the pages the
+     role can reach plus More, so anything added to either shows up here without
+     this test needing an edit -- which is exactly what did not happen last
+     time. */
+  const wholeNav = Object.keys(NAV.navMap.manager);
+  const missing = wholeNav.filter(l => !labels.includes(l));
+  ok('the rail is navMap, whole', missing.length === 0, 'missing ' + missing.join(','));
   ok('which beats the 5-slot bottom bar', labels.length > 5, labels.length + ' items');
 
   /* Same rail at every width above phone — that is the whole point of merging
@@ -292,6 +301,75 @@ section('6. rail navigates');
   if (more) {
     more.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
     ok('More opens the more screen', active() === 'more', 'got ' + active());
+  }
+}
+
+section('6b. nothing on the More screen is stranded on a big screen');
+{
+  /* This is the section that pins the actual bug, so it is worth spelling out.
+     More is the ONLY thing in the app that links to Report a technical bug,
+     Farm settings and Admin -- grep the source for data-go="farmsettings" and
+     there is exactly one hit, on the More screen. When More was left off the
+     rail, and the bottom bar is hidden above 820px, all three were unreachable
+     on every iPad and laptop. Nothing on screen said so; the rail simply did
+     not have them.
+
+     So this walks it for real rather than asserting a label exists: rail ->
+     More -> the row -> did we land on the screen. */
+  setWidth(1440);
+  win.go('home-manager');
+
+  ok('More is on the rail to click', !!rail().querySelector('[data-rail="More"]'));
+
+  /* renderRail() rebuilds rail.innerHTML on every navigation, so a saved
+     reference to the More item is detached the moment you go anywhere -- and a
+     click on a detached node bubbles to nothing. Re-query it every time. */
+  function clickRailMore() {
+    const m = rail().querySelector('[data-rail="More"]');
+    if (m) m.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  }
+
+  /* Every row the More screen offers, taken from the markup rather than a list
+     kept here -- a row added to More is then covered without editing this file,
+     which is the failure mode being guarded against. */
+  const rows = [...doc.querySelectorAll('#s-more .row[data-go]')]
+    .map(r => r.getAttribute('data-go'));
+  ok('the More screen has rows to check', rows.length > 0, rows.length + ' rows');
+
+  const stranded = rows.filter(go => {
+    win.go('home-manager');
+    clickRailMore();
+    if (active() !== 'more') return true;
+    const row = doc.querySelector('#s-more .row[data-go="' + go + '"]');
+    if (!row) return true;
+    row.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    return active() !== go;
+  });
+  ok('every More row is reachable from the rail', stranded.length === 0,
+     'stranded: ' + stranded.join(','));
+
+  /* Named explicitly as well. A test that only checked "More is on the rail"
+     would go green again if More came back for some other reason while these
+     three had been moved somewhere a big screen still cannot see. */
+  ['bugreport', 'farmsettings', 'admin'].forEach(go => {
+    win.go('home-manager');
+    clickRailMore();
+    const row = doc.querySelector('#s-more .row[data-go="' + go + '"]');
+    if (!row) { ok(go + ' has a row on More', false); return; }
+    row.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    ok(go + ' is reachable on a big screen', active() === go, 'got ' + active());
+  });
+
+  /* And the rail stays lit on More once you are inside one of them, rather than
+     going dark. That is RAIL_ROLLUP's job -- not SCREEN_DEST's, which the phone
+     bottom bar reads too. */
+  win.go('home-manager');
+  clickRailMore();
+  const fs = doc.querySelector('#s-more .row[data-go="farmsettings"]');
+  if (fs) {
+    fs.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    const on = [...rail().querySelectorAll('.rl-item.on')].map(i => i.getAttribute('data-rail'));
+    ok('Farm settings keeps More lit on the rail', on[0] === 'More', on.join(',') || 'nothing lit');
   }
 }
 

@@ -23,7 +23,14 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Must stay at or above what jsdom needs -- jsdom 30 wants Node 22.22,
+          # 24.15 or newer, and the test harnesses are built on it. Pinned to 20
+          # here, every check failed within seconds of starting while the same
+          # checks passed on the farm laptop, because the laptop runs 24. The
+          # steps that do not touch jsdom passed, which made it look like the
+          # tests themselves were broken. If you change this, check
+          # package.json's "engines" first.
+          node-version: '24'
 
       - name: Install the dev tools
         run: npm install --no-audit --no-fund

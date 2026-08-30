@@ -46,5 +46,8 @@
   "dependencies": {
     "firebase-admin": "^14.3.0",
     "playwright": "^1.62.1"
+  },
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
   }
 }

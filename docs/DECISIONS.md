@@ -635,3 +635,19 @@ all. Measured there: 4 at a time 72s, 6 at a time 65s, 8 at a time 60s but
 with node's `--max-old-space-size`: at 512 MB `test-auth.js` runs out of memory
 and aborts part-way through, which looks like a passing run right up until you
 read the exit code.
+
+### GitHub's copy of the checks runs Node 24, not 20 — 2026-08-29
+**Decision:** `.github/workflows/checks.yml` pins `node-version: '24'`, and
+`package.json` now declares the same requirement under `engines`.
+**Why:** the test harnesses are built on jsdom, and jsdom 30 refuses to run on
+anything older than Node 22.22 / 24.15. The workflow was written pinned to 20,
+so from its very first run every check failed on GitHub while the identical
+checks passed on the farm laptop, which runs 24. What made it hard to read is
+that it did not look like a version problem: installing worked, the sw.js check
+worked, and only "Run every check" failed — because those earlier steps are the
+ones that never touch jsdom. The whole job was over in seventeen seconds, far
+too fast to have run 1,698 checks, which is the tell.
+**Don't:** lower the Node version to match some other project, or bump the
+dependencies without checking what Node they now want. If GitHub starts failing
+every check in under twenty seconds while the laptop is green, this is the first
+thing to look at — it is a version mismatch, not a broken test.

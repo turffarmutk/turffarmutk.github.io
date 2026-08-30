@@ -2706,7 +2706,13 @@ function sdbShareBlocks_raw(){
    {st:FSTSYNC, summary:fstsyncSummary(), title:'Farm settings',
     what:'The sprayer numbers, the mower list, the labs list and the semester dates. This '
         +'is the one that TAKES rather than sends: the farm\'s copy wins on arrival, and '
-        +'from then on this phone sends only what it changes itself.'}
+        +'from then on this phone sends only what it changes itself.'},
+   {st:EQSYNC,  summary:eqsyncSummary(),  title:'The machines',
+    what:'Mark a mower down and it reads Down on everybody\'s phone, so nobody walks out '
+        +'to a machine that will not run. Carries the machines, the problems reported '
+        +'against them, the service history and when each one is next due. Anybody can '
+        +'report a problem, undergraduates included — they are the ones on the mowers. '
+        +'Taking a machine out of service stays with Bill and the technicians.'}
   ];
 }
 
@@ -6816,6 +6822,7 @@ function storeScan(){
   try{ tplsyncTick(); }catch(e){}
   try{ trsyncTick(); }catch(e){}
   try{ fstsyncTick(); }catch(e){}
+  try{ eqsyncTick(); }catch(e){}
 }
 function storeFlush(){ storeScan(); }
 function storeTouch(){ storeScan(); }   /* callers that want an immediate write */
@@ -6850,6 +6857,7 @@ function storeHydrate(){
   try{ tplsyncHydrate(); }catch(e){}
   try{ trsyncHydrate(); }catch(e){}
   try{ fstsyncHydrate(); }catch(e){}
+  try{ eqsyncHydrate(); }catch(e){}
   _storeOn=true;
   try{ setInterval(storeScan,STORE_SCAN_MS); }catch(e){}
 }

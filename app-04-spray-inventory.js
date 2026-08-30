@@ -2509,6 +2509,19 @@ let EQUIP=[
 let EQCHECKOUT=[];
 let EQMAINT=[];
 let EQPROBLEMS=[];
+/* Service-history entries had no id until 2026-08-30, because nothing outside
+   this phone ever needed to name one. Sharing them does: every drawer keys its
+   records by id, and two phones logging a service in the same second must not
+   land on the same one.
+
+   Rows already sitting on somebody's phone are stamped on READ rather than
+   being migrated, exactly as the field log does (flStampIds) -- a migration
+   would have to run once on twenty-three phones and be right every time, while
+   stamping on read simply cannot be missed. */
+function eqMaintNewId(){ return newId('m'); }
+function eqMaintStampIds(){
+  for(var i=0;i<EQMAINT.length;i++){ if(!EQMAINT[i].id) EQMAINT[i].id=eqMaintNewId(); }
+}
 /* ---- interval-based maintenance schedules ---- */
 function eqToday(){var d=new Date();d.setHours(0,0,0,0);return d;}
 function daysAgo(n){var d=eqToday();d.setDate(d.getDate()-(n||0));return d;}
@@ -2522,11 +2535,36 @@ function dueMeta(d){
 let EQSCHED=[
  /* Empty on purpose — see TASKS. Held 6 sample service schedules. */
 ];
-/* ---- roles ---- */
-function eqCanReport(){return currentRole==='manager'||currentRole==='tech'||currentRole==='grad';}
-function eqCanDown(){return currentRole==='manager'||currentRole==='tech';}
-function eqCanEdit(){return currentRole!=='grad'&&currentRole!=='undergrad';}
-function eqCanMaint(){return currentRole==='manager'||currentRole==='tech';}
+/* ---- roles ----
+   These four decide which buttons the equipment screens draw. They used to
+   work it out from currentRole; since 2026-08-30 they ask the four functions
+   over in app-02-fieldlog-sync.js, which read the ROSTER.
+
+   WHY THAT MATTERS, in one sentence: those same four rules are now written
+   into firestore.rules and enforced on every phone, so the button on screen
+   and the answer the database will give have to come from ONE place. When they
+   came from two, the app could cheerfully offer a button whose write the
+   database then refused -- which looks, to whoever tapped it, like the app is
+   broken.
+
+   The fallbacks are the old behaviour, and they are only reached if this file
+   somehow loads without app-02. Any real change goes in app-02. */
+function eqCanReport(){
+  return (typeof eqCanReportProblem==='function') ? eqCanReportProblem()
+       : (currentRole==='manager'||currentRole==='tech'||currentRole==='grad');
+}
+function eqCanDown(){
+  return (typeof eqCanTakeDown==='function') ? eqCanTakeDown()
+       : (currentRole==='manager'||currentRole==='tech');
+}
+function eqCanEdit(){
+  return (typeof eqCanEditMachine==='function') ? eqCanEditMachine()
+       : (currentRole!=='grad'&&currentRole!=='undergrad');
+}
+function eqCanMaint(){
+  return (typeof eqCanMaintain==='function') ? eqCanMaintain()
+       : (currentRole==='manager'||currentRole==='tech');
+}
 function eqStat(s){
  if(s==='down')return {lbl:'Down',dot:'#c0392b',bg:'#fdeceb',fg:'#c0392b'};
  if(s==='in_use')return {lbl:'In use',dot:'#489FDF',bg:'#e8eff5',fg:'#42688a'};
@@ -2604,7 +2642,7 @@ function renderEquipMaint(){
 function markSchedDone(id){
  var s=EQSCHED.find(function(x){return x.id===id;}); if(!s)return;
  s.lastDone=eqToday();
- EQMAINT.unshift({eq:s.eq,type:s.type,at:atToday(null),by:SESSION.pid,note:(s.note||'Scheduled service'),task:null});
+ EQMAINT.unshift({id:eqMaintNewId(),eq:s.eq,type:s.type,at:atToday(null),by:SESSION.pid,note:(s.note||'Scheduled service'),task:null});
  toast((EQMTL[s.type]||'Service')+' logged ✓');
  renderEquip();
 }
@@ -2736,7 +2774,7 @@ document.getElementById('s-eqdetail').addEventListener('click',function(e){
      mt.status='available';mt.flagged=false;
      var p=EQPROBLEMS.find(function(pp){return pp.eq===mt.id&&pp.status==='open';});
      var tid=null; if(p){p.status='resolved';tid=p.repairTask;var rt=TASKS.find(function(t){return t.id===p.repairTask;});if(rt)rt.status='done';}
-     EQMAINT.unshift({eq:mt.id,type:'repair',at:atToday(null),by:SESSION.pid,note:'Repair completed',task:tid});
+     EQMAINT.unshift({id:eqMaintNewId(),eq:mt.id,type:'repair',at:atToday(null),by:SESSION.pid,note:'Repair completed',task:tid});
      toast(mt.name+' back in service ✓');
      stack=stack.filter(function(x){return x!=='eqdetail';});
      openMachine(mt.id);
@@ -2832,7 +2870,7 @@ document.getElementById('eqm-save').addEventListener('click',function(){
  } else {
    /* A date input yields YYYY-MM-DD, which is already the stored form. */
    var dt=(document.getElementById('eqm-date').value||'').trim()||todayISO();
-   EQMAINT.unshift({eq:machineId,type:ty,at:dt,by:SESSION.pid,note:note,task:null});
+   EQMAINT.unshift({id:eqMaintNewId(),eq:machineId,type:ty,at:dt,by:SESSION.pid,note:note,task:null});
    toast('Maintenance logged ✓');
  }
  var back=window.eqMaintMachine;

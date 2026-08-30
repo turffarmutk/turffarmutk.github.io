@@ -28,6 +28,75 @@ down.
 
 ## Process & project
 
+### Equipment permissions read the roster, not currentRole — 2026-08-30
+**Decision:** the four equipment checks (`eqCanReport`, `eqCanDown`,
+`eqCanEdit`, `eqCanMaint`) no longer work the answer out from `currentRole`.
+They delegate to `eqCanReportProblem()`, `eqCanTakeDown()`, `eqCanEditMachine()`
+and `eqCanMaintain()` in `app-02-fieldlog-sync.js`, which read the roster — and
+those four are what `firestore.rules` was transcribed from.
+**Why:** the moment equipment started sharing, these stopped being "which
+buttons do I draw" and became rules the database enforces on everybody.
+`currentRole` is set once at sign-in, changes when somebody switches user, and
+the App Manager post used to overwrite it outright; the database reads the
+roster. When the screens ask one and the database enforces the other, the app
+offers a button whose write is refused — which, to whoever tapped it, looks
+exactly like the app is broken.
+**Don't:** put a `currentRole` test back into any of the four, and don't add a
+fifth equipment permission that reads it. `tools/test-equipment-sync.js`
+deliberately sets `currentRole` to the wrong value and proves the answer does
+not move; if that test starts failing, this is what broke.
+
+### Equipment checkout is not shared, because nothing writes it — 2026-08-30
+**Decision:** the equipment drawer carries four lists — machines, problems,
+service history, service schedules. `EQCHECKOUT` is left out.
+**Why:** the machine detail page displays a checkout log, but **nothing in the
+app has ever written to it.** It is an empty array on all twenty-three phones.
+Sharing it would mean a collection with no records and a database rule guarding
+nothing, against the rule the rules file states for itself: an empty drawer
+nobody can write into beats an open one nobody is watching.
+**Don't:** file "the checkout log never syncs" as a sync bug — the sync is
+fine, the feature was never finished. Either build signing a machine out and
+back in and then add the fifth list, or delete the section. Dillon's call on
+2026-08-30 was to leave it visible for now.
+
+### The equipment drawer is one table, not four pasted copies — 2026-08-30
+**Decision:** `EQSYNC` drives its four collections from a small table
+(`eqsyncTables()`) that says, per list, which collection it is, whether records
+change after they are written, and who may send them. The other ten drawers
+each carry one or two collections written out longhand.
+**Why:** four longhand copies of the sync module is roughly five hundred lines
+in which one copy can carry a typo nothing catches, because each collection is
+exercised so rarely that a wrong collection name would sit there for months.
+Everything *outside* the module — `eqsyncTick`, `eqsyncHydrate`,
+`eqsyncSummary`, the state object, on-always-with-no-switch — is shaped exactly
+like every other drawer.
+**Don't:** "make it consistent" by expanding the table back into four copies.
+And when adding a fifth list, add a row to the table rather than a new module.
+
+### Service history entries get an id, stamped on read — 2026-08-30
+**Decision:** `EQMAINT` records are minted with `id:eqMaintNewId()` at all three
+places that write one, and `eqMaintStampIds()` fills one in on any older row
+before it is sent.
+**Why:** they had no id, because nothing outside the phone had ever needed to
+name one. Every drawer keys its documents by id, and two phones logging a
+service in the same second must not land on the same one. Stamping on read
+rather than migrating is the same choice the field log made: a migration would
+have to run once on twenty-three phones and be right every time, while stamping
+on read cannot be missed.
+**Don't:** remove the stamp on the assumption every row now has an id — a phone
+that has been switched off since before this change still holds rows that do
+not.
+
+### The drawer numbers in the plan and in the rules are different — 2026-08-30
+**Decision:** `firestore.rules` numbers drawers in the order they were actually
+built (equipment is drawer 8). `docs/BACKEND-STEPS.md` numbers them in the order
+originally proposed (equipment is drawer 3).
+**Why:** the build order changed as the farm's needs did, and renumbering the
+rules file afterwards would break every comment that refers to a drawer by
+number.
+**Don't:** try to reconcile them. The rules file's numbers are the real build
+order; the plan's are a proposal from before any of it existed.
+
 ### The app's code is six files, loaded in numeric order — 2026-08-29
 **Decision:** the 10,800-line `<script>` block inside `UT-TurfFarm-App.html` was
 cut into `app-01-shell.js` through `app-05-tasks-clock.js`, sitting beside the

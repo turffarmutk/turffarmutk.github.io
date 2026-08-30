@@ -997,6 +997,288 @@ function tcsyncSummary(){
 }
 
 
+/* ================= EQUIPMENT ================= */
+/* Drawer 8. The machines and what is wrong with them.
+
+   THE PROBLEM THIS SOLVES, plainly: somebody marks a mower down on their phone
+   and nobody else finds out. It still reads "Available" on the other
+   twenty-two phones, so the next person walks out to a machine that does not
+   run. The same is true of every service record and every reported problem --
+   each one has lived on exactly one phone, and died with it.
+
+   FOUR LISTS, not five. Machines, problems, service history, service
+   schedules. EQCHECKOUT is deliberately left out: the machine detail page
+   reads it, but nothing in the app has ever written to it, so it is empty on
+   every phone. Sharing an empty list would mean a database rule guarding
+   nothing. See docs/DECISIONS.md.
+
+   ---- who may change what ----
+   ONE function each, transcribed into firestore.rules. A drawer means a
+   function, not a rule invented in the rules file.
+
+   All four read the ROSTER, never currentRole. The equipment screens used to
+   ask currentRole, which is fine for deciding which buttons to draw and wrong
+   for anything the database enforces: it is set once at sign-in, it changes
+   when somebody switches user, and the App Manager post used to overwrite it
+   outright. The database reads the roster, so these have to as well, or the
+   app's copy of the org chart and the database's copy drift and the app starts
+   offering buttons whose writes are refused. */
+
+/* Reporting a problem is now everybody's, undergraduates included -- Dillon's
+   call, 2026-08-30. They are the ones on the mowers and are usually first to
+   notice. Reporting only raises a flag; it does NOT take the machine out of
+   service, which is the separate and narrower eqCanTakeDown() below. */
+function eqCanReportProblem(){
+  if(!SESSION.pid) return false;
+  /* Signed in AND still on the roster -- the first thing every rule in
+     firestore.rules checks. Somebody switched off keeps their screens until
+     they reload; the database stops taking their writes immediately. */
+  return !(typeof personActive==='function'&&!personActive(SESSION.pid));
+}
+/* Taking a machine DOWN takes it out of everyone's day, so it stays with Bill
+   and the technicians -- the people who answer for whether it runs. A grad who
+   finds a machine unsafe reports it, and that flag is visible to everybody. */
+function eqCanTakeDown(){ return eqRoleIs(['Farm Manager','Technician']); }
+/* Deciding what a machine IS -- its name, model, hours, whether it is retired
+   -- rather than recording what happened to it. Faculty are in because a lab's
+   own equipment is theirs to describe. */
+function eqCanEditMachine(){ return eqRoleIs(['Farm Manager','Technician','Faculty']); }
+/* Service history and the service intervals: the maintenance record, which is
+   the technicians' job and Bill's. */
+function eqCanMaintain(){ return eqRoleIs(['Farm Manager','Technician']); }
+
+function eqRoleIs(roles){
+  if(!SESSION.pid) return false;
+  if(typeof personActive==='function'&&!personActive(SESSION.pid)) return false;
+  if(typeof personRole!=='function') return false;
+  return roles.indexOf(personRole(SESSION.pid))>=0;
+}
+
+
+/* ---- the four lists, and how each one merges ----------------------------
+   The drawer is driven from this table rather than from four near-identical
+   copies of the module below it. That is a deliberate difference from the
+   other drawers and it is worth a sentence: four pasted copies would be about
+   five hundred lines in which one copy can carry a typo that nothing catches,
+   because each collection is exercised so rarely. A table of four is something
+   a person can read in one go and check. Everything OUTSIDE this module --
+   eqsyncTick, eqsyncHydrate, eqsyncSummary, the state object -- is shaped
+   exactly like the other ten drawers.
+
+   The lists are reached through get() rather than captured here, for two
+   reasons: this file loads before app-04-spray-inventory.js, where they are
+   declared; and storeHydrate fills them in place, so a captured reference
+   would be right today and quietly wrong the day somebody reassigns one.
+   STORE_DEFS uses get() for the same reason.
+
+   MUTABLE says whether a record legitimately changes after it is written:
+     machines   - yes. Status, hours, whether it is retired.
+     problems   - yes. Opened, then resolved.
+     schedules  - yes. Intervals get edited.
+     history    - NO. A service either happened or it did not, so an incoming
+                  row this phone already holds is left ALONE rather than
+                  overwritten. Same rule as stock movements and the field log:
+                  a rewrite arriving from anywhere is a bug somewhere else. */
+var EQSYNC_MACHINES='equipment';
+var EQSYNC_PROBLEMS='eqproblems';
+var EQSYNC_MAINT='eqmaint';
+var EQSYNC_SCHED='eqsched';
+var EQSYNC_RETRY_MS=10000;
+
+var EQSYNC={ on:false, live:false, ready:false, seen:{}, err:null, up:0, down:0,
+             failed:{}, unsub:{} };
+var _eqsyncNextTry=0;
+
+function eqsyncTables(){
+  return [
+    { coll:EQSYNC_MACHINES, mutable:true,  what:'machine',
+      get:function(){return EQUIP;},      can:function(){return eqCanEditMachine();} },
+    { coll:EQSYNC_PROBLEMS, mutable:true,  what:'problem',
+      get:function(){return EQPROBLEMS;}, can:function(){return eqCanReportProblem();} },
+    { coll:EQSYNC_SCHED,    mutable:true,  what:'service schedule',
+      get:function(){return EQSCHED;},    can:function(){return eqCanMaintain();} },
+    { coll:EQSYNC_MAINT,    mutable:false, what:'service record',
+      get:function(){return EQMAINT;},    can:function(){return eqCanMaintain();} }
+  ];
+}
+
+/* On, always — see "SHARING IS NOT OPTIONAL" over flsyncWanted(). */
+function eqsyncWanted(){ return true; }
+function eqsyncHydrate(){ EQSYNC.on=eqsyncWanted(); }
+function eqsyncSetWanted(on){
+  EQSYNC.on=!!on;
+  if(on){ _eqsyncNextTry=0; eqsyncStart(); } else eqsyncStop();
+}
+
+/* One record, ready to travel. Everything is keyed by id, and a record that
+   points at a machine says which one as a string, because a number and the
+   same number as text are two different ids to a database. */
+function eqDoc(rec){
+  var out; try{ out=JSON.parse(JSON.stringify(rec||{})); }catch(e){ return null; }
+  if(!out||!out.id) return null;
+  out.id=String(out.id);
+  if(out.eq!==undefined&&out.eq!==null) out.eq=String(out.eq);
+  return out;
+}
+/* Two records are the same to this drawer if they say the same thing. Keyed by
+   collection AND id: a machine and a problem could both be "e1" otherwise. */
+function eqKey(coll,id){ return coll+'/'+id; }
+
+function eqsyncStart(){
+  if(EQSYNC.live) return true;
+  if(Date.now()<_eqsyncNextTry) return false;
+  var db=fbDb();
+  if(!db||!SESSION.pid){
+    EQSYNC.err=db?'Nobody is signed in yet':'The database code did not load on this device';
+    _eqsyncNextTry=Date.now()+EQSYNC_RETRY_MS; return false;
+  }
+  try{
+    eqsyncTables().forEach(function(tab){
+      EQSYNC.unsub[tab.coll]=db.collection(tab.coll).onSnapshot(snapOpts(),
+        function(snap){ eqsyncOnSnapshot(tab,snap); },
+        function(e){
+          /* One collection failing is not fatal to the rest — a phone that
+             cannot read service history can still be told a mower is down,
+             which is the part somebody is standing in a field waiting for. */
+          EQSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+          if(tab.coll===EQSYNC_MACHINES){
+            EQSYNC.live=false; EQSYNC.ready=false;
+            _eqsyncNextTry=Date.now()+EQSYNC_RETRY_MS;
+          }
+        });
+    });
+    EQSYNC.live=true; EQSYNC.err=null; return true;
+  }catch(e){
+    EQSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+    _eqsyncNextTry=Date.now()+EQSYNC_RETRY_MS; return false;
+  }
+}
+function eqsyncStop(){
+  Object.keys(EQSYNC.unsub).forEach(function(k){
+    try{ if(EQSYNC.unsub[k]) EQSYNC.unsub[k](); }catch(e){}
+  });
+  EQSYNC.unsub={}; EQSYNC.live=false; EQSYNC.ready=false;
+  EQSYNC.seen={}; EQSYNC.failed={};
+}
+
+function eqsyncOnSnapshot(tab,snap){
+  var changes; try{ changes=snap.docChanges(); }catch(e){ return; }
+  var list=tab.get(); if(!list) return;
+  var touched=false;
+  changes.forEach(function(ch){
+    var id=String(ch.doc.id), key=eqKey(tab.coll,id);
+    /* Nothing in this drawer is ever deleted — the rules refuse it, and a
+       machine is retired with active:false instead. A removal arriving here
+       means somebody got into the database another way, so forget it was seen
+       and otherwise leave this phone's copy alone. */
+    if(ch.type==='removed'){ delete EQSYNC.seen[key]; return; }
+    var data; try{ data=ch.doc.data(); }catch(e){ return; }
+    if(!data) return;
+    data.id=id;
+    EQSYNC.seen[key]=JSON.stringify(data);
+    delete EQSYNC.failed[key];
+    EQSYNC.down++;
+    var have=null;
+    for(var i=0;i<list.length;i++){ if(String(list[i].id)===id){ have=list[i]; break; } }
+    if(have){
+      if(!tab.mutable) return;                        /* written once, never rewritten */
+      if(JSON.stringify(eqDoc(have))===JSON.stringify(data)) return;
+      /* Updated IN PLACE so the closures already holding a reference keep
+         pointing at live data — the same rule storeHydrate follows. */
+      Object.keys(data).forEach(function(k){ have[k]=data[k]; });
+      touched=true;
+      return;
+    }
+    list.push(data); touched=true;
+  });
+  var fromCache=true;
+  try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
+  /* Ready is decided by the machines, the one collection everything else
+     names. Uploading before the shared copy has arrived would send this
+     phone's rows back up as if they were new. */
+  if(tab.coll===EQSYNC_MACHINES&&!EQSYNC.ready&&!fromCache){
+    EQSYNC.ready=true; eqsyncUploadNew();
+  }
+  if(touched){
+    try{ storeTouch(); }catch(e){}
+    eqsyncRepaint();
+  }
+}
+
+function eqsyncRepaint(){
+  try{
+    var scr=document.querySelector('.screen.active');
+    var id=scr?scr.id.replace(/^s-/,''):'';
+    /* Only the list screens. Redrawing a detail page or a form under somebody
+       who is halfway through filling it in is worse than showing them a stale
+       number for a few seconds. */
+    if(id==='equipment'&&typeof renderEquip==='function') renderEquip();
+    if(id==='sharedb'&&typeof sdbRender==='function') sdbRender();
+  }catch(e){}
+}
+
+/* This phone's equipment records going up for the first time. */
+function eqsyncUploadNew(){
+  var db=fbDb(); if(!db) return 0;
+  try{ if(typeof eqMaintStampIds==='function') eqMaintStampIds(); }catch(e){}
+  var n=0;
+  eqsyncTables().forEach(function(tab){
+    if(!tab.can()) return;
+    (tab.get()||[]).slice().forEach(function(rec){
+      var doc=eqDoc(rec); if(!doc) return;
+      var key=eqKey(tab.coll,doc.id);
+      if(EQSYNC.seen[key]!==undefined) return;
+      EQSYNC.seen[key]=JSON.stringify(doc);
+      n++; EQSYNC.up++;
+      try{ db.collection(tab.coll).doc(doc.id).set(doc).catch(function(e){ eqsyncFail(key,e); }); }
+      catch(e){ eqsyncFail(key,e); }
+    });
+  });
+  if(n){ try{ toast(n+' equipment record'+(n===1?'':'s')+' from this phone sent up'); }catch(e){} }
+  return n;
+}
+function eqsyncFail(key,e){
+  EQSYNC.failed[key]=(typeof sdbError==='function')?sdbError(e):String((e&&e.message)||e);
+}
+
+/* Outbound. Each list only goes up from somebody the app already lets change
+   it, so the screens and the rules agree and nothing is sent that the database
+   is only going to refuse. */
+function eqPush(){
+  if(!EQSYNC.on||!EQSYNC.live||!EQSYNC.ready) return 0;
+  var db=fbDb(); if(!db) return 0;
+  try{ if(typeof eqMaintStampIds==='function') eqMaintStampIds(); }catch(e){}
+  var n=0;
+  eqsyncTables().forEach(function(tab){
+    if(!tab.can()) return;
+    (tab.get()||[]).forEach(function(rec){
+      var doc=eqDoc(rec); if(!doc) return;
+      var key=eqKey(tab.coll,doc.id), json=JSON.stringify(doc);
+      if(EQSYNC.seen[key]===json) return;
+      EQSYNC.seen[key]=json; n++; EQSYNC.up++;
+      try{ db.collection(tab.coll).doc(doc.id).set(doc).catch(function(e){ eqsyncFail(key,e); }); }
+      catch(e){ eqsyncFail(key,e); }
+    });
+  });
+  return n;
+}
+
+function eqsyncTick(){
+  if(!EQSYNC.on) return;
+  if(!EQSYNC.live){ eqsyncStart(); return; }
+  eqPush();
+}
+
+function eqsyncSummary(){
+  if(!EQSYNC.on) return 'Off — a machine marked down stays known to this phone';
+  if(EQSYNC.err) return EQSYNC.err;
+  if(!EQSYNC.live) return 'Connecting…';
+  if(!EQSYNC.ready) return 'Connected — waiting for the shared copy';
+  var f=Object.keys(EQSYNC.failed).length;
+  return EQSYNC.up+' sent · '+EQSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+}
+
+
 /* ================= THE TASK LIST ================= */
 /* Drawer 7. The jobs the farm does, which the assign screen is built from --
    so with this off, a job Bill adds on his phone is a job nobody else can hand

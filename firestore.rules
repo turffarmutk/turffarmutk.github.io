@@ -690,13 +690,120 @@ service cloud.firestore {
     }
 
     /* ------------------------------------------------------------------
+       EQUIPMENT — drawer 8, four collections
+
+       The machines and what is wrong with them. Without this, somebody marks
+       a mower down on their phone and it still reads "Available" on the other
+       twenty-two, so the next person walks out to a machine that does not run.
+
+       FOUR collections, not five. The app also has an equipment CHECKOUT list,
+       but nothing in the app has ever written to it, so there is nothing to
+       share and no rule here for it. An empty drawer nobody can write into
+       beats an open one nobody is watching.
+
+       Transcribed from eqCanReportProblem(), eqCanTakeDown(), eqCanEditMachine()
+       and eqCanMaintain() in the app. The two must never drift. Those four
+       read the ROSTER, not currentRole, which is exactly so that they can be
+       copied here and mean the same thing.
+       ------------------------------------------------------------------ */
+
+    /* App: eqCanReportProblem() — everybody, undergraduates included. Dillon's
+       call, 2026-08-30: they are the ones on the mowers and are usually first
+       to notice. Reporting raises a flag; it does NOT take the machine out of
+       service, which is canTakeDownMachine() below and much narrower. */
+    function canReportProblem() {
+      return actor();
+    }
+
+    /* App: eqCanTakeDown() and eqCanMaintain() — the same two people. Taking a
+       machine out of service changes everyone's day, and the service record is
+       the technicians' job and Bill's. */
+    function canTakeDownMachine() {
+      return actor() && roleOf(me()) in ['Farm Manager', 'Technician'];
+    }
+    function canMaintainEquip() {
+      return actor() && roleOf(me()) in ['Farm Manager', 'Technician'];
+    }
+
+    /* App: eqCanEditMachine() — deciding what a machine IS (its name, model,
+       hours, whether it is retired) rather than recording what happened to it.
+       Faculty are in because a lab's own equipment is theirs to describe. */
+    function canEditMachine() {
+      return actor() && roleOf(me()) in ['Farm Manager', 'Technician', 'Faculty'];
+    }
+
+    match /equipment/{machineId} {
+      allow read: if actor();
+
+      /* Marking one DOWN is the narrow move, so it is checked on its own: a
+         write that sets status to 'down' needs canTakeDownMachine() even from
+         somebody who may otherwise edit the machine. Faculty may rename their
+         lab's sprayer; taking it out of the farm's day is not theirs. */
+      allow create, update: if canEditMachine()
+        && request.resource.data.id == machineId
+        && request.resource.data.name is string
+        && (request.resource.data.get('status', '') != 'down' || canTakeDownMachine());
+
+      /* A machine is RETIRED by setting active:false, never removed — the app
+         has a Restore button that depends on the record still being there. */
+      allow delete: if false;
+    }
+
+    match /eqproblems/{problemId} {
+      allow read: if actor();
+
+      /* Anybody may report one, and the report has to name a machine and say
+         who raised it. Marking the machine down at the same moment is the
+         separate write above, which is where that permission is checked. */
+      allow create: if canReportProblem()
+        && request.resource.data.id == problemId
+        && request.resource.data.eq is string
+        && request.resource.data.by == me();
+
+      /* Resolving somebody's report, or attaching the repair job to it, is a
+         maintenance decision rather than a report. */
+      allow update: if canMaintainEquip()
+        && request.resource.data.id == problemId
+        && request.resource.data.eq == resource.data.eq;
+
+      /* A problem that was raised was raised. Resolved ones stay on the
+         record, the same way the field log keeps a superseded entry. */
+      allow delete: if false;
+    }
+
+    match /eqmaint/{recordId} {
+      allow read: if actor();
+
+      /* Write-once. A service either happened or it did not, so there is no
+         update rule at all — the same shape as a stock movement. */
+      allow create: if canMaintainEquip()
+        && request.resource.data.id == recordId
+        && request.resource.data.eq is string;
+
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /eqsched/{schedId} {
+      allow read: if actor();
+
+      /* When a machine is next due. Intervals genuinely get edited, so unlike
+         the history above this one updates. */
+      allow create, update: if canMaintainEquip()
+        && request.resource.data.id == schedId
+        && request.resource.data.eq is string;
+
+      allow delete: if false;
+    }
+
+    /* ------------------------------------------------------------------
        EVERYTHING ELSE IS CLOSED.
 
-       Calendar and equipment get their own blocks here as each drawer is
-       built. Tasks, the map, crew claims, the field log, inventory, the
-       weekly schedules, the time clock, the task list, the trials and farm
-       settings already have theirs. Until then the database
-       refuses them, which is what we want: an empty drawer nobody can
+       The calendar gets its own block here when that drawer is built. Tasks,
+       the map, crew claims, the field log, inventory, the weekly schedules,
+       the time clock, the task list, the trials, farm settings and equipment
+       already have theirs. Until then the database
+       refuses it, which is what we want: an empty drawer nobody can
        write into beats an open one nobody is watching.
        ------------------------------------------------------------------ */
   }

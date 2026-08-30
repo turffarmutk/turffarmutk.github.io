@@ -32,6 +32,12 @@ const turf = require('@turf/turf');
 
 const APP = path.join(__dirname, '..', 'UT-TurfFarm-App.html');
 const HTML = fs.readFileSync(APP, 'utf8');
+/* The app's code, with the app-*.js files written back into the page exactly
+   where their <script> tags sit. The checks below search the source for a
+   line — that something dangerous is absent, that a comment still explains
+   why — and they have to search all of it, not just the part still written
+   inside the page. */
+const SRC = require('./_app').appText();
 
 let pass = 0, fail = 0;
 function ok(name, cond, extra) {
@@ -90,7 +96,7 @@ function boot(store) {
   win.navigator.geolocation = { watchPosition: () => 1, clearWatch: noop, getCurrentPosition: noop };
   Object.defineProperty(win, 'innerWidth', { value: 390, configurable: true, writable: true });
 
-  const scripts = [require('./_geo').geoSource(), ...win.document.querySelectorAll('script:not([src])')].map(s => typeof s === 'string' ? s : s.textContent);
+  const scripts = require('./_app').appScripts(win.document);
   try {
     win.eval(scripts.join('\n;\n')
       + '\n;window.__p={' + EX.map(n => n + ':(typeof ' + n + '!=="undefined"?' + n + ':undefined)').join(',') + '};'
@@ -190,15 +196,15 @@ section('5. every screen asks invQty() — none of them read it.qty');
   /* Source-level, because a screen that quietly goes back to it.qty keeps
      working and just shows April forever — the failure nobody notices. */
   const fnSrc = name => {
-    const i = HTML.indexOf('function ' + name + '(');
-    return i < 0 ? '' : HTML.slice(i, i + 400);
+    const i = SRC.indexOf('function ' + name + '(');
+    return i < 0 ? '' : SRC.slice(i, i + 400);
   };
   ['isLow', 'contCount', 'amtStr', 'amtBoth', 'mixInvQty'].forEach(n => {
     ok(n + '() derives it', fnSrc(n).indexOf('invQty(') >= 0, fnSrc(n).slice(0, 60));
   });
   /* Comments are stripped first: the ledger's own explanation quotes the old
      line, and quoting the bug is not committing it. */
-  const CODE = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const CODE = SRC.replace(/\/\*[\s\S]*?\*\//g, '');
   ok('nothing adds straight to the stored figure any more', !/\.qty\s*\+=/.test(CODE),
      (CODE.match(/.{0,40}\.qty\s*\+=.{0,20}/) || [''])[0]);
 }
@@ -415,12 +421,12 @@ section('15. the correction screen really does call the reconciler');
 {
   /* Section 14 proves the reconciler is right. This proves it is wired in —
      the two failures look identical from the outside. */
-  const i = HTML.indexOf('function flxSave()');
-  const src = i < 0 ? '' : HTML.slice(i, i + 2200);
+  const i = SRC.indexOf('function flxSave()');
+  const src = i < 0 ? '' : SRC.slice(i, i + 2200);
   ok('flxSave exists', i > 0);
   ok('and reconciles stock after correcting', src.indexOf('invReconcileFromLog') >= 0);
-  const j = HTML.indexOf('function flSave()');
-  ok('flSave asks how much to take off', HTML.slice(j, j + 3000).indexOf('flnStockAmount') >= 0);
+  const j = SRC.indexOf('function flSave()');
+  ok('flSave asks how much to take off', SRC.slice(j, j + 3000).indexOf('flnStockAmount') >= 0);
 }
 
 /* A Firestore snapshot, near enough. fromCache:true keeps the handler from
@@ -439,7 +445,7 @@ section('16. sharing the shelf — on, with no switch');
   const store = {};
   boot(store);
   ok('no key on this phone decides it', !('ut_inventory_shared_v1' in store));
-  ok('and no screen offers a way to turn it off', HTML.indexOf("btnId:'sdb-inv'") < 0);
+  ok('and no screen offers a way to turn it off', SRC.indexOf("btnId:'sdb-inv'") < 0);
 }
 
 section('17. movements arriving from another phone');
@@ -548,7 +554,7 @@ section('21. nothing anywhere deletes a movement');
 {
   /* The property the whole drawer rests on. Said once in the app, once in the
      rules, and checked here so neither can quietly stop being true. */
-  const CODE = HTML.replace(/\/\*[\s\S]*?\*\//g, '');
+  const CODE = SRC.replace(/\/\*[\s\S]*?\*\//g, '');
   ok('the app never splices the ledger', !/INVMOVES\.splice/.test(CODE));
   ok('nor empties it', !/INVMOVES\s*=\s*\[\]/.test(CODE.replace('var INVMOVES=[]', '')));
   ok('and the only thing that writes to it is invMove()',

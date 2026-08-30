@@ -50,7 +50,7 @@ win.navigator.geolocation = { watchPosition: () => 1, clearWatch: noop, getCurre
 try { win.eval(appSource(win.document)); }
 catch (e) { console.log('app script threw: ' + e.message); fail++; }
 
-const appText = fs.readFileSync(APP, 'utf8');
+const appText = require('./_app').appText();   /* the page WITH the app-*.js files written back in — see tools/_app.js */
 const rulesText = fs.readFileSync(RULES, 'utf8');
 
 /* -------------------------------------------------- 1. it is vendored ---- */

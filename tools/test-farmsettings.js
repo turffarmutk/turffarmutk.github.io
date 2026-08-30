@@ -34,6 +34,13 @@ const { JSDOM, VirtualConsole } = require('jsdom');
 
 const ROOT = path.join(__dirname, '..');
 const HTML = fs.readFileSync(path.join(ROOT, 'UT-TurfFarm-App.html'), 'utf8');
+/* The app's code, with the app-*.js files written back into the page exactly
+   where their <script> tags sit. The checks below search the source for a
+   line — that something dangerous is absent, that a comment still explains
+   why — and they have to search all of it, not just the part still written
+   inside the page. */
+const SRC = require('./_app').appText();
+const { appScripts } = require('./_app');
 const RULES = fs.readFileSync(path.join(ROOT, 'firestore.rules'), 'utf8');
 
 let pass = 0, fail = 0;
@@ -78,9 +85,7 @@ function boot(store) {
   win.matchMedia = () => ({ matches: false, addListener() {}, removeListener() {},
                             addEventListener() {}, removeEventListener() {} });
   win.scrollTo = () => {}; win.alert = () => {}; win.confirm = () => true;
-  const scripts = [fs.readFileSync(path.join(ROOT, 'farm-geo.js'), 'utf8')];
-  const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi; let m;
-  while ((m = re.exec(HTML))) { if (!/\bsrc\s*=/i.test(m[1])) scripts.push(m[2]); }
+  const scripts = appScripts(win.document);
   try {
     win.eval(scripts.join('\n;\n')
       + '\n;window.__p={' + EX.map(n => n + ':(typeof ' + n + '!=="undefined"?' + n + ':undefined)').join(',') + '};');
@@ -262,8 +267,8 @@ section('6. renaming warns when the records it moves cannot follow');
   ok('a mower rename checks the map has connected', src.indexOf('MSYNC.live') > 0);
   ok('a lab rename checks the trials have connected', src.indexOf('TRSYNC.live') > 0);
   ok('it warns and allows rather than blocking', src.indexOf('return confirm(') > 0);
-  ok('the mower rename asks first', HTML.indexOf("fstRenameOk('mower'") > 0);
-  ok('and so does the lab rename', HTML.indexOf("fstRenameOk('lab'") > 0);
+  ok('the mower rename asks first', SRC.indexOf("fstRenameOk('mower'") > 0);
+  ok('and so does the lab rename', SRC.indexOf("fstRenameOk('lab'") > 0);
   ok('counting people and studies in a lab is its own function',
      typeof w.eval("labsRecordCount('Sorochan')") === 'number');
 }
@@ -293,17 +298,17 @@ section('7. the rules file says all of it');
 section('8. sharing, and the wiring');
 {
   ok('it is on from the moment the app opens', p.FSTSYNC && p.FSTSYNC.on === true);
-  ok('nothing on this phone decides it', HTML.indexOf('ut_farmsettings_shared_v1') < 0);
-  ok('one collection, four documents', HTML.indexOf("FSTSYNC_COLL='farmsettings'") > 0);
-  ok('it has a read-out on the Shared database screen', /st:FSTSYNC,\s*summary:fstsyncSummary\(\)/.test(HTML));
-  ok('the read-out is in the list', /st:TRSYNC[\s\S]{0,900}st:FSTSYNC/.test(HTML));
-  ok('and there is no button to turn it off', HTML.indexOf("closest('#sdb-farm')") < 0);
-  ok('it rides the two-second scan', HTML.indexOf('fstsyncTick();') > 0);
-  ok('and is hydrated at startup', HTML.indexOf('fstsyncHydrate();') > 0);
+  ok('nothing on this phone decides it', SRC.indexOf('ut_farmsettings_shared_v1') < 0);
+  ok('one collection, four documents', SRC.indexOf("FSTSYNC_COLL='farmsettings'") > 0);
+  ok('it has a read-out on the Shared database screen', /st:FSTSYNC,\s*summary:fstsyncSummary\(\)/.test(SRC));
+  ok('the read-out is in the list', /st:TRSYNC[\s\S]{0,900}st:FSTSYNC/.test(SRC));
+  ok('and there is no button to turn it off', SRC.indexOf("closest('#sdb-farm')") < 0);
+  ok('it rides the two-second scan', SRC.indexOf('fstsyncTick();') > 0);
+  ok('and is hydrated at startup', SRC.indexOf('fstsyncHydrate();') > 0);
   /* Switching this one on REPLACES what is on the phone. Nowhere else does
      that, so the switch has to say so before it is pressed. */
   ok('the switch says plainly that it replaces this phone\'s settings',
-     /TAKES the farm's settings/.test(HTML));
+     /TAKES the farm's settings/.test(SRC));
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

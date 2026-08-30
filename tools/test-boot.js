@@ -4,10 +4,11 @@
  * This is the cheapest and most important check in the suite, and it is the
  * one that was missing. Run it FIRST — everything else assumes the app booted.
  *
- * WHY IT EXISTS. UT-TurfFarm-App.html is four <script> blocks, and the big one
- * is 11,000 lines. If any top-level line in a block throws, the browser
- * abandons THE REST OF THAT BLOCK and moves on to the next one. Every function
- * below the throw simply never comes into existence.
+ * WHY IT EXISTS. The app is six pieces of code: app-01-shell.js through
+ * app-05-tasks-clock.js, plus the blocks still written inside
+ * UT-TurfFarm-App.html. If any top-level line in one of them throws, the
+ * browser abandons THE REST OF THAT FILE and moves on to the next one. Every
+ * function below the throw simply never comes into existence.
  *
  * Nothing about that is visible. The page still renders, the header still
  * draws, sign-in still works. What is gone is whatever happened to live below
@@ -20,13 +21,19 @@
  * calendar, the time clock, semester dates, farm settings and admin — about
  * 2,200 lines — stopped existing on every phone. It was live for two days.
  *
- * HOW IT WORKS. A marker is appended to the end of every script block. The
- * blocks are then run the way the browser runs them. A block whose marker is
- * missing did not reach its own last line, which means it threw, and the error
- * is reported against the real UT-TurfFarm-App.html line number.
+ * That is also WHY THE APP WAS SPLIT INTO FILES on 2026-08-29. The hole a
+ * crash leaves is the size of the file it happens in, and one of them used to
+ * be 10,800 lines. Nothing about the code changed — only how much of it a
+ * single mistake can take down.
  *
- * The markers are generated, not maintained — this harness needs no editing
- * when the app grows.
+ * HOW IT WORKS. A marker is appended to the end of every piece. They are then
+ * run the way the browser runs them. A piece whose marker is missing did not
+ * reach its own last line, which means it threw, and the error is reported
+ * against the real file and line number.
+ *
+ * The markers are generated, not maintained, and tools/_app.js is the only
+ * thing that knows where the app's code lives — so this harness needs no
+ * editing when the app grows or is split further.
  *
  * Run:  node tools/test-boot.js
  */
@@ -35,7 +42,7 @@ const fs = require('fs');
 const path = require('path');
 const { JSDOM, VirtualConsole } = require('jsdom');
 const turf = require('@turf/turf');
-const { geoSource } = require('./_geo');
+const { appParts } = require('./_app');
 
 const APP = path.join(__dirname, '..', 'UT-TurfFarm-App.html');
 const HTML = fs.readFileSync(APP, 'utf8');
@@ -46,22 +53,6 @@ function ok(name, cond, extra) {
   else { fail++; console.log('  FAIL  ' + name + (extra ? '\n        -> ' + extra.split('\n').join('\n        ') : '')); }
 }
 function section(s) { console.log('\n' + s); }
-
-/* ---- where each inline <script> starts in the real file -------------------
-   So a failure can name a line somebody can actually go and look at, rather
-   than an offset into a string that only exists inside this harness. */
-function inlineScriptLines() {
-  const lines = HTML.split('\n');
-  const starts = [];
-  lines.forEach((ln, i) => {
-    /* Anchored at column 0: this file writes its real tags there, and the
-       word "<script>" also appears inside comments and inside a string that
-       builds the print view. Matching those shifted every reported line
-       number onto the wrong part of the file. */
-    if (/^<script(?![^>]*\bsrc=)[^>]*>/.test(ln)) starts.push(i + 2);
-  });
-  return starts;
-}
 
 /* ---- a Leaflet that does nothing, agreeably ------------------------------
    Boot only needs L to not throw; the map's real behaviour is covered by
@@ -102,38 +93,37 @@ Object.defineProperty(win, 'localStorage', {
 });
 win.navigator.geolocation = { watchPosition: () => 1, clearWatch: () => {}, getCurrentPosition: () => {} };
 
-const blocks = [...win.document.querySelectorAll('script:not([src])')].map(s => s.textContent);
-const startLines = inlineScriptLines();
+/* Every piece of the app's own code, in the order a browser runs it — the five
+   app-*.js files, farm-geo.js, and the blocks still written inside the page.
+   _app.js is the only thing that knows where they all are. */
+const blocks = appParts(win.document);
 
-/* farm-geo.js goes first, exactly as the <script src> in <head> would. The
-   blocks are then joined into one eval rather than run separately, because
-   the app's top-level `let` bindings are shared across blocks in a browser and
-   a separate eval would keep each one to itself. */
-const parts = [geoSource()];
-const marks = [];
-blocks.forEach((src, i) => {
-  parts.push(src);
+/* They are joined into one eval rather than run separately, because the app's
+   top-level `let` bindings are shared across files in a browser and a separate
+   eval would keep each one to itself. */
+const parts = [];
+blocks.forEach((b, i) => {
+  parts.push(b.code);
   parts.push('window.__block' + i + '=true;');
-  marks.push(i);
 });
 const source = parts.join('\n;\n');
 
-/* Which eval line each block's code starts on, so an error can be translated
-   back to a line in UT-TurfFarm-App.html. */
+/* Which eval line each piece's code starts on, so an error can be translated
+   back to a real file and a real line in it. */
 const evalStart = [];
 {
-  let n = geoSource().split('\n').length + 1;      /* +1 for the joining ;\n */
-  blocks.forEach((src, i) => {
+  let n = 0;
+  blocks.forEach((b, i) => {
     evalStart[i] = n + 1;
-    n += src.split('\n').length + 1;               /* the block */
-    n += 1 + 1;                                    /* the marker line */
+    n += b.code.split('\n').length + 1;             /* the code */
+    n += 1 + 1;                                     /* the marker line */
   });
 }
 function realLine(evalLine) {
   for (let i = blocks.length - 1; i >= 0; i--) {
     if (evalLine >= evalStart[i]) {
       const off = evalLine - evalStart[i];
-      return { block: i, line: (startLines[i] || 0) + off };
+      return { block: i, file: blocks[i].file, line: blocks[i].startLine + off };
     }
   }
   return null;
@@ -152,28 +142,27 @@ catch (e) {
 section('1. the app opens without throwing');
 ok('no error while the app boots', !threw,
    threw && (threw.message
-     + (threw.at ? '\nUT-TurfFarm-App.html:' + threw.at.line + '  (script block ' + (threw.at.block + 1) + ')' : '')
+     + (threw.at ? '\n' + threw.at.file + ':' + threw.at.line : '')
      + '\n' + threw.stack));
 
-section('2. every script block runs to its last line');
+section('2. every file of the app runs to its last line');
 /* A block that starts but does not finish is the dangerous case: the page
    renders, so it looks like it worked, and everything below the throw is gone.
 
    ONE THING TO KNOW WHEN READING A FAILURE HERE. A real browser runs each
-   <script> tag separately, so a throw in block 2 does not stop blocks 3 and 4.
-   This harness has to join them into one eval — the app's top-level `let`
-   bindings are shared across blocks in a browser, and separate evals would
-   keep each one to itself — so the first block to throw also marks every block
-   after it as unfinished. Fix the FIRST failure and the rest usually go with
-   it. Erring this way is deliberate: over-reporting is recoverable, and a
+   file separately, so a throw in app-02 does not stop app-03 and app-04. This
+   harness has to join them into one eval — the app's top-level `let` bindings
+   are shared across files in a browser, and separate evals would keep each one
+   to itself — so the first file to throw also marks every file after it as
+   unfinished. Fix the FIRST failure and the rest usually go with it. Erring this way is deliberate: over-reporting is recoverable, and a
    harness that quietly under-reports a boot crash is the thing that let the
    2026-08-27 bug ship. */
-blocks.forEach((src, i) => {
-  const n = src.split('\n').length;
-  ok('block ' + (i + 1) + ' (line ' + startLines[i] + ', ' + n + ' lines) finished',
+blocks.forEach((b, i) => {
+  const n = b.code.split('\n').length;
+  ok(b.file + (b.startLine > 1 ? ' (line ' + b.startLine + ', ' : ' (') + n + ' lines) finished',
      win['__block' + i] === true,
      win['__block' + i] === true ? null
-       : 'It stopped partway. Everything below the throw in this block never'
+       : 'It stopped partway. Everything below the throw in this file never'
          + '\nran — those functions do not exist. See failure 1 for where.');
 });
 
@@ -198,17 +187,17 @@ ok('the day and month names are filled in',
 
 section('5. nothing draws a screen before the app is defined');
 /* The rule that keeps this from happening again: a render call at the top
-   level belongs at the END of its block, below everything it might reach. */
-blocks.forEach((src, i) => {
-  const lines = src.split('\n');
+   level belongs at the END of its own file, below everything it might reach. */
+blocks.forEach(b => {
+  const lines = b.code.split('\n');
   const early = [];
   lines.forEach((ln, j) => {
     const m = /^(render|draw)[A-Z][A-Za-z0-9_$]*\(\s*\)\s*;\s*$/.exec(ln);
-    /* only flag one that is NOT in the last 40 lines of its block */
-    if (m && j < lines.length - 40) early.push('line ' + ((startLines[i] || 0) + j) + ': ' + ln.trim());
+    /* only flag one that is NOT in the last 40 lines of its file */
+    if (m && j < lines.length - 40) early.push('line ' + (b.startLine + j) + ': ' + ln.trim());
   });
-  ok('block ' + (i + 1) + ' has no render call stranded mid-block', early.length === 0,
-     early.length ? early.join('\n') + '\nMove it to the end of the block.' : null);
+  ok(b.file + ' has no render call stranded partway through it', early.length === 0,
+     early.length ? early.join('\n') + '\nMove it to the end of the file.' : null);
 });
 
 /* ---------------------------------------------------------------- */

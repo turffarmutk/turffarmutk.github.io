@@ -57,7 +57,7 @@ Object.defineProperty(win, 'localStorage', {
 });
 win.navigator.geolocation = { watchPosition: () => 1, clearWatch: noop, getCurrentPosition: noop };
 
-const scripts = [require('./_geo').geoSource(), ...win.document.querySelectorAll('script:not([src])')].map(s => typeof s === 'string' ? s : s.textContent);
+const scripts = require('./_app').appScripts(win.document);
 const EXPORTS = ['TASKS', 'TRIALS', 'TEMPLATES', 'FIELDLOG', 'currentRole'];
 try {
   win.eval(scripts.join('\n;\n')

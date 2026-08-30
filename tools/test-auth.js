@@ -28,6 +28,12 @@ const turf = require('@turf/turf');
 
 const APP = path.join(__dirname, '..', 'UT-TurfFarm-App.html');
 const HTML = fs.readFileSync(APP, 'utf8');
+/* The app's code, with the app-*.js files written back into the page exactly
+   where their <script> tags sit. The checks below search the source for a
+   line — that something dangerous is absent, that a comment still explains
+   why — and they have to search all of it, not just the part still written
+   inside the page. */
+const SRC = require('./_app').appText();
 
 let pass = 0, fail = 0;
 function ok(name, cond, extra) {
@@ -136,7 +142,7 @@ function boot(store, fake) {
     auth: function () { return authObj; }
   };
 
-  const scripts = [require('./_geo').geoSource(), ...win.document.querySelectorAll('script:not([src])')].map(s => typeof s === 'string' ? s : s.textContent);
+  const scripts = require('./_app').appScripts(win.document);
   try {
     win.eval(scripts.join('\n;\n')
       + '\n;window.__p={' + EX.map(n => n + ':(typeof ' + n + '!=="undefined"?' + n + ':undefined)').join(',') + '};'
@@ -174,11 +180,11 @@ section('0. it boots');
 
 section('1. the config is the public kind, and no secret is near it');
 {
-  ok('the shipped file carries a FB_CONFIG block', /var FB_CONFIG = \{[\s\S]*?\};/.test(HTML));
+  ok('the shipped file carries a FB_CONFIG block', /var FB_CONFIG = \{[\s\S]*?\};/.test(SRC));
   /* A service-account key bypasses every rule. It must never be in a file
      served to browsers, and this repo is public. */
   ok('no service-account key is anywhere in the file',
-     !/"type"\s*:\s*"service_account"|private_key|BEGIN PRIVATE KEY/.test(HTML));
+     !/"type"\s*:\s*"service_account"|private_key|BEGIN PRIVATE KEY/.test(SRC));
 }
 
 section('2. the sign-in screen is an email and password form, not a picker');
@@ -192,7 +198,7 @@ section('2. the sign-in screen is an email and password form, not a picker');
   /* The old screen listed all 23 names to anyone who opened the app. */
   const names = (login.textContent || '');
   ok('no crew member is named on it', !/Czekai|Gibbons|McCallum|Brosnan/.test(names), names.slice(0, 80));
-  ok('the old picker renderer is gone for good', HTML.indexOf('function renderSignIn') < 0);
+  ok('the old picker renderer is gone for good', SRC.indexOf('function renderSignIn') < 0);
 }
 
 section('3. with no stored session, nobody is signed in');
@@ -438,8 +444,8 @@ section('15. offline, it says so rather than pretending to send');
 
 section('16. TEMPORARY email-only sign-in, and the way back off it');
 {
-  ok('the switch ships in the file', /var EASY_SIGN_IN = (true|false);/.test(HTML));
-  ok('and the shared password with it', /var EASY_PASSWORD = '[^']+';/.test(HTML));
+  ok('the switch ships in the file', /var EASY_SIGN_IN = (true|false);/.test(SRC));
+  ok('and the shared password with it', /var EASY_PASSWORD = '[^']+';/.test(SRC));
 
   const b = boot({}, { user: userFor('p09') });
   b.win.__set('EASY_SIGN_IN', true);
@@ -507,7 +513,7 @@ section('16. TEMPORARY email-only sign-in, and the way back off it');
   const src = fs.readFileSync(path.join(__dirname, 'easy-sign-in.js'), 'utf8');
   ok('the account script is there', src.length > 0);
   ok('it reads the shared password out of the app', /var EASY_PASSWORD/.test(src));
-  const pw = (HTML.match(/var EASY_PASSWORD = '([^']+)';/) || [])[1];
+  const pw = (SRC.match(/var EASY_PASSWORD = '([^']+)';/) || [])[1];
   ok('and keeps no second copy of it that could drift',
      !!pw && src.indexOf("'" + pw + "'") < 0, pw);
   ok('it refuses to switch off in the wrong order', /Set it to false FIRST/.test(src));

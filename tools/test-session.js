@@ -64,7 +64,7 @@ function boot(store) {
   win.navigator.geolocation = { watchPosition: () => 1, clearWatch: noop, getCurrentPosition: noop };
   Object.defineProperty(win, 'innerWidth', { value: 390, configurable: true, writable: true });
 
-  const scripts = [require('./_geo').geoSource(), ...win.document.querySelectorAll('script:not([src])')].map(s => typeof s === 'string' ? s : s.textContent);
+  const scripts = require('./_app').appScripts(win.document);
   const EX = ['SESSION','sessionSet','sessionPerson','sessionRestore','sessionClear','signOut','doSignIn',
               'me','myLab','meName','calSelf','trMe','rstMe','roleSlug','ROLE_SLUG','renderSignIn',
               'authBoot','authSaveLocal','authLocal','authClearLocal',

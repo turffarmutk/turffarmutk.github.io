@@ -87,7 +87,7 @@ win.navigator.geolocation = { watchPosition: () => 1, clearWatch: noop, getCurre
 try { win.eval(appSource(win.document) + '\n;window.__FL = FIELDLOG; window.__FLCAP = FL_CAP; window.__FLCUR = function(v){ if(v!==undefined) flCur = v; return flCur; };'); }
 catch (e) { console.log('app script threw: ' + e.message); fail++; }
 
-const appText = fs.readFileSync(APP, 'utf8');
+const appText = require('./_app').appText();   /* the page WITH the app-*.js files written back in — see tools/_app.js */
 const rulesText = fs.readFileSync(RULES, 'utf8');
 const FL = () => win.__FL;
 const clearLog = () => { FL().length = 0; };

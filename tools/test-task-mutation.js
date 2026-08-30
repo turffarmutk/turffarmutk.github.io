@@ -89,7 +89,7 @@ function boot(store) {
     getSession: () => Promise.resolve({ data: { session: null } }),
     signOut: () => Promise.resolve({}), updateUser: () => Promise.resolve({}) } }) };
 
-  const scripts = [require('./_geo').geoSource(), ...win.document.querySelectorAll('script:not([src])')].map(s => typeof s === 'string' ? s : s.textContent);
+  const scripts = require('./_app').appScripts(win.document);
   try {
     win.eval(scripts.join('\n;\n')
       + '\n;window.__p={' + EX.map(n => n + ':(typeof ' + n + '!=="undefined"?' + n + ':undefined)').join(',') + '};'

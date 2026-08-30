@@ -25,6 +25,7 @@ const path = require('path');
 const { JSDOM, VirtualConsole } = require('jsdom');
 const turf = require('@turf/turf');
 const { appSource } = require('./_geo');
+const { appParts } = require('./_app');
 const { rosterDoc, rulesCan, creditsWorker } = require('./rules-model');
 
 const ROOT = path.join(__dirname, '..');
@@ -229,14 +230,21 @@ ok('no role, grant or field name appears in one file but not the other',
 
 /* ------------------------------------ 6. the app stamps what rules need --- */
 section('6. Every new task carries the fields the database will insist on');
-const appText = fs.readFileSync(APP, 'utf8');
-const creations = appText.split('\n')
-  .map((line, i) => ({ line, n: i + 1 }))
-  .filter(x => /TASKS\.(push|unshift)\(\{/.test(x.line));
+/* Read every file the app is made of, not just the page — most of this code
+   moved into app-05-tasks-clock.js on 2026-08-29. Each line is remembered with
+   the file it came from, so a failure names somewhere a person can open. */
+const creations = [];
+let appText = '';
+appParts(win.document).forEach(part => {
+  appText += part.code + '\n';
+  part.code.split('\n').forEach((line, i) => {
+    if (/TASKS\.(push|unshift)\(\{/.test(line)) creations.push({ line, where: part.file + ':' + (part.startLine + i) });
+  });
+});
 ok('found the places that create a task', creations.length > 0, creations.length + ' found');
 const missing = creations.filter(x => !/createdBy\s*:/.test(x.line));
 ok('every one stamps createdBy — the rules reject a task without it',
-   missing.length === 0, missing.map(x => 'line ' + x.n).join(', '));
+   missing.length === 0, missing.map(x => x.where).join(', '));
 ok('the assembled task in pushAssign() stamps createdBy',
    /base\.createdBy\s*=|createdBy\s*:\s*SESSION\.pid/.test(appText));
 

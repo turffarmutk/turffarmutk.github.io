@@ -29,6 +29,12 @@ const turf = require('@turf/turf');
 
 const APP = path.join(__dirname, '..', 'UT-TurfFarm-App.html');
 const HTML = fs.readFileSync(APP, 'utf8');
+/* The app's code, with the app-*.js files written back into the page exactly
+   where their <script> tags sit. The checks below search the source for a
+   line — that something dangerous is absent, that a comment still explains
+   why — and they have to search all of it, not just the part still written
+   inside the page. */
+const SRC = require('./_app').appText();
 
 let pass = 0, fail = 0;
 function ok(name, cond, extra) {
@@ -95,7 +101,7 @@ function boot(store, fetchMode) {
   };
   win.AbortController = class { constructor() { this.signal = {}; } abort() {} };
 
-  const scripts = [require('./_geo').geoSource(), ...win.document.querySelectorAll('script:not([src])')].map(s => typeof s === 'string' ? s : s.textContent);
+  const scripts = require('./_app').appScripts(win.document);
   try {
     win.eval(scripts.join('\n;\n')
       + '\n;window.__p={' + EX.map(n => n + ':(typeof ' + n + '!=="undefined"?' + n + ':undefined)').join(',') + '};'
@@ -337,7 +343,7 @@ section('10. tapping your own task on the board opens it');
      nothing at all. */
   const b = boot({});
   ok('the handler reads SESSION.pid as a value, not a call',
-     HTML.indexOf('taskIsFor(rt,SESSION.pid())') < 0);
+     SRC.indexOf('taskIsFor(rt,SESSION.pid())') < 0);
   b.p.sessionSet('p18');
   const today = b.p.atToday(null);
   const id = b.p.newId('t');

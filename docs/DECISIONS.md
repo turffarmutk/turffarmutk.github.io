@@ -28,6 +28,58 @@ down.
 
 ## Process & project
 
+### The app's code is six files, loaded in numeric order — 2026-08-29
+**Decision:** the 10,800-line `<script>` block inside `UT-TurfFarm-App.html` was
+cut into `app-01-shell.js` through `app-05-tasks-clock.js`, sitting beside the
+app file and loaded in numeric order. **Not one line of code was changed** — the
+files were generated as exact slices and diffed against the original to prove
+it. The map, trials, sign-in and boot code stayed in the page. No bundler, no
+build step, no modules: they are ordinary scripts sharing one namespace, exactly
+as they did when they were one block.
+**Why:** when a line fails while the app is opening, the browser abandons
+everything below it *in that block*, silently — the 2026-08-27 outage, live for
+two days. The size of the block is the size of the hole. This took the worst
+case from 10,800 lines to 2,900. Splitting further, or into real modules with
+imports, was rejected: a successor who cannot code can still open a plain file
+and read it, and a build step is one more thing that can stop working in 2031.
+**Don't:** rename them, reorder them, or move them into a subfolder — the
+numbers *are* the load order, and a subfolder would make `.nojekyll` load-bearing
+for the whole app rather than just the map. Adding `app-06-` is fine and needs
+no list updated anywhere: `tools/build-sw.js` finds them on disk and
+`tools/_app.js` tells every test harness about them.
+
+### A file may not call forward into a later file — 2026-08-29
+**Decision:** `tools/test-load-order.js` was added, and it runs with every
+`npm test`. It reads each file, finds the lines that run *as the app opens*, and
+fails if one of them calls something that is not written until a later file.
+**Why:** inside one file a function can be written at the bottom and called from
+the top, because the browser reads the whole file first. Across files it cannot.
+This is not theoretical — the split itself created exactly this bug on its first
+attempt (a line at the end of `app-01` calling `flStampWho()`, which had landed
+in `app-02`), and **all 1,700 existing checks passed anyway.** They passed
+because `test-boot.js` has to glue the files into one string to run them, and
+the glue hides the very mistake it should catch. Only opening the app in a
+browser found it. That is too thin a net for something that takes the app down
+on twenty-three phones.
+**Don't:** assume `test-boot.js` covers this — it structurally cannot, and the
+reason is written at the top of both files. And don't delete the new check
+because it "never finds anything": that is what it looks like when it is working.
+
+### The CSS stays inside the page, and that is not untidiness — 2026-08-29
+**Decision:** all of the app's CSS stays written in `<style>` blocks inside
+`UT-TurfFarm-App.html`. It was deliberately left there when the JavaScript was
+split out into files.
+**Why:** colour-blind mode (`cbCss()`) works by walking every `<style>` block,
+reading its text, rewriting each colour, and appending the result as a last
+stylesheet. A stylesheet loaded from a separate `.css` file has no text to read
+this way. Moving the CSS out would therefore switch colour-blind mode off for
+the entire app — **with no error, nothing in the console, and nothing on screen
+to notice** — for the people who need it most.
+**Don't:** "tidy" the CSS into `app.css`. If it ever has to move, `cbCss()` has
+to be rewritten to read `document.styleSheets` and its `cssRules` first, and
+somebody has to check colour-blind mode by eye afterwards, because no test
+watches colour.
+
 ### Sharing has no switch, and no way to turn it off — 2026-08-26
 **Decision:** the ten per-phone sharing switches were deleted. Every drawer
 shares with the whole farm from the moment the app opens, on every phone, and

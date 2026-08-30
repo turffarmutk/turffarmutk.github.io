@@ -55,7 +55,7 @@ Object.defineProperty(win, 'localStorage', {
 });
 win.navigator.geolocation = { watchPosition: () => 1, clearWatch: noop, getCurrentPosition: noop };
 
-const scripts = [require('./_geo').geoSource(), ...win.document.querySelectorAll('script:not([src])')].map(s => typeof s === 'string' ? s : s.textContent);
+const scripts = require('./_app').appScripts(win.document);
 /* stack is a `let` binding and the app reassigns it in a few places, so reach it
    through accessors rather than snapshotting the array once. */
 try {

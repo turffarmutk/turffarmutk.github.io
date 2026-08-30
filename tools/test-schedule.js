@@ -31,6 +31,13 @@ const turf = require('@turf/turf');
 
 const ROOT = path.join(__dirname, '..');
 const HTML = fs.readFileSync(path.join(ROOT, 'UT-TurfFarm-App.html'), 'utf8');
+/* The app's code, with the app-*.js files written back into the page exactly
+   where their <script> tags sit. The checks below search the source for a
+   line — that something dangerous is absent, that a comment still explains
+   why — and they have to search all of it, not just the part still written
+   inside the page. */
+const SRC = require('./_app').appText();
+const { appScripts } = require('./_app');
 const RULES = fs.readFileSync(path.join(ROOT, 'firestore.rules'), 'utf8');
 
 let pass = 0, fail = 0;
@@ -86,11 +93,7 @@ function boot(store, tweak) {
                             addEventListener() {}, removeEventListener() {} });
   win.scrollTo = () => {};
   win.alert = () => {}; win.confirm = () => true;
-  const scripts = [];
-  const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
-  let m;
-  while ((m = re.exec(HTML))) { if (!/\bsrc\s*=/i.test(m[1])) scripts.push(m[2]); }
-  scripts.unshift(fs.readFileSync(path.join(ROOT, 'farm-geo.js'), 'utf8'));
+  const scripts = appScripts(win.document);
   if (tweak) scripts.push(tweak);
   try {
     win.eval(scripts.join('\n;\n')
@@ -214,7 +217,7 @@ section('4. THE WIPE — the time clock keeps its history across a pay period');
   ok('and the stored copy was not emptied',
      JSON.parse(s2.ut_timeclock_v6).punches.p18.length === 1,
      s2.ut_timeclock_v6.slice(0, 120));
-  ok('the idx guard is gone from the source', HTML.indexOf('if(r&&r.idx===curIdx())') < 0);
+  ok('the idx guard is gone from the source', SRC.indexOf('if(r&&r.idx===curIdx())') < 0);
 
   /* Every punch needs an id before it can be a row in a shared database. */
   const noIds = { ut_timeclock_v6: JSON.stringify({
@@ -245,7 +248,7 @@ section('5. no fabricated data anywhere near the payroll screens');
    ['the manual crew board', 'var WEEKCREW='],
    ['the Edit crew button',  'data-editcrew']
   ].forEach(function (x) {
-    ok('  ' + x[0] + ' is gone', HTML.indexOf(x[1]) < 0);
+    ok('  ' + x[0] + ' is gone', SRC.indexOf(x[1]) < 0);
   });
 }
 
@@ -320,12 +323,12 @@ section('6. the app and the rules agree about who may write');
 section('7. both are shared, and neither can be turned off');
 {
   ok('schedules have a read-out on the Shared database screen',
-     /st:SCHSYNC,\s*summary:schsyncSummary\(\)/.test(HTML));
-  ok('the time clock has one', /st:TCSYNC,\s*summary:tcsyncSummary\(\)/.test(HTML));
+     /st:SCHSYNC,\s*summary:schsyncSummary\(\)/.test(SRC));
+  ok('the time clock has one', /st:TCSYNC,\s*summary:tcsyncSummary\(\)/.test(SRC));
   ok('schedules are on from the moment the app opens', p.SCHSYNC && p.SCHSYNC.on === true);
   ok('so is the clock', p.TCSYNC && p.TCSYNC.on === true);
   ok('and nothing on the phone decides either',
-     HTML.indexOf("ut_schedules_shared_v1") < 0 && HTML.indexOf("ut_timeclock_shared_v1") < 0);
+     SRC.indexOf("ut_schedules_shared_v1") < 0 && SRC.indexOf("ut_timeclock_shared_v1") < 0);
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

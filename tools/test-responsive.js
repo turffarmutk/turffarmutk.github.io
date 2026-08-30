@@ -63,7 +63,7 @@ Object.defineProperty(win, 'localStorage', {
 });
 win.navigator.geolocation = { watchPosition: () => 1, clearWatch: noop, getCurrentPosition: noop };
 
-const scripts = [require('./_geo').geoSource(), ...win.document.querySelectorAll('script:not([src])')].map(s => typeof s === 'string' ? s : s.textContent);
+const scripts = require('./_app').appScripts(win.document);
 try {
   /* NAV_OPTIONS and friends are `const`, so indirect eval keeps them out of the
      global object. Hand them out explicitly rather than duplicating the tables. */

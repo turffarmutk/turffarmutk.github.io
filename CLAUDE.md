@@ -79,7 +79,7 @@ show up." Never edit `sw.js` by hand; this command writes it.
 npm test
 ```
 
-29 sets of automated checks, about 1,700 in total, in roughly a minute. They
+30 sets of automated checks, about 1,700 in total, in roughly a minute. They
 run several at a time (`tools/run-tests.js`); `npm run test:serial` runs them
 one after another instead, which is slower but easier to read when two of them
 disagree.
@@ -100,11 +100,17 @@ python3 -m http.server 8891
 Then open `http://localhost:8891/UT-TurfFarm-App.html` in the browser tool and
 read the console — the browser's own list of errors. **It must be empty.**
 
-This step is not optional, and here is why. The app is one enormous block of
-code. If any line in it fails while the page is opening, the browser gives up
-on **everything below that line** — those parts of the app simply never come
-into existence. The page still draws, sign-in still works, and it all looks
-completely normal. That is what makes it dangerous.
+This step is not optional, and here is why. If any line fails while the page is
+opening, the browser gives up on **everything below that line in the same
+file** — those parts of the app simply never come into existence. The page
+still draws, sign-in still works, and it all looks completely normal. That is
+what makes it dangerous.
+
+Splitting the app into files on 2026-08-29 made that hole smaller — one file
+instead of all of it — but it did not close it, and it will not tell you when
+it happens. **Only opening the app does.** The split itself proves the point:
+it introduced a crash that all 1,700 checks passed straight over, and reading
+the console is what found it.
 
 Two traps when you do this:
 
@@ -165,24 +171,47 @@ get wrong.
 | `.nojekyll` | An empty file, and it is holding the app up. Delete it and the website stops serving the `vendor` folder — the map library, the fonts, everything. Then the offline copy refuses to install at all, while the page still loads and looks fine. **If the map ever goes blank after a push, check this first.** |
 | `sw.js` | Written by `npm run sw`. Never edit it by hand. |
 | `farm-geo.js` | The plot shapes. Must stay next to the app file. |
+| `app-01-*.js` … `app-05-*.js` | Two thirds of the app. They must sit next to the app file, and they must load **in numeric order** — the numbers are the order. Renaming or reordering them breaks the app on opening. Adding a sixth is fine: `npm run sw` finds it and `tools/_app.js` tells the tests about it, so nothing needs a list updating by hand. |
+| The CSS, which stays inside the page | Colour-blind mode works by reading the text of every `<style>` block and rewriting the colours. Move the CSS out to a `.css` file and colour-blind mode stops working **with no error at all** — nothing to see, just wrong colours for the people who need it most. |
 | Files at the top level | The website serves this folder directly, so these filenames *are* the web address. Nothing the live app needs can move into a subfolder. |
 | `roster-emails.local.json` | The crew's email addresses. Deliberately kept out of the public repo. Never commit it. |
 
 ---
 
-## Working inside the app file
+## Working inside the app
 
-`UT-TurfFarm-App.html` is about 19,500 lines. Find your way around by the
-`/* ===== SECTION ===== */` headings and by function name — **not** by line
-number, which changes the moment either of you edits the file.
+The app is about 19,500 lines spread over the page and five files beside it.
+**Work out which file first** — that is most of finding your way around:
+
+| File | Roughly | What is in it |
+|---|---|---|
+| `app-01-shell.js` | 1,700 | Per-person preferences, the phone/roomy shell, notifications, home-screen widgets, theme and colour-blind mode |
+| `app-02-fieldlog-sync.js` | 2,500 | The field log and its corrections; the shared-database drawers; ids and timestamps |
+| `app-03-people.js` | 1,400 | Roster, labs, session, sign-in, profile, semesters, and who may change what |
+| `app-04-spray-inventory.js` | 2,900 | Spray mix calculator, undergrad task-work mode, inventory, equipment |
+| `app-05-tasks-clock.js` | 2,200 | Task templates and list, assign wizard, calendar, time clock, weather, rainfall |
+| `UT-TurfFarm-App.html` | 8,800 | Every screen's markup, all the CSS, and three remaining blocks of code: the map, trials, sign-in and boot |
+
+Within a file, navigate by the `/* ===== SECTION ===== */` headings and by
+function name — **not** by line number, which changes the moment either of you
+edits the file.
 
 - Make small, targeted edits. Most things that break here break because
   something was rewritten wholesale rather than adjusted.
-- **Watch the order things are written in.** It is one long block, so a line
-  near the top that uses something defined further down gets nothing, and the
-  app crashes on opening. This is exactly what took the app down on
-  2026-08-27. Anything that draws a screen belongs at the **end** of its
-  block. `tools/test-boot.js` now checks for this.
+- **Watch the order things are written in.** A line that runs while the app is
+  opening and uses something defined further down gets nothing, and the app
+  crashes on opening. This is exactly what took the app down on 2026-08-27.
+  Anything that draws a screen belongs at the **end** of its file.
+  `tools/test-boot.js` checks for this.
+- **Across files the rule is stricter, and it is the one new trap.** Inside one
+  file a function can be written at the bottom and called from the top — the
+  browser reads the whole file before running it. **Across files it cannot.**
+  While `app-01` is running, `app-02` has not been read yet, so calling
+  something that lives in `app-02` throws and kills the rest of `app-01`.
+  `tools/test-load-order.js` checks for this, because `test-boot.js`
+  structurally cannot — it glues the files together to run them, and the glue
+  hides exactly this mistake. It caught a real one the day the files were
+  split.
 - Write in the style already there: same formatting, and comments that explain
   *why* at the same density.
 - `archive/` and `_to_delete/` are old scratch. Never read them to find out

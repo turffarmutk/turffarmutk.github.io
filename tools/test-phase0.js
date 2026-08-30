@@ -22,6 +22,12 @@ const turf = require('@turf/turf');
 
 const APP = path.join(__dirname, '..', 'UT-TurfFarm-App.html');
 const HTML = fs.readFileSync(APP, 'utf8');
+/* The app's code, with the app-*.js files written back into the page exactly
+   where their <script> tags sit. The checks below search the source for a
+   line — that something dangerous is absent, that a comment still explains
+   why — and they have to search all of it, not just the part still written
+   inside the page. */
+const SRC = require('./_app').appText();
 
 let pass = 0, fail = 0;
 function ok(name, cond, extra) {
@@ -61,7 +67,7 @@ function boot(store) {
   win.navigator.geolocation = { watchPosition: () => 1, clearWatch: noop, getCurrentPosition: noop };
   Object.defineProperty(win, 'innerWidth', { value: 390, configurable: true, writable: true });
 
-  const scripts = [require('./_geo').geoSource(), ...win.document.querySelectorAll('script:not([src])')].map(s => typeof s === 'string' ? s : s.textContent);
+  const scripts = require('./_app').appScripts(win.document);
   const EX = ['TASKS','EVENTS','FIELDLOG','EQMAINT','TEMPLATES','STUDENTS','CREW','WEEKCREW','SHIFT','ROSTER','SCHEDULES','FARM_SEMS',
               'dueLabel','fmtDay','fmtTime','fmtDateTime','isoLocal','parseISO','atToday','atOffset','ordOfISO',
               'taskOrd','isFutureTask','newId','flNewId','esc','pidOf','nameOf','isMe','initOf','titleOf',
@@ -291,7 +297,7 @@ section('5b. map popups use delegated handlers');
     ok('  ' + k + ' is registered', typeof p.PP_ACTIONS[k] === 'function');
   });
   ok('no string-built onclick is left in the source',
-     !/onclick="[A-Za-z_$][\w$]*\(\\''\+/.test(HTML));
+     !/onclick="[A-Za-z_$][\w$]*\(\\''\+/.test(SRC));
 }
 
 section('Load errors');

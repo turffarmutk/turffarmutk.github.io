@@ -20,7 +20,8 @@ there. GitHub Pages serves this repo from the root, so these paths are the URL:
 | File | What it is |
 |---|---|
 | `index.html` | Forwards to the app. This is why the bare URL works — Pages does not list directories. |
-| `UT-TurfFarm-App.html` | The app. One file, ~1.3 MB. |
+| `UT-TurfFarm-App.html` | The app: every screen, all the CSS, and the map, trials and sign-in code. |
+| `app-01-*.js` … `app-05-*.js` | The rest of the app's code. They load **in numeric order** and must stay beside the app file. Split out of it on 2026-08-29 so a crash while opening takes down one file rather than all of it. |
 | `farm-geo.js` | Plot shapes and map data. Must sit beside the app. |
 | `sw.js` | Service worker — the offline cache. **Generated; never hand-edit.** |
 | `manifest.webmanifest` | Makes it installable. |
@@ -62,9 +63,9 @@ versions). Both are git-ignored on purpose — see `docs/DECISIONS.md`.
 ```bash
 npm install                              # first time only
 git config core.hooksPath .githooks      # first time only - turns on the push check
-# edit UT-TurfFarm-App.html or farm-geo.js
+# edit UT-TurfFarm-App.html, one of the app-*.js files, or farm-geo.js
 npm run sw           # REQUIRED — regenerates the service worker
-npm test             # 29 harnesses, 1,698 checks, about a minute
+npm test             # 30 harnesses, ~1,700 checks, about a minute
 git add -A && git commit -m "what changed and why" && git push
 ```
 

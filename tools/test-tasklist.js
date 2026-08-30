@@ -28,6 +28,13 @@ const { JSDOM, VirtualConsole } = require('jsdom');
 
 const ROOT = path.join(__dirname, '..');
 const HTML = fs.readFileSync(path.join(ROOT, 'UT-TurfFarm-App.html'), 'utf8');
+/* The app's code, with the app-*.js files written back into the page exactly
+   where their <script> tags sit. The checks below search the source for a
+   line — that something dangerous is absent, that a comment still explains
+   why — and they have to search all of it, not just the part still written
+   inside the page. */
+const SRC = require('./_app').appText();
+const { appScripts } = require('./_app');
 const RULES = fs.readFileSync(path.join(ROOT, 'firestore.rules'), 'utf8');
 
 let pass = 0, fail = 0;
@@ -71,9 +78,7 @@ function boot(store) {
   win.matchMedia = () => ({ matches: false, addListener() {}, removeListener() {},
                             addEventListener() {}, removeEventListener() {} });
   win.scrollTo = () => {}; win.alert = () => {}; win.confirm = () => true;
-  const scripts = [fs.readFileSync(path.join(ROOT, 'farm-geo.js'), 'utf8')];
-  const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi; let m;
-  while ((m = re.exec(HTML))) { if (!/\bsrc\s*=/i.test(m[1])) scripts.push(m[2]); }
+  const scripts = appScripts(win.document);
   try {
     win.eval(scripts.join('\n;\n')
       + '\n;window.__p={' + EX.map(n => n + ':(typeof ' + n + '!=="undefined"?' + n + ':undefined)').join(',') + '};');
@@ -96,25 +101,25 @@ ok('the task list has jobs in it', Array.isArray(p.TEMPLATES) && p.TEMPLATES.len
   ok('under the key it already used', def && def.key === 'ut_task_templates_v2', def && def.key);
   ok('and the registry hands back the live array', def && def.get() === p.TEMPLATES);
 }
-ok('it no longer writes itself by hand', HTML.indexOf('localStorage.setItem(TPL_KEY') < 0);
+ok('it no longer writes itself by hand', SRC.indexOf('localStorage.setItem(TPL_KEY') < 0);
 
 section('1. one door, not three');
-ok('the "＋ Add Task" button is gone', HTML.indexOf('data-board="add"') < 0);
-ok('the "✎ Edit" button is gone', HTML.indexOf('data-board="edit"') < 0);
-ok('the board keeps its Assign button', HTML.indexOf('data-board="assign"') > 0);
+ok('the "＋ Add Task" button is gone', SRC.indexOf('data-board="add"') < 0);
+ok('the "✎ Edit" button is gone', SRC.indexOf('data-board="edit"') < 0);
+ok('the board keeps its Assign button', SRC.indexOf('data-board="assign"') > 0);
 ok('the Task Board header opens the list',
-   /id="s-taskboard"[\s\S]{0,600}?data-go="templates"/.test(HTML));
-ok('the list has its own Add button', HTML.indexOf('id="tpl-add"') > 0);
-ok('the screen is called the task list', /id="s-templates"[\s\S]{0,400}?>Task list</.test(HTML));
+   /id="s-taskboard"[\s\S]{0,600}?data-go="templates"/.test(SRC));
+ok('the list has its own Add button', SRC.indexOf('id="tpl-add"') > 0);
+ok('the screen is called the task list', /id="s-templates"[\s\S]{0,400}?>Task list</.test(SRC));
 /* Deleting moved off the rows and onto the job's own form, where the thing is
    in front of you — a red cross right-aligned on forty scrolling rows is a
    mis-tap waiting to happen. */
-ok('no ✕ on the rows any more', HTML.indexOf('data-tplrm') < 0);
-ok('the edit form carries the delete', HTML.indexOf('id="tn-del"') > 0);
+ok('no ✕ on the rows any more', SRC.indexOf('data-tplrm') < 0);
+ok('the edit form carries the delete', SRC.indexOf('id="tn-del"') > 0);
 ok('Save sits in the form header, right-aligned',
-   /id="s-tasknew"[\s\S]{0,400}?<div class="hdr">[\s\S]{0,600}?id="tn-save"/.test(HTML));
+   /id="s-tasknew"[\s\S]{0,400}?<div class="hdr">[\s\S]{0,600}?id="tn-save"/.test(SRC));
 ok('and no longer in a bar at the bottom',
-   HTML.indexOf('<div class="actionbar"><div class="action" id="tn-save">') < 0);
+   SRC.indexOf('<div class="actionbar"><div class="action" id="tn-save">') < 0);
 
 section('2. undergraduates read it; everybody else writes it');
 {
@@ -214,9 +219,9 @@ section('4. it survives a reload and reaches the backup');
 
 section('5. it is shared, and cannot be turned off');
 ok('the task list has a read-out on the Shared database screen',
-   /st:TPLSYNC,\s*summary:tplsyncSummary\(\)/.test(HTML));
+   /st:TPLSYNC,\s*summary:tplsyncSummary\(\)/.test(SRC));
 ok('it is on from the moment the app opens', p.TPLSYNC && p.TPLSYNC.on === true);
-ok('and nothing on the phone decides it', HTML.indexOf('ut_tasklist_shared_v1') < 0);
+ok('and nothing on the phone decides it', SRC.indexOf('ut_tasklist_shared_v1') < 0);
 ok('the publish notes cover it',
    fs.readFileSync(path.join(ROOT, 'docs', 'PUBLISH-THE-RULES.md'), 'utf8').indexOf('the task list') > 0);
 

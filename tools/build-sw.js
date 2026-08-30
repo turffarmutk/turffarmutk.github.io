@@ -24,6 +24,18 @@ const ROOT = path.join(__dirname, '..');
 const SHELL = ['UT-TurfFarm-App.html', 'farm-geo.js', 'manifest.webmanifest'];
 const DIRS = ['vendor', 'icons'];
 
+/* The app's own code — app-01-shell.js and the rest. FOUND, NOT LISTED, and
+   that is the whole point: if somebody splits out a sixth file in 2030 and
+   this were a hand-kept list, they would have to know to come and add it here.
+   They would not know. The app would then work perfectly on their machine and
+   fail to open on a phone with no signal, which is the hardest kind of bug to
+   be told about from a field. */
+function appFiles() {
+  return fs.readdirSync(ROOT)
+    .filter(f => /^app-\d\d-[a-z0-9-]+\.js$/.test(f))
+    .sort();
+}
+
 function walk(dir, out) {
   fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).forEach(e => {
     const rel = dir + '/' + e.name;
@@ -36,7 +48,7 @@ function walk(dir, out) {
 /* Exported so tools/test-pwa.js computes the version exactly the same way this
    does, rather than keeping a second copy of the rule that could drift. */
 function shellFiles() {
-  const files = SHELL.slice();
+  const files = SHELL.concat(appFiles());
   DIRS.forEach(d => walk(d, files));
   return files.sort();
 }

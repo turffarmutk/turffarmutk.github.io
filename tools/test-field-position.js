@@ -113,7 +113,7 @@ win.navigator.geolocation = { watchPosition: () => 1, clearWatch: () => {}, getC
 /* The app's script blocks share one scope in the browser, and some of its state
    is `let`-bound - which an eval keeps to itself. Concatenate the blocks into a
    single eval and hand the let-bound names back out at the end. */
-const scripts = [require('./_geo').geoSource(), ...dom.window.document.querySelectorAll('script:not([src])')].map(s => typeof s === 'string' ? s : s.textContent);
+const scripts = require('./_app').appScripts(dom.window.document);
 const EXPORTS = ['TASKS', 'TRIALS', 'STUDENTS', 'CREW', 'currentRole'];
 const source = scripts.join('\n;\n')
   + '\n;window.__app={' + EXPORTS.map(n => n + ':(typeof ' + n + '!=="undefined"?' + n + ':undefined)').join(',') + '};';

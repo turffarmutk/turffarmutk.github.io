@@ -1899,19 +1899,366 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
   });
 })();
 
+/* ============================================================
+   THE WEATHER — a real forecast, from the National Weather Service
+   ------------------------------------------------------------
+   WHAT THIS REPLACED, and why it mattered. Every number on the weather screen
+   used to be typed into the source: "78° Clear", the wind, the humidity, the
+   five day cards. The hourly strip looked convincing because it was CALCULATED
+   from those five made-up days on a sine curve, not because it was real. Only
+   the radar picture was ever true.
+
+   That was not merely useless. Four of the five home screens carry a spray
+   window that read GOOD or HOLD off those invented numbers -- a go/no-go on
+   taking the rig out, decided by a figure somebody typed in months earlier.
+   The comment above one of them said "real numbers". They were not.
+
+   WHERE IT COMES FROM NOW. api.weather.gov, run by the National Weather
+   Service. It is free, needs no account, no key and no card, which is the
+   whole reason it was chosen over any commercial forecast: there is nothing to
+   expire, nothing to bill, and nothing for a successor to renew. The farm
+   resolves to forecast office MRX -- the same station the radar loop already
+   came from.
+
+   WHAT HAPPENS WITH NO SIGNAL. The last good reading is kept on the phone and
+   still shown, with how old it is written next to it in plain words. It never
+   pretends to be current.
+
+   AND THE PART THAT MATTERS MOST: if the reading is more than WX_STALE_MS old,
+   the spray window stops giving an answer at all. It says it does not know,
+   rather than GOOD. An out-of-date GOOD is exactly the failure this whole
+   change exists to remove.
+   ============================================================ */
+
+/* The farm. Four decimal places because the service redirects anything more
+   precise, which would cost a round trip on every lookup. */
+var WX_LAT=35.9020, WX_LON=-83.9600;
+var WX_KEY='ut_weather_v1';        /* last good reading, kept for no signal */
+var WX_REFRESH_MS=15*60*1000;      /* do not ask more often than this */
+var WX_STALE_MS=3*60*60*1000;      /* older than this and we stop advising */
+var WX_TIMEOUT_MS=15000;
+
+var WX={ at:0, now:null, days:[], hours:[], point:null, err:null, loading:false };
+
+/* Five days, in the shape the rest of the app already reads. Filled IN PLACE
+   from the live forecast -- never reassigned, because the home widgets and the
+   day-detail screen hold on to it. */
+var WXDAYS=[];
+
+function wxNum(v){ var n=parseFloat(v); return isFinite(n)?n:null; }
+/* NWS writes wind as "5 mph" or "5 to 10 mph". Take the HIGHEST number in it.
+   For a spray decision the gust is the number that matters, and rounding a
+   range down is how somebody ends up spraying in the top of it. */
+function wxWindMph(s){
+  var m=String(s||'').match(/\d+(\.\d+)?/g);
+  if(!m||!m.length) return null;
+  return Math.max.apply(null, m.map(Number));
+}
+function wxC2F(c){ return (c===null||c===undefined)?null:Math.round(c*9/5+32); }
+function wxKm2Mi(k){ return (k===null||k===undefined)?null:Math.round(k*0.621371); }
+/* Every field on every reading can come back null -- the airport's pressure
+   sensor was down the day this was written. A missing number shows as a dash,
+   never as a stale one and never as a guess. */
+function wxOr(v,suffix){ return (v===null||v===undefined||v==='')?'—':(v+(suffix||'')); }
+
+function wxIcoFor(txt,precip,night){
+  var s=String(txt||'').toLowerCase();
+  if(/thunder|storm/.test(s)) return '⛈️';
+  if(/snow|sleet|ice|flurr/.test(s)) return '🌨️';
+  if(/rain|shower|drizzle/.test(s)) return '🌧️';
+  if(/fog|haze|mist/.test(s)) return '🌫️';
+  if(/mostly cloudy|overcast/.test(s)) return '☁️';
+  if(/partly|scattered|few/.test(s)) return night?'☁️':'⛅';
+  if(/cloud/.test(s)) return '☁️';
+  if((precip||0)>=50) return '⛈️';
+  return night?'🌙':'☀️';
+}
+
+/* ---- the cache -----------------------------------------------------------
+   Stored under its own key rather than through STORE_DEFS, because this is not
+   the farm's data -- it is a copy of somebody else's, and it should never ride
+   along in a backup or be restored onto a phone as if it were current. */
+function wxCacheSave(){
+  try{ localStorage.setItem(WX_KEY, JSON.stringify({
+    at:WX.at, now:WX.now, days:WX.days, hours:WX.hours, point:WX.point })); }catch(e){}
+}
+function wxCacheLoad(){
+  var raw=null; try{ raw=localStorage.getItem(WX_KEY); }catch(e){}
+  if(!raw) return false;
+  var p=null; try{ p=JSON.parse(raw); }catch(e){ return false; }
+  if(!p||typeof p!=='object') return false;
+  WX.at=+p.at||0;
+  WX.now=p.now||null;
+  WX.days=Array.isArray(p.days)?p.days:[];
+  WX.hours=Array.isArray(p.hours)?p.hours:[];
+  WX.point=p.point||null;
+  wxFillDays();
+  return WX.days.length>0;
+}
+
+function wxAgeMs(){ return WX.at?(Date.now()-WX.at):Infinity; }
+function wxIsFresh(){ return wxAgeMs()<WX_STALE_MS; }
+/* Plain words. "34 minutes ago" tells somebody what they need; a timestamp
+   makes them work it out while standing in a field. */
+function wxAgeText(){
+  if(!WX.at) return 'no reading yet';
+  var s=Math.floor(wxAgeMs()/1000);
+  if(s<90) return 'just now';
+  var m=Math.round(s/60);
+  if(m<60) return m+' minute'+(m===1?'':'s')+' ago';
+  var h=Math.round(m/60);
+  if(h<24) return h+' hour'+(h===1?'':'s')+' ago';
+  var d=Math.round(h/24);
+  return d+' day'+(d===1?'':'s')+' ago';
+}
+
+/* ---- asking the service -------------------------------------------------- */
+function wxFetchJson(url){
+  return new Promise(function(resolve,reject){
+    if(navigator.onLine===false){ reject(new Error('offline')); return; }
+    var ctl=null,timer=null;
+    try{ ctl=new AbortController(); timer=setTimeout(function(){ try{ctl.abort();}catch(e){} },WX_TIMEOUT_MS); }catch(e){}
+    fetch(url,{ headers:{'Accept':'application/geo+json'}, signal:ctl?ctl.signal:undefined })
+      .then(function(res){
+        if(timer) clearTimeout(timer);
+        if(!res.ok){ reject(new Error('HTTP '+res.status)); return; }
+        return res.json();
+      })
+      .then(function(j){ if(j) resolve(j); })
+      .catch(function(e){ if(timer) clearTimeout(timer); reject(e); });
+  });
+}
+
+/* Which grid square the farm sits in. Looked up once and kept, because it only
+   changes if the service re-draws its grid -- and when that happens the
+   forecast call 404s and this is looked up again, so nobody has to know. */
+function wxPoint(){
+  if(WX.point&&WX.point.forecast) return Promise.resolve(WX.point);
+  return wxFetchJson('https://api.weather.gov/points/'+WX_LAT+','+WX_LON).then(function(j){
+    var p=j&&j.properties; if(!p||!p.forecast) throw new Error('no grid for the farm');
+    WX.point={ forecast:p.forecast, hourly:p.forecastHourly, stations:p.observationStations };
+    return WX.point;
+  });
+}
+
+/* Fold the service's day/night pairs into the five day cards the app draws.
+   A day card wants a high and a low; the service sends them as two separate
+   periods, so they are matched up by date here. */
+function wxFoldDays(periods){
+  var byDay={}, order=[];
+  (periods||[]).forEach(function(pd){
+    var d=new Date(pd.startTime); if(isNaN(d)) return;
+    var key=d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate();
+    if(!byDay[key]){ byDay[key]={ date:d, hi:null, lo:null, cond:null, wind:null, dir:'', precip:null }; order.push(key); }
+    var e=byDay[key], t=wxNum(pd.temperature), w=wxWindMph(pd.windSpeed),
+        pr=(pd.probabilityOfPrecipitation&&pd.probabilityOfPrecipitation.value)||0;
+    if(pd.isDaytime){
+      e.hi=t; e.cond=pd.shortForecast; e.wind=w; e.dir=pd.windDirection||''; 
+      e.precip=Math.max(e.precip||0,pr);
+    }else{
+      e.lo=t;
+      if(e.cond===null){ e.cond=pd.shortForecast; e.wind=w; e.dir=pd.windDirection||''; }
+      e.precip=Math.max(e.precip||0,pr);
+    }
+  });
+  return order.slice(0,5).map(function(k){
+    var e=byDay[k];
+    return {
+      day: e.date.toLocaleDateString('en-US',{weekday:'long'}),
+      cond: e.cond||'—',
+      ico: wxIcoFor(e.cond,e.precip,false),
+      hi: e.hi, lo: e.lo,
+      hum: '—',                                  /* the daily product carries none */
+      wind: e.wind===null?'—':(e.wind+' mph'+(e.dir?' '+e.dir:'')),
+      precip: (e.precip===null?0:e.precip)+'%',
+      /* The service publishes no UV index in this product. A dash is the
+         honest answer; a number here would be invented, which is the exact
+         thing this rewrite removed. */
+      uv: '—'
+    };
+  });
+}
+
+function wxFoldHours(periods){
+  return (periods||[]).slice(0,24).map(function(h){
+    var d=new Date(h.startTime);
+    var pr=(h.probabilityOfPrecipitation&&h.probabilityOfPrecipitation.value)||0;
+    var hum=(h.relativeHumidity&&h.relativeHumidity.value);
+    var wind=wxWindMph(h.windSpeed);
+    var hh=d.getHours();
+    /* The service sends dew point in Celsius even though the temperature is in
+       Fahrenheit. It used to be estimated from humidity; this is the real one. */
+    var dew=(h.dewpoint&&h.dewpoint.value!=null)?wxC2F(h.dewpoint.value):null;
+    return {
+      h: hh, label: wxHourLabel(hh), t: new Date(h.startTime).getTime(), dew: dew,
+      temp: wxNum(h.temperature), wind: wind===null?0:wind, dir:h.windDirection||'',
+      precip: pr, hum: (hum===null||hum===undefined)?null:Math.round(hum),
+      cond: h.shortForecast||'', ico: wxIcoFor(h.shortForecast,pr,wxIsNight(hh)),
+      spray: (wind!==null&&wind<=WX_SPRAY_WIND&&pr<=WX_SPRAY_PRECIP)
+    };
+  });
+}
+
+function wxFoldNow(obs,hours){
+  var p=obs&&obs.properties;
+  if(p){
+    return {
+      temp: wxC2F(p.temperature&&p.temperature.value),
+      cond: p.textDescription||'—',
+      wind: wxKm2Mi(p.windSpeed&&p.windSpeed.value),
+      dir:  (p.windDirection&&p.windDirection.value)!=null?wxCompass(p.windDirection.value):'',
+      hum:  (p.relativeHumidity&&p.relativeHumidity.value)!=null?Math.round(p.relativeHumidity.value):null,
+      dew:  wxC2F(p.dewpoint&&p.dewpoint.value),
+      press:(p.barometricPressure&&p.barometricPressure.value)!=null
+              ?(p.barometricPressure.value/3386.39).toFixed(2):null,
+      station: p.station?String(p.station).split('/').pop():'',
+      taken: p.timestamp||null
+    };
+  }
+  /* No observation came back. The first forecast hour is a worse answer than a
+     real reading and a far better one than a made-up number. */
+  var h=hours&&hours[0];
+  return h?{ temp:h.temp, cond:h.cond, wind:h.wind, dir:h.dir, hum:h.hum,
+             dew:null, press:null, station:'', taken:null, fromForecast:true }:null;
+}
+function wxCompass(deg){
+  var pts=['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  return pts[Math.round(((deg%360)/22.5))%16];
+}
+
+/* Fill WXDAYS in place from the live days. */
+function wxFillDays(){
+  WXDAYS.length=0;
+  WX.days.forEach(function(d){ WXDAYS.push(d); });
+}
+
+/* The whole pipeline. Safe to call as often as you like -- it does nothing if
+   the reading is recent, and nothing if one is already in flight. */
+function wxRefresh(force){
+  if(WX.loading) return Promise.resolve(false);
+  if(!force&&WX.at&&(Date.now()-WX.at)<WX_REFRESH_MS) return Promise.resolve(false);
+  if(navigator.onLine===false){ WX.err='No connection'; return Promise.resolve(false); }
+  WX.loading=true; wxPaint();
+  return wxPoint().then(function(pt){
+    return Promise.all([
+      wxFetchJson(pt.forecast),
+      wxFetchJson(pt.hourly),
+      wxFetchJson('https://api.weather.gov/stations/KTYS/observations/latest').catch(function(){ return null; })
+    ]);
+  }).then(function(r){
+    var days=wxFoldDays(r[0]&&r[0].properties&&r[0].properties.periods);
+    var hours=wxFoldHours(r[1]&&r[1].properties&&r[1].properties.periods);
+    if(!days.length) throw new Error('the forecast came back empty');
+    WX.days=days; WX.hours=hours; WX.now=wxFoldNow(r[2],hours);
+    WX.at=Date.now(); WX.err=null;
+    wxFillDays(); wxCacheSave();
+    return true;
+  }).catch(function(e){
+    /* A stale grid: look it up again next time rather than failing forever. */
+    if(/HTTP 404/.test(String(e&&e.message))) WX.point=null;
+    WX.err=(String(e&&e.message)==='offline')?'No connection':'Could not reach the weather service';
+    return false;
+  }).then(function(ok){
+    WX.loading=false; wxPaint(); return ok;
+  });
+}
+
+/* Redraw whatever is on screen that reads the weather. */
+function wxPaint(){
+  try{
+    renderWxNow();
+    var scr=document.querySelector('.screen.active');
+    var id=scr?scr.id.replace(/^s-/,''):'';
+    if(id==='weather'){ WXH=wxHours(); wxRenderHours(); wxRenderCards(); }
+    if(/^home-/.test(id)&&typeof renderHome==='function') renderHome();
+  }catch(e){}
+}
+
+/* ---- drawing what came back ---------------------------------------------
+   Every one of these shows a dash where a number is missing. That is the whole
+   discipline of this screen now: it says what it knows, says when it last knew
+   it, and says nothing at all where it does not know. */
+function renderWxNow(){
+  var q=function(id){ return document.getElementById(id); };
+  var el=q('wx-now-temp'); if(!el) return;
+  var n=WX.now, d0=WX.days[0];
+  el.textContent = (n&&n.temp!==null&&n.temp!==undefined)?(n.temp+'°'):'—';
+  var cond=q('wx-now-cond');
+  if(cond) cond.textContent = WX.loading&&!WX.at ? 'Loading…'
+                            : (WX.err&&!WX.at) ? 'No forecast'
+                            : ((n&&n.cond)||'—');
+  var ico=q('wx-now-ico');
+  if(ico) ico.textContent = n?wxIcoFor(n.cond,0,wxIsNight(new Date().getHours())):'🌡️';
+  var sub=q('wx-now-sub');
+  if(sub){
+    var bits=[];
+    if(d0&&d0.hi!==null&&d0.lo!==null) bits.push('H '+d0.hi+'° / L '+d0.lo+'°');
+    if(n&&n.station) bits.push(n.station);
+    if(n&&n.fromForecast) bits.push('from the forecast');
+    sub.textContent=bits.join(' · ');
+  }
+  var set=function(id,v){ var e=q(id); if(e) e.textContent=v; };
+  set('wx-now-wind',   n&&n.wind!==null&&n.wind!==undefined ? (n.wind+' mph'+(n.dir?' '+n.dir:'')) : '—');
+  set('wx-now-hum',    wxOr(n&&n.hum,'%'));
+  set('wx-now-precip', d0?wxOr(parseInt(d0.precip,10),'%'):'—');
+  set('wx-now-uv',     '—');   /* the service publishes none; see wxFoldDays */
+  set('wx-now-dew',    wxOr(n&&n.dew,'°'));
+  set('wx-now-press',  wxOr(n&&n.press,'″'));
+
+  var age=q('wx-age');
+  if(age){
+    if(WX.loading&&!WX.at){ age.textContent='Fetching the forecast…'; age.style.color='var(--muted)'; }
+    else if(!WX.at){ age.textContent=(WX.err||'No forecast yet')+' — pull down or reopen when you have signal'; age.style.color='#c0392b'; }
+    else if(!wxIsFresh()){ age.textContent='Last reading '+wxAgeText()+' — too old to spray by'; age.style.color='#c0392b'; }
+    else { age.textContent='National Weather Service · '+wxAgeText(); age.style.color='var(--muted)'; }
+  }
+}
+
+/* The five day cards. They stay in the markup and are FILLED here rather than
+   rebuilt, which matters more than it looks: those five divs are written
+   unclosed in the page, and the browser's own repair of that is what puts the
+   rest of the screens where they belong. Replacing them with tidy, balanced
+   markup on 2026-08-30 moved forty-four screens up a level and broke the back
+   arrow on every one of them. Fill them; do not rewrite them. */
+function wxRenderCards(){
+  var cards=document.querySelectorAll('#s-weather .wxcard');
+  if(!cards.length) return;
+  cards.forEach(function(c,i){
+    var d=WX.days[i];
+    if(!d){
+      c.style.display='none';
+      return;
+    }
+    c.style.display='';
+    c.innerHTML='<div class="rs" style="font-weight:800;color:var(--ink)">'+esc(d.day.slice(0,3))+'</div>'
+      +'<div style="font-size:19px;margin:3px 0">'+d.ico+'</div>'
+      +'<div class="rs" style="font-weight:800;color:var(--ink)">'+(d.hi===null?'—':esc(String(d.hi))+'°')+'</div>'
+      +'<div class="rs">'+(d.lo===null?'—':esc(String(d.lo))+'°')+'</div>'
+      +'<div class="rs" style="color:#2456b8;margin-top:2px">'+esc(String(d.precip))+'</div>';
+  });
+}
+
+/* Tapping a card is wired here rather than on each card, because the cards are
+   rebuilt every time a forecast lands and listeners bound to the old ones
+   would go with them. */
+document.getElementById('s-weather').addEventListener('click',function(e){
+  var c=e.target.closest&&e.target.closest('.wxcard');
+  if(c){ renderWxDay(+c.getAttribute('data-wx')); show('wxday',true); }
+});
+
 /* ---- Weather: clickable forecast day detail ---- */
-var WXDAYS=[
- {day:'Wednesday',cond:'Partly cloudy',ico:'⛅',hi:90,lo:71,hum:'58%',wind:'8 mph SW',precip:'20%',uv:'7 · High'},
- {day:'Thursday',cond:'Scattered storms',ico:'⛈️',hi:85,lo:68,hum:'74%',wind:'12 mph S',precip:'60%',uv:'5 · Moderate'},
- {day:'Friday',cond:'Sunny',ico:'☀️',hi:88,lo:70,hum:'49%',wind:'5 mph NW',precip:'5%',uv:'8 · Very high'},
- {day:'Saturday',cond:'Mostly sunny',ico:'🌤️',hi:89,lo:70,hum:'52%',wind:'6 mph W',precip:'10%',uv:'8 · Very high'},
- {day:'Sunday',cond:'Isolated storms',ico:'🌦️',hi:86,lo:69,hum:'66%',wind:'9 mph SW',precip:'40%',uv:'6 · High'}
-];
 function renderWxDay(i){var d=WXDAYS[i];if(!d)return;var q=function(id){return document.getElementById(id);};
- q('wxd-day').textContent=d.day;q('wxd-temp').textContent=d.hi+'°';q('wxd-cond').textContent=d.cond;
- q('wxd-hilo').textContent='H '+d.hi+'° / L '+d.lo+'°';q('wxd-ico').textContent=d.ico;
- q('wxd-hum').textContent=d.hum;q('wxd-wind').textContent=d.wind;q('wxd-precip').textContent=d.precip;q('wxd-uv').textContent=d.uv;}
-document.querySelectorAll('#s-weather .wxcard').forEach(function(c){c.addEventListener('click',function(){renderWxDay(+c.getAttribute('data-wx'));show('wxday',true);});});
+ /* A dash wherever the service sent nothing. The old version of this screen
+    could not show a dash, because every number was typed in and therefore
+    always present -- which is exactly what made it look trustworthy. */
+ var dash=function(v,s){return (v===null||v===undefined||v==='')?'—':(v+(s||''));};
+ q('wxd-day').textContent=d.day;q('wxd-temp').textContent=dash(d.hi,'°');q('wxd-cond').textContent=d.cond;
+ q('wxd-hilo').textContent='H '+dash(d.hi,'°')+' / L '+dash(d.lo,'°');q('wxd-ico').textContent=d.ico;
+ q('wxd-hum').textContent=dash(d.hum);q('wxd-wind').textContent=dash(d.wind);q('wxd-precip').textContent=dash(d.precip);q('wxd-uv').textContent=dash(d.uv);}
+/* The per-card listeners that used to be bound here are gone: the cards are
+   rebuilt whenever a forecast arrives, so listeners bound to the old ones went
+   with them and tapping a day quietly stopped working. One listener on the
+   screen handles them all now -- see wxRenderCards() above. */
 
 /* ---- Hourly forecast -------------------------------------------------------
    The five-day row answers "what is the week doing". It does not answer the
@@ -1930,49 +2277,41 @@ document.querySelectorAll('#s-weather .wxcard').forEach(function(c){c.addEventLi
 
    When this app is wired to a live NWS feed, only wxHours() changes: everything
    below reads the array it returns. */
-var WX_SPRAY_WIND=10;    /* mph — over this and the spray drifts */
-var WX_SPRAY_PRECIP=20;  /* % — over this and it washes off */
+/* WX_SPRAY_WIND and WX_SPRAY_PRECIP moved to app-04-spray-inventory.js on
+   2026-08-30, next to the other spray numbers. They are spray settings, not
+   weather ones -- the weather only reports the wind, it does not decide how
+   much of it is too much -- and putting them there is what let them onto the
+   Spray settings screen where Bill can change them without a code edit. */
 function wxIsNight(h){ return h<7||h>=20; }
 function wxHourLabel(h){ return (h%12||12)+(h<12?'a':'p'); }
-/* Warmest at 3p, coldest at 3a — one curve drives temperature, wind and the
-   rain chance, which is why they move together the way a real day does. */
-function wxCurve(h){ return (Math.cos((h-15)/24*2*Math.PI)+1)/2; }
-function wxCond(precip,h){
-  if(precip>=50) return {ico:'⛈️',txt:'Storms'};
-  if(precip>=30) return {ico:'🌦️',txt:'Showers around'};
-  if(precip>=15) return wxIsNight(h)?{ico:'☁️',txt:'Cloudy'}:{ico:'⛅',txt:'Partly cloudy'};
-  return wxIsNight(h)?{ico:'🌙',txt:'Clear'}:{ico:'☀️',txt:'Sunny'};
-}
+/* wxCurve() and wxCond() were deleted on 2026-08-30. They existed only to
+   INVENT an hourly forecast -- a sine curve through five hardcoded day cards,
+   which is what made the old strip look real. The forecast is now fetched, so
+   there is nothing left for them to do, and leaving them here would be leaving
+   a loaded gun for whoever next wonders why the strip is empty offline. */
+/* The 24 hours the strip draws. This is the ONE function the original author
+   said would have to change when a live feed arrived, and it is: it used to
+   invent every hour from a sine curve through the five made-up day cards. It
+   now hands back what the service actually said.
+
+   The SHAPE is deliberately unchanged, so nothing below had to be touched. */
 function wxHours(){
-  if(typeof WXDAYS==='undefined'||!WXDAYS.length) return [];
-  var now=new Date(), out=[];
-  var t0=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
-  for(var k=0;k<24;k++){
-    var d=new Date(now.getFullYear(),now.getMonth(),now.getDate(),now.getHours()+k);
-    var h=d.getHours();
-    /* Which day card this hour belongs to — counted off midnight so the last
-       day of a month behaves like any other. */
-    var d0=new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();
-    var di=Math.min(Math.round((d0-t0)/86400000),WXDAYS.length-1);
-    var day=WXDAYS[di], c=wxCurve(h);
-    var temp=Math.round(day.lo+(day.hi-day.lo)*c);
-    var hum=Math.round(88-36*c);
-    /* Rain holds off overnight and stacks up through the afternoon. */
-    var pk=Math.max(0,Math.cos((h-16)/24*2*Math.PI));
-    var precip=Math.round(parseInt(day.precip,10)*(0.3+0.7*pk)/5)*5;
-    var wind=Math.round(3+9*c);
-    var dir=(day.wind.match(/[NSEW]{1,2}$/)||['SW'])[0];
-    var cond=wxCond(precip,h);
-    out.push({when:d,hour:h,label:k===0?'Now':wxHourLabel(h),
-              /* Day names come off the forecast row, not off the calendar, so
-                 the strip and the five-day cards never disagree. */
-              newDay:(k>0&&h===0),dayShort:(day.day||'').slice(0,3),
-              temp:temp,feels:temp+(hum>65&&temp>80?3:0),hum:hum,
-              /* dew ≈ T − 0.36(100 − RH) in Fahrenheit */
-              dew:Math.round(temp-0.36*(100-hum)),
-              precip:precip,wind:wind,dir:dir,ico:cond.ico,cond:cond.txt,
-              spray:(wind<=WX_SPRAY_WIND&&precip<=WX_SPRAY_PRECIP)});
-  }
+  if(!WX.hours||!WX.hours.length) return [];
+  var out=[], prevDay=null;
+  WX.hours.forEach(function(x,k){
+    var d=new Date(x.t);
+    var dayShort=d.toLocaleDateString('en-US',{weekday:'short'});
+    var newDay=(k>0&&prevDay!==null&&d.getDate()!==prevDay);
+    prevDay=d.getDate();
+    out.push({
+      when:d, hour:x.h, label:(k===0?'Now':x.label), newDay:newDay, dayShort:dayShort,
+      temp:x.temp, feels:x.temp, hum:x.hum, dew:x.dew,
+      precip:x.precip, wind:x.wind, dir:x.dir, ico:x.ico, cond:x.cond,
+      /* Read against the farm's own limits, which live on the Spray settings
+         screen -- so changing "we hold at 8 mph" changes this strip too. */
+      spray:(x.wind<=WX_SPRAY_WIND&&x.precip<=WX_SPRAY_PRECIP)
+    });
+  });
   return out;
 }
 var WXH=[], wxhSel=0;
@@ -2024,7 +2363,18 @@ function wxRenderHours(){
   if(w){ var nw=wxNextWindow(WXH); w.textContent=nw.txt; w.style.color=nw.c; }
 }
 /* Rebuilt on the way in so the strip always starts at the hour it is now. */
-function wxEnter(){ WXH=wxHours(); if(wxhSel>=WXH.length) wxhSel=0; wxRenderHours(); }
+/* Opening the weather screen draws whatever this phone already has -- straight
+   away, even with no signal -- and then asks for a fresh one. wxRefresh() does
+   nothing if the last reading is under a quarter of an hour old, so walking in
+   and out of the screen does not hammer the service. */
+function wxEnter(){
+  wxDraw();
+  wxRefresh().then(function(changed){ if(changed) wxDraw(); });
+}
+function wxDraw(){
+  WXH=wxHours(); if(wxhSel>=WXH.length) wxhSel=0;
+  renderWxNow(); wxRenderCards(); wxRenderHours();
+}
 (function(){
   var host=document.getElementById('s-weather'); if(!host) return;
   host.addEventListener('click',function(e){

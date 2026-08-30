@@ -1446,18 +1446,19 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
             <div style="flex:1;overflow-y:auto">
             <div class="wx" style="flex-direction:column;align-items:stretch;background:linear-gradient(135deg,var(--acc),#ff9f45);border:none;box-shadow:0 8px 20px rgba(255,130,0,.32);padding:15px 16px 13px">
               <div style="display:flex;align-items:flex-start;justify-content:space-between">
-                <div><div style="font:800 46px 'Archivo';color:#fff;line-height:1">78°</div><div style="font:800 15px 'Public Sans';color:#fff;margin-top:5px">Clear</div><div style="font:700 11.5px 'Public Sans';color:#fff;opacity:.92;margin-top:3px">Feels like 80° · H 90° / L 71°</div></div>
-                <span style="font-size:50px;line-height:1">🌤️</span>
+                <div><div id="wx-now-temp" style="font:800 46px 'Archivo';color:#fff;line-height:1">—</div><div id="wx-now-cond" style="font:800 15px 'Public Sans';color:#fff;margin-top:5px">Loading…</div><div id="wx-now-sub" style="font:700 11.5px 'Public Sans';color:#fff;opacity:.92;margin-top:3px"></div></div>
+                <span id="wx-now-ico" style="font-size:50px;line-height:1">🌡️</span>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:14px">
-                <div style="background:rgba(255,255,255,.17);border-radius:10px;padding:7px 9px"><div style="font:700 9px 'Public Sans';color:#fff;opacity:.85;text-transform:uppercase;letter-spacing:.4px">Wind</div><div style="font:800 14px 'Archivo';color:#fff;margin-top:2px">4 mph</div></div>
-                <div style="background:rgba(255,255,255,.17);border-radius:10px;padding:7px 9px"><div style="font:700 9px 'Public Sans';color:#fff;opacity:.85;text-transform:uppercase;letter-spacing:.4px">Humidity</div><div style="font:800 14px 'Archivo';color:#fff;margin-top:2px">55%</div></div>
-                <div style="background:rgba(255,255,255,.17);border-radius:10px;padding:7px 9px"><div style="font:700 9px 'Public Sans';color:#fff;opacity:.85;text-transform:uppercase;letter-spacing:.4px">Precip</div><div style="font:800 14px 'Archivo';color:#fff;margin-top:2px">10%</div></div>
-                <div style="background:rgba(255,255,255,.17);border-radius:10px;padding:7px 9px"><div style="font:700 9px 'Public Sans';color:#fff;opacity:.85;text-transform:uppercase;letter-spacing:.4px">UV index</div><div style="font:800 14px 'Archivo';color:#fff;margin-top:2px">6 · High</div></div>
-                <div style="background:rgba(255,255,255,.17);border-radius:10px;padding:7px 9px"><div style="font:700 9px 'Public Sans';color:#fff;opacity:.85;text-transform:uppercase;letter-spacing:.4px">Dew point</div><div style="font:800 14px 'Archivo';color:#fff;margin-top:2px">61°</div></div>
-                <div style="background:rgba(255,255,255,.17);border-radius:10px;padding:7px 9px"><div style="font:700 9px 'Public Sans';color:#fff;opacity:.85;text-transform:uppercase;letter-spacing:.4px">Pressure</div><div style="font:800 14px 'Archivo';color:#fff;margin-top:2px">30.10″</div></div>
+                <div style="background:rgba(255,255,255,.17);border-radius:10px;padding:7px 9px"><div style="font:700 9px 'Public Sans';color:#fff;opacity:.85;text-transform:uppercase;letter-spacing:.4px">Wind</div><div id="wx-now-wind" style="font:800 14px 'Archivo';color:#fff;margin-top:2px">—</div></div>
+                <div style="background:rgba(255,255,255,.17);border-radius:10px;padding:7px 9px"><div style="font:700 9px 'Public Sans';color:#fff;opacity:.85;text-transform:uppercase;letter-spacing:.4px">Humidity</div><div id="wx-now-hum" style="font:800 14px 'Archivo';color:#fff;margin-top:2px">—</div></div>
+                <div style="background:rgba(255,255,255,.17);border-radius:10px;padding:7px 9px"><div style="font:700 9px 'Public Sans';color:#fff;opacity:.85;text-transform:uppercase;letter-spacing:.4px">Precip</div><div id="wx-now-precip" style="font:800 14px 'Archivo';color:#fff;margin-top:2px">—</div></div>
+                <div style="background:rgba(255,255,255,.17);border-radius:10px;padding:7px 9px"><div style="font:700 9px 'Public Sans';color:#fff;opacity:.85;text-transform:uppercase;letter-spacing:.4px">UV index</div><div id="wx-now-uv" style="font:800 14px 'Archivo';color:#fff;margin-top:2px">—</div></div>
+                <div style="background:rgba(255,255,255,.17);border-radius:10px;padding:7px 9px"><div style="font:700 9px 'Public Sans';color:#fff;opacity:.85;text-transform:uppercase;letter-spacing:.4px">Dew point</div><div id="wx-now-dew" style="font:800 14px 'Archivo';color:#fff;margin-top:2px">—</div></div>
+                <div style="background:rgba(255,255,255,.17);border-radius:10px;padding:7px 9px"><div style="font:700 9px 'Public Sans';color:#fff;opacity:.85;text-transform:uppercase;letter-spacing:.4px">Pressure</div><div id="wx-now-press" style="font:800 14px 'Archivo';color:#fff;margin-top:2px">—</div></div>
               </div>
             </div>
+            <div id="wx-age" style="margin:7px 14px 2px;font:700 11px 'Public Sans';color:var(--muted);text-align:center"></div>
             <div style="margin:7px 14px 2px;background:#eef4ff;border:1px solid #cfe0ff;border-radius:12px;padding:8px 12px;display:flex;align-items:center;gap:8px"><span style="font-size:14px">❄️</span><div style="font:700 11px 'Public Sans';color:#2f5fa0">Frost/freeze watch armed · threshold 32°F · none in forecast</div></div>
 
             <div class="sec" style="margin:13px 16px 5px">Next 24 hours <span id="wxh-win" style="float:right;font:700 10.5px 'Public Sans';text-transform:none;letter-spacing:0"></span></div>
@@ -8762,6 +8763,12 @@ function pwaVersionLine(){
   try{ ppRegister(); }catch(e){}
   /* Load saved records over the seed arrays before a single screen paints. */
   try{ storeHydrate(); }catch(e){}
+  /* The last forecast this phone saw, so the weather screen and the spray
+     window on the home screens have something real to draw before -- or
+     without -- a signal. Asking the service for a new one happens on its own
+     a moment later, and again whenever the weather screen is opened. */
+  try{ wxCacheLoad(); }catch(e){}
+  try{ setTimeout(function(){ try{ wxRefresh(); }catch(e){} }, 1500); }catch(e){}
   if(!authBoot()){
     /* Nobody signed in. currentRole still has to hold *something* for the
        renderers that read it, and undergrad is the least-privileged option —

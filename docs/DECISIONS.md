@@ -28,6 +28,63 @@ down.
 
 ## Process & project
 
+### The weather is fetched, not invented — 2026-08-30
+**Decision:** the weather screen reads api.weather.gov (the National Weather
+Service). Every hardcoded forecast is gone, including `WXDAYS` and the
+`wxCurve()`/`wxCond()` pair that manufactured an hourly strip from it.
+**Why:** every number on that screen used to be typed into the source — "78°
+Clear", the wind, the humidity, five day cards — and the hourly strip was those
+five made-up days pushed through a sine curve. Only the radar was ever real.
+That was not merely useless: four of the five home screens carried a **spray
+window reading GOOD or HOLD off those invented numbers**, which is a go/no-go on
+taking the rig out. The comment above one of them said "real numbers".
+NWS was chosen over any commercial forecast for one reason above accuracy —
+**no account, no key, no card.** There is nothing to expire and nothing to bill,
+which is the only kind of dependency this app can safely carry past whoever
+wrote it. The farm resolves to office MRX, the same station the radar loop
+already used.
+**Don't:** put a fallback forecast in the source "so the screen is never empty".
+An empty screen tells the truth; a fallback is how this happened the first time.
+
+### A stale forecast gives NO spray answer — 2026-08-30
+**Decision:** `hwSprayOK()` returns `null` — not true, not false — when the
+reading is missing or older than `WX_STALE_MS` (3 hours). Every widget that
+calls it must render "No current forecast" for `null`. The weather screen turns
+its age line red and says "too old to spray by".
+**Why:** an out-of-date GOOD is worse than no answer at all, because no answer
+sends somebody to look out of the window and a stale GOOD does not. This is the
+single rule the whole weather rewrite exists to enforce.
+**Don't:** make `null` fall through to `false` "because HOLD is the safe
+default". It is not safe — a HOLD nobody believes gets ignored, and the next
+GOOD gets ignored with it. Say you do not know.
+
+### The weather day cards are FILLED, never rebuilt — 2026-08-30
+**Decision:** `wxRenderCards()` writes into the five `.wxcard` divs that are
+already in the page. It must not replace them or their container.
+**Why:** those five divs are written **unclosed** in `UT-TurfFarm-App.html`, and
+the browser's own repair of that malformed markup is what puts the rest of the
+screens at the nesting depth the app expects. Replacing them with tidy, balanced
+markup — which is what a reasonable person would do — moved **forty-four screens
+up one level, out of `#app`**, so the click handler that runs `back()` never saw
+them and the back arrow died on every one of those screens. That happened during
+this very change and only `tools/test-back-nav.js` caught it.
+**Don't:** "fix" the unclosed divs without checking every screen's nesting
+afterwards. `tools/test-weather.js` asserts the card count survives a redraw and
+that every screen is still inside `#app`; `tools/test-back-nav.js` is what
+actually catches the consequence.
+
+### The spray hold limits live with the spray settings — 2026-08-30
+**Decision:** `WX_SPRAY_WIND` (10 mph) and `WX_SPRAY_PRECIP` (20%) moved out of
+the weather code into `app-04-spray-inventory.js`, into the saved-difference
+machinery alongside the nozzle rates and boom charge, and onto the Spray
+settings screen under "When to hold off".
+**Why:** they are a decision about spraying, not about the weather — the
+forecast reports the wind, it does not decide how much of it is too much. And
+per `SUCCESSION.md`, "we hold at 8 mph, not 10" must not be a code edit.
+**Don't:** read them from the weather module's side. They are fenced on the way
+in (1–40 mph, 0–100%) because a hand-edited settings file claiming a 900 mph
+limit would switch the spray warning off entirely and look like nothing.
+
 ### Taking a calendar entry off is a mark, never a delete — 2026-08-30
 **Decision:** `calRemoveEvent()` sets `removed:true` (with who and when) instead
 of rebuilding `EVENTS` with `filter()`. `firestore.rules` refuses `delete`

@@ -66,16 +66,31 @@ var BOOM_CHARGE_OVER_GAL=25; /* only runs bigger than this get the charge */
    that particular section. Nothing is written until somebody changes it. */
 var SPRAY_KEY='ut_spray_settings_v1';
 var SPRAY_MIN_RATE=0.01, SPRAY_MAX_RATE=20;   /* gal/1000 ft² — a sanity fence, not a label */
+
+/* When it is too windy to spray, and how much rain in the forecast means it
+   would only wash off. The weather screen and every home-screen spray widget
+   judge the forecast against these two numbers.
+
+   They were constants in the weather code until 2026-08-30, which made "we
+   hold at 8 mph, not 10" a code edit. They are spray settings rather than
+   weather ones -- the forecast reports the wind, it does not decide how much
+   of it is too much -- so they live here with the tips and the boom charge,
+   and they are on the Spray settings screen. */
+var WX_SPRAY_WIND=10;    /* mph — over this and the spray drifts */
+var WX_SPRAY_PRECIP=20;  /* % — over this and it washes off */
 var _sprayBase=null;
 
 function sprayCaptureBase(){
-  _sprayBase={ nozzles:JSON.stringify(SPRAY_NOZZLES), charge:BOOM_CHARGE_GAL, over:BOOM_CHARGE_OVER_GAL };
+  _sprayBase={ nozzles:JSON.stringify(SPRAY_NOZZLES), charge:BOOM_CHARGE_GAL, over:BOOM_CHARGE_OVER_GAL,
+               wind:WX_SPRAY_WIND, precip:WX_SPRAY_PRECIP };
 }
 function sprayDiff(){
   var o={}; if(!_sprayBase) return o;
   if(JSON.stringify(SPRAY_NOZZLES)!==_sprayBase.nozzles) o.nozzles=SPRAY_NOZZLES;
   if(BOOM_CHARGE_GAL!==_sprayBase.charge) o.charge=BOOM_CHARGE_GAL;
   if(BOOM_CHARGE_OVER_GAL!==_sprayBase.over) o.over=BOOM_CHARGE_OVER_GAL;
+  if(WX_SPRAY_WIND!==_sprayBase.wind) o.wind=WX_SPRAY_WIND;
+  if(WX_SPRAY_PRECIP!==_sprayBase.precip) o.precip=WX_SPRAY_PRECIP;
   return o;
 }
 /* Every value is re-checked on the way in. A saved file can be edited by hand,
@@ -92,6 +107,10 @@ function sprayApply(v){
   }
   if(typeof v.charge==='number'&&isFinite(v.charge)&&v.charge>=0&&v.charge<=200) BOOM_CHARGE_GAL=v.charge;
   if(typeof v.over==='number'&&isFinite(v.over)&&v.over>=0&&v.over<=500) BOOM_CHARGE_OVER_GAL=v.over;
+  /* Fenced the same way as the rates. A hand-edited file saying the wind limit
+     is 900 mph would quietly turn the spray warning off altogether. */
+  if(typeof v.wind==='number'&&isFinite(v.wind)&&v.wind>=1&&v.wind<=40) WX_SPRAY_WIND=v.wind;
+  if(typeof v.precip==='number'&&isFinite(v.precip)&&v.precip>=0&&v.precip<=100) WX_SPRAY_PRECIP=v.precip;
 }
 function sprayHydrate(){
   sprayCaptureBase();
@@ -160,6 +179,15 @@ function sprRender(){
     : '<div class="fld"><span class="fl">Boom charge</span><span class="fv">'+esc(String(BOOM_CHARGE_GAL))+' gal</span></div>'
      +'<div class="fld" style="border-bottom:none"><span class="fl">Only on runs over</span><span class="fv">'+esc(String(BOOM_CHARGE_OVER_GAL))+' gal</span></div>';
 
+  /* The two numbers the weather screen judges the forecast against. Shown here
+     rather than on the weather screen because they are a decision about
+     spraying, not about the weather. */
+  var limits = edit
+    ? '<div class="fld"><span class="fl">Hold above</span><input class="inv-in" data-spr-num="wind" value="'+esc(String(WX_SPRAY_WIND))+'" inputmode="decimal"><span class="fv" style="flex:none;padding-left:6px">mph wind</span></div>'
+     +'<div class="fld" style="border-bottom:none"><span class="fl">Hold above</span><input class="inv-in" data-spr-num="precip" value="'+esc(String(WX_SPRAY_PRECIP))+'" inputmode="decimal"><span class="fv" style="flex:none;padding-left:6px">% rain</span></div>'
+    : '<div class="fld"><span class="fl">Hold above</span><span class="fv">'+esc(String(WX_SPRAY_WIND))+' mph wind</span></div>'
+     +'<div class="fld" style="border-bottom:none"><span class="fl">Hold above</span><span class="fv">'+esc(String(WX_SPRAY_PRECIP))+'% rain</span></div>';
+
   body.innerHTML=
      '<div style="margin:14px 16px 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px">'
     +'<div style="font:800 13px \'Archivo\';color:var(--ink)">These numbers decide what reaches the grass</div>'
@@ -180,6 +208,13 @@ function sprRender(){
     +'Product is still mixed for the whole tank, so everything leaving the nozzle stays on label rate.</div>'
     +'<div class="list">'+charge+'</div>'
 
+    +'<div class="sec">When to hold off</div>'
+    +'<div style="font:600 11.5px \'Public Sans\';color:var(--muted);line-height:1.5;margin:0 20px 8px">'
+    +'What counts as too windy to spray, and how much rain in the forecast means it would only wash off. '
+    +'The weather screen and the spray window on the home screens judge the forecast against these. '
+    +'They are a decision about spraying, so they are set here rather than there.</div>'
+    +'<div class="list">'+limits+'</div>'
+
     +(sprayIsDefault()
       ? '<div style="font:600 11.5px \'Public Sans\';color:var(--muted);margin:12px 20px 0">These are the built-in numbers.</div>'
       : ('<div class="sec">Changed on this device</div><div class="list">'
@@ -195,6 +230,8 @@ function sprayChangedText(){
   if(d.nozzles) bits.push('tips');
   if(d.charge!==undefined) bits.push('boom charge');
   if(d.over!==undefined) bits.push('threshold');
+  if(d.wind!==undefined) bits.push('wind limit');
+  if(d.precip!==undefined) bits.push('rain limit');
   return bits.length?(bits.join(', ')+' differ from the file'):'';
 }
 
@@ -224,6 +261,16 @@ document.getElementById('s-spraysettings').addEventListener('change',function(e)
       if(val===null||val<0||val>200){ toast('Boom charge has to be between 0 and 200 gal'); sprRender(); return; }
       if(val===BOOM_CHARGE_GAL) return;
       BOOM_CHARGE_GAL=val; sprayScan(); sprRender(); toast('Boom charge set to '+val+' gal ✓');
+    }else if(which==='wind'){
+      /* Fenced low as well as high: a limit of 0 would hold every spray
+         forever, which reads as the app being broken rather than as a setting. */
+      if(val===null||val<1||val>40){ toast('The wind limit has to be between 1 and 40 mph'); sprRender(); return; }
+      if(val===WX_SPRAY_WIND) return;
+      WX_SPRAY_WIND=val; sprayScan(); sprRender(); toast('Holding above '+val+' mph wind ✓');
+    }else if(which==='precip'){
+      if(val===null||val<0||val>100){ toast('The rain limit has to be between 0 and 100%'); sprRender(); return; }
+      if(val===WX_SPRAY_PRECIP) return;
+      WX_SPRAY_PRECIP=val; sprayScan(); sprRender(); toast('Holding above '+val+'% rain ✓');
     }else{
       if(val===null||val<0||val>500){ toast('The threshold has to be between 0 and 500 gal'); sprRender(); return; }
       if(val===BOOM_CHARGE_OVER_GAL) return;

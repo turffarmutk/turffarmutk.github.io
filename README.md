@@ -27,6 +27,12 @@ there. GitHub Pages serves this repo from the root, so these paths are the URL:
 | `manifest.webmanifest` | Makes it installable. |
 | `icons/`, `vendor/` | Home-screen icons; Leaflet, Geoman, Turf and the fonts. |
 | `robots.txt` | Keeps the site out of search results. |
+
+**The one thing the app fetches from the internet:** the forecast, from
+api.weather.gov (the National Weather Service). No account, no key, no card —
+and the last reading is kept on the phone, so the weather screen still works
+with no signal and says how old what it is showing is. The radar picture comes
+from the same service.
 | `.nojekyll` | **Empty file. Load-bearing. Never delete it.** See below. |
 
 ### `.nojekyll` is not optional
@@ -65,7 +71,7 @@ npm install                              # first time only
 git config core.hooksPath .githooks      # first time only - turns on the push check
 # edit UT-TurfFarm-App.html, one of the app-*.js files, or farm-geo.js
 npm run sw           # REQUIRED — regenerates the service worker
-npm test             # 32 harnesses, ~1,850 checks, about a minute
+npm test             # 33 harnesses, ~1,900 checks, about a minute
 git add -A && git commit -m "what changed and why" && git push
 ```
 

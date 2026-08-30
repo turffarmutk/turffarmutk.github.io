@@ -802,9 +802,41 @@ function hwMyPlots(role){
  return out;
 }
 
+/* ---- may we give a spray answer at all? ---------------------------------
+   THE ONE RULE THIS FILE MUST NOT GET WRONG. These widgets tell somebody
+   whether to take the sprayer out. Until 2026-08-30 they answered from five
+   forecast days typed into the source, so the answer was the same in January
+   as in July and had nothing to do with the sky. Now they answer from the
+   National Weather Service -- and when the phone has NOT heard from it
+   recently, they must say so rather than answer from an old reading.
+
+   A stale GOOD is worse than no answer, because no answer sends somebody to
+   look out of the window and a stale GOOD does not. Returns null when we do
+   not know, which every caller must handle. */
+function hwSprayOK(){
+  if(typeof WX==='undefined'||!WX.days||!WX.days.length) return null;
+  if(typeof wxIsFresh==='function'&&!wxIsFresh()) return null;
+  var h=(typeof wxHours==='function')?wxHours():[];
+  var lim=(typeof WX_SPRAY_WIND==='number')?WX_SPRAY_WIND:10;
+  var pl=(typeof WX_SPRAY_PRECIP==='number')?WX_SPRAY_PRECIP:20;
+  /* The next few hours, not the whole day: somebody spraying now cares about
+     now. The day card's single wind figure hid a windy morning behind a calm
+     afternoon average. */
+  var soon=h.slice(0,4);
+  if(!soon.length) return null;
+  return soon.every(function(x){ return x.wind<=lim&&x.precip<=pl; });
+}
+/* How old the reading is, for the widgets to admit to. */
+function hwWxAge(){ return (typeof wxAgeText==='function')?wxAgeText():''; }
+
 function hwWx(id,mode){
  if(typeof WXDAYS==='undefined')return;
- var d=WXDAYS[0],spray=parseInt(d.precip,10)<=20&&parseInt(d.wind,10)<=10;
+ if(!WXDAYS.length){
+   hwFill(id,hwHead(mode==='spray'?'Spray window':'Weather','Forecast')
+    +'<div class="rs" style="padding:6px 0">No forecast on this phone yet. Open Weather when you have signal.</div>','weather');
+   return;
+ }
+ var d=WXDAYS[0], spray=hwSprayOK();
  /* slice(1,3) drops today, so the forecast index is the loop index + 1. */
  var rows=WXDAYS.slice(1,3).map(function(x,i){
    return hwRow(hwName(x.day,x.cond),'<span style="font:800 13px \'Archivo\';color:var(--ink);flex:none">'+x.hi+'° / '+x.lo+'°</span>',i===1,'wx:'+(i+1));
@@ -813,9 +845,17 @@ function hwWx(id,mode){
   +'<div class="tap" data-open="wx:0" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px">'
    +'<span style="font:800 22px \'Archivo\';color:var(--ink)">'+d.hi+'°</span>'
    +'<span style="font-size:26px;line-height:1;flex:none" title="'+d.cond+'">'+d.ico+'</span></div>'
+  /* spray===null means the forecast is missing or too old to judge by. Say
+     that, rather than guessing in either direction. */
   +(mode==='spray'
-    ? '<div class="tap" data-open="wx:0" style="margin:6px 0 8px">'+(spray?hwPill('Good to spray','#eafaef','#2f7d3a'):hwPill('Hold — wind or rain','#fdeceb','#c0392b'))+'</div>'
-    : '<div class="tap" data-open="wx:0" style="margin:6px 0 8px">'+(spray?hwPill('Fine for outside work','#eafaef','#2f7d3a'):hwPill('Dress for weather','#fdf0dd','#9a5b00'))+'</div>')
+    ? '<div class="tap" data-open="wx:0" style="margin:6px 0 8px">'
+      +(spray===null?hwPill('No current forecast','#eef1f4','#5b6470')
+       :spray?hwPill('Good to spray','#eafaef','#2f7d3a')
+             :hwPill('Hold — wind or rain','#fdeceb','#c0392b'))+'</div>'
+    : '<div class="tap" data-open="wx:0" style="margin:6px 0 8px">'
+      +(spray===null?hwPill('No current forecast','#eef1f4','#5b6470')
+       :spray?hwPill('Fine for outside work','#eafaef','#2f7d3a')
+             :hwPill('Dress for weather','#fdf0dd','#9a5b00'))+'</div>')
   +rows,'weather');
 }
 function hwCal(id,role,mode){
@@ -1043,13 +1083,22 @@ function hwLogsToday(){
  var top=FIELDLOG.reduce(function(a,b){return b.ord>a.ord?b:a;}).ord;
  return FIELDLOG.filter(function(a){return a.ord===top;}).length;
 }
-/* Weather strip (manager) — same .wx shell, real numbers. */
+/* Weather strip (manager). The comment here used to say "real numbers" while
+   every one of them was typed into the source; they are real now. */
 function hwWxStrip(id){
  if(typeof WXDAYS==='undefined')return;
- var d=WXDAYS[0],ok=parseInt(d.precip,10)<=20&&parseInt(d.wind,10)<=10;
- hwFill(id,'<div><div class="t">'+d.hi+'° · '+d.cond+'</div>'
-  +'<div class="s">Spray window '+(ok?'GOOD':'HOLD')+' · wind '+d.wind+'</div></div>'
-  +'<div style="font-size:30px;line-height:1;flex:none" title="'+d.cond+'">'+d.ico+'</div>');
+ if(!WXDAYS.length){
+   hwFill(id,'<div><div class="t">No forecast yet</div>'
+    +'<div class="s">Open Weather when you have signal</div></div>'
+    +'<div style="font-size:30px;line-height:1;flex:none">🌡️</div>');
+   return;
+ }
+ var d=WXDAYS[0], ok=hwSprayOK();
+ var line = ok===null ? ('Spray window — no current forecast · last '+hwWxAge())
+                      : ('Spray window '+(ok?'GOOD':'HOLD')+' · wind '+d.wind);
+ hwFill(id,'<div><div class="t">'+(d.hi===null?'—':d.hi+'°')+' · '+esc(d.cond)+'</div>'
+  +'<div class="s">'+esc(line)+'</div></div>'
+  +'<div style="font-size:30px;line-height:1;flex:none" title="'+esc(d.cond)+'">'+d.ico+'</div>');
 }
 /* Who is in today, off the crew pattern, plus visitors from the calendar. */
 function hwMgrCal(id){

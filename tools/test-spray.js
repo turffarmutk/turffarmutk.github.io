@@ -217,7 +217,15 @@ section('6. the screen');
   ok('it renders', html.length > 200);
   ok('every tip has a row', (html.match(/data-spr-rate="/g) || []).length === 3,
      String((html.match(/data-spr-rate="/g) || []).length));
-  ok('the charge and threshold are editable', (html.match(/data-spr-num="/g) || []).length === 2);
+  /* Four editable numbers now: the boom charge, the run threshold, and since
+     2026-08-30 the two spray-hold limits that used to be constants in the
+     weather code. */
+  ok('the charge, the threshold and both hold limits are editable',
+     (html.match(/data-spr-num="/g) || []).length === 4,
+     String((html.match(/data-spr-num="/g) || []).length));
+  ok('the wind limit is on the screen', /data-spr-num="wind"/.test(html));
+  ok('and the rain limit', /data-spr-num="precip"/.test(html));
+  ok('with a plain-English reason for them', /too windy to spray/.test(html));
   ok('an unchanged device says so', /built-in numbers\./.test(html));
   ok('and offers no reset it does not need', !/data-spr="reset"/.test(html));
 
@@ -233,6 +241,30 @@ section('6. the screen');
   bad.value = '-4';
   bad.dispatchEvent(new b.win.Event('change', { bubbles: true }));
   ok('a bad typed rate is refused', b.p.mixNozzle('blue_tj').galM === 1.75, String(b.p.mixNozzle('blue_tj').galM));
+
+  /* The spray-hold limits, which the weather screen and every home-screen
+     spray widget judge the forecast against. */
+  {
+    const w = b.doc.querySelector('[data-spr-num="wind"]');
+    w.value = '8';
+    w.dispatchEvent(new b.win.Event('change', { bubbles: true }));
+    ok('Bill can say the farm holds at 8 mph, not 10', b.win.eval('WX_SPRAY_WIND') === 8,
+       String(b.win.eval('WX_SPRAY_WIND')));
+    ok('and it is written straight away', JSON.parse(b.store['ut_spray_settings_v1']).wind === 8);
+
+    const w2 = b.doc.querySelector('[data-spr-num="wind"]');
+    w2.value = '900';
+    w2.dispatchEvent(new b.win.Event('change', { bubbles: true }));
+    ok('a limit that would switch the warning off is refused', b.win.eval('WX_SPRAY_WIND') === 8,
+       String(b.win.eval('WX_SPRAY_WIND')));
+
+    const r = b.doc.querySelector('[data-spr-num="precip"]');
+    r.value = '35';
+    r.dispatchEvent(new b.win.Event('change', { bubbles: true }));
+    ok('and the rain limit moves too', b.win.eval('WX_SPRAY_PRECIP') === 35,
+       String(b.win.eval('WX_SPRAY_PRECIP')));
+    ok('the reset row names what was changed', /wind limit|rain limit/.test(b.doc.getElementById('spr-body').innerHTML));
+  }
 
   /* Adding and removing a tip. */
   b.doc.querySelector('[data-spr="addopen"]').click();

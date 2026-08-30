@@ -1097,6 +1097,45 @@ function twCrewRow(t){
   el.style.display='';
 }
 
+/* ---- who has what, on a job worked by more than one person ---------------
+   Zone jobs (the alleys, and the gravel on a spray) hand each piece of ground
+   to one person at a time so nobody mows a strip twice. That means "not
+   finished" and "not finishable by me" are different states, and the finish
+   button has to tell them apart -- before 2026-08-30 it did not, and a person
+   whose remaining ground was all held by somebody else got "Check off every
+   plot first" with no way to act on it and no way to close the job. */
+function twSplit(t){
+  var open=taskOpenPlots(t), me=SESSION.pid;
+  var done=[], held=[], free=[];
+  open.forEach(function(u){
+    if(t.donePlots.indexOf(u)>=0 || crewDoneBy(t.id,u)){ done.push(u); return; }
+    var c=crewClaim(t.id,u);
+    if(c && c.who!==me){ held.push({unit:u,who:c.who}); return; }
+    free.push(u);
+  });
+  /* What THIS person finished, which is what they can hand in. The shared
+     record knows who did each one; ground ticked before that record existed
+     falls back to what is on this phone. */
+  var mine=done.filter(function(u){
+    var d=crewDoneBy(t.id,u);
+    return d?(d.who===me):(t.donePlots.indexOf(u)>=0);
+  });
+  return {open:open,done:done,held:held,free:free,mine:mine};
+}
+
+/* Hand in the ground this person finished and leave the job open for whoever
+   is still out on the rest. Their zones go on the Field Log under their own
+   name; the task keeps its 'todo' status because it is genuinely not done. */
+function twHandIn(t,sp){
+  var n=(typeof flAddPartFromTask==='function')?flAddPartFromTask(t,sp.mine):0;
+  toast(n?('Your part is in the Field Log \u2713 \u00b7 job stays open')
+         :'Nothing new to hand in');
+  try{ renderBoard(); }catch(e){}
+  /* back() runs show(), and show() calls twStop() -- which hands back anything
+     still claimed, so walking away never locks ground behind you. */
+  back();
+}
+
 function renderTaskWork(){
  var t=TASKS.find(function(x){return x.id===workTaskId;}); if(!t)return;
  if(!t.donePlots)t.donePlots=[];
@@ -1181,8 +1220,46 @@ function renderTaskWork(){
  var btn=document.getElementById('tw-complete');
  var allDone=(open.length===0)||(done>=open.length);
  var unit=zoneJob?'zones':'plots';
- if(allDone){btn.textContent=open.length?('Finish — all '+unit+' done ✓'):'Complete task';btn.style.background='#2f9e4f';btn.style.opacity='1';}
- else{btn.textContent='Check off all '+unit+' to finish ('+done+'/'+open.length+')';btn.style.background='#c2c7cd';btn.style.opacity='1';}
+ btn.style.opacity='1';
+
+ /* A job with no ground on it at all. This is the state a renamed or deleted
+    mower used to produce: every plot drawn grey, nothing to tap, "0 / 0 done"
+    and a green Complete button that would close the job and file a Field Log
+    entry for work nobody did. Say what is wrong and refuse instead. */
+ var noGround=(typeof jobNoGround==='function')?jobNoGround(t.type,t.title,parsePlots(t)):'';
+ if(noGround){
+   if(hintEl) hintEl.textContent=noGround;
+   /* jobKindLabel falls back to "All mowers" when it cannot name a machine,
+      which on an empty job reads as though the whole farm is in scope. */
+   if(kEl) kEl.textContent='No ground';
+   btn.textContent='Nothing to check off — tell Bill';
+   btn.style.background='#c2c7cd';
+   return;
+ }
+
+ if(allDone){
+   btn.textContent=open.length?('Finish — all '+unit+' done ✓'):'Complete task';
+   btn.style.background='#2f9e4f';
+   return;
+ }
+
+ /* Nothing left that this person is allowed to take: everything still open is
+    in somebody else's hands. Offer the honest thing rather than a button that
+    refuses. twCrewRow above already names who is on what. */
+ var sp=twSplit(t);
+ if(!sp.free.length && sp.held.length){
+   if(sp.mine.length){
+     btn.textContent='Hand in my part ('+sp.mine.length+' '+(sp.mine.length===1?unit.replace(/s$/,''):unit)+') ›';
+     btn.style.background='var(--acc)';
+   } else {
+     btn.textContent='Nothing free right now · back to tasks';
+     btn.style.background='#c2c7cd';
+   }
+   return;
+ }
+
+ btn.textContent='Check off all '+unit+' to finish ('+done+'/'+open.length+')';
+ btn.style.background='#c2c7cd';
 }
 document.getElementById('s-taskwork').addEventListener('click',function(e){
  var tc=e.target.closest('[data-twchip]');
@@ -1204,7 +1281,30 @@ document.getElementById('s-taskwork').addEventListener('click',function(e){
      if(td<tr.length){toast('Tap every trial pin first');return;}
      openDoneSheet(workTaskId);return;
    }
-   var cp=ct?taskOpenPlots(ct):[];var cd=ct&&ct.donePlots?ct.donePlots.filter(function(p){return cp.indexOf(p)>=0;}).length:0;if(cp.length&&cd<cp.length){toast('Check off every plot first');return;}openDoneSheet(workTaskId);return;}
+   if(!ct) return;
+   /* A job with no ground on it must not be closeable -- it would file a Field
+      Log entry for work nobody did. Say why instead. */
+   var ng=(typeof jobNoGround==='function')?jobNoGround(ct.type,ct.title,parsePlots(ct)):'';
+   if(ng){ toast(ng); return; }
+   var sp=twSplit(ct);
+   var zoneJob=sp.open.length&&sp.open.every(jobIsZone);
+   var word=zoneJob?'zone':'plot';
+   if(sp.open.length && sp.done.length<sp.open.length){
+     /* Everything left is in somebody else's hands. Two honest outcomes: hand
+        in what this person finished, or -- with nothing of their own to hand
+        in -- get them back to the board instead of stranding them here. This
+        used to be one flat "Check off every plot first" that could not be
+        acted on, which is how a crew ended up stuck on the alleys job unable
+        to move to the next task. */
+     if(!sp.free.length && sp.held.length){
+       if(sp.mine.length){ twHandIn(ct,sp); return; }
+       var who=nameOf(sp.held[0].who)||'somebody else';
+       toast('Every '+word+' is with '+who+' right now');
+       back(); return;
+     }
+     toast('Check off every '+word+' first'); return;
+   }
+   openDoneSheet(workTaskId);return;}
 });
 document.querySelectorAll('.hdr').forEach(function(h){var f=h.firstElementChild;if(f&&f.textContent.trim()==='‹'){f.classList.add('backbtn','tap');}});
 

@@ -544,6 +544,34 @@ pin this behaviour — keep them green.
 
 ## Field data & farm constants
 
+### A mow job finds its machine through the mower list, never by its name — 2026-08-30
+**Decision:** `jobMowerKinds()` no longer carries the mower labels as text.
+It looks for a WORD in the farm's own mower list — both the "Machine on the
+plot record" column and the "Shows as" column — and hands back whatever that
+machine is called today. An empty result means "this job is one machine's
+ground and that machine is not on the list", which is different from `null`,
+"this job does not narrow to a machine at all", and the two must never be
+confused: answering `null` there would hand a rotary mow every plot on the
+farm.
+**Why:** it used to return `'Rotary Mower'`, `'Fairway Mower'` and four more as
+literal strings, and compare them against `mowerLabel()`, which reads the very
+same labels back out of `MOWER_CFG`. More → Farm settings → Mowers lets anyone
+retype those in the "Shows as" box. One retype and the two halves stopped
+agreeing: the job matched no plot, `taskPlots()` came back empty, and the work
+screen drew every plot grey and untappable while still reading "0 / 0 done"
+over a green **Complete task** button that would file a Field Log entry for a
+mow nobody did. Reproduced on 2026-08-30: renaming "Rotary Mower" took the
+Rotary - Plots job from 24 plots to 0. The machine column was already
+protected — renaming it moves the plots with it, see `mowersRename` — and the
+label column, the one this actually matched on, had none. It is also the
+succession rule in CLAUDE.md straight out: renaming a mower is exactly the
+routine change a farm manager should be able to make without editing source.
+**Don't:** put a machine name back in the code, here or anywhere. If a job ever
+needs a new machine, give it a word to look for. And do not "simplify" the
+empty list back to `null` — `tools/test-taskwork.js` section 2 pins the
+difference, because the two failures look identical on screen and only one of
+them is safe.
+
 ### Stock is a ledger of movements, never a running total — 2026-08-25
 **Decision:** inventory records **movements** (`INVMOVES`: `+50 lb in`,
 `−12 fl oz out`) and adds them up. `it.qty` is frozen as the **April opening
@@ -759,6 +787,46 @@ always offer the bake-in after map editing.
 ---
 
 ## Interface
+
+### A claim expires on the clock of the phone READING it — 2026-08-30
+**Decision:** `crewLive()` decides whether a claim on a zone is still live.
+A timestamp dated in this phone's future is not used for arithmetic at all;
+that claim is timed from when this phone first saw it instead.
+**Why:** a claim carries `beat` from the phone that made it, and the old test
+was `now - beat > CREW_TTL_MS`. A phone whose clock runs fast stamps a beat in
+everybody else's future, and that subtraction is then negative for as long as
+the clock is wrong — so the claim never went stale and the ground stayed locked
+on every other phone. Measured on 2026-08-30: a holder five minutes fast locked
+a zone permanently; a day fast locked it for a day. On the alleys job, where
+every piece of ground is a zone, that is the whole job dead for the rest of the
+crew. Erring towards keeping a claim is deliberate: holding it eight minutes too
+long costs a wait, freeing it too early costs two people on one strip.
+**Don't:** go back to comparing two clocks, and do not "fix" it by trusting
+`at` instead — it comes off the same phone. Anything that has to expire must be
+measured against a clock this device owns.
+
+### You can hand in your part of a job somebody else is still on — 2026-08-30
+**Decision:** on a zone job, when everything still open is held by other people,
+the finish button stops refusing. If you finished ground of your own it offers
+**Hand in my part**, which puts those zones on the Field Log under your name
+and leaves the task open for whoever is still out there. With nothing of your
+own done it offers a way back to the task list instead. Which ground is already
+handed in is read off the Field Log itself — `flPartUnits()` — and never from a
+field on the task.
+**Why:** the button used to say "Check off every plot first" whatever the
+reason, and on a job whose remaining ground was all claimed by a co-worker that
+could not be acted on: taps on their zones refused, the button refused, and the
+crew were stuck on a screen they could not finish, unable to move to the next
+task. Reported from the field 2026-08-30 on more than one phone. Reading the
+guard off the log rather than off the task is the part worth keeping: a task is
+a shared record that goes up to the database and comes back, and an older copy
+arriving from another phone would quietly take a marker off it — after which
+closing the job would log the same acre a second time under the wrong person's
+name. Log entries carry the `taskId` that made them and are never rewritten.
+**Don't:** move that marker onto the task "so it is in one place", and don't let
+a job with no ground on it be completable — that path files a Field Log entry
+for work nobody did, which is how this was found. `tools/test-taskwork.js`
+sections 2 and 5 pin both.
 
 ### More is on the wide-screen rail, even though every page already is — 2026-08-30
 **Decision:** the left rail that replaces the bottom tab bar at 820px and up now

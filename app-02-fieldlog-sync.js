@@ -2377,7 +2377,23 @@ function flTodayOrd(){var d=new Date();return d.getFullYear()*10000+(d.getMonth(
 function flAddFromTask(t){
  if(!t||t._logged)return false;
  var type=flClassify(t); if(!type)return false;
- var plots=parsePlots(t); if(!plots.length)plots=[(t.area||'—')];
+ var plots=parsePlots(t);
+ /* Ground somebody already handed in on their way off the job (see
+    flAddPartFromTask) is on the log under their name. Logging it again when
+    the job finally closes would double-count the acre and credit it to the
+    wrong person, so take it out here. */
+ var already=flPartUnits(t);
+ if(already.length){
+   /* A part-handed-in job needs its remainder listed unit by unit. Falling
+      back to the area label, as below, would put one summary row on the log
+      covering ground that is already on it. */
+   if(!plots.length && typeof taskPlots==='function') plots=taskPlots(t);
+   plots=plots.filter(function(p){ return already.indexOf(p)<0; });
+   /* Every piece of it was handed in already — the log is complete, so mark
+      the task logged and add nothing. */
+   if(!plots.length){ t._logged=true; return false; }
+ }
+ if(!plots.length)plots=[(t.area||'—')];
  /* `byId` is what the record stores; `by` is only for the human-readable
     detail line the entry shows on the log. */
  var byId=t.completedBy||t.assignee||SESSION.pid, by=nameOf(byId)||meName(),
@@ -2400,6 +2416,61 @@ function flAddFromTask(t){
    notes:(t.desc||'')+(mx?((t.desc?'\n':'')+'Mix: '+mx.line):'')
  });});
  t._logged=true; flCommit(); return true;
+}
+
+/* ---- handing in a piece of a job ----------------------------------------
+   Zone jobs (the alleys, and the gravel on a spray) are worked by more than
+   one person at once, and a zone is claimed so nobody mows a strip twice.
+   That means a person can genuinely finish everything available to them while
+   somebody else is still out on the rest. Before 2026-08-30 there was nothing
+   they could do with that: the finish button refused, said "Check off every
+   plot first", and the job stayed open with their work uncredited.
+
+   So they hand in their part. The zones they completed go on the log under
+   THEIR name, now, and the task stays open for whoever still holds ground.
+   The units are recorded on the task so the final completion does not log the
+   same acre twice — see the guard at the top of flAddFromTask. */
+/* Ground already handed in on this job, read off the Field Log itself.
+   ------------------------------------------------------------------
+   Deliberately NOT a field on the task. A task is a shared record: it goes up
+   to the database and comes back, and an older copy arriving from somebody
+   else's phone would quietly take the marker off again -- after which the
+   final completion would log the same acre a second time, under the wrong
+   person's name. The log entries are the thing that actually exists, they
+   carry the taskId that made them, and they are never rewritten. So ask
+   them. */
+function flPartUnits(t){
+ var out=[];
+ if(!t) return out;
+ FIELDLOG.forEach(function(e){
+   if(e && e.part && e.taskId===t.id && e.plot && out.indexOf(e.plot)<0) out.push(e.plot);
+ });
+ return out;
+}
+
+function flAddPartFromTask(t,units){
+ if(!t||!units||!units.length) return 0;
+ var type=flClassify(t); if(!type) return 0;
+ var already=flPartUnits(t);
+ var fresh=units.filter(function(u){ return already.indexOf(u)<0; });
+ if(!fresh.length) return 0;
+ var byId=SESSION.pid, by=nameOf(byId)||meName(), at=nowTime();
+ var mx=(typeof mixSummaryFor==='function')?mixSummaryFor(t):null;
+ fresh.forEach(function(p){FIELDLOG.push({
+   id:flNewId(),plot:p,type:type,title:t.title,
+   detail:(t.type||'Field practice')+' · '+by+' · '+at,
+   date:flTodayLabel(),ord:flTodayOrd(),fromTask:true,source:'task',
+   /* part:true says this row is one person's share of a job that was still
+      running when they logged it, not the whole job. */
+   part:true,
+   taskId:t.id,op:t.type||'Field practice',person:byId,loggedBy:SESSION.pid,time:at,
+   equipment:flEqName(t.machine),area:(t.area&&t.area!=='—')?t.area:null,
+   dueAt:t.dueAt||null,due:dueLabel(t)||null,repeat:(t.repeat&&t.repeat!=='None')?t.repeat:null,
+   product:mx?mx.productName:null,rate:mx?mx.rateText:null,amount:mx?mx.productText:null,
+   notes:(t.desc||'')+(mx?((t.desc?'\n':'')+'Mix: '+mx.line):'')
+ });});
+ flCommit();
+ return fresh.length;
 }
 function flEqName(id){
  if(!id)return null;

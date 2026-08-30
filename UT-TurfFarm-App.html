@@ -5565,13 +5565,51 @@ function crewTask(taskId) {
   return db;
 }
 
+/* Is this claim still live?
+   ------------------------------------------------------------------
+   A claim carries the time from the phone that made it, and phone clocks
+   drift. A phone whose clock runs fast stamps a beat in OUR future, and
+   `now - beat > TTL` is then never true: the claim never goes stale and it
+   locks everybody else off that ground for as long as that clock is wrong.
+   Measured on 2026-08-30: a holder five minutes fast locked a zone
+   permanently, and a day fast locked it for a day. On the alleys job, where
+   every piece of ground is a zone, that is the whole job dead on every other
+   phone -- zones highlighted in the holder's colour, taps refused, and the
+   finish button refusing with them, so nobody could move on to the next task.
+
+   So a timestamp we cannot trust is not used for arithmetic. Anything dated
+   in the future is timed from when THIS phone first saw it instead, which is
+   a clock we do own. Erring towards keeping the claim is deliberate: the cost
+   of holding it eight minutes too long is a wait, and the cost of freeing it
+   too early is two people on the same strip. */
+var _crewSeen = {};
+function crewLive(taskId, unit, c) {
+  if (!c) return false;
+  var now = Date.now(), beat = c.beat || c.at || 0;
+  if (beat <= now) return (now - beat) <= CREW_TTL_MS;
+  /* The key includes the beat, so every fresh heartbeat starts its own eight
+     minutes and a phone that is still out there keeps its ground. */
+  var k = taskId + '|' + unit + '|' + (c.who || '') + '|' + beat;
+  if (!_crewSeen[k]) {
+    /* Cheap bound: the keys are per heartbeat, so this grows on a long job.
+       Nothing here is worth remembering once it is older than the TTL. */
+    if (Object.keys(_crewSeen).length > 400) {
+      Object.keys(_crewSeen).forEach(function (old) {
+        if (now - _crewSeen[old] > CREW_TTL_MS) delete _crewSeen[old];
+      });
+    }
+    _crewSeen[k] = now;
+  }
+  return (now - _crewSeen[k]) <= CREW_TTL_MS;
+}
+
 /* Live claim on a unit, or null. Stale claims read as free. */
 function crewClaim(taskId, unit) {
   var db = crewLoad(), t = db[taskId];
   if (!t || !t.claims) return null;
   var c = t.claims[unit];
   if (!c) return null;
-  if (Date.now() - (c.beat || c.at || 0) > CREW_TTL_MS) return null;
+  if (!crewLive(taskId, unit, c)) return null;
   return c;
 }
 
@@ -5629,7 +5667,7 @@ function crewOthers(taskId, me) {
   Object.keys(t.claims).forEach(function (u) {
     var c = t.claims[u];
     if (!c || c.who === me) return;
-    if (Date.now() - (c.beat || c.at || 0) > CREW_TTL_MS) return;
+    if (!crewLive(taskId, u, c)) return;
     (out[c.who] = out[c.who] || []).push(u);
   });
   return Object.keys(out).map(function (w) { return { who: w, units: out[w] }; });
@@ -5744,6 +5782,33 @@ function jobActiveTrials(){
   if(typeof TRIALS==='undefined') return [];
   return TRIALS.filter(function(t){ return t.stage==='active' && trVisible(t); });
 }
+/* Find the farm's current name for a machine, by looking for a word in the
+   mower list rather than by knowing the name.
+   ------------------------------------------------------------------
+   This used to return hardcoded labels -- 'Rotary Mower', 'Fairway Mower' and
+   so on -- and compare them against mowerLabel(), which reads the SAME labels
+   out of MOWER_CFG. Farm settings > Mowers lets anyone retype those labels in
+   the "Shows as" box. Retype one and the two halves stopped agreeing: the job
+   asked for 'Rotary Mower', every plot answered with the new name, nothing
+   matched, and the job came back with no ground at all. On the work screen
+   that reads as plots drawn grey that will not respond to a tap.
+
+   The machine column was already protected -- renaming it moves the plots with
+   it, see mowersRename -- but the label column, the one this matched on, had
+   no protection at all. So match on a WORD instead, against both columns, and
+   hand back whatever that row is called today. */
+/* Returns a LIST, and an empty list is meaningful: it says this job is one
+   machine's ground but the farm's mower list no longer has that machine.
+   That must not read the same as null, which means "this job does not narrow
+   to a machine at all" -- answering null here would hand a rotary mow every
+   plot on the farm. */
+function _mowKindsFor(re){
+  var out=[];
+  MOWER_CFG.forEach(function(m){
+    if(re.test(((m[0]||'')+' '+(m[1]||'')).toLowerCase())) out.push(m[1]);
+  });
+  return out;
+}
 function jobMowerKinds(type,name){
   var s=((type||'')+' '+(name||'')).toLowerCase();
   /* Only genuine mowing narrows to a mower — "Fraise Mow" is cultivation. */
@@ -5751,12 +5816,17 @@ function jobMowerKinds(type,name){
   if(/weed ?eat|trim/.test(s)) return null;
   if(/alley/.test(s))   return null;
   if(/border/.test(s))  return null;
-  if(/rotary/.test(s))  return ['Rotary Mower'];
-  if(/fairway/.test(s)) return ['Fairway Mower'];
-  if(/2653/.test(s))    return ['JD 2653 Mower'];
-  if(/dennis/.test(s))  return ['Walk-Mow (Dennis)'];
-  if(/green/.test(s))   return /walk/.test(s)?['Walk-Mow (Toro)']:['Green Mower'];
-  if(/reel/.test(s))    return ['JD 2653 Mower','Fairway Mower','Green Mower','Walk-Mow (Dennis)','Walk-Mow (Toro)'];
+  /* Each of these is "the machine whose name mentions this word". A rename
+     that keeps the word going ("Rotary Mower" -> "Z915E Rotary") keeps
+     working; one that drops it falls back below rather than to nothing. */
+  if(/rotary/.test(s))  return _mowKindsFor(/rotary|z915|optimus/);
+  if(/fairway/.test(s)) return _mowKindsFor(/fairway|7700/);
+  if(/2653/.test(s))    return _mowKindsFor(/2653/);
+  if(/dennis/.test(s))  return _mowKindsFor(/dennis/);
+  if(/green/.test(s))   return /walk/.test(s)
+                                ? _mowKindsFor(/flex ?200|walk-?mow \(toro\)|toro greensmaster flex/)
+                                : _mowKindsFor(/green ?mower|greensmaster 3300|triplex|2550/);
+  if(/reel/.test(s))    return _mowKindsFor(/2653|fairway|green|dennis|toro|7700|2550|flex/);
   return MOWER_CFG.map(function(m){return m[1];});
 }
 /* Height of cut only gets labelled on rotary work. Every other mower on the
@@ -5896,7 +5966,22 @@ function jobPlots(type,name,fallback){
   if(jobIsAlleys(type,name))  return jobAlleyZones();
   if(jobIsBorders(type,name)) return jobBorderPlots();
   var kinds=jobMowerKinds(type,name);
-  if(kinds) return jobAllPlots().filter(function(n){ return kinds.indexOf(mowerLabel(n))>=0; });
+  if(kinds){
+    /* An empty `kinds` is a job whose machine has been deleted from the list.
+       It matches no plot, which is the honest answer -- not every plot. */
+    var byMower=kinds.length
+      ? jobAllPlots().filter(function(n){ return kinds.indexOf(mowerLabel(n))>=0; })
+      : [];
+    if(byMower.length) return byMower;
+    /* No plot on the farm is booked on that machine. This used to return the
+       empty list straight out, and an empty list is what made the work screen
+       draw every plot grey with nothing to tap. Fall back to the ground the
+       manager actually picked for the job; if they picked none, hand back
+       nothing and let jobNoGround() below tell the person why, rather than
+       showing them a map that quietly looks finished. */
+    var all0=jobAllPlots();
+    return (fallback||[]).filter(function(n){ return all0.indexOf(n)>=0; });
+  }
   var real=jobAllPlots();
   /* A weed spray on the CAFS block wants the gravel between the plots as well
      as the plots, so the zone is offered alongside them and can be picked on
@@ -5905,6 +5990,21 @@ function jobPlots(type,name,fallback){
   if(jobSpraysGravel(type,name)) real=real.concat(jobGravelZones());
   var fb=(fallback||[]).filter(function(n){return real.indexOf(n)>=0;});
   return fb.length?fb:real;
+}
+/* Why a job has no ground on it, in words the person on the map can act on,
+   or '' when it has some. A mow job that narrows to a machine is the case
+   that bites: the machine can be renamed or deleted in Farm settings, and
+   until 2026-08-30 the only symptom was a map full of plots that would not
+   respond to a tap. */
+function jobNoGround(type,name,fallback){
+  if(jobIsTrialDots(type,name)) return '';
+  if(jobPlots(type,name,fallback).length) return '';
+  var kinds=jobMowerKinds(type,name);
+  if(kinds && kinds.length) return 'No plot on the farm is booked on '+kinds.join(' or ')
+    +'. Check More \u2192 Farm settings \u2192 Mowers, or tell Bill.';
+  if(kinds) return 'The machine this job is for is not on the farm\'s mower list any more. '
+    +'Add it back in More \u2192 Farm settings \u2192 Mowers, or tell Bill.';
+  return 'This job has no ground on it yet. Tell Bill so he can add the plots.';
 }
 /* ---- Which trial restrictions actually block a given job -----------------
    A no-fungicide plot has no bearing on a mowing task, and a no-mow plot does

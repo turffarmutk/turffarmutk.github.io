@@ -1279,6 +1279,239 @@ function eqsyncSummary(){
 }
 
 
+/* ================= THE CALENDAR ================= */
+/* Drawer 9, and the last of them.
+
+   THE PROBLEM THIS SOLVES: five people keeping five versions of the same
+   month. A spray somebody put on their own calendar is a spray nobody else
+   knows about, and time off logged on a phone is time off Bill never sees
+   until the person does not turn up.
+
+   ---- who may change what ----
+   ONE function each, transcribed into firestore.rules, and both read the
+   ROSTER rather than currentRole for the same reason the equipment checks do:
+   these are about to be enforced by the database, and currentRole is a screen
+   state that drifts.
+
+   ON READING. Anybody signed in can read the whole calendar, which is the
+   same rule every other drawer uses -- including the time clock's punches and
+   the weekly schedules, both of which are more personal than a day off.
+   Dillon's call, 2026-08-30, made knowing what it means: an undergrad's phone
+   HOLDS everybody's time off even though it only ever DRAWS their own. The
+   alternative -- the database refusing records that are not yours -- would
+   need a different query per person, which no drawer does, and would make
+   this the only collection of its kind. If that ever changes it has to change
+   for punches and schedules too. */
+
+/* Which kinds of entry a person may add. This is the list the Add screen is
+   built from, so it is also the list the database will accept.
+     Bill        - everything, including putting somebody down as out
+     tech / grad - farm work: an event, a spray, a trial, anything else
+     faculty     - events and trials; sprays are the crew's to schedule
+     undergrad   - their own time off, and nothing else */
+function calAddTypesFor(pid){
+  var who=pid||SESSION.pid;
+  if(!who) return [];
+  if(typeof personActive==='function'&&!personActive(who)) return [];
+  var role=(typeof personRole==='function')?personRole(who):null;
+  if(role==='Farm Manager')          return ['crew','event','spray','trial','other'];
+  if(role==='Technician'||role==='Graduate Student') return ['event','spray','trial','other'];
+  if(role==='Faculty')               return ['event','trial','other'];
+  if(role==='Undergraduate Student') return ['timeoff'];
+  return [];
+}
+function calCanAddType(type){ return calAddTypesFor(SESSION.pid).indexOf(type)>=0; }
+
+/* Taking an entry OFF the calendar. Bill may remove anything, because a wrong
+   entry on the farm's month is his to fix. Everybody else may remove their own
+   time off and nothing else -- Dillon's call, 2026-08-30, so somebody who
+   mistypes their own day off can undo it without going to find him. */
+function calCanRemoveEvent(ev){
+  if(!ev||!SESSION.pid) return false;
+  if(typeof personActive==='function'&&!personActive(SESSION.pid)) return false;
+  if(typeof personRole==='function'&&personRole(SESSION.pid)==='Farm Manager') return true;
+  return ev.type==='crew' && !!ev.person && String(ev.person)===String(SESSION.pid);
+}
+
+
+/* ---- the drawer ----------------------------------------------------------
+   Same shape as the others. The collection is called `events`; the state
+   object is EVSYNC rather than CSYNC, because CSYNC was taken years ago by the
+   crew claims on the task board and renaming it now would rewrite ten
+   comments that refer to it. */
+var EVSYNC_COLL='events';
+var EVSYNC_RETRY_MS=10000;
+var EVSYNC={ on:false, live:false, ready:false, seen:{}, err:null, up:0, down:0, failed:{} };
+var _evsyncNextTry=0;
+
+/* On, always — see "SHARING IS NOT OPTIONAL" over flsyncWanted(). */
+function evsyncWanted(){ return true; }
+function evsyncHydrate(){ EVSYNC.on=evsyncWanted(); }
+function evsyncSetWanted(on){
+  EVSYNC.on=!!on;
+  if(on){ _evsyncNextTry=0; evsyncStart(); } else evsyncStop();
+}
+
+function evFind(id){
+  for(var i=0;i<EVENTS.length;i++){ if(String(EVENTS[i].id)===String(id)) return EVENTS[i]; }
+  return null;
+}
+/* One entry, ready to travel. `removed` is always present and always a real
+   true/false, so a tombstone is never mistaken for a field somebody forgot. */
+function evDoc(ev){
+  var out; try{ out=JSON.parse(JSON.stringify(ev||{})); }catch(e){ return null; }
+  if(!out||!out.id||!out.date||!out.type) return null;
+  out.id=String(out.id); out.date=String(out.date); out.type=String(out.type);
+  if(out.person!==undefined&&out.person!==null) out.person=String(out.person);
+  out.removed=!!out.removed;
+  return out;
+}
+function evJson(ev){ var d=evDoc(ev); return d?JSON.stringify(d):null; }
+
+/* What this phone is allowed to send. An entry only goes up from somebody the
+   app would have let make it, so the screens and the rules agree and nothing
+   is sent that the database is only going to refuse.
+
+   A time-off entry is a 'crew' entry carrying the person's own id, so it is
+   checked against that rather than against the type list -- an undergrad may
+   add their own time off and nothing else. */
+function evCanPush(ev){
+  if(!ev) return false;
+  if(ev.removed) return (typeof calCanRemoveEvent==='function')&&calCanRemoveEvent(ev);
+  if(ev.type==='crew'&&ev.person&&String(ev.person)===String(SESSION.pid)) return true;
+  return (typeof calCanAddType==='function')&&calCanAddType(ev.type);
+}
+
+function evsyncStart(){
+  if(EVSYNC.live) return true;
+  if(Date.now()<_evsyncNextTry) return false;
+  var db=fbDb();
+  if(!db||!SESSION.pid){
+    EVSYNC.err=db?'Nobody is signed in yet':'The database code did not load on this device';
+    _evsyncNextTry=Date.now()+EVSYNC_RETRY_MS; return false;
+  }
+  try{
+    EVSYNC.unsub=db.collection(EVSYNC_COLL).onSnapshot(snapOpts(),evsyncOnSnapshot,function(e){
+      EVSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+      EVSYNC.live=false; EVSYNC.ready=false; _evsyncNextTry=Date.now()+EVSYNC_RETRY_MS;
+    });
+    EVSYNC.live=true; EVSYNC.err=null; return true;
+  }catch(e){
+    EVSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+    _evsyncNextTry=Date.now()+EVSYNC_RETRY_MS; return false;
+  }
+}
+function evsyncStop(){
+  try{ if(EVSYNC.unsub) EVSYNC.unsub(); }catch(e){}
+  EVSYNC.unsub=null; EVSYNC.live=false; EVSYNC.ready=false;
+  EVSYNC.seen={}; EVSYNC.failed={};
+}
+
+function evsyncOnSnapshot(snap){
+  var changes; try{ changes=snap.docChanges(); }catch(e){ return; }
+  var touched=false;
+  changes.forEach(function(ch){
+    if(ch.type==='removed'){
+      /* Somebody deleted the document outright rather than marking it removed
+         -- not something this app does, but the console can. Treat it as a
+         removal rather than leaving the entry sitting on everyone's month. */
+      delete EVSYNC.seen[String(ch.doc.id)];
+      var had=evFind(String(ch.doc.id));
+      if(had&&!had.removed){ had.removed=true; touched=true; }
+      return;
+    }
+    var data; try{ data=ch.doc.data(); }catch(e){ return; }
+    if(!data||!data.date||!data.type) return;
+    data.id=String(ch.doc.id);
+    EVSYNC.seen[data.id]=JSON.stringify(data);
+    delete EVSYNC.failed[data.id];
+    EVSYNC.down++;
+    var have=evFind(data.id);
+    if(have){
+      if(JSON.stringify(evDoc(have))!==JSON.stringify(data)){
+        /* Updated IN PLACE, and fields the shared copy no longer has are
+           dropped, so an entry cannot keep a stale value forever. */
+        Object.keys(have).forEach(function(k){ if(!(k in data)) delete have[k]; });
+        Object.keys(data).forEach(function(k){ have[k]=data[k]; });
+        touched=true;
+      }
+      return;
+    }
+    EVENTS.push(data); touched=true;
+  });
+  var fromCache=true;
+  try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
+  if(!EVSYNC.ready&&!fromCache){ EVSYNC.ready=true; evsyncUploadNew(); }
+  if(touched){
+    try{ storeTouch(); }catch(e){}
+    evsyncRepaint();
+  }
+}
+
+function evsyncRepaint(){
+  try{
+    var scr=document.querySelector('.screen.active');
+    var id=scr?scr.id.replace(/^s-/,''):'';
+    /* Only the month itself and the read-out. Redrawing the Add form under
+       somebody halfway through filling it in is worse than a stale month. */
+    if(id==='calendar'&&typeof renderCalBody==='function') renderCalBody();
+    if(id==='sharedb'&&typeof sdbRender==='function') sdbRender();
+  }catch(e){}
+}
+
+/* This phone's calendar going up for the first time. */
+function evsyncUploadNew(){
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  EVENTS.slice().forEach(function(ev){
+    if(!ev||!ev.id) return;
+    var id=String(ev.id);
+    if(EVSYNC.seen[id]!==undefined) return;
+    if(!evCanPush(ev)) return;
+    var doc=evDoc(ev); if(!doc) return;
+    EVSYNC.seen[id]=JSON.stringify(doc);
+    n++; EVSYNC.up++;
+    try{ db.collection(EVSYNC_COLL).doc(id).set(doc).catch(function(e){ evsyncFail(id,e); }); }
+    catch(e){ evsyncFail(id,e); }
+  });
+  if(n){ try{ toast(n+' calendar entr'+(n===1?'y':'ies')+' from this phone sent up'); }catch(e){} }
+  return n;
+}
+function evsyncFail(id,e){
+  EVSYNC.failed[id]=(typeof sdbError==='function')?sdbError(e):String((e&&e.message)||e);
+}
+
+function evPush(){
+  if(!EVSYNC.on||!EVSYNC.live||!EVSYNC.ready) return 0;
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  EVENTS.forEach(function(ev){
+    if(!ev||!ev.id||!evCanPush(ev)) return;
+    var id=String(ev.id), json=evJson(ev);
+    if(json===null||EVSYNC.seen[id]===json) return;
+    EVSYNC.seen[id]=json; n++; EVSYNC.up++;
+    try{ db.collection(EVSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ evsyncFail(id,e); }); }
+    catch(e){ evsyncFail(id,e); }
+  });
+  return n;
+}
+
+function evsyncTick(){
+  if(!EVSYNC.on) return;
+  if(!EVSYNC.live){ evsyncStart(); return; }
+  evPush();
+}
+
+function evsyncSummary(){
+  if(!EVSYNC.on) return 'Off — this phone keeps its own month';
+  if(EVSYNC.err) return EVSYNC.err;
+  if(!EVSYNC.live) return 'Connecting…';
+  if(!EVSYNC.ready) return 'Connected — waiting for the shared copy';
+  var f=Object.keys(EVSYNC.failed).length;
+  return EVSYNC.up+' sent · '+EVSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+}
+
+
 /* ================= THE TASK LIST ================= */
 /* Drawer 7. The jobs the farm does, which the assign screen is built from --
    so with this off, a job Bill adds on his phone is a job nobody else can hand

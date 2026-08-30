@@ -121,6 +121,21 @@ five minutes now and is miserable to sort out after something goes wrong.
 
 ## The drawers, and the order
 
+> **Status, 2026-08-30: all of them are built.** Every drawer below now shares,
+> and so do several that are not in this table — crew claims, the weekly
+> schedules, the time clock, the task list, the trials and farm settings. What
+> follows is the plan as it was written, kept because the *reasoning* about
+> order and cost still explains why things are the way they are. The numbering
+> here is the order originally proposed; `firestore.rules` numbers them in the
+> order they were actually built, so equipment is drawer 3 here and drawer 8
+> there. The open questions further down have mostly been answered — each
+> answer is in `docs/DECISIONS.md`, dated.
+>
+> **One thing is still a manual step:** the rules are installed by pasting them
+> into the Firebase console (`docs/PUBLISH-THE-RULES.md`). A drawer does
+> nothing until that is done.
+
+
 Think of the shared copy as a filing cabinet with a drawer for each kind of
 thing. **I do one drawer at a time, start to finish, and the farm uses it for a
 week before I start the next.**

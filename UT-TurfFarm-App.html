@@ -2712,7 +2712,14 @@ function sdbShareBlocks_raw(){
         +'to a machine that will not run. Carries the machines, the problems reported '
         +'against them, the service history and when each one is next due. Anybody can '
         +'report a problem, undergraduates included — they are the ones on the mowers. '
-        +'Taking a machine out of service stays with Bill and the technicians.'}
+        +'Taking a machine out of service stays with Bill and the technicians.'},
+   {st:EVSYNC,  summary:evsyncSummary(),  title:'The calendar',
+    what:'One month the whole farm reads, instead of five people keeping five versions of '
+        +'it. A spray, a trial visit, a meeting — and time off, so Bill sees who is away '
+        +'before the day rather than when they do not turn up. Everybody adds the kinds of '
+        +'entry their job calls for. Taking one off is Bill\'s, except your own time off, '
+        +'which is yours to undo. Nothing is ever really deleted — it is marked, so it '
+        +'stays gone instead of coming back from a phone that was switched off.'}
   ];
 }
 
@@ -6823,6 +6830,7 @@ function storeScan(){
   try{ trsyncTick(); }catch(e){}
   try{ fstsyncTick(); }catch(e){}
   try{ eqsyncTick(); }catch(e){}
+  try{ evsyncTick(); }catch(e){}
 }
 function storeFlush(){ storeScan(); }
 function storeTouch(){ storeScan(); }   /* callers that want an immediate write */
@@ -6858,6 +6866,7 @@ function storeHydrate(){
   try{ trsyncHydrate(); }catch(e){}
   try{ fstsyncHydrate(); }catch(e){}
   try{ eqsyncHydrate(); }catch(e){}
+  try{ evsyncHydrate(); }catch(e){}
   _storeOn=true;
   try{ setInterval(storeScan,STORE_SCAN_MS); }catch(e){}
 }

@@ -797,13 +797,96 @@ service cloud.firestore {
     }
 
     /* ------------------------------------------------------------------
+       THE CALENDAR — drawer 9, and the last of them
+
+       Five people keeping five versions of the same month. A spray somebody
+       put on their own calendar is a spray nobody else knows about, and time
+       off logged on a phone is time off Bill never sees until the person does
+       not turn up.
+
+       ON READING. Open to anybody signed in, which is what every other
+       collection here does, including the punches and the weekly schedules --
+       both more personal than a day off. Dillon's call, 2026-08-30, made
+       knowing what it means: a phone HOLDS everybody's time off even though the
+       app only ever DRAWS your own. Refusing records that are not yours would
+       need a different query per person, which no drawer does. If that ever
+       changes it has to change for punches and schedules at the same time.
+
+       Transcribed from calAddTypesFor(), calCanAddType() and
+       calCanRemoveEvent() in the app. The two must never drift.
+       ------------------------------------------------------------------ */
+
+    /* App: calAddTypesFor() — which kinds of entry each role may add.
+         Bill        everything, including putting somebody down as out
+         tech / grad an event, a spray, a trial, anything else
+         faculty     events and trials; sprays are the crew's to schedule
+         undergrad   their own time off, and nothing else (the crew branch
+                     below, which is checked against their own id) */
+    function calTypesFor(role) {
+      return role == 'Farm Manager' ? ['crew', 'event', 'spray', 'trial', 'other']
+           : (role == 'Technician' || role == 'Graduate Student') ? ['event', 'spray', 'trial', 'other']
+           : role == 'Faculty' ? ['event', 'trial', 'other']
+           : [];
+    }
+    /* Time off is a 'crew' entry carrying the person's own id. Checked here
+       rather than through the type list, which is exactly how an undergrad may
+       log their own day off without being able to put anybody else down. */
+    function calIsOwnTimeOff(d) {
+      return d.type == 'crew' && d.get('person', '') == me();
+    }
+    function calMayAdd(d) {
+      return actor() && (calIsOwnTimeOff(d) || d.type in calTypesFor(roleOf(me())));
+    }
+    /* App: calCanRemoveEvent() — Bill may take anything off the farm's month;
+       everybody else may remove their own time off and nothing else. */
+    function calMayRemove(d) {
+      return actor() && (roleOf(me()) == 'Farm Manager' || calIsOwnTimeOff(d));
+    }
+
+    match /events/{eventId} {
+      allow read: if actor();
+
+      allow create: if calMayAdd(request.resource.data)
+        && request.resource.data.id == eventId
+        && request.resource.data.date is string
+        && request.resource.data.type is string
+        && request.resource.data.removed == false;
+
+      /* An entry is taken off the calendar by setting removed:true, never by
+         deleting the document — see the note in the app's calRemoveEvent().
+         A phone that has been switched off still holds its own copy and pushes
+         up whatever the shared copy is missing, so a genuinely deleted entry
+         would come straight back, and keep coming back. A mark travels.
+
+         The only permitted change to somebody else's entry is that mark, and
+         only by somebody allowed to make it. Everything else about an entry --
+         what day it is, who it is about -- stays as it was written. */
+      allow update: if actor()
+        && request.resource.data.id == eventId
+        && request.resource.data.date == resource.data.date
+        && request.resource.data.type == resource.data.type
+        && request.resource.data.get('person', '') == resource.data.get('person', '')
+        && (
+             /* marking it removed */
+             (request.resource.data.removed == true && resource.data.removed == false
+              && calMayRemove(resource.data))
+             /* or the person who may add it correcting their own entry */
+          || (request.resource.data.removed == resource.data.removed
+              && calMayAdd(resource.data))
+           );
+
+      allow delete: if false;
+    }
+
+    /* ------------------------------------------------------------------
        EVERYTHING ELSE IS CLOSED.
 
-       The calendar gets its own block here when that drawer is built. Tasks,
-       the map, crew claims, the field log, inventory, the weekly schedules,
-       the time clock, the task list, the trials, farm settings and equipment
-       already have theirs. Until then the database
-       refuses it, which is what we want: an empty drawer nobody can
+       Every drawer now has one: tasks, the map, crew claims, the field log,
+       inventory, the weekly schedules, the time clock, the task list, the
+       trials, farm settings, equipment and the calendar. Anything NOT listed
+       above is still refused, which is what we want and what should stay true
+       -- a new collection gets a block here, written from a function in the
+       app, or it does not get written to at all. An empty drawer nobody can
        write into beats an open one nobody is watching.
        ------------------------------------------------------------------ */
   }

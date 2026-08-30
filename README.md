@@ -65,7 +65,7 @@ npm install                              # first time only
 git config core.hooksPath .githooks      # first time only - turns on the push check
 # edit UT-TurfFarm-App.html, one of the app-*.js files, or farm-geo.js
 npm run sw           # REQUIRED — regenerates the service worker
-npm test             # 31 harnesses, ~1,800 checks, about a minute
+npm test             # 32 harnesses, ~1,850 checks, about a minute
 git add -A && git commit -m "what changed and why" && git push
 ```
 

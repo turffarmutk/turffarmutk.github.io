@@ -28,6 +28,47 @@ down.
 
 ## Process & project
 
+### Taking a calendar entry off is a mark, never a delete — 2026-08-30
+**Decision:** `calRemoveEvent()` sets `removed:true` (with who and when) instead
+of rebuilding `EVENTS` with `filter()`. `firestore.rules` refuses `delete`
+outright, and the app hides removed entries rather than dropping them.
+**Why:** the moment the calendar is shared, deleting an entry stops working. A
+phone that was switched off still holds its own copy, and pushes up whatever the
+shared copy is missing when it comes back — so a genuinely deleted entry comes
+straight back, and keeps coming back, forever. A mark travels like any other
+change, so it stays gone. The task list hit this first and solved it the same
+way. The old code also **reassigned** `EVENTS`, which strands every reference
+already held elsewhere; it now edits the list in place.
+**Don't:** "simplify" this back to removing the entry from the array. It will
+look like it works on one phone and be unfixable on twenty-three.
+
+### Anyone signed in can read the whole calendar, time off included — 2026-08-30
+**Decision:** `allow read: if actor()` on `events`, the same as every other
+collection. The app still shows an undergrad only their own absences and hides
+crew entries from faculty; that is a screen rule, not a database one.
+**Why:** Dillon's call, made knowing what it means — **a phone HOLDS everybody's
+time off even though it only ever DRAWS your own.** This is already true of the
+time clock's punches and the weekly schedules, both more personal than a day off,
+so the calendar is consistent rather than newly permissive. Refusing records
+that are not yours is possible but would need a different query per person,
+because Firestore rules filter nothing: a listener on a collection fails
+entirely if any document in it might be unreadable. No drawer does that.
+**Don't:** tighten this for the calendar alone. If it changes it has to change
+for punches and schedules at the same time, and each of those needs its sync
+rewritten to query per person.
+
+### An undergrad may remove their own time off — 2026-08-30
+**Decision:** `calCanRemoveEvent()` lets the Farm Manager remove anything, and
+lets anybody else remove a crew entry carrying their own roster id. The button
+now reads "Remove" and appears for both.
+**Why:** Dillon's call, 2026-08-30. Before this only Bill could take anything off
+the calendar, so an undergrad who mistyped their own day off had to go and find
+him. This is the one branch in the calendar checked against a person's **own
+id** rather than their role — which is also exactly what stops them putting
+somebody else down as out.
+**Don't:** widen it to "your own entries" generally. It is deliberately only
+crew/time-off entries; a spray somebody scheduled is farm business.
+
 ### Equipment permissions read the roster, not currentRole — 2026-08-30
 **Decision:** the four equipment checks (`eqCanReport`, `eqCanDown`,
 `eqCanEdit`, `eqCanMaint`) no longer work the answer out from `currentRole`.

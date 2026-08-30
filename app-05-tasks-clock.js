@@ -916,7 +916,34 @@ function calSelf(){ return me().n; }
 function calUserLab(){return calMyLab();}   // who's adding → which lab tag
 function evLab(ev){return ev.lab||'Bill';}                     // untagged/farm items belong to Bill
 function calCanSeeType(t){ if(currentRole==='faculty'&&t==='crew')return false; return true; }
+/* Taking an entry off the calendar MARKS it rather than removing it.
+
+   Why it cannot simply be dropped from the list, now that the calendar is
+   shared: a phone that was switched off still holds its own copy, and when it
+   comes back it pushes up everything the shared copy is missing. A genuinely
+   deleted entry would come straight back, and keep coming back. A mark travels
+   like any other change, so it stays gone. The task list learned this first --
+   see its sync module and docs/DECISIONS.md.
+
+   It also no longer rebuilds EVENTS with filter(). Reassigning the array
+   strands every reference already held elsewhere; the list is edited in place,
+   the same rule storeHydrate follows. */
+function calRemoveEvent(id){
+  var ev=EVENTS.find(function(x){return x.id===id;});
+  if(!ev) return false;
+  if(typeof calCanRemoveEvent==='function'&&!calCanRemoveEvent(ev)){
+    toast('That one is not yours to remove'); return false;
+  }
+  ev.removed=true;
+  ev.removedBy=SESSION.pid||null;
+  ev.removedAt=isoLocal(new Date(),true);
+  try{ storeTouch(); }catch(e){}
+  toast('Removed from the calendar');
+  return true;
+}
+
 function calVisible(ev){
+ if(ev.removed)return false;                              // taken off the calendar; the record stays
  if(!calCanSeeType(ev.type))return false;
  if(ev.type==='crew'&&ev.status!=='out')return false;     // Crew on calendar = absences only (availability lives on task board / home)
  if(ev.type==='crew'&&currentRole==='undergrad'&&!isMe(ev.person))return false;
@@ -924,7 +951,22 @@ function calVisible(ev){
  if(calTypes.size>0&&!calTypes.has(ev.type))return false; // type pills active → only those types
  return true;
 }
-function calAddTypes(){ if(currentRole==='manager')return ['crew','event','spray','trial','other']; if(currentRole==='grad'||currentRole==='tech')return ['event','spray','trial','other']; if(currentRole==='faculty')return ['event','trial','other']; if(currentRole==='undergrad')return ['timeoff']; return ['other']; }
+/* The list the Add screen is built from. It comes from calAddTypesFor() in
+   app-02-fieldlog-sync.js, which reads the ROSTER -- because the database now
+   enforces the same list, and a screen offering a choice the database will
+   refuse looks to whoever taps it like the app is broken. The fallback is the
+   old behaviour and is only reached if this file loads without app-02. */
+function calAddTypes(){
+  if(typeof calAddTypesFor==='function'){
+    var t=calAddTypesFor(SESSION.pid);
+    if(t&&t.length) return t;
+  }
+  if(currentRole==='manager')return ['crew','event','spray','trial','other'];
+  if(currentRole==='grad'||currentRole==='tech')return ['event','spray','trial','other'];
+  if(currentRole==='faculty')return ['event','trial','other'];
+  if(currentRole==='undergrad')return ['timeoff'];
+  return ['other'];
+}
 function getDayEvents(v){var d=(v instanceof Date)?v:parseISO(v); return d?eventsOnDate(d):[];}
 function uniqTypes(evs){var s=[];evs.forEach(function(e){if(s.indexOf(e.type)<0)s.push(e.type);});return s;}
 function buildCalLabs(){
@@ -1040,8 +1082,12 @@ function openCalEvent(id){
    '<div class="hdr" style="background:#2f3133;padding:15px 16px;gap:10px"><div class="title" style="color:#fff;font-size:17px;flex:1;line-height:1.15">'+esc(ev.title)+'</div></div>'
   +'<div class="sec">Details</div><div class="list">'+rows+'</div>';
  var acts='';
- if(currentRole==='manager'){
-   acts+='<div class="action tap" data-delev="'+ev.id+'" style="flex:1;background:#17181a">Delete</div>';
+ /* Bill may remove anything; everybody else may remove their own time off.
+    Same function the database checks, so the button and the answer agree. */
+ var mayRemove=(typeof calCanRemoveEvent==='function') ? calCanRemoveEvent(ev)
+                                                       : (currentRole==='manager');
+ if(mayRemove){
+   acts+='<div class="action tap" data-delev="'+ev.id+'" style="flex:1;background:#17181a">Remove</div>';
  }
  if(!acts)acts='<div style="text-align:center;width:100%;font-weight:700;font-size:12px;color:var(--muted);padding:6px">View only</div>';
  document.getElementById('ce-actions').innerHTML=acts;
@@ -1124,7 +1170,7 @@ document.getElementById('s-calendar').addEventListener('click',function(e){
 });
 document.getElementById('s-calevent').addEventListener('click',function(e){
  var ns=e.target.closest('[data-noshow]'); if(ns){var ev=EVENTS.find(function(x){return x.id===ns.getAttribute('data-noshow');});if(ev&&ev.person){NOSHOW[ev.person]=(NOSHOW[ev.person]||0)+1;toast('No-show recorded · '+(nameOf(ev.person)||ev.person));back();}return;}
- var dl=e.target.closest('[data-delev]'); if(dl){var id=dl.getAttribute('data-delev');EVENTS=EVENTS.filter(function(x){return x.id!==id;});toast('Event deleted');back();return;}
+ var dl=e.target.closest('[data-delev]'); if(dl){var id=dl.getAttribute('data-delev');calRemoveEvent(id);back();return;}
 });
 
 /* ======================= TIME CLOCK ======================= */

@@ -28,6 +28,26 @@ down.
 
 ## Process & project
 
+### A check must not depend on the clock it happens to run on — 2026-08-30
+**Decision:** `tools/test-weather.js` builds its fake forecast from **local
+midnight** and sets the hours on it — a day period at 07:00 and its night at
+19:00 on the same date — rather than from "now" plus an offset. A second check
+sits next to it that reads the fixture back and asserts each day and its night
+really do land on one date.
+**Why:** it used to build the night period as "now plus thirteen hours", which
+is the same day only if you run it before 11am. From 11am the night landed on
+the FOLLOWING date, `wxFoldDays()` correctly paired it with the wrong day, and
+"each with a high and a low" went red. Confirmed by running the file at fixed
+times: green at 03:00 and 08:00, red at 11:00, 14:00 and 20:00, with not one
+line of app code different between them. That is worse than a plain broken
+test. It taught everyone to look at a red result and say "oh, that one always
+fails", which is exactly how a real failure gets waved through — and this one
+sat red through several pushes for that reason.
+**Don't:** anchor test data to `Date.now()` when the thing under test buckets
+by calendar date, and don't paper over a red check by loosening the assertion.
+If a check passes in the morning and fails in the afternoon, the clock is the
+bug, and it is nearly always in the fixture rather than in the app.
+
 ### The weather is fetched, not invented — 2026-08-30
 **Decision:** the weather screen reads api.weather.gov (the National Weather
 Service). Every hardcoded forecast is gone, including `WXDAYS` and the

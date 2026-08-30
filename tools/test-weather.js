@@ -51,14 +51,27 @@ function hourly(n, over) {
   }
   return out;
 }
+/* The daily forecast, shaped the way the service really sends it: for each
+   date, a daytime period that starts that MORNING and a night period that
+   starts that same EVENING. wxFoldDays() pairs a high with its low by calendar
+   date, so the two have to fall on one date.
+
+   This used to be built as "now" and "now plus thirteen hours", which is the
+   same thing only if you run it before 11am. From 11am on, the night period
+   landed on the FOLLOWING date, every high was split from its low, and the
+   check below failed -- a red result caused entirely by the clock the suite
+   happened to run on, with nothing wrong in the app. Anchor to local midnight
+   and set the hours, so the fixture is the same at every time of day. */
 function daily() {
   const out = [];
+  const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
   for (let d = 0; d < 5; d++) {
-    const day = new Date(Date.now() + d * 24 * HOUR);
-    out.push({ startTime: day.toISOString(), isDaytime: true, temperature: 88 - d,
+    const morning = new Date(midnight.getTime() + d * 24 * HOUR); morning.setHours(7, 0, 0, 0);
+    const evening = new Date(morning); evening.setHours(19, 0, 0, 0);
+    out.push({ startTime: morning.toISOString(), isDaytime: true, temperature: 88 - d,
                probabilityOfPrecipitation: { value: 10 + d }, windSpeed: '5 to 12 mph',
                windDirection: 'SW', shortForecast: 'Partly Sunny' });
-    out.push({ startTime: new Date(day.getTime() + 13 * HOUR).toISOString(), isDaytime: false,
+    out.push({ startTime: evening.toISOString(), isDaytime: false,
                temperature: 68 - d, probabilityOfPrecipitation: { value: 5 },
                windSpeed: '3 mph', windDirection: 'S', shortForecast: 'Mostly Clear' });
   }
@@ -138,6 +151,22 @@ section('2. Asking the service, and what comes back');
   ok('and for what it is doing right now', served.some(u => /observations\/latest/.test(u)));
   ok('five days came back', WX().days.length === 5, String(WX().days.length));
   ok('each with a high and a low', WX().days.every(d => d.hi !== null && d.lo !== null));
+  /* Guard on the fixture rather than on the app. The check above failed for
+     months of afternoons because the fake night period drifted onto the next
+     date -- so if that is ever reintroduced, say so HERE, where the fault
+     actually is, instead of blaming the folding code. */
+  ok('and the fixture really does put each day and its night on one date',
+     (function () {
+       const byDate = {};
+       daily().forEach(p => {
+         const d = new Date(p.startTime);
+         const k = d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
+         (byDate[k] = byDate[k] || []).push(p.isDaytime);
+       });
+       const keys = Object.keys(byDate);
+       return keys.length === 5 && keys.every(k => byDate[k].length === 2
+         && byDate[k].indexOf(true) >= 0 && byDate[k].indexOf(false) >= 0);
+     })(), 'the fake forecast splits a day across two dates');
   ok('24 hours came back', WX().hours.length === 24, String(WX().hours.length));
 
   section('3. Wind, read the way a sprayer has to read it');

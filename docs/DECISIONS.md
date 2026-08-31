@@ -78,6 +78,28 @@ single rule the whole weather rewrite exists to enforce.
 default". It is not safe — a HOLD nobody believes gets ignored, and the next
 GOOD gets ignored with it. Say you do not know.
 
+### The home weather card falls back to the reading NOW, not to a dash — 2026-08-30
+**Decision:** the temperature on the home screen's weather card (and on the
+manager's weather strip) shows today's forecast high while there is one, and
+otherwise the current reading, labelled **now**. A dash only when there is
+neither. `hwWxTemp()` in `app-01-shell.js` decides; `hwDeg()` is what stops a
+missing number ever being printed as text.
+**Why:** the National Weather Service drops today's daytime period once the
+afternoon is past, so `WXDAYS[0].hi` is `null` for the second half of every
+day. The widget printed it straight out, and the home screen read
+**"null°"** — reported from the farm on 2026-08-30. The obvious repair is a
+dash, which is what the Weather day cards do, but a dash on the biggest number
+on the card from mid-afternoon onwards helps nobody deciding whether to go out.
+The current reading is already fetched — it is what the Weather screen leads
+with — so the card shows that instead, with a small "now" beside it so it is
+never mistaken for the day's high. Dillon chose this over the dash.
+**Don't:** print a forecast number by concatenating it into text without
+`hwDeg()`. And do not "make the home card consistent" by dropping the fallback
+back to a dash — the difference from the day cards is deliberate: a day card is
+a record of one day, while this card is answering "what is it like out there
+right now". `tools/test-weather.js` section 4b pins all of it, including that
+the word "null" never reaches the screen.
+
 ### The weather day cards are FILLED, never rebuilt — 2026-08-30
 **Decision:** `wxRenderCards()` writes into the five `.wxcard` divs that are
 already in the page. It must not replace them or their container.

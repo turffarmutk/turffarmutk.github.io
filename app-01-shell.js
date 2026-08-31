@@ -856,6 +856,26 @@ function hwSprayOK(){
 }
 /* How old the reading is, for the widgets to admit to. */
 function hwWxAge(){ return (typeof wxAgeText==='function')?wxAgeText():''; }
+/* A degree figure, or a dash where the service sent nothing. Printing the
+   number straight out put the word "null" on the home screen every afternoon:
+   once the daytime period has passed, the forecast stops carrying a high for
+   today and hands back nothing at all. */
+function hwDeg(v){ return (v===null||v===undefined||v==='')?'—':(v+'°'); }
+/* The headline temperature on the weather card, and whether it is a forecast
+   high or a reading taken just now.
+
+   Today's high disappears from the forecast in the middle of the afternoon,
+   and a dash on the biggest number on the card for the rest of every day is
+   not much use to somebody deciding whether to go out. The current reading is
+   a better answer and the app already has it — it is what the Weather screen
+   leads with. It is labelled "now" so nobody reads it as the day's high, and
+   it falls back to a dash when there is no reading either. */
+function hwWxTemp(d){
+  if(d&&d.hi!==null&&d.hi!==undefined&&d.hi!=='') return {t:hwDeg(d.hi),now:false};
+  var n=(typeof WX!=='undefined'&&WX)?WX.now:null;
+  if(n&&n.temp!==null&&n.temp!==undefined&&n.temp!=='') return {t:hwDeg(n.temp),now:true};
+  return {t:'—',now:false};
+}
 
 function hwWx(id,mode){
  if(typeof WXDAYS==='undefined')return;
@@ -864,14 +884,15 @@ function hwWx(id,mode){
     +'<div class="rs" style="padding:6px 0">No forecast on this phone yet. Open Weather when you have signal.</div>','weather');
    return;
  }
- var d=WXDAYS[0], spray=hwSprayOK();
+ var d=WXDAYS[0], spray=hwSprayOK(), tp=hwWxTemp(d);
  /* slice(1,3) drops today, so the forecast index is the loop index + 1. */
  var rows=WXDAYS.slice(1,3).map(function(x,i){
-   return hwRow(hwName(x.day,x.cond),'<span style="font:800 13px \'Archivo\';color:var(--ink);flex:none">'+x.hi+'° / '+x.lo+'°</span>',i===1,'wx:'+(i+1));
+   return hwRow(hwName(x.day,x.cond),'<span style="font:800 13px \'Archivo\';color:var(--ink);flex:none">'+hwDeg(x.hi)+' / '+hwDeg(x.lo)+'</span>',i===1,'wx:'+(i+1));
  }).join('');
  hwFill(id,hwHead(mode==='spray'?'Spray window':'Weather','Forecast')
   +'<div class="tap" data-open="wx:0" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:3px">'
-   +'<span style="font:800 22px \'Archivo\';color:var(--ink)">'+d.hi+'°</span>'
+   +'<span style="font:800 22px \'Archivo\';color:var(--ink)">'+tp.t
+    +(tp.now?'<span style="font:800 11px \'Public Sans\';color:var(--muted);margin-left:5px">now</span>':'')+'</span>'
    +'<span style="font-size:26px;line-height:1;flex:none" title="'+d.cond+'">'+d.ico+'</span></div>'
   /* spray===null means the forecast is missing or too old to judge by. Say
      that, rather than guessing in either direction. */
@@ -1121,10 +1142,13 @@ function hwWxStrip(id){
     +'<div style="font-size:30px;line-height:1;flex:none">🌡️</div>');
    return;
  }
- var d=WXDAYS[0], ok=hwSprayOK();
+ var d=WXDAYS[0], ok=hwSprayOK(), tp=hwWxTemp(d);
  var line = ok===null ? ('Spray window — no current forecast · last '+hwWxAge())
                       : ('Spray window '+(ok?'GOOD':'HOLD')+' · wind '+d.wind);
- hwFill(id,'<div><div class="t">'+(d.hi===null?'—':d.hi+'°')+' · '+esc(d.cond)+'</div>'
+ /* Same as the weather card: today's high is gone from the forecast by the
+    middle of the afternoon, so this falls back to the reading taken now
+    rather than showing a dash for the rest of the day. */
+ hwFill(id,'<div><div class="t">'+tp.t+(tp.now?' now':'')+' · '+esc(d.cond)+'</div>'
   +'<div class="s">'+esc(line)+'</div></div>'
   +'<div style="font-size:30px;line-height:1;flex:none" title="'+esc(d.cond)+'">'+d.ico+'</div>');
 }

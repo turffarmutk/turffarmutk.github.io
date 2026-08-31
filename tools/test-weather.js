@@ -185,6 +185,59 @@ section('2. Asking the service, and what comes back');
      WX().days[0].hum === '—');
   ok('and a dash for UV', WX().days[0].uv === '—');
 
+  section('4b. The word "null" never reaches the home screen');
+  /* Reported 2026-08-30: the home screen read "null°". By the middle of the
+     afternoon the forecast has no daytime period left for today, so today's
+     high comes back as nothing at all -- and the widget printed it straight
+     out. Every other screen shows a dash there; this one showed the word.
+
+     The answer is better than a dash on the biggest number on the card: it
+     falls back to the reading taken NOW, labelled as such, which is what
+     somebody deciding whether to go out actually wants at 3pm. */
+  {
+    const w = WX();
+    const hi0 = w.days[0].hi, now0 = w.now;
+    w.days[0].hi = null;                       /* the afternoon, as it really is */
+    w.now = { temp: 84, cond: 'Sunny', wind: 4, dir: 'SW', hum: 55 };
+    win.WXDAYS[0].hi = null;
+
+    win.hwWx('hw-u-wx', 'work');
+    const card = doc.getElementById('hw-u-wx');
+    ok('the card never prints the word "null"', !/null/i.test(card.textContent),
+       card.textContent.trim().slice(0, 60));
+    ok('it shows the temperature right now instead', /84°/.test(card.textContent),
+       card.textContent.trim().slice(0, 60));
+    ok('and says that is what it is, so nobody reads it as the day\'s high',
+       /now/.test(card.textContent), card.textContent.trim().slice(0, 60));
+
+    win.hwWxStrip('hw-m-wx');
+    const strip = doc.getElementById('hw-m-wx');
+    ok('the manager strip does the same', /84° now/.test(strip.textContent) && !/null/i.test(strip.textContent),
+       strip.textContent.trim().slice(0, 60));
+
+    /* No reading either — a phone that has a cached forecast but has not
+       reached the observation. A dash, and still never "null". */
+    w.now = null;
+    win.hwWx('hw-u-wx', 'work');
+    ok('with no reading at all it falls back to a dash',
+       /—/.test(card.textContent) && !/null/i.test(card.textContent),
+       card.textContent.trim().slice(0, 60));
+
+    /* The two forecast rows underneath had the same hole. */
+    const hi1 = win.WXDAYS[1].hi;
+    win.WXDAYS[1].hi = null;
+    win.hwWx('hw-u-wx', 'work');
+    ok('a missing high on a later day is a dash too, not "null"',
+       !/null/i.test(card.textContent), card.textContent.trim().slice(0, 90));
+    win.WXDAYS[1].hi = hi1;
+
+    w.days[0].hi = hi0; win.WXDAYS[0].hi = hi0; w.now = now0;
+    win.hwWx('hw-u-wx', 'work');
+    ok('and with a real high it is back to showing the high',
+       new RegExp(hi0 + '°').test(card.textContent) && !/now/.test(card.textContent),
+       card.textContent.trim().slice(0, 60));
+  }
+
   section('5. It says how old the reading is');
   ok('a fresh one reads as just now', /just now/.test(txt('wx-age')), txt('wx-age'));
   ok('and names where it came from', /National Weather Service/.test(txt('wx-age')));

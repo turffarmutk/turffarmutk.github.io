@@ -1200,3 +1200,34 @@ too fast to have run 1,698 checks, which is the tell.
 dependencies without checking what Node they now want. If GitHub starts failing
 every check in under twenty seconds while the laptop is green, this is the first
 thing to look at — it is a version mismatch, not a broken test.
+
+### A new hire is added by roster id, and 23 is frozen in place — 2026-08-31
+**Decision:** `rstSeedNewcomers()` in `app-03-people.js` copies somebody from
+the built-in roster onto a phone only when their id is HIGHER than the highest
+that phone has ever seen. The mark is stored in `ut_people_seen_v1`, and on a
+phone that has never stored one it starts at `RST_HWM_BASE=23`.
+**Why:** a phone that has saved its own roster stops reading the built-in list,
+which is right — it is holding somebody's edits, and reading over the top would
+undo them every morning. The cost was that a new hire was invisible to everyone
+except whoever typed them in. Levi Cunningham (p24) could sign in on his own new
+phone while Bill, whose phone had had the app for weeks, could not see him to
+put him on a job. Copying the list back in blindly would have been worse than
+the bug: removing somebody from the roster is deliberate and has no undo, and a
+blind copy would hand them back at the next reload. Ids only ever count upwards
+— `rstNewId()` takes the highest and adds one — so an id above the mark cannot
+be somebody this phone removed, and an id below it that is missing was taken off
+on purpose. That is the whole trick.
+**Don't:** raise `RST_HWM_BASE` when somebody is hired. It is not the size of
+the roster; it is a fact about what was on every phone on 2026-08-31, and it
+must stay 23 forever. Raising it to 24 for Levi would tell every phone that
+p24 is old news and he would stop arriving on the ones that have not opened the
+app yet. Also don't replace the stored mark with "the highest id I hold, worked
+out fresh" — removing p24 would drop that to 23 and hand him straight back the
+next morning. `tools/test-session.js` sections 9, 9b and 9c pin all of this.
+**Still true, and worth saying out loud:** hiring somebody STILL means editing
+`app-03-people.js`, which is exactly what `docs/SUCCESSION.md` says should not
+be necessary. This makes the current arrangement work; it does not fix it. The
+real fix is the roster travelling through the shared database like tasks and
+equipment do, and that needs a decision first — `refdata/roster` deliberately
+carries only role, lab, active and grants, and NOT names (see the crew-addresses
+entry), so it cannot carry a new person today.

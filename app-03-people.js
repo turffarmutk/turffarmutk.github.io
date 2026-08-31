@@ -156,11 +156,62 @@ var RST_SEED=[
  {id:'p20',first:'Taryn',last:'Breeden',pron:'she/her/hers',role:'Undergraduate Student',lab:'Bill',email:'',active:true},
  {id:'p21',first:'Jed',last:'Bates',pron:'he/him/his',role:'Undergraduate Student',lab:'Bill',email:'',active:true},
  {id:'p22',first:'Caroline',last:'Hagler',pron:'she/her/hers',role:'Undergraduate Student',lab:'Bill',email:'',active:true},
- {id:'p23',first:'Lauren',last:'Valk',pron:'she/her/hers',role:'Undergraduate Student',lab:'Brosnan',email:'',active:true}
+ {id:'p23',first:'Lauren',last:'Valk',pron:'she/her/hers',role:'Undergraduate Student',lab:'Brosnan',email:'',active:true},
+ {id:'p24',first:'Levi',last:'Cunningham',pron:'he/him/his',role:'Undergraduate Student',lab:'Bill',email:'',active:true}
 ];
 var PEOPLE=RST_SEED.map(function(p){var c={};for(var k in p)c[k]=p[k];return c;});
 try{var _rp=localStorage.getItem(RST_KEY);if(_rp){var _pp=JSON.parse(_rp);if(_pp&&_pp.length)PEOPLE=_pp;}}catch(e){}
 function rstSave(){try{localStorage.setItem(RST_KEY,JSON.stringify(PEOPLE));}catch(e){}}
+
+/* ---- A NEW HIRE REACHES PHONES THAT ALREADY HAVE THE APP -----------------
+   A phone that has saved its own roster stops reading RST_SEED above, for
+   good reason: it is holding edits somebody made. The cost was that a person
+   added to the built-in list was invisible to everyone EXCEPT whoever typed
+   them in. That is how Levi Cunningham (p24) could sign in on his own new
+   phone on 2026-08-31 while Bill, whose phone had had the app for weeks,
+   could not see him to put him on a job.
+
+   Copying the built-in list back in blindly would be worse than the bug: it
+   would resurrect anybody who had been REMOVED from the roster, and removing
+   somebody is deliberate and cannot be undone from the screen.
+
+   So this leans on the one thing that tells a new hire apart from a removal.
+   Roster ids only ever count UPWARDS -- rstNewId() takes the highest and adds
+   one -- so an id higher than any this phone has ever seen cannot be somebody
+   this phone removed. It has to be new. Anyone BELOW the mark who is missing
+   was taken off on purpose, and stays off.
+
+   The mark is remembered rather than worked out fresh each time. Working it
+   out would read "highest id I hold", so removing p24 would drop it back to
+   23 and hand p24 straight back the next morning. */
+var RST_HWM_KEY='ut_people_seen_v1';
+/* Every id up to here was on every phone before this mechanism existed, so on
+   the first run they count as already seen -- otherwise somebody removed from
+   the old roster would come back once. It is a fact about 2026-08-31 and
+   nothing else; it never needs raising when somebody new is hired. */
+var RST_HWM_BASE=23;
+function rstIdNum(id){ var m=/^p(\d+)$/.exec(id||''); return m?+m[1]:0; }
+function rstSeedNewcomers(){
+  var have={}; PEOPLE.forEach(function(p){ if(p&&p.id) have[p.id]=1; });
+  var hwm=0;
+  try{ var v=localStorage.getItem(RST_HWM_KEY); if(v!==null) hwm=+v||0; }catch(e){}
+  if(!hwm){
+    hwm=RST_HWM_BASE;
+    PEOPLE.forEach(function(p){ var n=rstIdNum(p&&p.id); if(n>hwm) hwm=n; });
+  }
+  var added=0, top=hwm;
+  RST_SEED.forEach(function(sp){
+    var n=rstIdNum(sp.id);
+    if(n>top) top=n;
+    if(n<=hwm || have[sp.id]) return;
+    var c={}; for(var k in sp) c[k]=sp[k];
+    PEOPLE.push(c); added++;
+  });
+  try{ localStorage.setItem(RST_HWM_KEY,String(top)); }catch(e){}
+  if(added) rstSave();
+  return added;
+}
+rstSeedNewcomers();
 /* ---- one-time: Dr. Stier's second lab moves onto the roster --------------
    It used to be a hardcoded map inside the trials module (TR_EXTRA_LABS), which
    the database could not read. It is a grant on his roster record now. A phone

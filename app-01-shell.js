@@ -321,6 +321,10 @@ function adaptiveResize(){
   railTop();
   if(!APP_SIZE_APPLY()) return;
   renderRail();
+  /* moreEnter() decides which More rows to show by size band (see moreEnter),
+     so a size flip while already on that screen needs it re-run, or a phone
+     turned sideways into tablet width would keep showing pages twice. */
+  if(document.getElementById('s-more')&&document.getElementById('s-more').classList.contains('active'))moreEnter();
   /* Same list applyTextSize() pokes — every live Leaflet instance, including the
      per-job maps in JOBMAP, since all of them just had their box resized. */
   setTimeout(function(){
@@ -342,7 +346,19 @@ window.addEventListener('orientationchange',function(){ setTimeout(adaptiveResiz
    trimmed to four tabs. It is never hidden behind a permission. */
 var MORE_ALWAYS={roles:1,login:1,farmsettings:1,bugreport:1,admin:1};
 function moreEnter(){ var role=currentRole,nav=navMap[role]||{},chosen=navChosen(role);
-  var onNav={}; chosen.forEach(function(l){ if(nav[l]) onNav[nav[l]]=1; });
+  var onNav={};
+  /* On the phone's bottom bar only the 3 chosen favourites sit outside More, so
+     everything else reachable still needs a row here. From tablet width up the
+     rail replaces that bar and shows EVERY reachable page (see renderRail()),
+     so listing them again here would just be the same page twice on one
+     screen. Treat every reachable page as already "on nav" there instead,
+     leaving More to do the one job the rail can't: Report a bug, Farm
+     settings and Admin. */
+  if((typeof APP_SIZE==='function')&&APP_SIZE()!=='phone'){
+    (NAV_OPTIONS[role]||[]).forEach(function(l){ if(PAGE_DEST[l]) onNav[PAGE_DEST[l]]=1; });
+  } else {
+    chosen.forEach(function(l){ if(nav[l]) onNav[nav[l]]=1; });
+  }
   var reachable={}; (NAV_OPTIONS[role]||[]).forEach(function(l){ if(PAGE_DEST[l]) reachable[PAGE_DEST[l]]=1; });
   var scr=document.getElementById('s-more'); if(!scr)return;
   scr.querySelectorAll('.row[data-go]').forEach(function(r){

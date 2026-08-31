@@ -78,6 +78,14 @@ function boot(store) {
   return { win, doc: win.document, s: win.__s || {}, errs };
 }
 
+/* The roster as it stood on the day before Levi was hired -- taken from the
+   app's own built-in list with him dropped, so it cannot drift out of step
+   with the real thing the way a second copy typed out here would. */
+const RST23 = (function () {
+  const { s } = boot({});
+  return s.PEOPLE.filter(p => p.id !== 'p24').map(p => JSON.parse(JSON.stringify(p)));
+})();
+
 /* ---------------------------------------------------------------- */
 section('1. the role is derived from the person, not chosen');
 {
@@ -101,7 +109,7 @@ section('2. the eighteen people who could never sign in before');
 {
   const { s } = boot({});
   const everyone = s.rstActive();
-  ok('roster has 23 active people', everyone.length === 23, String(everyone.length));
+  ok('roster has 24 active people', everyone.length === 24, String(everyone.length));
   const bad = everyone.filter(p => !s.sessionSet(p.id));
   ok('every one of them can sign in', bad.length === 0, bad.map(p => p.id).join(','));
 
@@ -211,6 +219,64 @@ section('8. signing out');
   ok('the session is cleared', !s.SESSION.pid, String(s.SESSION.pid));
   ok('and forgotten on this device', !store.ut_session_v1, store.ut_session_v1);
   ok('the login screen is showing', doc.getElementById('s-login').classList.contains('active'));
+}
+
+section('9. a new hire reaches a phone that already has the app');
+{
+  /* Bill's phone, 2026-08-31: it saved its own roster back when the farm had
+     23 people, so it had stopped reading the built-in list and could not see
+     Levi (p24) to put him on a job. */
+  const older = JSON.parse(JSON.stringify(RST23));
+  const store = { ut_people_v1: JSON.stringify(older) };
+  const { s } = boot(store);
+  const ids = s.PEOPLE.map(p => p.id);
+  ok('Levi is there now', ids.indexOf('p24') >= 0, ids.length + ' people');
+  ok('and nobody was lost doing it', ids.length === 24, String(ids.length));
+  const levi = s.rstFind('p24');
+  ok('with his real role and lab', !!levi && levi.role === 'Undergraduate Student' && levi.lab === 'Bill',
+     levi ? levi.role + '/' + levi.lab : 'missing');
+  ok('Bill can now put him on a job', s.rstActive().some(p => p.id === 'p24'));
+  ok('and the phone remembers it saw him', store.ut_people_seen_v1 === '24', store.ut_people_seen_v1);
+  ok('the roster was written back to the phone',
+     JSON.parse(store.ut_people_v1 || '[]').length === 24);
+}
+
+section('9b. and it CANNOT bring back somebody who was removed');
+{
+  /* The whole risk of the above. Removing somebody is deliberate and there is
+     no undo on the screen, so a phone that has taken a person off must never
+     have them handed back at the next reload. */
+
+  /* Removed AFTER the mark was being kept: p24 himself. */
+  const minusLevi = JSON.parse(JSON.stringify(RST23));
+  const storeA = { ut_people_v1: JSON.stringify(minusLevi), ut_people_seen_v1: '24' };
+  const a = boot(storeA).s;
+  ok('Levi stays off once this phone has removed him',
+     a.PEOPLE.every(p => p.id !== 'p24'), a.PEOPLE.length + ' people');
+
+  /* Removed BEFORE it existed, and they held the highest id -- the case the
+     base mark is there to cover. Lauren (p23) is gone and nothing is
+     remembered, so only the base mark stands between her and coming back. */
+  const minusLauren = JSON.parse(JSON.stringify(RST23)).filter(p => p.id !== 'p23');
+  const storeB = { ut_people_v1: JSON.stringify(minusLauren) };
+  const b = boot(storeB).s;
+  ok('somebody removed before this shipped stays removed',
+     b.PEOPLE.every(p => p.id !== 'p23'), b.PEOPLE.filter(p => p.id === 'p23').length + ' found');
+  ok('while the new hire still arrives on that same phone',
+     b.PEOPLE.some(p => p.id === 'p24'));
+}
+
+section('9c. an edited roster is not overwritten by the built-in list');
+{
+  /* The reason the saved roster wins in the first place. Somebody moved lab on
+     the Roster screen; reading the built-in list back over the top would undo
+     their work every morning. */
+  const edited = JSON.parse(JSON.stringify(RST23));
+  edited.find(p => p.id === 'p18').lab = 'Sorochan';
+  const store = { ut_people_v1: JSON.stringify(edited) };
+  const { s } = boot(store);
+  ok('the edit survives', s.rstFind('p18').lab === 'Sorochan', s.rstFind('p18').lab);
+  ok('and the new hire still arrived', !!s.rstFind('p24'));
 }
 
 section('Load errors');

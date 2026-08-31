@@ -179,8 +179,8 @@ section('9. the whole grid, so nothing is allowed by accident');
   /* Every actor against every target. Anything true that is not in this list
      is a rule nobody wrote down. */
   const expected = new Set([
-    'p07>p18','p07>p19','p07>p20','p07>p21','p07>p22','p07>p23',   /* Bill -> undergrads */
-    'p01>p18','p01>p19','p01>p20','p01>p21','p01>p22','p01>p23',   /* Dillon holds the grant */
+    'p07>p18','p07>p19','p07>p20','p07>p21','p07>p22','p07>p23','p07>p24',   /* Bill -> undergrads */
+    'p01>p18','p01>p19','p01>p20','p01>p21','p01>p22','p01>p23','p01>p24',   /* Dillon holds the grant */
     'p13>p05','p13>p06','p13>p12','p13>p23',                        /* Brosnan -> own lab */
     'p05>p23','p06>p23','p12>p23',                                  /* ...and Lauren's lab-mates */
     'p14>p08',                                                      /* Horvath -> own lab */

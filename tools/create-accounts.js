@@ -54,6 +54,15 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const ROSTER = path.join(ROOT, 'roster-emails.local.json');
 const APP = path.join(ROOT, 'UT-TurfFarm-App.html');
+/* The roster list and the App Manager entry used to sit in the page itself.
+   They moved into app-03-people.js when the script was split up on
+   2026-08-29, and this script kept reading the page — so it found NOBODY,
+   treated everyone as active, and found no App Manager, which quietly wiped
+   Dillon's App Manager status off his token. Read every app file, so moving
+   the list again cannot break this the same way. */
+const APP_FILES = [APP].concat(
+  fs.readdirSync(ROOT).filter(n => /^app-\d+-.*\.js$/.test(n)).sort()
+    .map(n => path.join(ROOT, n)));
 const DRY = process.argv.indexOf('--dry-run') >= 0;
 
 /* --- guard rails ------------------------------------------------------- */
@@ -77,7 +86,7 @@ const people = JSON.parse(fs.readFileSync(ROSTER, 'utf8')).filter(p => p.email);
 
 /* The app is the source of truth for who is still on the roster and who holds
    the App Manager post — read it rather than keeping a second list in step. */
-const html = fs.readFileSync(APP, 'utf8');
+const html = APP_FILES.map(f => fs.readFileSync(f, 'utf8')).join('\n');
 const active = (function () {
   const out = {};
   const re = /\{id:'(p\d+)',[^}]*?active:(true|false)/g;
@@ -86,6 +95,19 @@ const active = (function () {
 })();
 const adminMatch = html.match(/var APP_ADMIN=\{[^}]*?pid:'(p\d+)'/);
 const adminPid = adminMatch ? adminMatch[1] : null;
+
+/* STOP rather than guess. If the list cannot be found, every person looks
+   active and nobody looks like the App Manager - and this script would then
+   go and write that wrong answer onto 24 real accounts. Silence is the
+   dangerous outcome here, so it is not allowed. */
+if (!Object.keys(active).length || !adminPid) {
+  console.error('Could not read the roster out of the app files.\n' +
+    'Expected people written as {id:\'p01\',...active:true} and a line\n' +
+    'starting var APP_ADMIN={...pid:\'p01\'. Looked in:\n  ' +
+    APP_FILES.map(f => path.basename(f)).join('\n  ') + '\n' +
+    'Nothing was sent to Firebase. Tell whoever looks after the app.');
+  process.exit(1);
+}
 
 /* A placeholder password that nobody is ever told, and nobody ever types.
    Firebase requires a password to create an account, so each one gets a long

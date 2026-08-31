@@ -255,6 +255,84 @@ document.getElementById('s-fldetail').addEventListener('click',function(e){
  if(jump){ var to=jump.getAttribute('data-flgo'); if(flById(to)){ flCur=to; renderFlDetail(); } return; }
 });
 /* ============================================================
+   TWO THINGS EVERY DRAWER BELOW DEPENDS ON        (added 2026-08-31)
+   ------------------------------------------------------------
+   Both of these exist because of one afternoon. On 2026-08-31 the farm used
+   4.4 MILLION database reads in a day with one person using the app. The free
+   plan allows fifty thousand. Two drawers had got into an argument with the
+   server -- send a record up, get it back, decide it looks different, send it
+   again -- and nothing anywhere put a stop to it.
+
+   1. sdbJson(): COMPARE RECORDS WITH THE FIELDS SORTED.
+
+   A drawer sends a record whenever it differs from what the server last said,
+   and it works out "differs" by turning both into text and comparing the text.
+   The trap is that the database hands a record back with its fields in
+   ALPHABETICAL order, which is almost never the order the app created them in.
+   So a product typed in on this phone came back looking different from itself,
+   purely because `name` now came before `unit`. Nothing about the record had
+   changed. It got sent again, and again, forever.
+
+   Sorting both sides before comparing closes that off for good. Lists are left
+   in the order they were in -- the order of a list is part of what it says.
+
+   2. sdbMaySend(): THE BRAKE.
+
+   The sorting fix repairs the loops we know about. This catches the next one.
+   If a drawer offers the SAME record more than a dozen times in a minute, that
+   is not somebody editing -- the fastest anything here can legitimately send is
+   once every two seconds, and a person does not save the same thing twelve
+   times a minute. So that record stops going up, and the Shared database
+   screen says so in words.
+
+   The cost of being wrong here is one record not syncing until the app is
+   reopened, and it says on screen that it happened. The cost of NOT having it
+   is the farm's whole day of database allowance, spent by lunchtime, with
+   nothing on any screen to explain why sharing stopped.
+   ============================================================ */
+
+function _sdbSort(v){
+  if(Array.isArray(v)) return v.map(_sdbSort);        /* a list's order is meaning; keep it */
+  if(v&&typeof v==='object'){
+    var out={}, ks=Object.keys(v).sort();
+    for(var i=0;i<ks.length;i++) out[ks[i]]=_sdbSort(v[ks[i]]);
+    return out;
+  }
+  return v;
+}
+/* Use this instead of JSON.stringify anywhere a drawer decides whether a
+   record has changed, or remembers what the server last said. */
+function sdbJson(o){ try{ return JSON.stringify(_sdbSort(o)); }catch(e){ return null; } }
+
+var SDB_LOOP_MAX=12;             /* sends of ONE record... */
+var SDB_LOOP_WINDOW_MS=60000;    /* ...inside this long, before we call it stuck */
+var SDB_LOOP={};                 /* key -> how many, and since when */
+var SDB_STUCK={};                /* key -> the drawer it was in, for the screen */
+
+/* Ask before sending. `key` names one record in one drawer, e.g. 'inv/i7'.
+   A false answer means DO NOT send and DO NOT record it as sent, so the record
+   is paused rather than lost -- reopening the app clears the count. */
+function sdbMaySend(key,what){
+  if(SDB_STUCK[key]) return false;
+  var now=Date.now(), r=SDB_LOOP[key];
+  if(!r||(now-r.since)>SDB_LOOP_WINDOW_MS){ SDB_LOOP[key]={n:1,since:now}; return true; }
+  r.n++;
+  if(r.n>SDB_LOOP_MAX){
+    SDB_STUCK[key]=what||'record';
+    try{ console.warn('Shared database: stopped sending '+key+' — it was going up over and over.'); }catch(e){}
+    return false;
+  }
+  return true;
+}
+function sdbStuckCount(){ return Object.keys(SDB_STUCK).length; }
+/* What every *syncSummary() adds, so a stuck record cannot go unnoticed. */
+function sdbStuckNote(){
+  var n=sdbStuckCount();
+  if(!n) return '';
+  return ' · '+n+' stuck in a loop and stopped — report this';
+}
+function sdbLoopReset(){ SDB_LOOP={}; SDB_STUCK={}; }
+/* ============================================================
    THE FIELD LOG IN THE SHARED DATABASE — drawer 3
    ------------------------------------------------------------
    The record most people will read months or years later. Until 2026-08-31
@@ -310,7 +388,7 @@ function flDoc(a){
   if(!out.loggedBy) out.loggedBy=out.person||SESSION.pid||null;
   return out;
 }
-function flJson(a){ var d=flDoc(a); return d?JSON.stringify(d):null; }
+function flJson(a){ var d=flDoc(a); return d?sdbJson(d):null; }
 
 /* The oldest day this phone still holds. Anything older was trimmed by the
    cap, and must not be dragged back down. */
@@ -370,13 +448,13 @@ function flsyncOnSnapshot(snap){
     var data; try{ data=ch.doc.data(); }catch(e){ return; }
     if(!data) return;
     data.id=String(ch.doc.id);
-    FLSYNC.seen[data.id]=JSON.stringify(data);      /* agreed before anything reads it */
+    FLSYNC.seen[data.id]=sdbJson(data);      /* agreed before anything reads it */
     delete FLSYNC.failed[data.id];
     FLSYNC.down++;
 
     var have=flById(data.id);
     if(have){
-      if(JSON.stringify(flDoc(have))!==JSON.stringify(data)){
+      if(sdbJson(flDoc(have))!==sdbJson(data)){
         Object.keys(have).forEach(function(k){ if(!(k in data)) delete have[k]; });
         Object.keys(data).forEach(function(k){ have[k]=data[k]; });
         touched=true;
@@ -409,7 +487,8 @@ function flsyncUploadNew(){
     var id=String(a.id);
     if(FLSYNC.seen[id]!==undefined) return;
     var doc=flDoc(a); if(!doc) return;
-    FLSYNC.seen[id]=JSON.stringify(doc);
+    if(!sdbMaySend('fieldlog/'+id,'field log entry')) return;   /* the brake — see sdbMaySend() */
+    FLSYNC.seen[id]=sdbJson(doc);
     n++; FLSYNC.up++;
     try{ db.collection(FLSYNC_COLL).doc(id).set(doc).catch(function(e){ flsyncFail(id,e); }); }
     catch(e){ flsyncFail(id,e); }
@@ -433,6 +512,7 @@ function flPush(){
     if(!a||!a.id) return;
     var id=String(a.id), json=flJson(a);
     if(json===null||FLSYNC.seen[id]===json) return;
+    if(!sdbMaySend('fieldlog/'+id,'field log entry')) return;   /* the brake — see sdbMaySend() */
     FLSYNC.seen[id]=json; n++; FLSYNC.up++;
     try{ db.collection(FLSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ flsyncFail(id,e); }); }
     catch(e){ flsyncFail(id,e); }
@@ -459,7 +539,7 @@ function flsyncSummary(){
   if(!FLSYNC.live) return 'Connecting…';
   if(!FLSYNC.ready) return 'Connected — waiting for the shared copy';
   var f=Object.keys(FLSYNC.failed).length;
-  return FLSYNC.up+' sent · '+FLSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+  return FLSYNC.up+' sent · '+FLSYNC.down+' received'+(f?(' · '+f+' refused'):'')+sdbStuckNote();
 }
 
 
@@ -572,18 +652,24 @@ function invsyncOnMoves(snap){
     var data; try{ data=ch.doc.data(); }catch(e){ return; }
     if(!data) return;
     data.id=String(ch.doc.id);
-    INVSYNC.seen[data.id]=JSON.stringify(data);
-    delete INVSYNC.failed[data.id];
+    /* Remember it, and keep it, in the form this phone would SEND it -- not the
+       form it arrived in. invMoveDoc() fills in a missing `delta`, so
+       remembering the raw arrival leaves the two looking different forever and
+       the movement goes up again on every scan. Same lesson as the products
+       and the machines above; see docs/DECISIONS.md, 2026-08-31. */
+    var doc=invMoveDoc(data); if(!doc) return;
+    INVSYNC.seen[doc.id]=sdbJson(doc);
+    delete INVSYNC.failed[doc.id];
     INVSYNC.down++;
-    if(invMoveById(data.id)) return;                 /* already here, and immutable */
-    INVMOVES.push(data); touched=true;
+    if(invMoveById(doc.id)) return;                  /* already here, and immutable */
+    INVMOVES.push(doc); touched=true;
   });
   var fromCache=true;
   try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
   if(!INVSYNC.ready&&!fromCache){ INVSYNC.ready=true; invsyncUploadNew(); }
   if(touched){
     invSumsDirty();                                  /* the totals are now stale */
-    try{ storeTouch(); }catch(e){}
+    try{ storeSaveLocal(); }catch(e){}
     invsyncRepaintScreens();
   }
 }
@@ -598,10 +684,15 @@ function invsyncOnItems(snap){
     var data; try{ data=ch.doc.data(); }catch(e){ return; }
     if(!data) return;
     data.id=String(ch.doc.id);
-    INVSYNC.itemSeen[data.id]=JSON.stringify(data);
+    INVSYNC.itemSeen[data.id]=sdbJson(data);
     var have=INVENTORY.find(function(x){return x.id===data.id;});
     if(have){
-      if(JSON.stringify(invItemDoc(have))!==JSON.stringify(data)){
+      if(sdbJson(invItemDoc(have))!==sdbJson(data)){
+        /* Fields the arriving record does not have go FIRST. Leaving one
+           behind is what kept this drawer arguing with the server on
+           2026-08-31 — the record never matched, so it was sent forever.
+           Apply completely or refuse completely; there is no half-way. */
+        Object.keys(have).forEach(function(k){ if(!(k in data)) delete have[k]; });
         Object.keys(data).forEach(function(k){ have[k]=data[k]; });
         touched=true;
       }
@@ -610,7 +701,9 @@ function invsyncOnItems(snap){
     INVENTORY.push(data); touched=true;
   });
   if(touched){
-    try{ storeTouch(); }catch(e){}
+    /* Saved to the phone, and NOT storeTouch() — see the note over storeScan().
+       Sending is the two-second heartbeat's job, never an arriving record's. */
+    try{ storeSaveLocal(); }catch(e){}
     invsyncRepaintScreens();
   }
 }
@@ -634,7 +727,8 @@ function invsyncUploadNew(){
     var id=String(m.id);
     if(INVSYNC.seen[id]!==undefined) return;
     var doc=invMoveDoc(m); if(!doc) return;
-    INVSYNC.seen[id]=JSON.stringify(doc);
+    if(!sdbMaySend('invmove/'+id,'stock movement')) return;   /* the brake — see sdbMaySend() */
+    INVSYNC.seen[id]=sdbJson(doc);
     n++; INVSYNC.up++;
     try{ db.collection(INVSYNC_MOVES).doc(id).set(doc).catch(function(e){ invsyncFail(id,e); }); }
     catch(e){ invsyncFail(id,e); }
@@ -655,8 +749,9 @@ function invPush(){
   INVMOVES.forEach(function(m){
     if(!m||!m.id) return;
     var doc=invMoveDoc(m); if(!doc) return;
-    var id=String(m.id), json=JSON.stringify(doc);
+    var id=String(m.id), json=sdbJson(doc);
     if(INVSYNC.seen[id]===json) return;
+    if(!sdbMaySend('invmove/'+id,'stock movement')) return;   /* the brake — see sdbMaySend() */
     INVSYNC.seen[id]=json; n++; INVSYNC.up++;
     try{ db.collection(INVSYNC_MOVES).doc(id).set(doc).catch(function(e){ invsyncFail(id,e); }); }
     catch(e){ invsyncFail(id,e); }
@@ -665,8 +760,9 @@ function invPush(){
     INVENTORY.forEach(function(it){
       if(!it||!it.id) return;
       var doc=invItemDoc(it); if(!doc) return;
-      var id=String(it.id), json=JSON.stringify(doc);
+      var id=String(it.id), json=sdbJson(doc);
       if(INVSYNC.itemSeen[id]===json) return;
+      if(!sdbMaySend('product/'+id,'product')) return;   /* the brake — see sdbMaySend() */
       INVSYNC.itemSeen[id]=json; n++; INVSYNC.up++;
       try{ db.collection(INVSYNC_ITEMS).doc(id).set(doc).catch(function(e){ invsyncFail(id,e); }); }
       catch(e){ invsyncFail(id,e); }
@@ -687,7 +783,7 @@ function invsyncSummary(){
   if(!INVSYNC.live) return 'Connecting…';
   if(!INVSYNC.ready) return 'Connected — waiting for the shared copy';
   var f=Object.keys(INVSYNC.failed).length;
-  return INVSYNC.up+' sent · '+INVSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+  return INVSYNC.up+' sent · '+INVSYNC.down+' received'+(f?(' · '+f+' refused'):'')+sdbStuckNote();
 }
 
 
@@ -764,7 +860,7 @@ function schDoc(r){
   if(!out.days||typeof out.days!=='object') return null;
   return out;
 }
-function schJson(r){ var d=schDoc(r); return d?JSON.stringify(d):null; }
+function schJson(r){ var d=schDoc(r); return d?sdbJson(d):null; }
 function schById(id){ for(var i=0;i<SCHEDULES.length;i++) if(SCHEDULES[i]&&String(SCHEDULES[i].id)===String(id)) return SCHEDULES[i]; return null; }
 
 function schsyncStart(){
@@ -804,12 +900,12 @@ function schsyncOnSnapshot(snap){
     var data; try{ data=ch.doc.data(); }catch(e){ return; }
     if(!data) return;
     data.id=String(ch.doc.id);
-    SCHSYNC.seen[data.id]=JSON.stringify(data);
+    SCHSYNC.seen[data.id]=sdbJson(data);
     delete SCHSYNC.failed[data.id];
     SCHSYNC.down++;
     var have=schById(data.id);
     if(have){
-      if(JSON.stringify(schDoc(have))!==JSON.stringify(data)){
+      if(sdbJson(schDoc(have))!==sdbJson(data)){
         Object.keys(have).forEach(function(k){ if(!(k in data)) delete have[k]; });
         Object.keys(data).forEach(function(k){ have[k]=data[k]; });
         touched=true;
@@ -822,7 +918,7 @@ function schsyncOnSnapshot(snap){
   try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
   if(!SCHSYNC.ready&&!fromCache){ SCHSYNC.ready=true; schsyncUploadNew(); }
   if(touched){
-    try{ storeTouch(); }catch(e){}
+    try{ storeSaveLocal(); }catch(e){}
     /* Somebody else's hours changing is exactly the thing the day board is
        for, so repaint whatever is open rather than waiting for a navigation.
        The one exception is a person's own schedule screen while they have a
@@ -842,7 +938,8 @@ function schsyncUploadNew(){
     if(SCHSYNC.seen[id]!==undefined) return;
     if(!schCanPush(r)) return;
     var doc=schDoc(r); if(!doc) return;
-    SCHSYNC.seen[id]=JSON.stringify(doc);
+    if(!sdbMaySend('schedule/'+id,'schedule')) return;   /* the brake — see sdbMaySend() */
+    SCHSYNC.seen[id]=sdbJson(doc);
     n++; SCHSYNC.up++;
     try{ db.collection(SCHSYNC_COLL).doc(id).set(doc).catch(function(e){ schsyncFail(id,e); }); }
     catch(e){ schsyncFail(id,e); }
@@ -865,6 +962,7 @@ function schPush(){
     if(!r||!r.id||!schCanPush(r)) return;
     var id=String(r.id), json=schJson(r);
     if(json===null||SCHSYNC.seen[id]===json) return;
+    if(!sdbMaySend('schedule/'+id,'schedule')) return;   /* the brake — see sdbMaySend() */
     SCHSYNC.seen[id]=json; n++; SCHSYNC.up++;
     try{ db.collection(SCHSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ schsyncFail(id,e); }); }
     catch(e){ schsyncFail(id,e); }
@@ -888,7 +986,7 @@ function schsyncSummary(){
   if(!SCHSYNC.live) return 'Connecting…';
   if(!SCHSYNC.ready) return 'Connected — waiting for the shared copy';
   var f=Object.keys(SCHSYNC.failed).length;
-  return SCHSYNC.up+' sent · '+SCHSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+  return SCHSYNC.up+' sent · '+SCHSYNC.down+' received'+(f?(' · '+f+' refused'):'')+sdbStuckNote();
 }
 
 /* ================= TIME CLOCK ================= */
@@ -915,7 +1013,7 @@ function tcDoc(p){
   if(out.out===undefined) out.out=null;
   return out;
 }
-function tcJson(p){ var d=tcDoc(p); return d?JSON.stringify(d):null; }
+function tcJson(p){ var d=tcDoc(p); return d?sdbJson(d):null; }
 function tcAllDocs(){
   try{ return (typeof window.tcPunchDocs==='function')?(window.tcPunchDocs()||[]):[]; }catch(e){ return []; }
 }
@@ -953,7 +1051,7 @@ function tcsyncOnSnapshot(snap){
     var data; try{ data=ch.doc.data(); }catch(e){ return; }
     if(!data||!data.pid||!data.date) return;
     data.id=String(ch.doc.id);
-    TCSYNC.seen[data.id]=JSON.stringify(data);
+    TCSYNC.seen[data.id]=sdbJson(data);
     delete TCSYNC.failed[data.id];
     TCSYNC.down++;
     add.push(data);
@@ -975,7 +1073,8 @@ function tcsyncUploadNew(){
     if(TCSYNC.seen[id]!==undefined) return;
     if(!tcCanPush(p)) return;
     var doc=tcDoc(p); if(!doc) return;
-    TCSYNC.seen[id]=JSON.stringify(doc);
+    if(!sdbMaySend('timeclock/'+id,'time clock punch')) return;   /* the brake — see sdbMaySend() */
+    TCSYNC.seen[id]=sdbJson(doc);
     n++; TCSYNC.up++;
     try{ db.collection(TCSYNC_COLL).doc(id).set(doc).catch(function(e){ tcsyncFail(id,e); }); }
     catch(e){ tcsyncFail(id,e); }
@@ -994,6 +1093,7 @@ function tcPush(){
     if(!p||!p.id||!tcCanPush(p)) return;
     var id=String(p.id), json=tcJson(p);
     if(json===null||TCSYNC.seen[id]===json) return;
+    if(!sdbMaySend('timeclock/'+id,'time clock punch')) return;   /* the brake — see sdbMaySend() */
     TCSYNC.seen[id]=json; n++; TCSYNC.up++;
     try{ db.collection(TCSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ tcsyncFail(id,e); }); }
     catch(e){ tcsyncFail(id,e); }
@@ -1017,7 +1117,7 @@ function tcsyncSummary(){
   if(!TCSYNC.live) return 'Connecting…';
   if(!TCSYNC.ready) return 'Connected — waiting for the shared copy';
   var f=Object.keys(TCSYNC.failed).length;
-  return TCSYNC.up+' sent · '+TCSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+  return TCSYNC.up+' sent · '+TCSYNC.down+' received'+(f?(' · '+f+' refused'):'')+sdbStuckNote();
 }
 
 
@@ -1199,16 +1299,20 @@ function eqsyncOnSnapshot(tab,snap){
     var data; try{ data=ch.doc.data(); }catch(e){ return; }
     if(!data) return;
     data.id=id;
-    EQSYNC.seen[key]=JSON.stringify(data);
+    EQSYNC.seen[key]=sdbJson(data);
     delete EQSYNC.failed[key];
     EQSYNC.down++;
     var have=null;
     for(var i=0;i<list.length;i++){ if(String(list[i].id)===id){ have=list[i]; break; } }
     if(have){
       if(!tab.mutable) return;                        /* written once, never rewritten */
-      if(JSON.stringify(eqDoc(have))===JSON.stringify(data)) return;
+      if(sdbJson(eqDoc(have))===sdbJson(data)) return;
       /* Updated IN PLACE so the closures already holding a reference keep
-         pointing at live data — the same rule storeHydrate follows. */
+         pointing at live data — the same rule storeHydrate follows.
+         Fields the arriving record does not have go FIRST: leaving one behind
+         means this record never matches the shared copy, so it gets sent up
+         forever. That is what happened on 2026-08-31. */
+      Object.keys(have).forEach(function(k){ if(!(k in data)) delete have[k]; });
       Object.keys(data).forEach(function(k){ have[k]=data[k]; });
       touched=true;
       return;
@@ -1224,7 +1328,7 @@ function eqsyncOnSnapshot(tab,snap){
     EQSYNC.ready=true; eqsyncUploadNew();
   }
   if(touched){
-    try{ storeTouch(); }catch(e){}
+    try{ storeSaveLocal(); }catch(e){}
     eqsyncRepaint();
   }
 }
@@ -1252,7 +1356,8 @@ function eqsyncUploadNew(){
       var doc=eqDoc(rec); if(!doc) return;
       var key=eqKey(tab.coll,doc.id);
       if(EQSYNC.seen[key]!==undefined) return;
-      EQSYNC.seen[key]=JSON.stringify(doc);
+      if(!sdbMaySend('equipment/'+key,'equipment record')) return;   /* the brake — see sdbMaySend() */
+      EQSYNC.seen[key]=sdbJson(doc);
       n++; EQSYNC.up++;
       try{ db.collection(tab.coll).doc(doc.id).set(doc).catch(function(e){ eqsyncFail(key,e); }); }
       catch(e){ eqsyncFail(key,e); }
@@ -1277,8 +1382,9 @@ function eqPush(){
     if(!tab.can()) return;
     (tab.get()||[]).forEach(function(rec){
       var doc=eqDoc(rec); if(!doc) return;
-      var key=eqKey(tab.coll,doc.id), json=JSON.stringify(doc);
+      var key=eqKey(tab.coll,doc.id), json=sdbJson(doc);
       if(EQSYNC.seen[key]===json) return;
+      if(!sdbMaySend('equipment/'+key,'equipment record')) return;   /* the brake — see sdbMaySend() */
       EQSYNC.seen[key]=json; n++; EQSYNC.up++;
       try{ db.collection(tab.coll).doc(doc.id).set(doc).catch(function(e){ eqsyncFail(key,e); }); }
       catch(e){ eqsyncFail(key,e); }
@@ -1299,7 +1405,7 @@ function eqsyncSummary(){
   if(!EQSYNC.live) return 'Connecting…';
   if(!EQSYNC.ready) return 'Connected — waiting for the shared copy';
   var f=Object.keys(EQSYNC.failed).length;
-  return EQSYNC.up+' sent · '+EQSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+  return EQSYNC.up+' sent · '+EQSYNC.down+' received'+(f?(' · '+f+' refused'):'')+sdbStuckNote();
 }
 
 
@@ -1390,7 +1496,7 @@ function evDoc(ev){
   out.removed=!!out.removed;
   return out;
 }
-function evJson(ev){ var d=evDoc(ev); return d?JSON.stringify(d):null; }
+function evJson(ev){ var d=evDoc(ev); return d?sdbJson(d):null; }
 
 /* What this phone is allowed to send. An entry only goes up from somebody the
    app would have let make it, so the screens and the rules agree and nothing
@@ -1447,12 +1553,12 @@ function evsyncOnSnapshot(snap){
     var data; try{ data=ch.doc.data(); }catch(e){ return; }
     if(!data||!data.date||!data.type) return;
     data.id=String(ch.doc.id);
-    EVSYNC.seen[data.id]=JSON.stringify(data);
+    EVSYNC.seen[data.id]=sdbJson(data);
     delete EVSYNC.failed[data.id];
     EVSYNC.down++;
     var have=evFind(data.id);
     if(have){
-      if(JSON.stringify(evDoc(have))!==JSON.stringify(data)){
+      if(sdbJson(evDoc(have))!==sdbJson(data)){
         /* Updated IN PLACE, and fields the shared copy no longer has are
            dropped, so an entry cannot keep a stale value forever. */
         Object.keys(have).forEach(function(k){ if(!(k in data)) delete have[k]; });
@@ -1467,7 +1573,7 @@ function evsyncOnSnapshot(snap){
   try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
   if(!EVSYNC.ready&&!fromCache){ EVSYNC.ready=true; evsyncUploadNew(); }
   if(touched){
-    try{ storeTouch(); }catch(e){}
+    try{ storeSaveLocal(); }catch(e){}
     evsyncRepaint();
   }
 }
@@ -1493,7 +1599,8 @@ function evsyncUploadNew(){
     if(EVSYNC.seen[id]!==undefined) return;
     if(!evCanPush(ev)) return;
     var doc=evDoc(ev); if(!doc) return;
-    EVSYNC.seen[id]=JSON.stringify(doc);
+    if(!sdbMaySend('calendar/'+id,'calendar event')) return;   /* the brake — see sdbMaySend() */
+    EVSYNC.seen[id]=sdbJson(doc);
     n++; EVSYNC.up++;
     try{ db.collection(EVSYNC_COLL).doc(id).set(doc).catch(function(e){ evsyncFail(id,e); }); }
     catch(e){ evsyncFail(id,e); }
@@ -1513,6 +1620,7 @@ function evPush(){
     if(!ev||!ev.id||!evCanPush(ev)) return;
     var id=String(ev.id), json=evJson(ev);
     if(json===null||EVSYNC.seen[id]===json) return;
+    if(!sdbMaySend('calendar/'+id,'calendar event')) return;   /* the brake — see sdbMaySend() */
     EVSYNC.seen[id]=json; n++; EVSYNC.up++;
     try{ db.collection(EVSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ evsyncFail(id,e); }); }
     catch(e){ evsyncFail(id,e); }
@@ -1532,7 +1640,7 @@ function evsyncSummary(){
   if(!EVSYNC.live) return 'Connecting…';
   if(!EVSYNC.ready) return 'Connected — waiting for the shared copy';
   var f=Object.keys(EVSYNC.failed).length;
-  return EVSYNC.up+' sent · '+EVSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+  return EVSYNC.up+' sent · '+EVSYNC.down+' received'+(f?(' · '+f+' refused'):'')+sdbStuckNote();
 }
 
 
@@ -1623,7 +1731,7 @@ function rstDoc(p){
     v:RSTSYNC_V
   };
 }
-function rstJson(p){ var d=rstDoc(p); return d?JSON.stringify(d):null; }
+function rstJson(p){ var d=rstDoc(p); return d?sdbJson(d):null; }
 
 /* What this phone may send, one person at a time. Never offer the database a
    write it is only going to refuse: rosterCanWrite() is the app's copy of the
@@ -1699,13 +1807,13 @@ function rstsyncOnSnapshot(snap){
     if(!data.role) return;                                /* not a person */
     data.id=id;
     var doc=rstDoc(data); if(!doc) return;
-    RSTSYNC.seen[id]=JSON.stringify(doc);
+    RSTSYNC.seen[id]=sdbJson(doc);
     delete RSTSYNC.failed[id];
     RSTSYNC.down++;
     var have=null;
     for(var j=0;j<PEOPLE.length;j++){ if(String(PEOPLE[j].id)===id){ have=PEOPLE[j]; break; } }
     if(have){
-      if(rstJson(have)!==JSON.stringify(doc)){ rstApply(have,doc); touched=true; }
+      if(rstJson(have)!==sdbJson(doc)){ rstApply(have,doc); touched=true; }
       return;
     }
     PEOPLE.push(doc); touched=true;
@@ -1753,7 +1861,8 @@ function rstsyncUploadNew(){
     var id=String(p.id);
     if(RSTSYNC.seen[id]!==undefined) return;
     var doc=rstDoc(p); if(!doc) return;
-    RSTSYNC.seen[id]=JSON.stringify(doc);
+    if(!sdbMaySend('roster/'+id,'person')) return;   /* the brake — see sdbMaySend() */
+    RSTSYNC.seen[id]=sdbJson(doc);
     n++; RSTSYNC.up++;
     try{ db.collection(RSTSYNC_COLL).doc(id).set(doc).catch(function(e){ rstsyncFail(id,e); }); }
     catch(e){ rstsyncFail(id,e); }
@@ -1773,6 +1882,7 @@ function rstPush(){
     if(!p||!p.id||!rstCanPush(p)) return;
     var id=String(p.id), json=rstJson(p);
     if(json===null||RSTSYNC.seen[id]===json) return;
+    if(!sdbMaySend('roster/'+id,'person')) return;   /* the brake — see sdbMaySend() */
     RSTSYNC.seen[id]=json; n++; RSTSYNC.up++;
     try{ db.collection(RSTSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ rstsyncFail(id,e); }); }
     catch(e){ rstsyncFail(id,e); }
@@ -1792,7 +1902,7 @@ function rstsyncSummary(){
   if(!RSTSYNC.live) return 'Connecting…';
   if(!RSTSYNC.ready) return 'Connected — waiting for the shared copy';
   var f=Object.keys(RSTSYNC.failed).length;
-  return RSTSYNC.up+' sent · '+RSTSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+  return RSTSYNC.up+' sent · '+RSTSYNC.down+' received'+(f?(' · '+f+' refused'):'')+sdbStuckNote();
 }
 
 
@@ -1826,7 +1936,7 @@ function tplDoc(t){
   out.removed=!!out.removed;
   return out;
 }
-function tplJson(t){ var d=tplDoc(t); return d?JSON.stringify(d):null; }
+function tplJson(t){ var d=tplDoc(t); return d?sdbJson(d):null; }
 
 function tplsyncStart(){
   if(TPLSYNC.live) return true;
@@ -1868,12 +1978,12 @@ function tplsyncOnSnapshot(snap){
     var data; try{ data=ch.doc.data(); }catch(e){ return; }
     if(!data||typeof data.name!=='string') return;
     data.id=String(ch.doc.id);
-    TPLSYNC.seen[data.id]=JSON.stringify(data);
+    TPLSYNC.seen[data.id]=sdbJson(data);
     delete TPLSYNC.failed[data.id];
     TPLSYNC.down++;
     var have=tplFind(data.id);
     if(have){
-      if(JSON.stringify(tplDoc(have))!==JSON.stringify(data)){
+      if(sdbJson(tplDoc(have))!==sdbJson(data)){
         Object.keys(have).forEach(function(k){ if(!(k in data)) delete have[k]; });
         Object.keys(data).forEach(function(k){ have[k]=data[k]; });
         touched=true;
@@ -1886,7 +1996,7 @@ function tplsyncOnSnapshot(snap){
   try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
   if(!TPLSYNC.ready&&!fromCache){ TPLSYNC.ready=true; tplsyncUploadNew(); }
   if(touched){
-    try{ storeTouch(); }catch(e){}
+    try{ storeSaveLocal(); }catch(e){}
     /* The assign screen and the task list are both built from this, so repaint
        whichever is open instead of waiting for a navigation. */
     try{ if(document.getElementById('s-templates').classList.contains('active')&&typeof renderTemplates==='function') renderTemplates(); }catch(e){}
@@ -1905,7 +2015,8 @@ function tplsyncUploadNew(){
     var id=String(t.id);
     if(TPLSYNC.seen[id]!==undefined) return;
     var doc=tplDoc(t); if(!doc) return;
-    TPLSYNC.seen[id]=JSON.stringify(doc);
+    if(!sdbMaySend('template/'+id,'task template')) return;   /* the brake — see sdbMaySend() */
+    TPLSYNC.seen[id]=sdbJson(doc);
     n++; TPLSYNC.up++;
     try{ db.collection(TPLSYNC_COLL).doc(id).set(doc).catch(function(e){ tplsyncFail(id,e); }); }
     catch(e){ tplsyncFail(id,e); }
@@ -1924,6 +2035,7 @@ function tplPush(){
     if(!t||!t.id) return;
     var id=String(t.id), json=tplJson(t);
     if(json===null||TPLSYNC.seen[id]===json) return;
+    if(!sdbMaySend('template/'+id,'task template')) return;   /* the brake — see sdbMaySend() */
     TPLSYNC.seen[id]=json; n++; TPLSYNC.up++;
     try{ db.collection(TPLSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ tplsyncFail(id,e); }); }
     catch(e){ tplsyncFail(id,e); }
@@ -1947,7 +2059,7 @@ function tplsyncSummary(){
   if(!TPLSYNC.live) return 'Connecting…';
   if(!TPLSYNC.ready) return 'Connected — waiting for the shared copy';
   var f=Object.keys(TPLSYNC.failed).length;
-  return TPLSYNC.up+' sent · '+TPLSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+  return TPLSYNC.up+' sent · '+TPLSYNC.down+' received'+(f?(' · '+f+' refused'):'')+sdbStuckNote();
 }
 
 /* ================= TRIALS AND RESTRICTIONS ================= */
@@ -2021,8 +2133,8 @@ function trLiftDoc(t,r){
            lifted:String(r.lifted), liftedBy:String(r.liftedBy||''),
            liftedByPid:String(r.liftedByPid||'') };
 }
-function trTrialJson(t){ var d=trTrialDoc(t); return d?JSON.stringify(d):null; }
-function trLiftJson(t,r){ var d=trLiftDoc(t,r); return d?JSON.stringify(d):null; }
+function trTrialJson(t){ var d=trTrialDoc(t); return d?sdbJson(d):null; }
+function trLiftJson(t,r){ var d=trLiftDoc(t,r); return d?sdbJson(d):null; }
 
 /* ---- what this phone is allowed to offer ----
    Never offer a write that is going to be refused: every phone holds a copy of
@@ -2103,7 +2215,7 @@ function trsyncOnTrials(snap){
     var data; try{ data=ch.doc.data(); }catch(e){ return; }
     if(!data) return;
     data.id=id;
-    TRSYNC.seen[id]=JSON.stringify(data);
+    TRSYNC.seen[id]=sdbJson(data);
     delete TRSYNC.failed[id];
     TRSYNC.down++;
     if(data.removed===true){
@@ -2121,8 +2233,8 @@ function trsyncOnTrials(snap){
     if(typeof data.title!=='string') return;
     var have=trById(id);
     if(have){
-      var mine=JSON.stringify(trTrialDoc(have));
-      if(mine!==JSON.stringify(data)){
+      var mine=sdbJson(trTrialDoc(have));
+      if(mine!==sdbJson(data)){
         Object.keys(have).forEach(function(k){ if(!(k in data)) delete have[k]; });
         Object.keys(data).forEach(function(k){ have[k]=data[k]; });
         trsyncApplyLifts(have);
@@ -2149,7 +2261,7 @@ function trsyncOnLifts(snap){
     var data; try{ data=ch.doc.data(); }catch(e){ return; }
     if(!data||!data.lifted) return;
     data.id=rid;
-    TRSYNC.liftSeen[rid]=JSON.stringify(data);
+    TRSYNC.liftSeen[rid]=sdbJson(data);
     delete TRSYNC.failed[rid];
     TRSYNC.down++;
     TRSYNC.lifts[rid]={lifted:String(data.lifted),liftedBy:String(data.liftedBy||''),
@@ -2163,7 +2275,7 @@ function trsyncOnLifts(snap){
 }
 
 function trsyncTouched(){
-  try{ storeTouch(); }catch(e){}
+  try{ storeSaveLocal(); }catch(e){}
   try{ if(document.getElementById('s-trial').classList.contains('active')&&typeof trRender==='function') trRender(); }catch(e){}
   try{ if(document.getElementById('s-trialdetail').classList.contains('active')&&typeof trRenderDetail==='function') trRenderDetail(); }catch(e){}
   try{ trsyncRepaint(); }catch(e){}
@@ -2183,7 +2295,8 @@ function trsyncUploadNew(){
     var id=String(t.id);
     if(TRSYNC.seen[id]===undefined){
       var doc=trTrialDoc(t); if(!doc) return;
-      TRSYNC.seen[id]=JSON.stringify(doc); n++; TRSYNC.up++;
+      if(!sdbMaySend('trial/'+id,'study')) return;   /* the brake — see sdbMaySend() */
+      TRSYNC.seen[id]=sdbJson(doc); n++; TRSYNC.up++;
       try{ db.collection(TRSYNC_COLL).doc(id).set(doc).catch(function(e){ trsyncFail(id,e); }); }
       catch(e){ trsyncFail(id,e); }
     }
@@ -2191,7 +2304,8 @@ function trsyncUploadNew(){
   TR_GONE.slice().forEach(function(g){
     var doc=trGoneDoc(g); if(!doc||!trCanEditLab(doc.lab)) return;
     if(TRSYNC.seen[doc.id]!==undefined) return;
-    TRSYNC.seen[doc.id]=JSON.stringify(doc); n++; TRSYNC.up++;
+    if(!sdbMaySend('trial/'+doc.id,'study')) return;   /* the brake — see sdbMaySend() */
+    TRSYNC.seen[doc.id]=sdbJson(doc); n++; TRSYNC.up++;
     try{ db.collection(TRSYNC_COLL).doc(doc.id).set(doc).catch(function(e){ trsyncFail(doc.id,e); }); }
     catch(e){ trsyncFail(doc.id,e); }
   });
@@ -2208,6 +2322,7 @@ function trsyncPushLifts(db){
       if(!r||!r.id||!r.lifted) return;
       var rid=String(r.id), json=trLiftJson(t,r);
       if(json===null||TRSYNC.liftSeen[rid]===json) return;
+      if(!sdbMaySend('lift/'+rid,'lifted restriction')) return;   /* the brake — see sdbMaySend() */
       TRSYNC.liftSeen[rid]=json; n++; TRSYNC.up++;
       try{ db.collection(TRSYNC_LIFTS).doc(rid).set(JSON.parse(json)).catch(function(e){ trsyncFail(rid,e); }); }
       catch(e){ trsyncFail(rid,e); }
@@ -2225,14 +2340,16 @@ function trsyncPush(){
     if(!t||!t.id||!trsyncCanPushTrial(t)) return;
     var id=String(t.id), json=trTrialJson(t);
     if(json===null||TRSYNC.seen[id]===json) return;
+    if(!sdbMaySend('trial/'+id,'study')) return;   /* the brake — see sdbMaySend() */
     TRSYNC.seen[id]=json; n++; TRSYNC.up++;
     try{ db.collection(TRSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ trsyncFail(id,e); }); }
     catch(e){ trsyncFail(id,e); }
   });
   TR_GONE.forEach(function(g){
     var doc=trGoneDoc(g); if(!doc||!trCanEditLab(doc.lab)) return;
-    var json=JSON.stringify(doc);
+    var json=sdbJson(doc);
     if(TRSYNC.seen[doc.id]===json) return;
+    if(!sdbMaySend('trial/'+doc.id,'study')) return;   /* the brake — see sdbMaySend() */
     TRSYNC.seen[doc.id]=json; n++; TRSYNC.up++;
     try{ db.collection(TRSYNC_COLL).doc(doc.id).set(doc).catch(function(e){ trsyncFail(doc.id,e); }); }
     catch(e){ trsyncFail(doc.id,e); }
@@ -2257,7 +2374,7 @@ function trsyncSummary(){
   if(!TRSYNC.live||!TRSYNC.liveLifts) return 'Connecting…';
   if(!TRSYNC.ready||!TRSYNC.readyLifts) return 'Connected — waiting for the shared copy';
   var f=Object.keys(TRSYNC.failed).length;
-  return TRSYNC.up+' sent · '+TRSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+  return TRSYNC.up+' sent · '+TRSYNC.down+' received'+(f?(' · '+f+' refused'):'')+sdbStuckNote();
 }
 
 /* ================= FARM SETTINGS ================= */
@@ -2330,14 +2447,14 @@ var FST_GROUPS=[
     if(!good.length) return;
     FARM_SEMS.length=0;
     good.forEach(function(x){ FARM_SEMS.push(x); });
-    try{ storeTouch(); }catch(e){}
+    try{ storeSaveLocal(); }catch(e){}
   },
   restore:function(){
     var b=null; try{ b=JSON.parse(_semBase); }catch(e){ b=null; }
     if(!Array.isArray(b)) return;
     FARM_SEMS.length=0;
     b.forEach(function(x){ FARM_SEMS.push(x); });
-    try{ storeTouch(); }catch(e){}
+    try{ storeSaveLocal(); }catch(e){}
   },
   repaint:function(){ _fstRepaint('s-semsettings','smsRender'); }},
 
@@ -2394,7 +2511,7 @@ function fstDoc(g){
 function fstValueJson(g){
   var v=null; try{ v=g.read(); }catch(e){ v=null; }
   if(v===undefined) v=null;
-  try{ return JSON.stringify(v===null?null:v); }catch(e){ return null; }
+  try{ return sdbJson(v===null?null:v); }catch(e){ return null; }
 }
 
 function fstsyncStart(){
@@ -2426,7 +2543,7 @@ function fstsyncApplyDoc(id,data){
   var g=fstGroup(id); if(!g) return false;
   var v=(data&&('v' in data))?data.v:null;
   var mine=fstValueJson(g);
-  var theirs; try{ theirs=JSON.stringify(v===undefined?null:v); }catch(e){ return false; }
+  var theirs; try{ theirs=sdbJson(v===undefined?null:v); }catch(e){ return false; }
   FSTSYNC.seen[id]=theirs;
   if(mine===theirs) return false;
   try{
@@ -2457,7 +2574,7 @@ function fstsyncOnSnapshot(snap){
   try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
   if(!FSTSYNC.ready&&!fromCache){ FSTSYNC.ready=true; fstsyncSeed(); }
   if(touched){
-    try{ storeTouch(); }catch(e){}
+    try{ storeSaveLocal(); }catch(e){}
     try{ fstsyncRepaint(); }catch(e){}
   }
 }
@@ -2476,6 +2593,7 @@ function fstsyncSeed(){
     var may=false; try{ may=!!g.can(); }catch(e){ may=false; }
     if(!may) return;
     var doc=fstDoc(g);
+    if(!sdbMaySend('setting/'+g.id,'farm setting')) return;   /* the brake — see sdbMaySend() */
     FSTSYNC.seen[g.id]=fstValueJson(g);
     n++; FSTSYNC.up++;
     try{ db.collection(FSTSYNC_COLL).doc(g.id).set(doc).catch(function(e){ fstsyncFail(g.id,e); }); }
@@ -2511,6 +2629,7 @@ function fstsyncPush(){
     if(FSTSYNC.seen[g.id]===json) return;
     var may=false; try{ may=!!g.can(); }catch(e){ may=false; }
     if(!may) return;                              /* never offer a refused write */
+    if(!sdbMaySend('setting/'+g.id,'farm setting')) return;   /* the brake — see sdbMaySend() */
     FSTSYNC.seen[g.id]=json;
     n++; FSTSYNC.up++;
     try{ db.collection(FSTSYNC_COLL).doc(g.id).set(fstDoc(g)).catch(function(e){ fstsyncFail(g.id,e); }); }
@@ -2535,7 +2654,7 @@ function fstsyncSummary(){
   if(!FSTSYNC.live) return 'Connecting…';
   if(!FSTSYNC.ready) return 'Connected — waiting for the shared copy';
   var f=Object.keys(FSTSYNC.failed).length;
-  return FSTSYNC.up+' sent · '+FSTSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+  return FSTSYNC.up+' sent · '+FSTSYNC.down+' received'+(f?(' · '+f+' refused'):'')+sdbStuckNote();
 }
 
 /* ---- the correction sheet ----

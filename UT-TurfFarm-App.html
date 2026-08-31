@@ -2755,6 +2755,13 @@ function sdbError(e){
   if(c.indexOf('permission-denied')>=0) return 'The database refused it — were the rules published?';
   if(c.indexOf('unauthenticated')>=0) return 'Sign in first, then try again';
   if(c.indexOf('unavailable')>=0) return 'No connection — try again on wifi';
+  /* The free plan allows 50,000 records read and 20,000 written a day, and the
+     count resets at 3am our time. Hitting it does NOT stop the app: every
+     phone keeps its own copy, so people can still clock in, log a spray and
+     see their jobs. What stops is sharing, and nothing is lost -- anything
+     done meanwhile goes up on its own once the allowance comes back. Said in
+     those words because 'resource-exhausted' tells nobody any of that. */
+  if(c.indexOf('resource-exhausted')>=0) return 'The farm has used up its database allowance for today — the app still works and nothing is lost, sharing comes back after 3am';
   return 'It did not save: '+c;
 }
 
@@ -5519,7 +5526,7 @@ function csyncOnSnapshot(snap){
     CSYNC.seen[id]=JSON.parse(JSON.stringify(rec));   /* agreed before anything reads it */
     CSYNC.down++;
     try{
-      if(JSON.stringify(db[id])!==JSON.stringify(rec)){ db[id]=rec; touched=true; }
+      if(sdbJson(db[id])!==sdbJson(rec)){ db[id]=rec; touched=true; }
     }catch(e){ db[id]=rec; touched=true; }
   });
 
@@ -5543,7 +5550,7 @@ function crewPush(db){
     ['claims','done'].forEach(function(kind){
       var a=prev[kind]||{}, b=next[kind]||{};
       Object.keys(b).forEach(function(u){
-        var same; try{ same=JSON.stringify(a[u])===JSON.stringify(b[u]); }catch(e){ same=false; }
+        var same; try{ same=sdbJson(a[u])===sdbJson(b[u]); }catch(e){ same=false; }
         if(!same){ payload[kind][u]=b[u]; any=true; }
       });
       Object.keys(a).forEach(function(u){
@@ -5552,6 +5559,7 @@ function crewPush(db){
     });
     if(!any) return;
 
+    if(!sdbMaySend('crew/'+taskId,'crew claim')) return;   /* the brake — see sdbMaySend() */
     CSYNC.seen[taskId]=JSON.parse(JSON.stringify(next));
     wrote++; CSYNC.up++;
     try{ fdb.collection(CSYNC_COLL).doc(String(taskId)).set(payload,{merge:true})
@@ -5570,7 +5578,7 @@ function csyncSummary(){
   if(!CSYNC.on) return 'Off — only tabs on this machine see each other';
   if(CSYNC.err) return CSYNC.err;
   if(!CSYNC.live) return 'Connecting…';
-  return CSYNC.up+' sent · '+CSYNC.down+' received';
+  return CSYNC.up+' sent · '+CSYNC.down+' received'+sdbStuckNote();
 }
 function crewOn(fn)  { if (CREW_SUBS.indexOf(fn) < 0) CREW_SUBS.push(fn); }
 function crewOff(fn) { var i = CREW_SUBS.indexOf(fn); if (i >= 0) CREW_SUBS.splice(i, 1); }
@@ -7005,8 +7013,18 @@ function storeWriteRaw(def,json){
   }
 }
 
-/* Serialise each collection, write the ones that changed. */
-function storeScan(){
+/* Serialise each collection, write the ones that changed. ONTO THIS PHONE
+   ONLY — nothing here touches the network.
+
+   THIS IS THE HALF AN ARRIVING RECORD IS ALLOWED TO CALL.   (2026-08-31)
+   Every drawer's snapshot handler used to call storeTouch(), meaning one
+   record arriving from another phone immediately ran a full send-everything
+   sweep of all seventeen drawers. That turned a small disagreement in ONE
+   drawer into a loop running at network speed rather than at the two-second
+   heartbeat: 4.4 million reads in a day against an allowance of fifty
+   thousand. Saving to the phone is what a snapshot handler wants. Sending is
+   the heartbeat's job, and only the heartbeat's. See docs/DECISIONS.md. */
+function storeSaveLocal(){
   if(!_storeOn) return;
   STORE_DEFS.forEach(function(d){
     var s,a; try{ a=d.get(); }catch(e){ return; }
@@ -7020,6 +7038,13 @@ function storeScan(){
   try{ mowersScan(); }catch(e){}
   try{ labsScan(); }catch(e){}
   try{ bugcfgScan(); }catch(e){}
+}
+
+/* Save to the phone, then offer everything to the shared database. Only the
+   two-second heartbeat and a few deliberate "send it now" callers run this. */
+function storeScan(){
+  if(!_storeOn) return;
+  storeSaveLocal();
   try{ tsyncTick(); }catch(e){}
   try{ msyncTick(); }catch(e){}
   try{ csyncTick(); }catch(e){}
@@ -7157,7 +7182,7 @@ function taskDoc(t){
   if(!out.createdBy) out.createdBy=SESSION.pid||null;
   return out;
 }
-function tsyncJson(t){ var d=taskDoc(t); return d?JSON.stringify(d):null; }
+function tsyncJson(t){ var d=taskDoc(t); return d?sdbJson(d):null; }
 
 function tsyncFail(id,e){
   TSYNC.failed[id]=(typeof sdbError==='function')?sdbError(e):String((e&&e.message)||e);
@@ -7226,7 +7251,7 @@ function tsyncOnSnapshot(snap){
     var data; try{ data=ch.doc.data(); }catch(e){ return; }
     if(!data) return;
     data.id=id;
-    var json=JSON.stringify(data);
+    var json=sdbJson(data);
     TSYNC.seen[id]=json;             /* agreed BEFORE anything reads it — no echo */
     delete TSYNC.failed[id];
     TSYNC.down++;
@@ -7242,7 +7267,7 @@ function tsyncOnSnapshot(snap){
   try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
   if(!TSYNC.ready&&!fromCache){ TSYNC.ready=true; tsyncUploadNew(); }
 
-  if(touched){ try{ storeTouch(); }catch(e){} tsyncRepaint(); }
+  if(touched){ try{ storeSaveLocal(); }catch(e){} tsyncRepaint(); }
 }
 
 /* The migration step, and the reason everyone has to open the app once on
@@ -7255,7 +7280,8 @@ function tsyncUploadNew(){
     var id=String(t.id);
     if(TSYNC.seen[id]!==undefined) return;      /* the shared copy already has it */
     var doc=taskDoc(t); if(!doc) return;
-    TSYNC.seen[id]=JSON.stringify(doc);
+    if(!sdbMaySend('task/'+id,'task')) return;   /* the brake — see sdbMaySend() */
+    TSYNC.seen[id]=sdbJson(doc);
     n++; TSYNC.up++;
     try{ db.collection(TSYNC_COLL).doc(id).set(doc).catch(function(e){ tsyncFail(id,e); }); }
     catch(e){ tsyncFail(id,e); }
@@ -7275,6 +7301,7 @@ function tsyncScan(){
   Object.keys(here).forEach(function(id){
     var json=tsyncJson(here[id]); if(json===null) return;
     if(TSYNC.seen[id]===json) return;
+    if(!sdbMaySend('task/'+id,'task')) return;   /* the brake — see sdbMaySend() */
     TSYNC.seen[id]=json; TSYNC.up++;
     try{ db.collection(TSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ tsyncFail(id,e); }); }
     catch(e){ tsyncFail(id,e); }
@@ -7323,7 +7350,7 @@ function tsyncSummary(){
   if(!TSYNC.live) return 'Connecting…';
   if(!TSYNC.ready) return 'Connected — waiting for the shared copy';
   var f=Object.keys(TSYNC.failed).length;
-  return TSYNC.up+' sent · '+TSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+  return TSYNC.up+' sent · '+TSYNC.down+' received'+(f?(' · '+f+' refused'):'')+sdbStuckNote();
 }
 
 /* ---- map records: store the difference, not the whole thing ----
@@ -7541,7 +7568,7 @@ function mapPlaceJson(rec){
   var d; try{ d=JSON.parse(JSON.stringify(rec||{})); }catch(e){ return null; }
   if(!d) return null;
   delete d.updatedAt; delete d.updatedBy;
-  return JSON.stringify(d);
+  return sdbJson(d);
 }
 
 /* Lay an arriving record over what this device has. Mirrors mapApply(): a
@@ -7555,13 +7582,13 @@ function mapPlaceApply(rec){
     var o=d.get(); if(!o||typeof o!=='object') return;
     var v=rec[d.name];
     if(v===null){ if(id in o){ delete o[id]; changed=true; } }
-    else { try{ if(JSON.stringify(o[id])!==JSON.stringify(v)){ o[id]=v; changed=true; } }catch(e){ o[id]=v; changed=true; } }
+    else { try{ if(sdbJson(o[id])!==sdbJson(v)){ o[id]=v; changed=true; } }catch(e){ o[id]=v; changed=true; } }
   });
 
   try{
     if('geom' in rec){
       if(rec.geom===null){ if(PE_STORE.geom[id]){ delete PE_STORE.geom[id]; changed=true; } }
-      else if(JSON.stringify(PE_STORE.geom[id])!==JSON.stringify(rec.geom)){ PE_STORE.geom[id]=rec.geom; changed=true; }
+      else if(sdbJson(PE_STORE.geom[id])!==sdbJson(rec.geom)){ PE_STORE.geom[id]=rec.geom; changed=true; }
     }
     if(rec.added){
       var have=PE_STORE.added.some(function(a){ return a&&a.number===id; });
@@ -7624,7 +7651,7 @@ function msyncOnSnapshot(snap){
 
   if(touched){
     try{ peSave(); }catch(e){}
-    try{ storeTouch(); }catch(e){}
+    try{ storeSaveLocal(); }catch(e){}
     /* ~160 live polygon objects are holding the old geometry. peRedraw() is
        the app's own answer to that and it already exists. */
     try{ if(typeof peRedraw==='function') peRedraw(); }catch(e){}
@@ -7639,6 +7666,7 @@ function msyncUploadNew(){
   Object.keys(recs).forEach(function(id){
     if(MSYNC.seen[id]!==undefined) return;
     var doc=mapPlaceDoc(recs[id]); if(!doc) return;
+    if(!sdbMaySend('map/'+id,'map record')) return;   /* the brake — see sdbMaySend() */
     MSYNC.seen[id]=mapPlaceJson(recs[id]);
     n++; MSYNC.up++;
     try{ db.collection(MSYNC_COLL).doc(id).set(doc).catch(function(e){ msyncFail(id,e); }); }
@@ -7660,6 +7688,7 @@ function msyncScan(){
     var json=mapPlaceJson(recs[id]); if(json===null) return;
     if(MSYNC.seen[id]===json) return;
     var doc=mapPlaceDoc(recs[id]); if(!doc) return;
+    if(!sdbMaySend('map/'+id,'map record')) return;   /* the brake — see sdbMaySend() */
     MSYNC.seen[id]=json; MSYNC.up++;
     try{ db.collection(MSYNC_COLL).doc(id).set(doc).catch(function(e){ msyncFail(id,e); }); }
     catch(e){ msyncFail(id,e); }
@@ -7685,7 +7714,7 @@ function msyncSummary(){
   if(!MSYNC.live) return 'Connecting…';
   if(!MSYNC.ready) return 'Connected — waiting for the shared copy';
   var f=Object.keys(MSYNC.failed).length;
-  return MSYNC.up+' sent · '+MSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+  return MSYNC.up+' sent · '+MSYNC.down+' received'+(f?(' · '+f+' refused'):'')+sdbStuckNote();
 }
 
 /* Drop this device's edits and go back to what the file says. The reload is
@@ -8699,7 +8728,7 @@ function rosterLinkPerson(p,email){
   return batch.commit().then(function(){
     /* The drawer has now seen exactly what we sent, so it must not send it a
        second time on the next scan. */
-    try{ if(typeof RSTSYNC==='object'&&RSTSYNC&&RSTSYNC.seen) RSTSYNC.seen[doc.id]=JSON.stringify(doc); }catch(e){}
+    try{ if(typeof RSTSYNC==='object'&&RSTSYNC&&RSTSYNC.seen) RSTSYNC.seen[doc.id]=sdbJson(doc); }catch(e){}
     return true;
   });
 }
@@ -8765,7 +8794,7 @@ function rosterPush(){
        and send it a second time. */
     try{
       if(typeof RSTSYNC==='object'&&RSTSYNC&&RSTSYNC.seen)
-        ids.forEach(function(pid){ RSTSYNC.seen[pid]=JSON.stringify(payload.people[pid]); });
+        ids.forEach(function(pid){ RSTSYNC.seen[pid]=sdbJson(payload.people[pid]); });
     }catch(e){}
     return payload.count;
   });

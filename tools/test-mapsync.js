@@ -174,7 +174,10 @@ section('4. Clearing one phone must never delete the farm\'s corrections');
 /* ---------------------------------------- 5. a correction coming down -- */
 section('5. A correction from somebody else lands here');
 {
-  win.MSYNC.seen = {};
+  /* Deliberately NOT wiping MSYNC.seen. Wiping it makes the drawer forget
+     every record it has ever sent, so the next scan re-offers all of them and
+     the echo we are actually looking for gets lost in the noise. C7 is new
+     here, which is all this section needs. */
   emit('mapplaces', [{ type: 'added', id: 'C7', data: { id: 'C7', plotinfo: [['Turfgrass', 'Zoysia']], updatedBy: 'p07' } }], false);
   ok('it is applied to this phone', JSON.stringify(INFO()['C7']) === '[["Turfgrass","Zoysia"]]');
   reset(); win.msyncScan();
@@ -189,6 +192,12 @@ section('5. A correction from somebody else lands here');
 /* ------------------------------------------- 6. crew claims, off/on ---- */
 section('6. Crew claims — no switch, so they travel on their own');
 ok('sharing is on with nothing to press', win.CSYNC.on === true);
+/* The two-second heartbeat is what attaches a drawer. It used to be enough to
+   let another drawer receive something, because every snapshot handler called
+   storeTouch() -- which is exactly the amplification that spent 4.4 million
+   reads on 2026-08-31. Snapshot handlers now only save to the phone, so the
+   heartbeat is the only thing that attaches and sends. Run it. */
+win.storeScan();
 ok('and it attached itself once somebody was signed in', win.CSYNC.live === true);
 {
   reset();

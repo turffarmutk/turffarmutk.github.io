@@ -1328,3 +1328,82 @@ in this public file**. Hiding it would hide the only way out.
 **Don't:** hide the link again while `EASY_SIGN_IN` is true. The switch is
 still meant to be turned off, and this panel is how the crew get moved across
 one at a time instead of all at once from a laptop.
+
+### Records are compared with their fields sorted — 2026-08-31
+**Decision:** every drawer decides "has this changed?" through `sdbJson()` in
+`app-02-fieldlog-sync.js`, which sorts a record's fields by name before turning
+it into text. Bare `JSON.stringify` is no longer used for that anywhere, and
+`sdbJson()` is what fills each drawer's `seen` list too.
+**Why:** the database hands a record back with its fields in **alphabetical**
+order, which is almost never the order the app created them in. Comparing the
+two as plain text therefore reads an unchanged record as changed. The drawer
+sends it up, the server sends it back, and it never converges. On 2026-08-31
+that spent **4.4 million reads in one day** against a free-plan allowance of
+fifty thousand, with one person using the app, and took the farm's sharing down
+with nothing on any screen to say why.
+**Don't:** "simplify" a comparison back to `JSON.stringify` because it looks
+like the same thing. It is the same thing exactly until a record makes a round
+trip, which is the only case that matters. Lists are deliberately **not**
+sorted — the order of a list is part of what it says.
+
+### A drawer remembers a record in the form it would SEND it — 2026-08-31
+**Decision:** when a record arrives, a drawer records `seen[id]` as
+`sdbJson(theDrawersOwnDocFunction(arrivingRecord))`, not as `sdbJson(arriving)`.
+The stock movements drawer was changed to do this; it is the rule for new ones.
+**Why:** several `*Doc()` functions fill in a missing field — `invMoveDoc()`
+supplies `delta`, `flDoc()` supplies `loggedBy`, `taskDoc()` supplies
+`createdBy`. Remembering the raw arrival while comparing against the filled-in
+version means the two never match, and the record goes up on every scan
+forever. Same failure as above, different cause.
+**Don't:** assume a record that came from the server is already in the form
+this phone would send. It is only true when the doc function adds nothing.
+
+### An arriving record saves to the phone; it does not start a send — 2026-08-31
+**Decision:** `storeScan()` was split. `storeSaveLocal()` is the half that
+writes to the phone and touches no network; `storeScan()` is that plus every
+drawer's `*syncTick()`. **Every snapshot handler calls `storeSaveLocal()`.**
+Only the two-second heartbeat and a few deliberate user actions call
+`storeScan()`/`storeTouch()`.
+**Why:** eleven snapshot handlers used to call `storeTouch()`, so one record
+arriving from another phone immediately offered **all seventeen drawers** to
+the database. A record arriving is the thing a send causes, so that closed a
+circle: send, receive, send. It meant a disagreement in ONE drawer ran at
+network speed rather than once every two seconds — the difference between about
+43,000 reads in a day and 4.4 million.
+**Don't:** put `storeTouch()` back in a snapshot handler because the screen
+felt slow to catch up. It never was the thing that made records reach other
+phones; the heartbeat is, and it is two seconds away.
+**Note:** `tools/test-mapsync.js` had two checks that only passed *because* of
+this amplification — one drawer's traffic was starting another drawer. They
+were rewritten to run the heartbeat instead.
+
+### The brake: a record offered over and over is stopped — 2026-08-31
+**Decision:** `sdbMaySend(key, what)` in `app-02-fieldlog-sync.js` sits in front
+of every send. Offer the same record more than `SDB_LOOP_MAX` (12) times in a
+minute and it stops going up; every drawer's summary line on the Shared
+database screen then says so in words. Reopening the app clears it.
+**Why:** the three fixes above repair the loops we found. This catches the next
+one. The fastest anything here can legitimately send is once every two seconds,
+and nobody saves the same record twelve times in a minute, so twelve is well
+clear of real use and still stops a runaway in under a second. The cost of
+being wrong is one record not syncing until the app is reopened, and it says on
+screen that it happened. The cost of not having it was the whole farm's day of
+database allowance, spent by lunchtime, silently.
+**Don't:** raise the limit to get past a record that keeps tripping it. A
+record that trips it is a record that cannot agree with the server, and that is
+the bug.
+
+### Every drawer has a settling test — 2026-08-31
+**Decision:** `tools/test-sync-settles.js` walks every drawer, hands it a
+record, hands the same record back as the server would, and requires the drawer
+to have nothing to say. It does it twice: once with the fields in the order the
+database uses, once reversed.
+**Why:** this check already existed on 2026-08-31, for **one** drawer — the
+roster, in `tools/test-rostersync.js` — and the roster is the one drawer that
+did not break. That is the whole lesson. Written as one file rather than a line
+in each drawer's own test so that leaving a drawer out is visible: section 1
+fails if the app listens to a collection the table does not name, which is how
+the time clock got added to it.
+**Don't:** let a row go vacuous. Each row carries its own sample record on
+purpose — an earlier draft used whatever the app had seeded, and most
+collections are empty at boot, so it passed while checking almost nothing.

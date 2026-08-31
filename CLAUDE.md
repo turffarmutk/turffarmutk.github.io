@@ -152,18 +152,30 @@ minutes.**
 
 Open the app in two browser profiles signed in as different people. Make a
 change on one and watch it arrive on the other. **Then leave both sitting and
-watch the write count in the Firebase console. It must go flat.**
+watch the Shared database screen on each. Every `sent · received` count must go
+flat.** A count still climbing on a phone nobody is touching is the bug.
 
-This is a whole class of mistake that `npm test` cannot see and that opening
-the app once cannot see either. A drawer sends a record whenever it differs
-from what the server last said, so if applying an arriving record leaves *any*
-difference behind — a field you declined to take, a person you declined to
-drop — two phones write at each other twice a second. The free plan allows
-twenty thousand writes a day. That spends them in about seven hours, takes
-sharing down for the whole farm, and puts nothing on screen to say why.
+A drawer sends a record whenever it differs from what the server last said, so
+if applying an arriving record leaves *any* difference behind — a field you
+declined to take, a person you declined to drop, or the same fields in a
+different order — two phones write at each other until the allowance is gone.
+
+**This is not hypothetical and the numbers here are the real ones.** On
+2026-08-31 it happened, and it cost more than this file used to say. The free
+plan allows twenty thousand **writes** a day and fifty thousand **reads** —
+reads are the tighter limit, because every phone is told about every write. The
+farm spent **4.4 million reads in one day, with one person using the app.** It
+was not twice a second either: snapshot handlers were kicking off a send of all
+seventeen drawers, so the loop ran at network speed. See `docs/DECISIONS.md`
+for all four entries dated 2026-08-31.
 
 The rule that prevents it: **apply an arriving record completely, or refuse it
 completely and stop sending it too.** Never half of one.
+
+**And the rule that now checks it for you:** `tools/test-sync-settles.js` walks
+every drawer and requires each one to settle. It is part of `npm test`, so this
+particular mistake can no longer reach a phone. Watching two phones is still
+worth doing — but it is confirmation now, not the only defence.
 
 **5. Say honestly what you did.** Report what you ran and what you saw. If you
 skipped a step, say which and why. If something is still failing, say so. Do
@@ -213,6 +225,7 @@ get wrong.
 | `app-01-*.js` … `app-05-*.js` | Two thirds of the app. They must sit next to the app file, and they must load **in numeric order** — the numbers are the order. Renaming or reordering them breaks the app on opening. Adding a sixth is fine: `npm run sw` finds it and `tools/_app.js` tells the tests about it, so nothing needs a list updating by hand. |
 | `RST_SEED` in `app-03-people.js` | **No longer how a person reaches a phone**, since 2026-08-31. It is the starting list for a phone that has never had the app, and nothing else. Adding somebody here looks like it worked on the laptop and reaches **nobody** — the farm's real list of people lives in the database now. **The Roster screen is the way, and it is the only way.** |
 | The five weather day cards in the page | Those `.wxcard` divs are written **unclosed**, and the browser's repair of that is what puts every other screen at the depth the app expects. Tidying them into balanced markup moves 44 screens out of `#app` and the back arrow dies on all of them — silently, because the page still looks right. Fill them from code; never rewrite them. See `docs/DECISIONS.md`. |
+| `storeScan()` / `storeTouch()` | The two-second heartbeat that offers **every** drawer to the shared database. `storeSaveLocal()` is the other half — it writes to the phone and touches no network. Calling `storeScan()` or `storeTouch()` from anywhere that runs when a record *arrives* closes a loop and spends the farm's whole day of database allowance in an afternoon, with nothing on any screen to say why. That is not a worry, it is a thing that happened on 2026-08-31. Arriving records call `storeSaveLocal()`. |
 | The CSS, which stays inside the page | Colour-blind mode works by reading the text of every `<style>` block and rewriting the colours. Move the CSS out to a `.css` file and colour-blind mode stops working **with no error at all** — nothing to see, just wrong colours for the people who need it most. |
 | Files at the top level | The website serves this folder directly, so these filenames *are* the web address. Nothing the live app needs can move into a subfolder. |
 | `roster-emails.local.json` | The crew's email addresses. Deliberately kept out of the public repo. Never commit it. |
@@ -288,13 +301,37 @@ starts before anybody is signed in to the app, and there is a long comment
 over `RSTSYNC` in `app-02-fieldlog-sync.js` explaining the deadlock that
 forces that. Read it before changing anything about how it starts.
 
-Each group is **three things that change together**:
+Each group is **four things that change together**:
 
 1. the syncing code in the app, copying the pattern the existing ones use,
 2. the matching permission rules in `firestore.rules`,
-3. a test in `tools/` that proves it.
+3. a test in `tools/` that proves it,
+4. **a row in the table at the top of `tools/test-sync-settles.js`**, which is
+   what proves the drawer can ever stop talking.
 
-Never do one without the other two. The permission checks written in the app
+Never do one without the other three. Number 4 is the newest and it is there
+because of the worst day this app has had — see below.
+
+**THE TWO TRAPS THAT SPENT 4.4 MILLION READS IN AN AFTERNOON.** Both look like
+nothing. Both are in `docs/DECISIONS.md` under 2026-08-31.
+
+- **Compare records with their fields sorted — use `sdbJson()`, never
+  `JSON.stringify`.** The database hands a record back with its fields in
+  alphabetical order, which is almost never the order the app made them in. A
+  record typed in on a phone therefore comes back looking *different from
+  itself*. The drawer sends it again. And again. Nothing on screen changes;
+  only the bill does.
+- **A snapshot handler must never call `storeTouch()`. Call
+  `storeSaveLocal()`.** `storeTouch()` offers all seventeen drawers to the
+  database on the spot, and a record arriving is the thing a send causes — so
+  it closes a circle. It is the difference between a bad drawer costing 43,000
+  reads a day and costing four million. Saving to the phone is what a snapshot
+  handler wants; sending is the two-second heartbeat's job, two seconds away.
+
+There is also a brake, `sdbMaySend()`, in front of every send: a record offered
+more than twelve times in a minute stops going up and the Shared database
+screen says so. **It is a backstop, not permission to skip the two rules above**
+— by the time it fires something is already wrong. The permission checks written in the app
 are the real decision, and they get **copied across** into `firestore.rules`
 — never invent a rule that only exists in the rules file. A person's role
 always comes from the roster, never from `currentRole`, which is only about

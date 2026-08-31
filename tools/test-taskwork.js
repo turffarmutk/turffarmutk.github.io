@@ -333,7 +333,62 @@ section('6. an ordinary job is untouched by any of this');
      /finish/i.test(txt('tw-complete')), txt('tw-complete'));
 }
 
-section('7. nothing blew up');
+section('7. the job is the ground the manager picked, not the whole machine');
+{
+  /* Reported 2026-08-30: Bill did not want every fairway mown on Friday, so he
+     picked three in the assign wizard. The undergrad's phone listed the lot.
+     The plots he picked were saved on the task correctly -- they were thrown
+     away on the way back out, because a mow job asked the mower list what
+     ground it covered and only read the saved plots if that came back empty. */
+  const all = win.jobPlots('Mow', 'Fairway', []);
+  ok('the wizard offers every fairway to pick from', all.length > 3, String(all.length));
+
+  const some = all.slice(0, 3);
+  const t = mowTask('tw-7', 'Fairway');
+  t.plots = some.slice();
+  t.area = win.areaLabel(some);
+
+  const shown = win.taskPlots(t);
+  ok('the undergrad gets exactly the plots that were picked',
+     shown.length === some.length && some.every(n => shown.indexOf(n) >= 0),
+     shown.join(','));
+
+  win.__tw.setWork('tw-7');
+  win.go('taskwork');
+  ok('and the count is out of those, not out of the whole machine',
+     txt('tw-progress').indexOf('0 / ' + some.length + ' done') === 0, txt('tw-progress'));
+  t.donePlots = some.slice();
+  win.renderTaskWork();
+  ok('so checking off what he was given finishes the job',
+     /^Finish — all/.test(txt('tw-complete')), txt('tw-complete'));
+
+  /* Alley and border jobs resolve their ground the same way, and lost a
+     part-selection the same way. */
+  const az = win.jobPlots('Mow', 'Alley', []);
+  if (az.length > 2) {
+    const t2 = mowTask('tw-7b', 'Alley');
+    t2.plots = az.slice(0, 2);
+    ok('an alley job keeps its picked zones too', win.taskPlots(t2).length === 2,
+       win.taskPlots(t2).join(','));
+  }
+
+  /* What must NOT change: picking nothing still means the machine's ground.
+     That is how "mow the rotary plots" is assigned in one tap. */
+  const t3 = mowTask('tw-7c', 'Fairway');
+  ok('a job with nothing picked still covers the whole machine',
+     win.taskPlots(t3).length === all.length, String(win.taskPlots(t3).length));
+
+  /* And a job whose picked plots have all gone from the map says so, rather
+     than quietly growing back into every fairway. */
+  const t4 = mowTask('tw-7d', 'Fairway');
+  t4.plots = ['ZZ99'];
+  ok('a job whose picked ground has vanished has no ground', win.taskPlots(t4).length === 0,
+     win.taskPlots(t4).join(','));
+  const why4 = win.jobNoGround(t4.type, t4.title, win.parsePlots(t4));
+  ok('and it says so in words, agreeing with the map', /not on the farm map any more/.test(why4), why4);
+}
+
+section('8. nothing blew up');
 {
   const real = seen.filter(m => !/Not implemented|Could not parse CSS/i.test(m));
   ok('no jsdom errors', real.length === 0, real.slice(0, 3).join(' | '));

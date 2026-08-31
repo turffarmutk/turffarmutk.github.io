@@ -5991,6 +5991,14 @@ function jobPlots(type,name,fallback){
   var fb=(fallback||[]).filter(function(n){return real.indexOf(n)>=0;});
   return fb.length?fb:real;
 }
+/* Out of a list of plot names somebody saved, the ones still on the map today.
+   A plot that has since gone from farm-geo.js is dropped rather than counted:
+   left in, it would sit in the "3 / 4 done" total with nothing on screen to
+   tap, and the job could never be finished. */
+function jobRealPlots(list){
+  var all=jobAllPlots();
+  return (list||[]).filter(function(n){ return all.indexOf(n)>=0 || jobIsZone(n); });
+}
 /* Why a job has no ground on it, in words the person on the map can act on,
    or '' when it has some. A mow job that narrows to a machine is the case
    that bites: the machine can be renamed or deleted in Farm settings, and
@@ -5998,6 +6006,13 @@ function jobPlots(type,name,fallback){
    respond to a tap. */
 function jobNoGround(type,name,fallback){
   if(jobIsTrialDots(type,name)) return '';
+  /* Ground picked by hand answers this first, and it has to answer it the same
+     way taskPlots() does, or the two disagree and the screen goes quiet again:
+     picked plots ARE the job, and a job whose picked plots have all vanished
+     off the map has no ground, whatever machine it is on. */
+  if((fallback||[]).length) return jobRealPlots(fallback).length ? ''
+    : 'The plots this job was given are not on the farm map any more. '
+      +'Tell Bill so he can pick the ground again.';
   if(jobPlots(type,name,fallback).length) return '';
   var kinds=jobMowerKinds(type,name);
   if(kinds && kinds.length) return 'No plot on the farm is booked on '+kinds.join(' or ')

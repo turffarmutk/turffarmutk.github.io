@@ -611,6 +611,31 @@ pin this behaviour — keep them green.
 
 ## Field data & farm constants
 
+### The plots picked when a job is assigned ARE the job — 2026-08-30
+**Decision:** `taskPlots()` — the ground an assigned job actually covers —
+returns the plots saved on the task whenever there are any, and only falls
+through to `jobPlots()` when the task was assigned with nothing picked.
+`jobPlots()` answers a different question: *what could a job like this cover?*
+That is the picker's question, and for a mow job the answer is every plot
+booked on the machine.
+**Why:** the two questions shared one function, with the saved plots passed in
+as a *fallback* — and a fallback is only read when nothing else matched. A mow
+job always matched something (its machine's ground), so the manager's
+selection was thrown away every single time. Reported from the farm: Bill did
+not want all the fairways mown on Friday, picked three, and the undergrad's
+phone listed all eighteen, with a progress count of 0/18 he could not clear.
+Nothing looked broken — the task even *said* "Plots B1, B2, B3" at the top of
+the brief, because that text is stored, while the map below it was recomputed.
+It hit mow, alley and border jobs, which narrow to a machine or a zone list;
+sprays were never affected, because their branch already preferred the
+selection. `tools/test-taskwork.js` section 7 pins it.
+**Don't:** "tidy" these back into one call. And do not make `taskPlots()` fall
+back to the machine's ground when the picked plots no longer exist on the map
+— it now returns nothing there, on purpose, so `jobNoGround()` can say *the
+plots this job was given are not on the farm map any more* rather than the job
+quietly growing back into every fairway. Those two have to agree, or the work
+screen goes silent in exactly the way the entry below describes.
+
 ### A mow job finds its machine through the mower list, never by its name — 2026-08-30
 **Decision:** `jobMowerKinds()` no longer carries the mower labels as text.
 It looks for a WORD in the farm's own mower list — both the "Machine on the

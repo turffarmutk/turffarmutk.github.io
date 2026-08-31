@@ -906,9 +906,29 @@ function openTaskWork(id){var t=TASKS.find(function(x){return x.id===id;});if(!t
     drives anywhere, and the mix sheet lives there. */
  twBrief=!!(t.desc&&t.desc.trim())||(typeof sprayIsBoom==='function'&&sprayIsBoom(t));
  go('taskwork');}
-/* Plots a task covers. Mowing jobs read the mower assignment off the farm data
-   so a Rotary Mow task lights up exactly the rotary-mown ground. */
-function taskPlots(t){ return jobPlots(t.type,t.title,parsePlots(t)); }
+/* Plots a task covers -- the ground THIS assignment is on, which is not the
+   same question the plot picker asks.
+
+   jobPlots() answers "what could a job like this cover?", and for a mow job
+   that is every plot booked on the machine. Handing that same answer to the
+   undergrad is what put fairways on his phone that Bill had deliberately left
+   unpicked on Friday: the three plots saved on the task were passed in as a
+   fallback, and a fallback is only read when nothing else matched. So the
+   selection was thrown away every time the machine had ground of its own --
+   mow jobs, alley jobs and border jobs, silently, on the work map, the task
+   detail map and the progress count.
+
+   Picked ground wins. A task saved with no plots at all still falls through to
+   the machine's ground, which is the "mow the lot" case and stays as it was. */
+function taskPlots(t){
+  if(jobIsTrialDots(t.type,t.title)) return [];
+  var picked=parsePlots(t);
+  /* Dropping plots that are no longer on the map, rather than falling back to
+     the whole machine, keeps this in step with jobNoGround(): a job whose
+     ground has vanished says so instead of quietly growing. */
+  if(picked.length) return jobRealPlots(picked);
+  return jobPlots(t.type,t.title,picked);
+}
 function taskOpenPlots(t){ return taskPlots(t).filter(function(n){ return jobRes(n,t.type,t.title).full.length===0; }); }
 /* ---- The brief -----------------------------------------------------------
    A job with notes opens on them, not on the map: the crew reads what Bill

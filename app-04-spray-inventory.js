@@ -2318,7 +2318,7 @@ function openItem(id){
  document.getElementById('id-actions').innerHTML=
    (invCanMove()
      ? ('<div class="action tap" data-go="invlog" data-mode="restock" data-item="'+it.id+'" style="flex:1">Restock</div>'
-       +'<div class="action tap" data-go="invlog" data-mode="out" data-item="'+it.id+'" style="flex:1;background:#8a3b2f">Log usage</div>')
+       +'<div class="action tap" data-go="invlog" data-mode="out" data-item="'+it.id+'" style="flex:1;background:#2f9e4f">Log usage</div>')
      : '')
   +(invCanEdit()
      ? '<div class="action tap" data-go="additem" data-edit="'+it.id+'" style="flex:1;background:#17181a">Edit</div>'

@@ -380,6 +380,39 @@ needed at three points, marked **YOU**.
 
 ---
 
+## Step 8c — Hiring somebody, from now on  **YOU, and no laptop**
+
+**As of 2026-08-31 you do not run anything on the Mac to hire somebody.**
+
+1. More → People → **Add**. Fill in their name, role, lab, pronouns, and
+   **their farm email address** — the address is what their sign-in gets
+   attached to, so it is the one field that matters most here.
+2. Save. That is it. They appear on everybody's phone within a few seconds.
+3. Tell them to open <https://turffarmutk.github.io/>, tap **"First time here,
+   or want your own password?"**, type their email address and choose a
+   password.
+
+They land on their own home screen. Nobody edits the app, nobody pushes
+anything, and nothing has to reach twenty-three phones first.
+
+**Who can do it:** Bill, you, whoever holds the undergrad-assignment job, and
+the faculty — a PI can add and edit people in their own lab, every
+undergraduate, and the Farm Manager entry. A PI cannot touch another PI and
+cannot hand out the undergrad job.
+
+**Taking somebody off** is the "Currently working here" switch on their record,
+not a deletion. Their old field logs and timesheets keep reading correctly, and
+they cannot sign in from the moment it is off.
+
+**One thing worth knowing.** The people hired this way have their roster id in
+the database rather than stamped on their sign-in token, which is a fraction
+slower and works just as well. If you ever run `tools/create-accounts.js` again
+it will **adopt** their existing account and stamp the token properly rather
+than making a second one — but only if you have also added them to
+`roster-emails.local.json` by hand. You do not have to; it is tidier if you do.
+
+---
+
 ## Step 9 — Decide the money question  **YOU**
 
 Free Firebase covers 23 people comfortably. But once the farm's records live

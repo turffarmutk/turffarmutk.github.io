@@ -28,36 +28,86 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /* ------------------------------------------------------------------
-       WHO IS ASKING
+       WHO IS ASKING — the roster id, two ways
 
-       The roster id ("p09") travels on the sign-in token as a custom claim,
-       stamped there by tools/create-accounts.js. The account holder cannot
-       edit it, and it is readable with no signal because it is cached with
-       the token. The crew's email addresses are deliberately not in the app,
-       so the id is the only thing that identifies a person here.
+       FIRST CHOICE, THE TOKEN. The roster id ("p09") travels on the sign-in
+       token as a custom claim, stamped there by tools/create-accounts.js on
+       a laptop. The account holder cannot edit it, it costs the database
+       nothing to read, and it is readable with no signal because it is
+       cached with the token. This is still the better of the two and it is
+       tried first.
+
+       SECOND CHOICE, THE ACCOUNTS ROW. Somebody hired THROUGH THE APP has no
+       claim, because nobody ran anything on a laptop — that is the entire
+       point of them. For those people the id is looked up from the row that
+       was written when they were added. It costs one document read, it is
+       only ever reached by somebody with no claim, and the moment anybody
+       does run create-accounts.js again the claim takes over and the read
+       stops happening.
+
+       The addresses used to be nowhere near this project (docs/DECISIONS.md,
+       2026-08-17). That decision was about a PUBLIC repository, and it still
+       holds: they are not in the app, not in the source, not in a commit.
+       They are here, in a private database, behind the rules below, because
+       a new hire cannot be told who they are without them.
        ------------------------------------------------------------------ */
-    function me() {
+    function claimPid() {
       return request.auth != null && request.auth.token.pid is string
         ? request.auth.token.pid : '';
+    }
+    /* Lower-cased, because the row is filed under the lower-cased address and
+       a person may type theirs however they like. */
+    function signInEmail() {
+      return request.auth != null && request.auth.token.email is string
+        ? request.auth.token.email.lower() : '';
+    }
+    function accountRow() {
+      return /databases/$(database)/documents/accounts/$(signInEmail());
+    }
+    /* exists() FIRST. Reading a field off a row that is not there is an
+       error, and an error here does not deny one rule — it denies EVERY rule
+       in this file for that person. */
+    function accountPid() {
+      return signInEmail() != '' && exists(accountRow())
+        ? get(accountRow()).data.get('pid', '') : '';
+    }
+    function me() {
+      return claimPid() != '' ? claimPid() : accountPid();
     }
     function signedIn() {
       return me() != '';
     }
 
     /* ------------------------------------------------------------------
-       THE ROSTER — one document, refdata/roster
+       THE ROSTER — one record per person, roster/{pid}
 
-       Read as ONE document rather than one per person, on purpose: a rule
-       may only fetch a handful of documents per request, and the whole
-       roster is 23 short entries. Repeated lookups inside one request are
-       fetched once and reused, so this costs a single read no matter how
-       many times the rules below ask a question about somebody.
+       This used to be ONE document holding everybody, which was cheaper: a
+       single fetch answered every question in a request. It was split on
+       2026-08-31 because a whole-roster document cannot express "a PI may
+       edit their own lab and nobody else's". The whole thing arrives as one
+       write, and no rule can tell "added a hire" apart from "made myself
+       Farm Manager" inside it. One record per person is the only shape where
+       that sentence can be written down and enforced.
 
-       Shape:
-         { people: { p01: {role, lab, active, grants[]}, ... } }
+       What it costs: a request that asks about two people (an actor and the
+       person they are acting on) now fetches two records instead of one. The
+       ceiling is ten document fetches for a single-document request, and
+       repeated lookups of the SAME record inside one request are still
+       fetched once and reused. Two is not close to ten.
+
+       Shape, per record:
+         { id, first, last, pron, role, lab, active, grants[], v }
+       and NOT the email address — see the `accounts` collection for that.
        ------------------------------------------------------------------ */
+    function recPath(id) {
+      return /databases/$(database)/documents/roster/$(id);
+    }
+    /* exists() FIRST, always. Reading a field off a record that is not there
+       is an error, and an error here does not deny one rule — it denies
+       EVERY rule in this file for that person, including the roster read
+       they need before the app can tell them anything useful. */
     function rec(id) {
-      return get(/databases/$(database)/documents/refdata/roster).data.people.get(id, {});
+      return id != '' && exists(recPath(id)) ? get(recPath(id)).data : {};
     }
     function str(v) {
       return v == null ? '' : v;
@@ -174,12 +224,122 @@ service cloud.firestore {
        the ONLY place in the whole file where a person is named, and if both
        ever leave the farm it is the one line a successor has to change.
        ------------------------------------------------------------------ */
+    /* Who may write the farm's list of people. Pulled out into a named
+       function because Stage 3 uses it again for the `accounts` rows: adding
+       somebody to the roster and attaching a sign-in to them are one act, so
+       they get one test.
+
+       The two ids are the bootstrap. Somebody has to be allowed to write the
+       roster before there IS a roster to check a grant against. p07 is Bill,
+       p01 is Dillon. This is the ONLY place in the whole file where a person
+       is named, and if both ever leave the farm it is the one line a
+       successor has to change. tools/test-db.js reads this list straight out
+       of this file and fails if the app's copy ever differs. */
+    function rosterKeeper() {
+      return me() != '' && (
+           me() in ['p01', 'p07']
+        || assignsUndergrads(me())
+      );
+    }
+
+    /* The App Manager holds every record, including the faculty's. It is a
+       claim on the token, stamped by tools/create-accounts.js, not a role on
+       the roster — the job is "looks after the app", not "works on the farm". */
+    function appAdmin() {
+      return request.auth != null && request.auth.token.app_admin == true;
+    }
+
+    /* A PI may add and edit people in their OWN lab, every undergraduate (they
+       all work one shared pool), and the Farm Manager entry — so that if Bill
+       ever leaves, the faculty can still hand the job to somebody. A PI may not
+       touch another PI, or another lab's grads and technicians.
+
+       This is rosterCanWrite() in UT-TurfFarm-App.html, transcribed.
+       tools/test-rules.js runs the two against every person against every
+       person and fails if they ever differ.
+
+       Two things a PI may not do even inside their own lab, because each is a
+       way of quietly promoting somebody:
+         - touch a Faculty record, before or after the write;
+         - hand out grants. `assign_undergrads` IS the undergrad job.
+
+       And the lab is checked on BOTH sides of an edit, not just the new value.
+       Checking only what was written would let a PI pull another lab's
+       technician into their own lab and then edit them freely. */
+    /* The em dash the app writes for "no lab" is the shared undergrad pool,
+       not a lab everybody is in together — same normalising as labOf(). */
+    function labNorm(v) { return v == '—' ? '' : v; }
+    function wrote(f) { return request.resource.data.get(f, ''); }
+    function had(f)   { return resource == null ? '' : resource.data.get(f, ''); }
+    function facultyMayWrite() {
+      return roleOf(me()) == 'Faculty'
+        && wrote('role') != 'Faculty'
+        && had('role') != 'Faculty'
+        && request.resource.data.get('grants', []).size() == 0
+        && (resource == null || resource.data.get('grants', []).size() == 0)
+        && (
+             wrote('role') == 'Undergraduate Student'
+          || wrote('role') == 'Farm Manager'
+          || (labOf(me()) != ''
+              && labNorm(wrote('lab')) == labOf(me())
+              && (resource == null || labNorm(had('lab')) == labOf(me())))
+        );
+    }
+
+    match /roster/{pid} {
+      /* Everybody signed in reads the whole roster. They already do — the
+         names are in the app's source, which is public. What is NOT here is
+         the email addresses. */
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && (appAdmin() || rosterKeeper() || facultyMayWrite());
+      /* The app never deletes a person — taking somebody off the farm is
+         `active: false`, which keeps their old field logs and timesheets
+         reading correctly years later. So this stays with the few people who
+         could undo the damage if it were ever done from the console. */
+      allow delete: if appAdmin() || rosterKeeper();
+    }
+
+    /* The old whole-roster document, closed. Nothing writes it any more and
+       nothing reads it. Left as an explicit refusal rather than deleted, so
+       that a phone still running a week-old copy of the app gets a clean
+       "no" instead of silently writing to a document nothing reads. */
     match /refdata/roster {
       allow read: if signedIn();
-      allow write: if signedIn() && (
-           me() in ['p01', 'p07']
-        || (exists(/databases/$(database)/documents/refdata/roster) && assignsUndergrads(me()))
-      );
+      allow write: if false;
+    }
+
+    /* ------------------------------------------------------------------
+       ACCOUNTS — which sign-in belongs to which person
+
+       One short row per address: { pid, addedBy, addedAt }. Written by the
+       same people who may write the roster, because adding somebody to the
+       farm and attaching a sign-in to them are one act.
+
+       WHY `get` AND NOT `read`. In Firestore, `read` means get AND LIST. The
+       addresses ARE the document names here, so `allow read` would hand
+       anybody with an account the whole crew's address book in a single
+       request — and anybody on the internet can make an account in this
+       project, because the app's Firebase key is public and has to be. They
+       get no roster id and every other rule refuses them, but they must not
+       be able to list this. `list` is refused in writing, below, so that
+       nobody puts it back by accident.
+       ------------------------------------------------------------------ */
+    match /accounts/{signInAddress} {
+      allow get: if request.auth != null
+        && signInEmail() != ''
+        && signInAddress == signInEmail();
+      allow list: if false;
+
+      allow create, update: if (appAdmin() || rosterKeeper())
+        && request.resource.data.pid is string
+        && request.resource.data.pid != ''
+        && request.resource.data.keys().hasOnly(['pid', 'addedBy', 'addedAt']);
+
+      /* Deleting a row takes the person's id away at their very next request,
+         so it is the fastest way to shut somebody out. It stays with the
+         people who could have added it. */
+      allow delete: if appAdmin() || rosterKeeper();
     }
 
     /* ------------------------------------------------------------------

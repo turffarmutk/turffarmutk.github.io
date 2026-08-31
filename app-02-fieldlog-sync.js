@@ -1536,6 +1536,266 @@ function evsyncSummary(){
 }
 
 
+/* ================= THE ROSTER ================= */
+/* Drawer 13, and the one the other twelve stand on.
+   --------------------------------------------------------------------------
+   WHAT IT IS FOR. Hiring somebody used to take three things, and only one of
+   them could be done in the app: a row typed on the Roster screen (which saved
+   on that phone and nowhere else), an edit to RST_SEED in app-03-people.js,
+   and a command run on Dillon's Mac. docs/SUCCESSION.md says a routine change
+   that needs the source file edited is a change that stops happening the day
+   he leaves, and hiring is the most routine change a farm has. So the roster
+   moves into the shared database and the Roster screen becomes the only way.
+
+   ONE RECORD PER PERSON, not one document for the whole roster. That is what
+   lets the database say "a PI may edit their own lab and nobody else's" -- a
+   single whole-roster document arrives as one write, and the rules cannot tell
+   "added a hire" apart from "made myself Farm Manager" inside it. It also
+   makes this an ordinary drawer, the same shape as the other twelve, instead
+   of the app's only document listener.
+
+   TWO THINGS HERE ARE DELIBERATELY UNLIKE EVERY OTHER DRAWER.
+
+   1. IT STARTS WITHOUT A SESSION. Every other drawer refuses until SESSION.pid
+      is set. This one cannot, and the reason is a deadlock: a new hire's phone
+      has never had the app, so its list of people is RST_SEED, which does not
+      contain them. sessionSet() refuses an id it cannot find, so they would be
+      told "That account is no longer active on the roster" -- the exact
+      opposite of the truth. The roster has to be allowed to arrive BEFORE the
+      app knows who is holding the phone, so this drawer gates on being signed
+      in to Firebase rather than on being placed on the roster.
+
+   2. EMAIL ADDRESSES NEVER TRAVEL ON THIS DRAWER. They are in the database --
+      see the `accounts` collection, which is what attaches a login to a person
+      -- but they are filed one row per address, readable only by the person
+      whose address it is. Putting them on the roster record instead would mean
+      anybody signed in could read the whole crew's address book in a single
+      request. rstDoc() strips `email` on the way out and rstApply() preserves
+      whatever this phone already had on the way in.
+
+   WHY THE MERGE MUST LEAVE LOCAL EQUAL TO SHARED. A drawer pushes a record
+   whenever it differs from what the server last said. So if applying an
+   arriving record left ANY difference behind -- a field we declined to take, a
+   person we declined to drop -- this phone would push its version straight
+   back, the other phone would push its version back, and two phones would
+   write at each other twice a second forever. The free plan allows twenty
+   thousand writes a day; that pattern spends them in about seven hours and
+   takes sharing down for the whole farm with nothing on screen to say why.
+   Everything below either applies an arriving record COMPLETELY or refuses it
+   completely and stops pushing it too. There is no half-way. */
+
+/* ---- the drawer ---------------------------------------------------------- */
+var RSTSYNC_COLL='roster';
+var RSTSYNC_RETRY_MS=10000;
+var RSTSYNC={ on:false, live:false, ready:false, seen:{}, err:null, up:0, down:0, failed:{} };
+var _rstsyncNextTry=0;
+
+/* The shape stamp. A phone whose saved copy of the app is a week old is still
+   running the OLD roster code, which sent role/lab/active/grants and no names
+   at all. Without this, the first time that phone sent the roster up, every
+   phone on the farm would show a list of people with no names and nothing to
+   explain it. Records below v2 are ignored outright. */
+var RSTSYNC_V=2;
+
+/* On, always -- see "SHARING IS NOT OPTIONAL" over flsyncWanted(). */
+function rstsyncWanted(){ return true; }
+function rstsyncHydrate(){ RSTSYNC.on=rstsyncWanted(); }
+function rstsyncSetWanted(on){
+  RSTSYNC.on=!!on;
+  if(on){ _rstsyncNextTry=0; rstsyncStart(); } else rstsyncStop();
+}
+
+/* The seven fields that travel, and NOT `email`. Written out rather than
+   copied from the record so that a field somebody adds to a person on the
+   Roster screen cannot start travelling by accident. */
+function rstDoc(p){
+  if(!p||!p.id||!/^p\d+$/.test(String(p.id))) return null;
+  if(!p.role) return null;                       /* no role means not a person yet */
+  return {
+    id:String(p.id),
+    first:String(p.first||''),
+    last:String(p.last||''),
+    pron:String(p.pron||''),
+    role:String(p.role),
+    lab:String(p.lab||''),
+    active:p.active!==false,
+    grants:(p.grants||[]).map(String),
+    v:RSTSYNC_V
+  };
+}
+function rstJson(p){ var d=rstDoc(p); return d?JSON.stringify(d):null; }
+
+/* What this phone may send, one person at a time. Never offer the database a
+   write it is only going to refuse: rosterCanWrite() is the app's copy of the
+   rule, and firestore.rules is the copy that actually decides. */
+function rstCanPush(p){
+  return (typeof rosterCanWrite==='function') ? rosterCanWrite(p) : false;
+}
+
+function rstsyncStart(){
+  if(RSTSYNC.live) return true;
+  if(Date.now()<_rstsyncNextTry) return false;
+  var db=fbDb();
+  /* NOT SESSION.pid -- see point 1 in the header. Signed in to Firebase is
+     enough, and it has to be, because who this person is on the roster is the
+     very thing this drawer exists to find out. */
+  var signedInToFirebase=false;
+  try{ var a=fbAuth(); signedInToFirebase=!!(a&&a.currentUser); }catch(e){}
+  if(!db||!signedInToFirebase){
+    RSTSYNC.err=db?'Not signed in yet':'The database code did not load on this device';
+    _rstsyncNextTry=Date.now()+RSTSYNC_RETRY_MS; return false;
+  }
+  try{
+    RSTSYNC.unsub=db.collection(RSTSYNC_COLL).onSnapshot(snapOpts(),rstsyncOnSnapshot,function(e){
+      RSTSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+      RSTSYNC.live=false; RSTSYNC.ready=false; _rstsyncNextTry=Date.now()+RSTSYNC_RETRY_MS;
+    });
+    RSTSYNC.live=true; RSTSYNC.err=null; return true;
+  }catch(e){
+    RSTSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+    _rstsyncNextTry=Date.now()+RSTSYNC_RETRY_MS; return false;
+  }
+}
+function rstsyncStop(){
+  try{ if(RSTSYNC.unsub) RSTSYNC.unsub(); }catch(e){}
+  RSTSYNC.unsub=null; RSTSYNC.live=false; RSTSYNC.ready=false;
+  RSTSYNC.seen={}; RSTSYNC.failed={};
+}
+
+/* An arriving record, applied whole. `email` is the one field kept from what
+   this phone already had -- it never travels, so an arriving record saying
+   nothing about it must not wipe it. */
+function rstApply(have,data){
+  var keepEmail=have.email;
+  Object.keys(have).forEach(function(k){ if(!(k in data)) delete have[k]; });
+  Object.keys(data).forEach(function(k){ have[k]=data[k]; });
+  if(keepEmail!==undefined) have.email=keepEmail;
+}
+
+function rstsyncOnSnapshot(snap){
+  var changes; try{ changes=snap.docChanges(); }catch(e){ return; }
+  var touched=false;
+  changes.forEach(function(ch){
+    var id=String(ch.doc.id);
+    if(ch.type==='removed'){
+      /* Somebody deleted the record outright in the Firebase console. The app
+         itself never does this -- taking somebody off the farm is `active:
+         false`, which keeps their old field logs and timesheets readable.
+         The one person who is NOT dropped is whoever is holding the phone:
+         removing them here would sign them out of their own app in a field. */
+      delete RSTSYNC.seen[id];
+      if(SESSION.pid&&String(SESSION.pid)===id) return;
+      var at=-1;
+      for(var i=0;i<PEOPLE.length;i++){ if(String(PEOPLE[i].id)===id){ at=i; break; } }
+      if(at>=0){ PEOPLE.splice(at,1); touched=true; }
+      return;
+    }
+    var data; try{ data=ch.doc.data(); }catch(e){ return; }
+    /* The three guards. A record that fails any of them is ignored AND left
+       out of `seen`, so this phone goes on offering its own version rather
+       than silently adopting a broken one. */
+    if(!data||typeof data!=='object') return;
+    if(!(+data.v>=RSTSYNC_V)) return;                     /* old shape, no names */
+    if(!data.role) return;                                /* not a person */
+    data.id=id;
+    var doc=rstDoc(data); if(!doc) return;
+    RSTSYNC.seen[id]=JSON.stringify(doc);
+    delete RSTSYNC.failed[id];
+    RSTSYNC.down++;
+    var have=null;
+    for(var j=0;j<PEOPLE.length;j++){ if(String(PEOPLE[j].id)===id){ have=PEOPLE[j]; break; } }
+    if(have){
+      if(rstJson(have)!==JSON.stringify(doc)){ rstApply(have,doc); touched=true; }
+      return;
+    }
+    PEOPLE.push(doc); touched=true;
+    /* Raise the high-water mark to match. rstNewId() counts up from it, so a
+       person who arrives from another phone must never have their id handed
+       out again here — which is exactly what would happen if they were later
+       taken off this phone and the mark had stayed where it was. */
+    try{
+      if(typeof rstIdNum==='function'&&typeof RST_HWM_KEY==='string'){
+        var n=rstIdNum(id), seen=+(localStorage.getItem(RST_HWM_KEY)||0);
+        if(n>seen) localStorage.setItem(RST_HWM_KEY,String(n));
+      }
+    }catch(e){}
+  });
+  var fromCache=true;
+  try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
+  if(!RSTSYNC.ready&&!fromCache){ RSTSYNC.ready=true; rstsyncUploadNew(); }
+  if(touched){
+    try{ rstSave(); }catch(e){}
+    /* Rebuilds STUDENTS, CREW and the account cards in place, so the dozens of
+       closures already holding a reference keep pointing at live data. */
+    try{ rstSync(); }catch(e){}
+    rstsyncRepaint();
+  }
+}
+
+function rstsyncRepaint(){
+  try{
+    var scr=document.querySelector('.screen.active');
+    var id=scr?scr.id.replace(/^s-/,''):'';
+    if(id==='roster'&&typeof rstRender==='function') rstRender();
+    if(id==='assign'&&typeof renderBoard==='function') renderBoard();
+    if(id==='sharedb'&&typeof sdbRender==='function') sdbRender();
+  }catch(e){}
+}
+
+/* This phone's roster going up for the first time. This is also the migration:
+   the farm's twenty-four people start life in RST_SEED, and the first keeper to
+   open the app after this ships is what puts them in the database. */
+function rstsyncUploadNew(){
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  PEOPLE.slice().forEach(function(p){
+    if(!p||!p.id||!rstCanPush(p)) return;
+    var id=String(p.id);
+    if(RSTSYNC.seen[id]!==undefined) return;
+    var doc=rstDoc(p); if(!doc) return;
+    RSTSYNC.seen[id]=JSON.stringify(doc);
+    n++; RSTSYNC.up++;
+    try{ db.collection(RSTSYNC_COLL).doc(id).set(doc).catch(function(e){ rstsyncFail(id,e); }); }
+    catch(e){ rstsyncFail(id,e); }
+  });
+  if(n){ try{ toast(n+' '+(n===1?'person':'people')+' from this phone sent up'); }catch(e){} }
+  return n;
+}
+function rstsyncFail(id,e){
+  RSTSYNC.failed[id]=(typeof sdbError==='function')?sdbError(e):String((e&&e.message)||e);
+}
+
+function rstPush(){
+  if(!RSTSYNC.on||!RSTSYNC.live||!RSTSYNC.ready) return 0;
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  PEOPLE.forEach(function(p){
+    if(!p||!p.id||!rstCanPush(p)) return;
+    var id=String(p.id), json=rstJson(p);
+    if(json===null||RSTSYNC.seen[id]===json) return;
+    RSTSYNC.seen[id]=json; n++; RSTSYNC.up++;
+    try{ db.collection(RSTSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ rstsyncFail(id,e); }); }
+    catch(e){ rstsyncFail(id,e); }
+  });
+  return n;
+}
+
+function rstsyncTick(){
+  if(!RSTSYNC.on) return;
+  if(!RSTSYNC.live){ rstsyncStart(); return; }
+  rstPush();
+}
+
+function rstsyncSummary(){
+  if(!RSTSYNC.on) return 'Off — this phone keeps its own list of people';
+  if(RSTSYNC.err) return RSTSYNC.err;
+  if(!RSTSYNC.live) return 'Connecting…';
+  if(!RSTSYNC.ready) return 'Connected — waiting for the shared copy';
+  var f=Object.keys(RSTSYNC.failed).length;
+  return RSTSYNC.up+' sent · '+RSTSYNC.down+' received'+(f?(' · '+f+' refused'):'');
+}
+
+
 /* ================= THE TASK LIST ================= */
 /* Drawer 7. The jobs the farm does, which the assign screen is built from --
    so with this off, a job Bill adds on his phone is a job nobody else can hand

@@ -51,6 +51,12 @@ piece of equipment — it belongs in the database with a screen for editing it,
 not buried in the code. Genuinely structural things, like the map maths, can
 stay in the code and get written down instead.
 
+**Hiring passes that test as of 2026-08-31, and it did not before.** Bill, the
+faculty or Dillon add somebody on the Roster screen; they appear on every
+phone and can sign in, with no source edit, no push and no laptop. What still
+does *not* pass: adding a new role name or a new lab, and the map maths. Those
+are still code.
+
 ---
 
 ## Check that it works before pushing. This is not optional.
@@ -136,6 +142,29 @@ rail just didn't have them.
 The crew are on phones in the fields, so narrow still decides how a thing should
 look. Wide decides whether it is there at all.
 
+The sign-in screen is the exception, and it is a useful one: it exists *before*
+the app has chosen a shell, so anything put there cannot go missing from
+either. That is why "First time here" is a panel on that screen and not a
+screen of its own.
+
+**4b. If you touched a shared-database drawer, watch two phones for five
+minutes.**
+
+Open the app in two browser profiles signed in as different people. Make a
+change on one and watch it arrive on the other. **Then leave both sitting and
+watch the write count in the Firebase console. It must go flat.**
+
+This is a whole class of mistake that `npm test` cannot see and that opening
+the app once cannot see either. A drawer sends a record whenever it differs
+from what the server last said, so if applying an arriving record leaves *any*
+difference behind — a field you declined to take, a person you declined to
+drop — two phones write at each other twice a second. The free plan allows
+twenty thousand writes a day. That spends them in about seven hours, takes
+sharing down for the whole farm, and puts nothing on screen to say why.
+
+The rule that prevents it: **apply an arriving record completely, or refuse it
+completely and stop sending it too.** Never half of one.
+
 **5. Say honestly what you did.** Report what you ran and what you saw. If you
 skipped a step, say which and why. If something is still failing, say so. Do
 not call a change done because the code is written.
@@ -182,6 +211,7 @@ get wrong.
 | `sw.js` | Written by `npm run sw`. Never edit it by hand. |
 | `farm-geo.js` | The plot shapes. Must stay next to the app file. |
 | `app-01-*.js` … `app-05-*.js` | Two thirds of the app. They must sit next to the app file, and they must load **in numeric order** — the numbers are the order. Renaming or reordering them breaks the app on opening. Adding a sixth is fine: `npm run sw` finds it and `tools/_app.js` tells the tests about it, so nothing needs a list updating by hand. |
+| `RST_SEED` in `app-03-people.js` | **No longer how a person reaches a phone**, since 2026-08-31. It is the starting list for a phone that has never had the app, and nothing else. Adding somebody here looks like it worked on the laptop and reaches **nobody** — the farm's real list of people lives in the database now. **The Roster screen is the way, and it is the only way.** |
 | The five weather day cards in the page | Those `.wxcard` divs are written **unclosed**, and the browser's repair of that is what puts every other screen at the depth the app expects. Tidying them into balanced markup moves 44 screens out of `#app` and the back arrow dies on all of them — silently, because the page still looks right. Fill them from code; never rewrite them. See `docs/DECISIONS.md`. |
 | The CSS, which stays inside the page | Colour-blind mode works by reading the text of every `<style>` block and rewriting the colours. Move the CSS out to a `.css` file and colour-blind mode stops working **with no error at all** — nothing to see, just wrong colours for the people who need it most. |
 | Files at the top level | The website serves this folder directly, so these filenames *are* the web address. Nothing the live app needs can move into a subfolder. |
@@ -197,8 +227,8 @@ The app is about 19,500 lines spread over the page and five files beside it.
 | File | Roughly | What is in it |
 |---|---|---|
 | `app-01-shell.js` | 1,700 | Per-person preferences, the phone/roomy shell, notifications, home-screen widgets, theme and colour-blind mode |
-| `app-02-fieldlog-sync.js` | 2,500 | The field log and its corrections; the shared-database drawers; ids and timestamps |
-| `app-03-people.js` | 1,400 | Roster, labs, session, sign-in, profile, semesters, and who may change what |
+| `app-02-fieldlog-sync.js` | 3,500 | The field log and its corrections; the shared-database drawers, including the roster one; ids and timestamps |
+| `app-03-people.js` | 1,600 | The Roster **screen**, labs, session, sign-in, profile, semesters, and who may change what. It no longer owns who is on the farm — the database does, and `RSTSYNC` in `app-02` is what carries it. |
 | `app-04-spray-inventory.js` | 2,900 | Spray mix calculator, undergrad task-work mode, inventory, equipment |
 | `app-05-tasks-clock.js` | 2,200 | Task templates and list, assign wizard, calendar, time clock, weather, rainfall |
 | `UT-TurfFarm-App.html` | 8,800 | Every screen's markup, all the CSS, and three remaining blocks of code: the map, trials, sign-in and boot |
@@ -249,7 +279,16 @@ account — a deliberate choice, explained in `docs/BACKEND-STEPS.md`. Phones
 keep working with no signal and catch up later.
 
 Records are moved over one group at a time: tasks, calendar, equipment, field
-log, inventory, map. Each group is **three things that change together**:
+log, inventory, map, and — since 2026-08-31 — **the roster**.
+
+**The roster is not just another drawer.** Every rule in `firestore.rules`
+goes through `rec()`, which reads it, so a mistake there does not break one
+screen: the database refuses *the whole farm*. It is also the only drawer that
+starts before anybody is signed in to the app, and there is a long comment
+over `RSTSYNC` in `app-02-fieldlog-sync.js` explaining the deadlock that
+forces that. Read it before changing anything about how it starts.
+
+Each group is **three things that change together**:
 
 1. the syncing code in the app, copying the pattern the existing ones use,
 2. the matching permission rules in `firestore.rules`,

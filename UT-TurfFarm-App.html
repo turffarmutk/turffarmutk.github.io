@@ -1388,6 +1388,7 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
         <button id="lg-go" class="lg-btn" type="submit">Sign in</button>
       </form>
       <div id="lg-reset" class="lg-reset tap">First time here, or forgotten your password?</div>
+      <div id="lg-first" style="display:none"></div>
       <div id="lg-note" class="lg-note"></div>
     </div>
   </div>
@@ -2599,9 +2600,14 @@ function sdbRender(){
     +'nothing here to switch on. This page is where you check that it is working, and it is the '
     +'one screen in the app that talks about the database at all.'
     +'<br><br>'
-    +'The database decides who may do what by reading a copy of the roster — who is a technician, '
-    +'who is in which lab, who holds the undergrad job. That copy has to be sent up before anything '
-    +'else can save. Send it again whenever somebody joins, leaves, or changes lab in More → People.'
+    +'The database decides who may do what by reading the farm\'s list of people — who is a '
+    +'technician, who is in which lab, who holds the undergrad job. That list has to reach the '
+    +'database before anything else can save.'
+    +'<br><br>'
+    +'It now keeps itself up to date: add somebody in More → People and they appear on '
+    +'everybody\'s phone within seconds, with no button to press here. The button below is for '
+    +'two occasions only — the very first time, to put the farm in the database at all, and if '
+    +'something ever looks out of step and you want to send the whole list again.'
     +'</div></div>'
     +'<div class="list" style="margin-top:12px">'+rows+'</div>'
     +btn
@@ -2672,8 +2678,10 @@ function sdbShareBlock(o){
     +warn+'</div>';
 }
 
-/* All ten, in the order they were built. Anchored on the pair, never the tail —
-   appending an eleventh must not need anything else changed. */
+/* Every drawer, in the order they were built. Anchored on the pair, never the
+   tail — appending another must not need anything else changed. (This comment
+   said "All ten" long after there were twelve; it is a count nobody remembers
+   to update, so it no longer carries one.) */
 function sdbShareBlocks(){ return sdbShareBlocks_raw().map(sdbShareBlock).join(''); }
 function sdbShareBlocks_raw(){
   return [
@@ -2725,7 +2733,16 @@ function sdbShareBlocks_raw(){
         +'before the day rather than when they do not turn up. Everybody adds the kinds of '
         +'entry their job calls for. Taking one off is Bill\'s, except your own time off, '
         +'which is yours to undo. Nothing is ever really deleted — it is marked, so it '
-        +'stays gone instead of coming back from a phone that was switched off.'}
+        +'stays gone instead of coming back from a phone that was switched off.'},
+   {st:RSTSYNC, summary:rstsyncSummary(), title:'Who works here',
+    what:'The farm\'s list of people, so hiring somebody is something you do on the '
+        +'Roster screen and nowhere else — no editing the app, no waiting for a new '
+        +'version to reach twenty-three phones. Add them here and they turn up on '
+        +'everybody\'s phone within seconds, and can sign in. Email addresses are NOT '
+        +'part of this: they are filed separately, one to a person, and only the person '
+        +'whose address it is can read it. Taking somebody off the farm is "currently '
+        +'working here" turned off, never a deletion, so their old field logs and '
+        +'timesheets still read correctly years later.'}
   ];
 }
 
@@ -7015,6 +7032,7 @@ function storeScan(){
   try{ fstsyncTick(); }catch(e){}
   try{ eqsyncTick(); }catch(e){}
   try{ evsyncTick(); }catch(e){}
+  try{ rstsyncTick(); }catch(e){}
 }
 function storeFlush(){ storeScan(); }
 function storeTouch(){ storeScan(); }   /* callers that want an immediate write */
@@ -7051,6 +7069,7 @@ function storeHydrate(){
   try{ fstsyncHydrate(); }catch(e){}
   try{ eqsyncHydrate(); }catch(e){}
   try{ evsyncHydrate(); }catch(e){}
+  try{ rstsyncHydrate(); }catch(e){}
   _storeOn=true;
   try{ setInterval(storeScan,STORE_SCAN_MS); }catch(e){}
 }
@@ -8590,7 +8609,10 @@ function fbDb(){
 }
 function dbConfigured(){ return !!fbDb(); }
 
-var ROSTER_PATH='refdata/roster';
+/* One record per person now, not one document for the farm. The old path,
+   refdata/roster, is closed in firestore.rules rather than deleted, so a
+   phone running a week-old copy of the app gets a clean refusal. */
+var ROSTER_COLL='roster';
 var ROSTER_SENT_KEY='ut_roster_sent';
 
 /* MUST MATCH the bootstrap list in firestore.rules. The rules check the roster
@@ -8605,15 +8627,104 @@ function rosterCanPush(who){
   return DB_BOOTSTRAP_PIDS.indexOf(pid)>=0 || assignsUndergrads(pid);
 }
 
-/* Only the four things the rules actually ask about travel. Names, pronouns
-   and email addresses stay in the app — the crew's addresses were taken out
-   deliberately (docs/DECISIONS.md) and this is not the place to put them back. */
+/* WHO MAY CHANGE ONE PERSON'S RECORD.
+   -----------------------------------------------------------------------
+   This is rstCanEdit() in app-03-people.js written with the ROSTER as the
+   source of truth instead of currentRole. Both exist on purpose and they are
+   not the same thing: rstCanEdit decides which buttons the Roster screen
+   offers, and currentRole is only about which screen is showing. THIS one is
+   the version the database enforces, so it may not ask a question about the
+   screen. firestore.rules carries the same words, and tools/test-rules.js
+   runs the two against every person against every person.
+
+   Bill edits the whole farm. A PI edits their own lab, every undergraduate
+   (they all work one shared pool), and the Farm Manager entry — so that if
+   Bill ever leaves, the faculty can still hand the job to somebody.
+
+   Two things a PI may not do even inside their own lab, because each is a way
+   of quietly promoting somebody:
+     - touch a Faculty record. A PI is appointed by the university, not hired
+       by the farm, so those belong to the App Manager.
+     - hand out grants. `assign_undergrads` IS the undergrad job. */
+function rosterCanWrite(target,who){
+  var pid=pidOf(who)||SESSION.pid;
+  if(!pid||!target) return false;
+  if(rstIsAdmin()) return true;                     /* the App Manager holds every record */
+  if(rosterCanPush(pid)) return true;               /* Bill, and whoever holds the job */
+  var mine=rstFind(pid);
+  if(!mine||mine.role!=='Faculty') return false;
+  if(target.role==='Faculty') return false;
+  if((target.grants||[]).length) return false;
+  if(target.role==='Undergraduate Student') return true;
+  if(target.role==='Farm Manager') return true;
+  /* Same normalising as labOf()/sameLab() in firestore.rules: the em dash the
+     app writes for "no lab" is the shared undergrad pool, NOT a lab everybody
+     is in together — so a blank lab matches nobody, including itself. */
+  var myLab=rosterLabKey(mine.lab), toLab=rosterLabKey(target.lab);
+  return myLab!=='' && myLab===toLab;
+}
+function rosterLabKey(v){ return (!v||v==='—')?'':String(v); }
+
+/* ------------------------------------------------------------------------
+   ATTACHING A SIGN-IN TO A PERSON
+
+   A roster record says who somebody is. It does NOT say which sign-in belongs
+   to them — that is one short row per email address, in `accounts`, readable
+   only by the person whose address it is. Firebase will not let a public web
+   page stamp a roster id onto a token (that needs the master key, on a
+   laptop), so this row is how somebody hired through the app is told who they
+   are the first time they sign in. See authPidResolve().
+
+   BOTH IN ONE BATCH, deliberately. A person on the roster with no sign-in
+   attached is somebody who cannot get in and nobody knows why; a sign-in
+   attached to a person who is not on the roster is worse. A batch is
+   all-or-nothing, so neither half can exist alone.
+   ------------------------------------------------------------------------ */
+var ACCOUNTS_COLL='accounts';
+function accountKey(email){ return String(email||'').trim().toLowerCase(); }
+
+function rosterLinkPerson(p,email){
+  var db=fbDb(); if(!db) return Promise.reject(new Error('nodb'));
+  if(!p||!p.id) return Promise.reject(new Error('nobody'));
+  if(!rosterCanWrite(p)) return Promise.reject(new Error('notallowed'));
+  var doc=(typeof rstDoc==='function')?rstDoc(p):null;
+  if(!doc) return Promise.reject(new Error('nobody'));
+  var key=accountKey(email);
+  var batch=db.batch();
+  batch.set(db.collection(ROSTER_COLL).doc(doc.id), doc);
+  if(key&&key.indexOf('@')>0){
+    batch.set(db.collection(ACCOUNTS_COLL).doc(key),
+              { pid:doc.id, addedBy:SESSION.pid||null, addedAt:new Date().toISOString() });
+  }
+  return batch.commit().then(function(){
+    /* The drawer has now seen exactly what we sent, so it must not send it a
+       second time on the next scan. */
+    try{ if(typeof RSTSYNC==='object'&&RSTSYNC&&RSTSYNC.seen) RSTSYNC.seen[doc.id]=JSON.stringify(doc); }catch(e){}
+    return true;
+  });
+}
+
+/* NAMES TRAVEL NOW. ADDRESSES STILL DO NOT.        (changed 2026-08-31)
+   -----------------------------------------------------------------------
+   This used to send four things per person — role, lab, active, grants —
+   because they were the only four the rules asked about, and because the
+   crew's addresses had been deliberately taken out of this file
+   (docs/DECISIONS.md). Names went out with them, which was over-cautious:
+   the names are in the app's source, and the source is a PUBLIC website.
+   Keeping them out of a PRIVATE, rules-protected database bought nothing,
+   and it cost the farm the ability to hire anybody without a code change.
+
+   So the name and pronouns travel. The EMAIL ADDRESS still does not, and
+   the difference is not squeamishness — it is that a roster record is
+   readable by everybody signed in, and one row per address readable only by
+   its owner is a different thing entirely. See the `accounts` collection.
+   tools/test-db.js fails if an '@' ever appears in what this sends. */
 function rosterPayload(){
   var people={};
   (PEOPLE||[]).forEach(function(p){
     if(!p||!p.id) return;
-    people[p.id]={ role:p.role||'', lab:p.lab||'',
-                   active:p.active!==false, grants:(p.grants||[]).slice() };
+    var d=(typeof rstDoc==='function')?rstDoc(p):null;
+    if(d) people[p.id]=d;
   });
   return { people:people, count:Object.keys(people).length,
            updatedAt:new Date().toISOString(), updatedBy:SESSION.pid||null };
@@ -8623,16 +8734,39 @@ function rosterSentAt(){
   try{ return localStorage.getItem(ROSTER_SENT_KEY)||null; }catch(e){ return null; }
 }
 
-/* Writes the WHOLE document rather than patching it. It is 23 short entries,
-   and a whole-document write cannot leave one person half-updated the way a
-   field-by-field merge can. */
+/* ONE WRITE PER PERSON, all in one batch.
+   -----------------------------------------------------------------------
+   This used to be a single set() on one document holding everybody. The
+   roster was split into a record each on 2026-08-31 so that the database
+   could tell "added a hire" apart from "made myself Farm Manager" — see the
+   long note over rec() in firestore.rules.
+
+   A batch is still ONE all-or-nothing write, so this cannot leave the farm
+   half-updated any more than the single document could. What it is NOT is
+   the ordinary way the roster travels: that is the RSTSYNC drawer, which
+   sends a person the moment they change. This button is the migration — the
+   first keeper to press it after this ships is what puts the farm's
+   twenty-four people into the database in the first place — and afterwards
+   it is a "send it all again" for when something looks out of step. */
 function rosterPush(){
   var db=fbDb();
   if(!db) return Promise.reject(new Error('nodb'));
   if(!rosterCanPush()) return Promise.reject(new Error('notallowed'));
   var payload=rosterPayload();
-  return db.doc(ROSTER_PATH).set(payload).then(function(){
+  var ids=Object.keys(payload.people);
+  if(!ids.length) return Promise.reject(new Error('nobody'));
+  var batch=db.batch();
+  ids.forEach(function(pid){
+    batch.set(db.collection(ROSTER_COLL).doc(pid), payload.people[pid]);
+  });
+  return batch.commit().then(function(){
     try{ localStorage.setItem(ROSTER_SENT_KEY,payload.updatedAt); }catch(e){}
+    /* The drawer has now seen exactly what we sent, so it must not turn round
+       and send it a second time. */
+    try{
+      if(typeof RSTSYNC==='object'&&RSTSYNC&&RSTSYNC.seen)
+        ids.forEach(function(pid){ RSTSYNC.seen[pid]=JSON.stringify(payload.people[pid]); });
+    }catch(e){}
     return payload.count;
   });
 }
@@ -8660,6 +8794,64 @@ function authClaims(user){
 }
 function authPidOfClaims(c){ return (c && c.pid) || null; }
 function authIsAdminClaims(c){ return !!(c && c.app_admin === true); }
+
+/* THE ROSTER ID, THE TWO WAYS IT CAN ARRIVE.        (second way: 2026-08-31)
+   -----------------------------------------------------------------------
+   The claim on the token first, always: it costs nothing, it cannot be
+   edited by the account holder, and it works with no signal.
+
+   Then, only if there is no claim, the `accounts` row. Somebody hired through
+   the app has no claim, because a claim can only be stamped with the master
+   key on a laptop and the entire point of hiring in the app is that nobody
+   has to touch a laptop.
+
+   THREE RULES THIS FUNCTION KEEPS, AND THEY ARE NOT NEGOTIABLE:
+     - it never throws;
+     - it never signs anybody out;
+     - it never waits on the network when there is none. Offline must not be
+       the reason somebody cannot record a mow, and the only place this is
+       called from that can be offline is the background re-check, which
+       treats "no answer" as "change nothing". */
+function authPidResolve(user){
+  return authClaims(user).then(function(c){
+    var pid=authPidOfClaims(c);
+    if(pid) return { pid:pid, admin:authIsAdminClaims(c) };
+    if(navigator.onLine===false) return { pid:null, admin:false };
+    var db=fbDb(), key=accountKey(user&&user.email);
+    if(!db||!key) return { pid:null, admin:false };
+    return db.collection(ACCOUNTS_COLL).doc(key).get().then(function(d){
+      var v=(d&&d.exists)?(d.data()||{}):null;
+      return { pid:(v&&v.pid)?String(v.pid):null, admin:false };
+    }).catch(function(){ return { pid:null, admin:false }; });
+  }).catch(function(){ return { pid:null, admin:false }; });
+}
+
+/* Fetch the whole roster once, right now, rather than waiting for the drawer.
+   Called from ONE place: a sign-in that knows who somebody is but cannot find
+   them in this phone's list of people. That is a new hire on a phone that has
+   never had the app, and it is the deadlock the roster drawer exists to
+   break — the drawer needs a moment to arrive, and this is that moment.
+   Returns how many people it managed to read; 0 means "could not", never
+   "there is nobody". */
+function authFetchRoster(){
+  var db=fbDb(); if(!db) return Promise.resolve(0);
+  return db.collection(ROSTER_COLL).get().then(function(snap){
+    var got=0;
+    snap.forEach(function(d){
+      var data=d.data()||{};
+      if(!(+data.v>=2)||!data.role) return;
+      data.id=String(d.id);
+      var doc=(typeof rstDoc==='function')?rstDoc(data):null; if(!doc) return;
+      var have=null;
+      for(var i=0;i<PEOPLE.length;i++){ if(String(PEOPLE[i].id)===doc.id){ have=PEOPLE[i]; break; } }
+      if(have){ if(typeof rstApply==='function') rstApply(have,doc); }
+      else PEOPLE.push(doc);
+      got++;
+    });
+    if(got){ try{ rstSave(); }catch(e){} try{ rstSync(); }catch(e){} }
+    return got;
+  }).catch(function(){ return 0; });
+}
 
 /* Put a person into the app. Shared by boot and by a fresh sign-in so the two
    paths cannot drift. Returns false if the id is not a live roster person. */
@@ -8708,7 +8900,17 @@ function authVerify(){
       if(user){
         authClaims(user).then(function(c){
           var pid = authPidOfClaims(c);
-          if(pid) authSaveLocal({ pid:pid, email:user.email||'', admin:authIsAdminClaims(c), at:isoLocal(new Date()) });
+          if(pid){
+            authSaveLocal({ pid:pid, email:user.email||'', admin:authIsAdminClaims(c), at:isoLocal(new Date()) });
+            return;
+          }
+          /* No claim on the token. Somebody hired through the app never has
+             one. Ask the database — and if it cannot answer, do NOTHING. A
+             re-check that fails is not a sign-out, and never has been. */
+          authPidResolve(user).then(function(r){
+            if(r&&r.pid)
+              authSaveLocal({ pid:r.pid, email:user.email||'', admin:r.admin, at:isoLocal(new Date()) });
+          }).catch(function(){});
         });
         return;
       }
@@ -8739,9 +8941,16 @@ function authEasyLayout(){
   var hide = !!EASY_SIGN_IN;
   if(lab) lab.style.display = hide ? 'none' : '';
   if(p){ p.style.display = hide ? 'none' : ''; if(hide) p.value=''; }
-  /* The link would send mail that is not arriving. Hiding it saves somebody
-     standing in a field waiting for an email that never comes. */
-  if(link) link.style.display = hide ? 'none' : '';
+  /* THE LINK STAYS, and this changed on 2026-08-31. It used to be hidden in
+     email-only mode, because it sent mail that was not arriving and somebody
+     standing in a field waiting for it was worse than no link at all. It is
+     back because it no longer only sends mail: it is now the way anybody on
+     the farm chooses a password of their own, which is the way OFF the one
+     shared password published in this file. */
+  if(link) link.style.display='';
+  if(link) link.textContent = hide
+    ? 'First time here, or want your own password?'
+    : 'First time here, or forgotten your password?';
 }
 
 /* One person whose account already has a real password of its own - Dillon's,
@@ -8905,25 +9114,7 @@ function authSignIn(email, pass){
 
   auth.signInWithEmailAndPassword(email, pass).then(function(cred){
     var user = cred && cred.user;
-    return authClaims(user).then(function(c){
-      done();
-      var pid = authPidOfClaims(c);
-      if(!pid){
-        authMsg('This account is not linked to anyone on the roster yet. Ask the app manager.');
-        return;
-      }
-      var admin = authIsAdminClaims(c);
-      if(!authEnter(pid, admin)){
-        authMsg('That account is no longer active on the roster.');
-        return;
-      }
-      authSaveLocal({ pid:pid, email:(user&&user.email)||email, admin:admin, at:isoLocal(new Date()) });
-      try{ localStorage.setItem(AUTH_KEY+'_last', JSON.stringify({email:(user&&user.email)||email})); }catch(e){}
-      var pw=document.getElementById('lg-pass'); if(pw) pw.value='';
-      authMsg('');
-      stack.length=0;
-      goRoot(lgHome());
-    });
+    return authAdmit(user, email, done);
   }).catch(function(err){
     done();
     var code = (err && err.code) || '';
@@ -8954,6 +9145,164 @@ function authSignIn(email, pass){
   });
 }
 
+/* ------------------------------------------------------------------------
+   FIRST TIME HERE — one panel, three situations, one button
+   ------------------------------------------------------------------------
+   It sits on the sign-in screen rather than on a screen of its own, and that
+   is deliberate: the sign-in screen is the one screen that exists before the
+   app has chosen between the phone shell and the wide one, so a panel here
+   cannot go missing from either. A separate screen could, and has before.
+
+   THE TWO ROUTES:
+
+   1. "Email me a link" — the ordinary, safe way, and the way this should work
+      once the farm's own @utk.edu mailbox exists. It is wired up NOW so that
+      the day the mailbox starts working there is nothing to build. Until then
+      the mail does not arrive, which the note under it says plainly rather
+      than leaving somebody waiting in a field.
+
+   2. "Choose a password now" — covers all three of the situations a person
+      can actually be in, with one button, because asking somebody to work out
+      which of three they are is a good way to lose them:
+        - a NEW HIRE with no account at all -> the account is created here;
+        - somebody still on the shared password -> signed in with it behind
+          the scenes, then moved onto the password they just chose. THIS IS
+          THE ROAD OFF EASY_SIGN_IN, one person at a time;
+        - somebody who already chose their own -> told to sign in with it,
+          without being told anything about whether the address is known.
+
+   The wording never reveals whether an address is expected. Same rule as
+   authSendReset(), and for the same reason: this page is public. */
+function authFirstMsg(t,ok){
+  var el=document.getElementById('lgf-msg'); if(!el) return;
+  el.textContent=t||'';
+  el.style.color = ok ? '#2e7d32' : '#ffb4a9';
+}
+function authFirstOpen(){
+  var box=document.getElementById('lg-first'); if(!box) return;
+  if(box.style.display!=='none'){ box.style.display='none'; return; }
+  box.style.display='';
+  box.innerHTML=
+     '<div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.14)">'
+    +'<div class="lg-lab">Choose a password</div>'
+    +'<input id="lgf-pw" class="lg-in" type="password" autocomplete="new-password" '
+    +'placeholder="At least 6 characters">'
+    +'<input id="lgf-pw2" class="lg-in" type="password" autocomplete="new-password" '
+    +'placeholder="Type it again" style="margin-top:8px">'
+    +'<div id="lgf-msg" class="lg-msg" role="alert" aria-live="polite"></div>'
+    +'<div id="lgf-go" class="lg-btn tap" style="text-align:center">Set my password</div>'
+    +'<div class="lg-note" style="margin-top:10px">'
+    +'Type your farm email address in the box above first. This works whether '
+    +'you have never signed in before or you already have — either way you end '
+    +'up with a password only you know.</div>'
+    +'<div id="lgf-link" class="lg-reset tap" style="margin-top:14px">Or email me a link instead</div>'
+    +'<div class="lg-note" style="margin-top:4px">'
+    +'The farm\'s own email account is not set up yet, so the link may not '
+    +'arrive. Choosing a password above works today.</div>'
+    +'</div>';
+  var go=document.getElementById('lgf-go');
+  if(go) go.addEventListener('click', authFirstSet);
+  var lk=document.getElementById('lgf-link');
+  if(lk) lk.addEventListener('click', authSendReset);
+  var pw=document.getElementById('lgf-pw'); if(pw) pw.focus();
+}
+
+function authFirstSet(){
+  var auth=fbAuth();
+  if(!auth){ authFirstMsg('Sign-in is not set up on this copy of the app.'); return; }
+  var email=(document.getElementById('lg-email')||{}).value||'';
+  email=email.trim();
+  var pw=(document.getElementById('lgf-pw')||{}).value||'';
+  var pw2=(document.getElementById('lgf-pw2')||{}).value||'';
+  if(!email){ authFirstMsg('Type your farm email address in the box above first.'); return; }
+  if(email.indexOf('@')<0){ authFirstMsg('That does not look like an email address.'); return; }
+  if(pw.length<6){ authFirstMsg('Pick a password of at least 6 characters.'); return; }
+  if(pw!==pw2){ authFirstMsg('Those two do not match. Try typing both again.'); return; }
+  if(navigator.onLine===false){
+    authFirstMsg('No signal. Choosing a password needs a connection, once.'); return;
+  }
+  var btn=document.getElementById('lgf-go');
+  if(btn){ btn.textContent='Setting it…'; btn.style.opacity='.6'; }
+  var done=function(){ if(btn){ btn.textContent='Set my password'; btn.style.opacity=''; } };
+  authFirstMsg('');
+
+  /* No account yet — a new hire. Make one. */
+  auth.createUserWithEmailAndPassword(email, pw).then(function(cred){
+    return authAdmit(cred&&cred.user, email, done);
+  }).catch(function(err){
+    var code=(err&&err.code)||'';
+    if(code!=='auth/email-already-in-use'){
+      done();
+      if(code==='auth/weak-password') authFirstMsg('That password is too easy to guess. Try a longer one.');
+      else if(code==='auth/invalid-email') authFirstMsg('That does not look like an email address.');
+      else if(code==='auth/network-request-failed') authFirstMsg('Could not reach the sign-in service. Check your connection.');
+      else if(code==='auth/operation-not-allowed') authFirstMsg('Setting a password is switched off for this project. Tell whoever looks after the app.');
+      else authFirstMsg('That did not work. The sign-in service said: '+(code||'no reason given'));
+      return;
+    }
+    /* THE ACCOUNT ALREADY EXISTS. Either they are on the shared password and
+       are moving off it — which is the whole point — or they already chose one
+       of their own, in which case there is nothing to do here and we must not
+       hint at which. */
+    if(!EASY_SIGN_IN){
+      done();
+      authFirstMsg('You already have a password. Sign in with it above, or use the emailed link.');
+      return;
+    }
+    auth.signInWithEmailAndPassword(email, EASY_PASSWORD).then(function(cred){
+      var user=cred&&cred.user;
+      return user.updatePassword(pw).then(function(){
+        return authAdmit(user, email, done);
+      });
+    }).catch(function(){
+      done();
+      authFirstMsg('You already have a password of your own. Sign in with it above.');
+    });
+  });
+}
+
+/* EVERYTHING BETWEEN "Firebase says this is a real account" AND "the app is
+   open on their home screen". Shared by signing in and by choosing a password
+   for the first time, so the two paths cannot drift apart. */
+function authAdmit(user, typedEmail, done){
+  return authPidResolve(user).then(function(r){
+    var pid=r.pid, admin=r.admin;
+    if(!pid){
+      if(done) done();
+      authMsg('This account is not linked to anyone on the roster yet. Ask the app manager.');
+      return false;
+    }
+    if(authEnter(pid, admin)){ authLandIn(user, typedEmail, pid, admin, done); return true; }
+    /* WE KNOW WHO THEY ARE AND THIS PHONE HAS NEVER HEARD OF THEM.
+       That is somebody hired through the app, opening it for the first time on
+       a phone whose list of people is still the built-in one. Fetch the roster
+       and try once more. Telling a person who was hired this morning that they
+       are not on the roster would be untrue, and impossible for them to do
+       anything about. */
+    return authFetchRoster().then(function(got){
+      if(authEnter(pid, admin)){ authLandIn(user, typedEmail, pid, admin, done); return true; }
+      if(done) done();
+      authMsg(got ? 'That account is no longer active on the roster.'
+                  : 'We found your account, but could not fetch the farm roster. '
+                    + 'Try again somewhere with a better signal.');
+      return false;
+    });
+  });
+}
+
+/* The last few steps of a successful sign-in, shared by the ordinary path and
+   by the one that had to fetch the roster first, so the two cannot drift. */
+function authLandIn(user, typedEmail, pid, admin, done){
+  if(done) done();
+  var addr=(user&&user.email)||typedEmail;
+  authSaveLocal({ pid:pid, email:addr, admin:admin, at:isoLocal(new Date()) });
+  try{ localStorage.setItem(AUTH_KEY+'_last', JSON.stringify({email:addr})); }catch(e){}
+  var pw=document.getElementById('lg-pass'); if(pw) pw.value='';
+  authMsg('');
+  stack.length=0;
+  goRoot(lgHome());
+}
+
 function authSignOut(){
   var auth=fbAuth();
   /* Local state goes first: a failed network call must not leave somebody
@@ -8970,7 +9319,9 @@ function authSignOut(){
 
 (function(){
   var r=document.getElementById('lg-reset');
-  if(r) r.addEventListener('click', authSendReset);
+  /* Opens the panel now rather than sending mail straight away. The emailed
+     link is still there, inside it — see authFirstOpen(). */
+  if(r) r.addEventListener('click', authFirstOpen);
   var f=document.getElementById('lg-form');
   if(f) f.addEventListener('submit', function(e){
     e.preventDefault();

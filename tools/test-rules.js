@@ -26,7 +26,7 @@ const { JSDOM, VirtualConsole } = require('jsdom');
 const turf = require('@turf/turf');
 const { appSource } = require('./_geo');
 const { appParts } = require('./_app');
-const { rosterDoc, rulesCan, creditsWorker } = require('./rules-model');
+const { rosterDoc, rulesCan, creditsWorker, rosterCanWriteIn } = require('./rules-model');
 
 const ROOT = path.join(__dirname, '..');
 const APP = path.join(ROOT, 'UT-TurfFarm-App.html');
@@ -72,9 +72,24 @@ const rulesText = fs.existsSync(RULES) ? fs.readFileSync(RULES, 'utf8') : '';
 ok('firestore.rules exists', rulesText.length > 0);
 ok("declares rules_version = '2'", /rules_version\s*=\s*'2'/.test(rulesText));
 ok('has a tasks block', /match \/tasks\/\{taskId\}/.test(rulesText));
-ok('has a roster block', /match \/refdata\/roster/.test(rulesText));
-ok('reads the roster id off the token, not the email',
-   /request\.auth\.token\.pid/.test(rulesText) && !/token\.email/.test(rulesText));
+ok('has a roster block', /match \/roster\/\{pid\}/.test(rulesText));
+ok('and the old whole-roster document is closed, not just abandoned',
+   /match \/refdata\/roster[\s\S]*?allow write: if false;/.test(rulesText));
+/* The id comes off the TOKEN when there is one, and only falls back to the
+   accounts row when there is not. That fallback was added on 2026-08-31 so
+   somebody hired through the app — who has no claim, because nobody ran
+   anything on a laptop — can be told who they are. This assertion used to
+   forbid token.email outright; the reversal is written up in
+   docs/DECISIONS.md. What must NEVER come back is listing that collection. */
+ok('the roster id is read off the token first', /request\.auth\.token\.pid/.test(rulesText));
+ok('and falls back to the accounts row only when the token has none',
+   /function me\(\)[\s\S]{0,120}claimPid\(\) != ''[\s\S]{0,40}accountPid\(\)/.test(rulesText));
+ok('the address is lower-cased before it is used as a key',
+   /token\.email\.lower\(\)/.test(rulesText));
+ok('the accounts rows can be fetched one at a time but never listed',
+   /match \/accounts\/\{signInAddress\}[\s\S]*?allow get:[\s\S]*?allow list: if false;/.test(rulesText));
+ok('and a row can only be fetched by the person whose address it is',
+   /signInAddress == signInEmail\(\)/.test(rulesText));
 
 
 /* --------------------------------------- 1b. the rules file hangs together - */
@@ -211,6 +226,50 @@ section('4b. Closing a job and doing it are not the same act');
 }
 
 /* -------------------------------------------- 5. the two files' words ----- */
+section('4c. Who may change a person\'s record — the app and the rules agree');
+{
+  /* The same sweep §3 does for tasks, for the roster. Hiring moved into the
+     app on 2026-08-31, so this rule is now the difference between "a PI adds
+     an undergrad to their own lab" and "a PI makes themselves Farm Manager".
+     Every person against every person, both as a new record and as an edit. */
+  const doc = rosterDoc(win.PEOPLE);
+  const ids = win.PEOPLE.map(p => p.id);
+  const byId = {};
+  win.PEOPLE.forEach(p => { byId[p.id] = p; });
+  const drift = [];
+
+  ids.forEach(actor => {
+    win.sessionSet(actor);
+    /* currentRole is set by sessionSet; the point of this rule is that it does
+       NOT consult it, so shove it somewhere wrong and prove nothing moves. */
+    ids.forEach(target => {
+      const t = byId[target];
+      const app = win.rosterCanWrite(t, actor);
+      const rules = rosterCanWriteIn(doc, actor, rosterDoc([t]).people[target] || null,
+                                     { existing: rosterDoc([t]).people[target] || null });
+      if (app !== rules) drift.push(actor + '>' + target + ' app=' + app + ' rules=' + rules);
+    });
+  });
+  ok('the app and the rules answer identically for every pair',
+     drift.length === 0, drift.slice(0, 6).join(' | '));
+
+  /* And the specific promises, spelled out so a change that breaks one is
+     named rather than just showing up as a count. */
+  const can = (a, t) => win.rosterCanWrite(byId[t], a);
+  win.sessionSet('p13');
+  ok('a PI may add somebody to their own lab',          can('p13', 'p12'));
+  ok('a PI may edit any undergraduate',                 can('p13', 'p18'));
+  ok('a PI may edit the Farm Manager entry, so the job can be handed on',
+     can('p13', 'p07'));
+  ok('a PI may NOT touch another PI',                  !can('p13', 'p16'));
+  ok('a PI may NOT touch another lab\'s technician',   !can('p13', 'p02'));
+  ok('a PI may NOT touch somebody holding a grant',    !can('p13', 'p01'));
+  ok('a technician may not rewrite the roster',        !can('p02', 'p18'));
+  ok('an undergrad certainly may not',                 !can('p18', 'p19'));
+  ok('Bill may change anybody',
+     ids.every(t => t === 'p07' || can('p07', t)));
+}
+
 section('5. The rules file and its mirror use the same words');
 const modelText = fs.readFileSync(MODEL, 'utf8');
 const wordsIn = txt => {

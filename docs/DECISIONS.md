@@ -1231,3 +1231,100 @@ real fix is the roster travelling through the shared database like tasks and
 equipment do, and that needs a decision first — `refdata/roster` deliberately
 carries only role, lab, active and grants, and NOT names (see the crew-addresses
 entry), so it cannot carry a new person today.
+
+### The roster is one record per person, not one document — 2026-08-31
+**Decision:** `refdata/roster`, a single document holding everybody, was
+replaced by `roster/{pid}`, one record each. `rec()` in `firestore.rules` reads
+those instead. The old document is left in the rules as an explicit
+`allow write: if false` rather than deleted.
+**Why:** Dillon wanted the faculty to be able to add a hire. A whole-roster
+document arrives at the database as ONE write, and no rule can look inside it
+and tell "added an undergrad to my own lab" apart from "made myself Farm
+Manager". One record per person is the only shape in which that sentence can be
+written down and enforced — it is now `facultyMayWrite()`. The split also made
+the syncing code *simpler*, not harder: the roster became an ordinary
+collection drawer like the other twelve instead of the app's only document
+listener.
+**What it costs:** a request that asks about two people now fetches two records
+instead of one. The ceiling is ten per request and repeated lookups of the same
+record inside one request are still fetched once, so two is not close.
+**Don't:** delete the closed `refdata/roster` block. A phone running a
+week-old copy of the app still knows that path, and a clean refusal is better
+than a write that lands somewhere nothing reads. And don't "simplify" `rec()`
+by dropping the `exists()` guard — reading a field off a record that is not
+there is an error, and an error there denies *every* rule in the file for that
+person, including the roster read they need before the app can tell them
+anything at all.
+
+### Names travel to the database now; addresses travel separately — 2026-08-31
+**Decision:** roster records carry `first`, `last` and `pron`. Email addresses
+do not — they live one row per address in `accounts/{lowercased-email}`, which
+is `allow get` for the owner of that address and `allow list: if false`.
+**Why:** the entry above from 2026-08-17 kept names out along with the
+addresses. That was over-cautious and it cost the farm the ability to hire
+anybody without a code change: the names are already in the app's source, and
+the source is a **public website**. Keeping them out of a private,
+rules-protected database bought nothing. Addresses are genuinely different, and
+not for squeamish reasons: a roster record is readable by everybody signed in,
+so an address on it is the whole crew's address book handed to anyone with an
+account — and anyone on the internet can make an account in this project,
+because the app's Firebase key is public and has to be. One row per address,
+readable only by its owner, is a different thing entirely.
+**Don't:** change `allow get` to `allow read` on `accounts`. In Firestore
+`read` means get **and list**, and the addresses ARE the document names, so
+that one word hands the address book to any junk account in a single request.
+`allow list: if false` is written out underneath precisely so that nobody
+re-adds it by accident. Also don't put addresses back into `RST_SEED` or the
+repo — that decision has not changed and `tools/test-db.js` fails on an `@` in
+anything the roster sends.
+
+### The roster drawer starts before anybody is signed in — 2026-08-31
+**Decision:** `rstsyncStart()` gates on `fbAuth().currentUser`, where all
+twelve other drawers gate on `SESSION.pid`. `authSignIn` also fetches the
+roster once, on the spot, when it knows who somebody is but this phone does
+not.
+**Why:** a deadlock. `sessionSet()` refuses an id it cannot find in `PEOPLE`. A
+new hire's phone has never had the app, so `PEOPLE` is `RST_SEED`, which does
+not contain them — they were told *"That account is no longer active on the
+roster"*, which is both untrue and impossible for them to act on. But the
+roster is what would tell the phone who they are, and every other drawer
+refuses to start until the phone already knows. Roster needs session; session
+needs roster. The roster is the one that has to give.
+**Don't:** "tidy" that gate to match the other twelve. It looks like an
+inconsistency and it is the fix. And don't move the roster fetch into
+`authBoot()` — that function is synchronous on purpose and must never wait on
+the network; `authSignIn` is the right place because it already refuses to run
+offline.
+
+### A roster id can come from the database, not only the token — 2026-08-31
+**Decision:** `me()` in `firestore.rules` is now "the claim on the token if
+there is one, otherwise the `accounts` row". `authPidResolve()` in the app does
+the same, in the same order.
+**Why:** a custom claim can only be stamped with the master key, which means a
+laptop, which is the exact thing hiring-in-the-app exists to remove. Somebody
+hired through the app has no claim, so there has to be a second answer. The
+claim is still tried first and is still better: it costs nothing, it cannot be
+edited by the account holder, and it works with no signal. The lookup is only
+ever reached by somebody who has no claim, and the moment
+`tools/create-accounts.js` is run again the claim takes over and the read stops
+happening. **The twenty-four existing people pay nothing** — the ternary
+short-circuits before the `get()`.
+**Don't:** reverse the order "for consistency". And note that
+`tools/test-rules.js` used to assert `token.email` appeared nowhere in the
+rules; that assertion was this decision written as a test, and replacing it was
+deliberate, not a workaround.
+
+### "First time here" is a panel on the sign-in screen, not a screen — 2026-08-31
+**Decision:** the flow that lets anybody choose their own password lives inside
+`#s-login` as `#lg-first`, and the link that opens it is shown even in
+`EASY_SIGN_IN` mode, where it used to be hidden.
+**Why:** two reasons. The sign-in screen is the one screen that exists *before*
+the app has chosen between the phone shell and the wide one, so a panel there
+cannot go missing from one of them — which is exactly what happened to More on
+the rail (see the entry for 2026-08-30). And the link was hidden because it
+only sent mail that was not arriving; it now also lets a person set a password
+with no mail at all, which is **the way off the one shared password published
+in this public file**. Hiding it would hide the only way out.
+**Don't:** hide the link again while `EASY_SIGN_IN` is true. The switch is
+still meant to be turned off, and this panel is how the crew get moved across
+one at a time instead of all at once from a laptop.

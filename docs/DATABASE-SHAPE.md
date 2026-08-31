@@ -14,40 +14,90 @@ Rules live in `firestore.rules`. Publishing them is `docs/PUBLISH-THE-RULES.md`.
 Everything else is denied by the rules until its drawer is built. An unbuilt
 drawer is a closed one, not an open one.
 
-### `refdata/roster` — one document, not one per person
+### `roster/{pid}` — one record per person
 
 ```
-refdata/roster
-  updatedAt : ISO string
-  updatedBy : roster id
-  people:
-    p01: { role:'Technician', lab:'Sorochan', active:true, grants:['assign_undergrads'] }
-    p07: { role:'Farm Manager', lab:'Bill',   active:true, grants:[] }
-    ...23 entries
+roster/p07
+  id     : 'p07'                 (must equal the document name)
+  first  : 'Bill'
+  last   : 'Czekai'
+  pron   : 'he/him/his'
+  role   : 'Farm Manager'
+  lab    : 'Bill'
+  active : true
+  grants : []
+  v      : 2                     (the shape stamp — see below)
 ```
 
-**Why one document rather than 23.** A security rule may only fetch a small
-number of documents per request, and it has to answer questions about two people
-at once — the person asking, and the person the work is being put on. Repeated
-lookups of the same document inside one request are fetched once and reused, so
-the whole roster costs a single read no matter how many questions the rules ask.
-Twenty-three short entries is nowhere near the 1 MB document ceiling.
+**It used to be one document holding everybody** (`refdata/roster`), which was
+cheaper: one fetch answered every question in a request. It was split on
+2026-08-31 so that the faculty could add a hire. A whole-roster document
+arrives as ONE write, and no rule can look inside it and tell "added an
+undergrad to my own lab" apart from "made myself Farm Manager". One record per
+person is the only shape where that distinction can be enforced. The old path
+is left in `firestore.rules` as an explicit refusal, not deleted, so a phone
+running a week-old copy of the app gets a clean "no".
 
-**Why the roster is in the database at all**, when it is also baked into the app:
-the rules cannot see inside the app. This is the fix for the mistake noted in
-`docs/BACKEND-STEPS.md` — the old plan's permission check asked the database a
-question about farm roles that the database had no way to answer.
+**What it costs.** A request that asks about two people — the person asking and
+the person being acted on — now fetches two records instead of one. The limit
+is ten document fetches per request, and repeated lookups of the *same* record
+inside one request are still fetched once and reused. Two is not close to ten.
 
-**Only four fields per person travel.** Role, lab, active, grants. Names,
-pronouns and email addresses stay in the app. The crew's email addresses were
-deliberately taken out of the app (`docs/DECISIONS.md`) and this is not the place
-to put them back.
+**Why the roster is in the database at all**, when it is also baked into the
+app: the rules cannot see inside the app. This is the fix for the mistake noted
+in `docs/BACKEND-STEPS.md` — the old plan's permission check asked the database
+a question about farm roles that the database had no way to answer.
 
-**Who may write it.** Whoever holds `assign_undergrads` — the same grant that
-governs handing out undergrad labour, because it is the same job. The bootstrap
-is two hardcoded ids (p01, p07), because until the roster document exists there
-is no roster to check a grant against. That is the only place a person is named
-in the rules.
+**`v` is a shape stamp and it is load-bearing.** A phone whose saved copy of
+the app is a week old is still running the OLD code, which sent four fields and
+no names. Records below `v:2` are ignored outright. Without that, the first
+time such a phone sent the roster up, every phone on the farm would show a list
+of people with no names and nothing to explain it.
+
+**Names travel. Addresses do not.** The names are already in the app's source,
+which is a public website, so keeping them out of a private database bought
+nothing and cost the farm the ability to hire without a code change. Addresses
+are different, and they live in `accounts` below.
+
+**Who may write it.** Bill, Dillon, and whoever holds `assign_undergrads` — the
+same grant that governs handing out undergrad labour, because it is the same
+job. On top of that, a PI may write a record in their own lab, any
+undergraduate, and the Farm Manager entry, but may not touch another PI and may
+not hand out grants. The bootstrap is two hardcoded ids (p01, p07), because
+until a roster exists there is no roster to check a grant against. That is the
+only place a person is named in the rules.
+
+### `accounts/{lowercased-email}` — which sign-in belongs to which person
+
+```
+accounts/nellis@vols.utk.edu
+  pid     : 'p25'
+  addedBy : 'p07'
+  addedAt : ISO string
+```
+
+**What it is for.** A roster id normally travels on the sign-in token as a
+custom claim, stamped by `tools/create-accounts.js` — which needs the master
+key, which means a laptop. Somebody hired *through the app* has no claim,
+because the whole point of them is that nobody touched a laptop. This row is
+how they are told who they are the first time they sign in. The claim is still
+tried first, and costs nothing; this is only ever read when there is no claim.
+
+**`allow get`, never `allow read`.** In Firestore `read` means get **and
+list**, and the addresses ARE the document names — so `read` would hand
+anybody with an account the whole crew's address book in one request, and
+anybody on the internet can make an account in this project because the app's
+Firebase key is public and has to be. A row can only be fetched by the person
+whose address it is. `allow list: if false` is written out underneath so that
+nobody puts it back by accident.
+
+**Written together with the roster record, in one batch.** A person on the
+roster with no sign-in attached cannot get in and nobody knows why; a sign-in
+attached to nobody is worse. A batch is all-or-nothing, so neither half can
+exist alone.
+
+**Deleting a row** takes that person's id away at their very next request, so
+it is the fastest way to shut somebody out of the app.
 
 ### `tasks/{taskId}` — one document per job
 

@@ -22,22 +22,79 @@
 
 'use strict';
 
-/* The roster document — refdata/roster — as the rules see it:
-     { people: { p01: {role, lab, active, grants[]}, ... } }
-   Built from the app's PEOPLE list by rosterDoc() below, which is also the
-   shape the app must push. */
+/* The roster as the rules see it. Since 2026-08-31 this is ONE RECORD PER
+   PERSON — roster/{pid} — rather than one document holding everybody:
+     { id, first, last, pron, role, lab, active, grants[], v }
+   and NOT the email address, which lives one row per person in `accounts`.
+
+   The split was needed so the rules could say "a PI may edit their own lab
+   and nobody else's"; a whole-roster document arrives as one write and no
+   rule can look inside it and tell which part changed.
+
+   `people` is still keyed by id here, because that is how a rules `get()` on
+   roster/$(id) behaves from the model's point of view — one lookup per id.
+   Built from the app's PEOPLE list, and it is also the shape the app pushes,
+   so tools/test-db.js can compare the two directly. */
+const ROSTER_V = 2;
 function rosterDoc(people) {
   const out = {};
   (people || []).forEach(function (p) {
     if (!p || !p.id) return;
+    if (!p.role) return;                 /* no role means not a person yet */
     out[p.id] = {
-      role: p.role || '',
+      id: String(p.id),
+      first: String(p.first || ''),
+      last: String(p.last || ''),
+      pron: String(p.pron || ''),
+      role: p.role,
       lab: p.lab || '',
       active: p.active !== false,
-      grants: (p.grants || []).slice()
+      grants: (p.grants || []).slice().map(String),
+      v: ROSTER_V
     };
   });
   return { people: out };
+}
+
+/* Mirrors the roster/{pid} write rule -- rosterKeeper(), appAdmin() and
+   facultyMayWrite() together. The app's copy is rosterCanWrite() in
+   UT-TurfFarm-App.html; tools/test-rules.js runs the two against every person
+   against every person and fails if they ever differ.
+
+   `existing` is the record as it stands before the write, or null for a new
+   person -- the rules check the lab on BOTH sides of an edit, so the model
+   has to as well, or it would miss a PI pulling another lab's technician into
+   their own and then editing them. */
+function labNorm(v) { return (!v || v === '—') ? '' : String(v); }
+function rosterCanWriteIn(doc, mePid, target, opts) {
+  const o = opts || {};
+  const me = mePid == null ? '' : String(mePid);
+  if (o.appAdmin) return true;
+  if (keepsRoster(doc, me)) return true;
+  const mine = ((doc && doc.people) || {})[me] || {};
+  if (mine.role !== 'Faculty') return false;
+  if (!target) return false;
+  if (target.role === 'Faculty') return false;
+  if ((target.grants || []).length) return false;
+  const was = o.existing || null;
+  if (was && (was.role === 'Faculty' || (was.grants || []).length)) return false;
+  if (target.role === 'Undergraduate Student') return true;
+  if (target.role === 'Farm Manager') return true;
+  const myLab = labNorm(mine.lab);
+  if (myLab === '' || labNorm(target.lab) !== myLab) return false;
+  if (was && labNorm(was.lab) !== myLab) return false;
+  return true;
+}
+
+/* Mirrors rosterKeeper() in firestore.rules — who may write a roster record,
+   and (Stage 3) an `accounts` row. The app's own copy is rosterCanPush() in
+   UT-TurfFarm-App.html; tools/test-db.js runs the two against each other. */
+function keepsRoster(doc, mePid) {
+  const me = mePid == null ? '' : String(mePid);
+  if (me === '') return false;
+  if (me === 'p01' || me === 'p07') return true;
+  const r = ((doc && doc.people) || {})[me] || {};
+  return r.role === 'Farm Manager' || (r.grants || []).indexOf('assign_undergrads') >= 0;
 }
 
 /* ---- the rules file, function for function ---- */
@@ -148,4 +205,4 @@ function creditsWorker(before, after, mePid) {
   return onIt || credited === me;
 }
 
-module.exports = { rosterDoc, Rules, rulesCan, creditsWorker };
+module.exports = { rosterDoc, Rules, rulesCan, creditsWorker, keepsRoster, ROSTER_V, rosterCanWriteIn };

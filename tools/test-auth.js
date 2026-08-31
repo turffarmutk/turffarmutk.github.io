@@ -348,8 +348,15 @@ section('13. setting a first password, and forgetting one, are the same flow');
   const b = boot({}, { knownEmail: 'rose@example.edu' });
   const link = b.doc.getElementById('lg-reset');
   ok('the sign-in screen offers it', !!link, 'no #lg-reset');
-  ok('and it covers both cases in one line',
-     /first time/i.test(link.textContent) && /forgot/i.test(link.textContent), link.textContent);
+  /* Two wordings, because in email-only mode there is no password to have
+     forgotten — what the link is FOR then is choosing one of your own, which
+     is the way off the shared password. Either way it names the first-time
+     case, because that is the person most likely to be standing there stuck. */
+  ok('and it names the first-time case',
+     /first time/i.test(link.textContent), link.textContent);
+  ok('and offers the other case too, whichever mode it is in',
+     /forgot/i.test(link.textContent) || /your own password/i.test(link.textContent),
+     link.textContent);
 
   /* With no address typed it must ask, not silently do nothing. */
   b.p.authSendReset();
@@ -452,9 +459,15 @@ section('16. TEMPORARY email-only sign-in, and the way back off it');
   b.p.authRenderLogin();
   const passw = b.doc.getElementById('lg-pass'), link = b.doc.getElementById('lg-reset');
   ok('the password box is off the screen', passw.style.display === 'none', passw.style.display);
-  /* The emailed link is the thing that is broken. Leaving it on screen would
-     have people standing in a field waiting for mail that never comes. */
-  ok('so is the emailed-link offer', link.style.display === 'none', link.style.display);
+  /* THE LINK STAYS NOW — changed 2026-08-31. It used to be hidden here,
+     because it only sent mail and the mail was not arriving. It now opens the
+     panel where anybody can choose a password of their own without any mail
+     at all, which is how the farm gets off the one shared password published
+     in this file. Hiding it would hide the only way out. */
+  ok('but the first-time offer stays, because it is the way off the shared password',
+     link.style.display !== 'none', link.style.display);
+  ok('and it opens the panel rather than only sending mail',
+     /authFirstOpen/.test(SRC) && /createUserWithEmailAndPassword/.test(SRC));
   ok('and the screen says no password is needed',
      /no password is needed/i.test((b.doc.getElementById('lg-note') || {}).textContent || ''));
 

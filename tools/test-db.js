@@ -16,7 +16,7 @@ const path = require('path');
 const { JSDOM, VirtualConsole } = require('jsdom');
 const turf = require('@turf/turf');
 const { appSource } = require('./_geo');
-const { rosterDoc } = require('./rules-model');
+const { rosterDoc, ROSTER_V } = require('./rules-model');
 
 const ROOT = path.join(__dirname, '..');
 const APP = path.join(ROOT, 'UT-TurfFarm-App.html');
@@ -89,10 +89,9 @@ section('3. What the app sends is exactly what the rules expect');
   Object.keys(want.people).forEach(pid => {
     const a = sent.people[pid], b = want.people[pid];
     if (!a) { mismatch.push(pid + ' missing'); return; }
-    if (a.role !== b.role) mismatch.push(pid + ' role');
-    if (a.lab !== b.lab) mismatch.push(pid + ' lab');
-    if (a.active !== b.active) mismatch.push(pid + ' active');
-    if (JSON.stringify(a.grants) !== JSON.stringify(b.grants)) mismatch.push(pid + ' grants');
+    Object.keys(b).forEach(k => {
+      if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) mismatch.push(pid + ' ' + k);
+    });
   });
   ok('every person matches the shape the rules read', mismatch.length === 0, mismatch.slice(0, 6).join(', '));
 
@@ -101,6 +100,15 @@ section('3. What the app sends is exactly what the rules expect');
     ok('the rules read .' + f + ', and it is sent',
        rulesText.indexOf("'" + f + "'") >= 0 && Object.keys(sent.people).every(p => f in sent.people[p]));
   });
+
+  /* THE SHAPE STAMP. A phone running a week-old copy of the app sends the OLD
+     four-field record with no names in it. Without a version on every record
+     the drawer cannot tell that apart from a real one, and the whole farm ends
+     up looking at a list of people with no names. */
+  ok('every record carries the shape stamp',
+     Object.keys(sent.people).every(p => sent.people[p].v === ROSTER_V));
+  ok('the name travels now, because hiring has to work without a code change',
+     sent.people.p07.first === 'Bill' && sent.people.p07.last === 'Czekai');
 
   ok("Dillon's undergrad grant survives the trip",
      (sent.people.p01.grants || []).indexOf('assign_undergrads') >= 0);
@@ -116,14 +124,18 @@ section('4. Names and addresses stay in the app');
   const leaked = [];
   Object.keys(sent.people).forEach(pid => {
     Object.keys(sent.people[pid]).forEach(k => {
-      if (['role', 'lab', 'active', 'grants'].indexOf(k) < 0) leaked.push(pid + '.' + k);
+      if (['id', 'first', 'last', 'pron', 'role', 'lab', 'active', 'grants', 'v'].indexOf(k) < 0) leaked.push(pid + '.' + k);
     });
   });
-  ok('nothing travels but role, lab, active and grants', leaked.length === 0, leaked.slice(0, 6).join(', '));
+  ok('nothing travels but the nine agreed fields', leaked.length === 0, leaked.slice(0, 6).join(', '));
   const blob = JSON.stringify(sent);
+  /* THE ONE THAT STILL MATTERS. Names became public the day the app did — they
+     are in the source of a public website. Addresses did not, and they do not
+     belong on a record every signed-in person can read. They live one row per
+     person in `accounts`, readable only by the person whose address it is. */
   ok('no email address is in the payload', blob.indexOf('@') < 0);
-  ok('no first or last name is in the payload',
-     blob.indexOf('Dillon') < 0 && blob.indexOf('Czekai') < 0 && blob.indexOf('Valk') < 0);
+  ok('no address field is even offered',
+     Object.keys(sent.people).every(p => !('email' in sent.people[p])));
 }
 
 /* ------------------------------------------- 5. who may send the roster -- */

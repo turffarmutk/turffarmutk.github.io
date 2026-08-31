@@ -298,7 +298,22 @@ function sortPids(ids){ return rstSort(pidsOf(ids).map(function(i){return rstFin
 function rstFind(id){for(var i=0;i<PEOPLE.length;i++)if(PEOPLE[i].id===id)return PEOPLE[i];return null;}
 function rstFindByName(n){for(var i=0;i<PEOPLE.length;i++)if(pName(PEOPLE[i])===n)return PEOPLE[i];return null;}
 function rstActive(){return PEOPLE.filter(function(p){return p.active!==false;});}
-function rstNewId(){var n=1;PEOPLE.forEach(function(p){var m=/^p(\d+)$/.exec(p.id||'');if(m&&+m[1]>=n)n=+m[1]+1;});return 'p'+(n<10?'0':'')+n;}
+/* The next free roster id. It counts up from the highest this phone has ever
+   SEEN, not the highest it currently holds — and since 2026-08-31 that matters,
+   because two people can now add a hire at the same time on two phones. Taking
+   only what is held would hand p25 to both of them, the second write would
+   quietly overwrite the first, and every task, punch and field-log entry filed
+   against p25 would then point at the wrong person. The high-water mark is
+   already kept for rstSeedNewcomers(); this reads the same one. */
+function rstNewId(){
+  var n=1;
+  PEOPLE.forEach(function(p){var m=/^p(\d+)$/.exec(p.id||'');if(m&&+m[1]>=n)n=+m[1]+1;});
+  try{
+    var seen=+(localStorage.getItem(RST_HWM_KEY)||0);
+    if(seen>=n) n=seen+1;
+  }catch(e){}
+  return 'p'+(n<10?'0':'')+n;
+}
 function rstSort(list){return list.slice().sort(function(a,b){
   var d=(RST_ORDER[a.role]==null?9:RST_ORDER[a.role])-(RST_ORDER[b.role]==null?9:RST_ORDER[b.role]);
   return d||(a.lab||'').localeCompare(b.lab||'')||pName(a).localeCompare(pName(b));});}
@@ -746,6 +761,24 @@ document.getElementById('rste-save').addEventListener('click',function(){
   rstSync();
   if(typeof renderBoard==='function'){try{renderBoard();}catch(err){}}
   toast(adding?pName(p)+' added ✓':(wasRole!==p.role?pName(p)+' is now a '+(RST_TITLE[p.role]||p.role)+' ✓':'Saved changes ✓'));
+  /* Send the person AND their sign-in together, rather than waiting for the
+     drawer's next scan to take the roster record on its own. Somebody added
+     with an address can then sign in straight away, which is the whole point
+     of hiring inside the app. The drawer is still the safety net: if this
+     fails -- no signal, usually -- the record goes up on the next scan and
+     the address follows the next time somebody opens this screen. */
+  if(typeof rosterLinkPerson==='function'){
+    rosterLinkPerson(p,p.email).then(function(){
+      if(adding&&p.email) toast(pName(p)+' can sign in with '+p.email);
+    }).catch(function(e){
+      /* Silent when there is simply no database on this device or no signal --
+         the drawer will catch up. Loud when it was actually refused, because
+         that means the person cannot get in and somebody has to know. */
+      var why=(e&&e.message)||'';
+      if(why==='notallowed') toast('Saved here, but only Bill can add somebody to the database');
+      else if(why!=='nodb'&&why!=='nobody'&&typeof sdbError==='function') toast(sdbError(e));
+    });
+  }
   back(); rstRender();
 });
 /* ---- handing the app over ----

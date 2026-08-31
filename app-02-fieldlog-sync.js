@@ -1977,16 +1977,18 @@ function trsyncSummary(){
 }
 
 /* ================= FARM SETTINGS ================= */
-/* The sprayer numbers, the mower list, the labs list and the semester dates.
-   Four small things rather than a list of records, so this drawer is shaped
-   differently from every other one, in two ways that matter.
+/* The sprayer numbers, the mower list, the labs list, the semester dates, and
+   where bug reports are delivered. Five small things rather than a list of
+   records, so this drawer is shaped differently from every other one, in two
+   ways that matter.
 
    ONE DOCUMENT PER GROUP, not per record. `farmsettings/spray`,
-   `farmsettings/mowers`, `farmsettings/labs`, `farmsettings/semesters`.
+   `farmsettings/mowers`, `farmsettings/labs`, `farmsettings/semesters`,
+   `farmsettings/bugcfg`.
 
    AND THE SHARED COPY WINS ON ARRIVAL. Everywhere else a phone that has been
    switched off pushes up whatever the shared copy is missing. That is right for
-   a list of jobs and wrong here: these four each have exactly one value, so a
+   a list of jobs and wrong here: these five each have exactly one value, so a
    phone still holding the built-in defaults would not be adding anything, it
    would be overwriting the farm's real settings with them. So: turning the
    switch on TAKES the farm's settings, and this phone only sends a value it
@@ -2053,7 +2055,25 @@ var FST_GROUPS=[
     b.forEach(function(x){ FARM_SEMS.push(x); });
     try{ storeTouch(); }catch(e){}
   },
-  repaint:function(){ _fstRepaint('s-semsettings','smsRender'); }}
+  repaint:function(){ _fstRepaint('s-semsettings','smsRender'); }},
+
+ /* Where the crew's bug reports get delivered. Not a farm setting like the
+    other four, but it has exactly the same problem and therefore the same
+    answer: a value set on one phone that every other phone has to know, or the
+    feature silently does nothing for everybody except the person who set it.
+    See the long note over bugcfgRead() in the page. */
+ {id:'bugcfg', label:'where bug reports go',
+  can:function(){ return (typeof bugCanConfig==='function')&&bugCanConfig(); },
+  read:function(){ return (typeof bugcfgRead==='function')?bugcfgRead():null; },
+  apply:function(v){ if(typeof bugcfgApply==='function') bugcfgApply(v); },
+  restore:function(){ if(typeof bugcfgRestore==='function') bugcfgRestore(); },
+  /* Two screens, because the report form itself carries the "not set up to
+     send yet" warning, and that warning is exactly what has to disappear the
+     moment the key arrives. */
+  repaint:function(){
+    _fstRepaint('s-bugsettings','bgsRender');
+    _fstRepaint('s-bugreport','bugRender');
+  }}
 ];
 function fstGroup(id){
   for(var i=0;i<FST_GROUPS.length;i++) if(FST_GROUPS[i].id===id) return FST_GROUPS[i];
@@ -2190,7 +2210,20 @@ function fstsyncPush(){
   var n=0;
   FST_GROUPS.forEach(function(g){
     var json=fstValueJson(g);
-    if(json===null&&FSTSYNC.seen[g.id]===undefined) return;
+    /* 'null' in quotes, because fstValueJson() returns JSON TEXT -- the four
+       characters n-u-l-l, never the value null. Comparing against the value
+       meant this guard never once fired, so a phone that had set nothing still
+       announced its nothing to the whole farm, laying down a `v:null`
+       document for a group no human had touched.
+
+       Harmless for the sprayer and the other three, which is why it sat here
+       unnoticed since 2026-08-27: every phone was on the built-in values
+       anyway, so "go back to the built-in values" changed nothing. It is NOT
+       harmless for the bug-report key, where the shared value is the only
+       thing that exists. A second phone belonging to Bill, freshly installed
+       and holding nothing, would have published its nothing and wiped the key
+       off every phone on the farm -- including the one he set it up on. */
+    if(json==='null'&&FSTSYNC.seen[g.id]===undefined) return;
     if(FSTSYNC.seen[g.id]===json) return;
     var may=false; try{ may=!!g.can(); }catch(e){ may=false; }
     if(!may) return;                              /* never offer a refused write */

@@ -99,13 +99,13 @@ const p = b.p, w = b.win;
 const J = JSON.stringify;
 
 /* ---------------------------------------------------------------- */
-section('0. it boots, and there are four groups');
+section('0. it boots, and there are five groups');
 ok('no jsdom errors on load', b.errs.length === 0, b.errs[0]);
 {
   const ids = (p.FST_GROUPS || []).map(g => g.id);
-  ok('four settings groups', ids.length === 4, ids.join(','));
-  ok('and they are the four screens on the page',
-     ids.sort().join(',') === 'labs,mowers,semesters,spray', ids.join(','));
+  ok('five settings groups', ids.length === 5, ids.join(','));
+  ok('and they are the five screens on the page',
+     ids.slice().sort().join(',') === 'bugcfg,labs,mowers,semesters,spray', ids.join(','));
   (p.FST_GROUPS || []).forEach(g => {
     ok(g.id + ' can be read, applied, restored and asked about',
        typeof g.read === 'function' && typeof g.apply === 'function'
@@ -114,10 +114,10 @@ ok('no jsdom errors on load', b.errs.length === 0, b.errs[0]);
 }
 
 /* ---------------------------------------------------------------- */
-section('1. none of the four gates reads currentRole');
+section('1. none of the five gates reads currentRole');
 {
   ['sprCanEdit', 'mowCanEdit', 'labsCanEdit', 'semCanEdit', 'farmCanSee',
-   'fstCanEditKit', 'fstCanEditLists'].forEach(fn => {
+   'fstCanEditKit', 'fstCanEditLists', 'fstCanEditBugs', 'bugCanConfig'].forEach(fn => {
     const src = w.eval(fn + '.toString()');
     ok(fn + ' is off the roster, not the screen', src.indexOf('currentRole') < 0, src.slice(0, 90));
   });
@@ -289,9 +289,44 @@ section('7. the rules file says all of it');
      /canEditFarmKit\(\)[\s\S]{0,200}?roleOf\(me\(\)\) != 'Undergraduate Student'/.test(RULES));
   ok('the lists line is Bill and faculty',
      /canEditFarmLists\(\)[\s\S]{0,260}?Farm Manager[\s\S]{0,80}?Faculty/.test(RULES));
+  ok('bug settings go through their own, narrower line',
+     /\(group == 'bugcfg' && canEditBugSettings\(\)\)/.test(RULES));
+  ok('and that line is Bill or the App Manager, not faculty',
+     /function canEditBugSettings\(\)[\s\S]{0,220}?roleOf\(me\(\)\) == 'Farm Manager'/.test(RULES)
+     && !/function canEditBugSettings\(\)[\s\S]{0,220}?Faculty/.test(RULES));
   ok('the App Manager post is read off the token, not the roster',
      /function isAppManager\(\)[\s\S]{0,200}?request\.auth\.token\.app_admin == true/.test(RULES));
   ok('and it is defined exactly once', (RULES.match(/function isAppManager\(/g) || []).length === 1);
+}
+
+/* ---------------------------------------------------------------- */
+section('7b. a phone that has set nothing says nothing');
+{
+  /* THE BUG THIS PINS. The guard here compared the JSON TEXT 'null' against
+     the VALUE null, so it never fired: a phone holding only the built-in
+     values still wrote a `v:null` document for every group, for the whole
+     farm, unasked. It went unnoticed for three days because "go back to the
+     built-in values" is invisible when every phone is already on them -- and
+     it stopped being invisible the moment the bug-report key moved in here,
+     because there the shared copy is the only copy there is. */
+  const b2 = boot({});
+  const w2 = b2.win;
+  w2.eval("sessionSet('p07');");        /* Bill -- the one person who may set it */
+  w2.eval("FSTSYNC.on=true;FSTSYNC.live=true;FSTSYNC.ready=true;FSTSYNC.seen={};");
+  const wrote = [];
+  w2.eval("window.__wrote=[];window.fbDb=function(){return{collection:function(){return{"
+        + "doc:function(id){return{set:function(d){window.__wrote.push(id);"
+        + "return{catch:function(){}};}};}};}};};");
+  w2.eval("fstsyncPush();");
+  const ids = w2.eval("JSON.stringify(window.__wrote)");
+  ok('nothing is published by a phone still on the built-in values',
+     ids === '[]', ids);
+
+  /* And the other half: a real change still goes up. */
+  w2.eval("BUGCFG.key='k-real';");
+  w2.eval("fstsyncPush();");
+  const ids2 = w2.eval("JSON.stringify(window.__wrote)");
+  ok('but a key somebody actually typed does', ids2 === '["bugcfg"]', ids2);
 }
 
 /* ---------------------------------------------------------------- */
@@ -299,7 +334,7 @@ section('8. sharing, and the wiring');
 {
   ok('it is on from the moment the app opens', p.FSTSYNC && p.FSTSYNC.on === true);
   ok('nothing on this phone decides it', SRC.indexOf('ut_farmsettings_shared_v1') < 0);
-  ok('one collection, four documents', SRC.indexOf("FSTSYNC_COLL='farmsettings'") > 0);
+  ok('one collection, five documents', SRC.indexOf("FSTSYNC_COLL='farmsettings'") > 0);
   ok('it has a read-out on the Shared database screen', /st:FSTSYNC,\s*summary:fstsyncSummary\(\)/.test(SRC));
   ok('the read-out is in the list', /st:TRSYNC[\s\S]{0,900}st:FSTSYNC/.test(SRC));
   ok('and there is no button to turn it off', SRC.indexOf("closest('#sdb-farm')") < 0);

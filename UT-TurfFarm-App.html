@@ -8001,7 +8001,51 @@ function bugToLabel(){
 }
 function bugKey(){ return (BUGCFG.key||'').trim(); }
 function bugConfigured(){ return !!bugKey(); }
-function bugCanConfig(){ return (typeof rstIsAdmin==='function'&&rstIsAdmin())||currentRole==='manager'; }
+/* Off the roster, not off currentRole -- see fstCanEditBugs() in app-03. The
+   database has to be able to ask the same question, and it cannot see which
+   screen anybody is looking at. */
+function bugCanConfig(){
+  return (typeof fstCanEditBugs==='function')
+    ? fstCanEditBugs()
+    : ((typeof rstIsAdmin==='function')&&rstIsAdmin());
+}
+
+/* ---- the setting travels to every phone --------------------------------
+   THE BUG THIS FIXES, because it is the whole reason the form looked built
+   and still did nothing:
+
+   The access key was kept in ONE phone's own storage. Bill pastes it in and
+   his phone starts sending. Every other phone on the farm has never seen it,
+   so bugConfigured() is false there, and all twenty-two of them quietly write
+   their reports down and keep them. Nobody is told. The crew believe they have
+   reported something; the reports are sitting on their own phones, and the
+   only screen that would say so is the settings screen they cannot open.
+
+   So the setting rides the farmsettings drawer that already carries the
+   sprayer numbers -- one document, `farmsettings/bugcfg`, written only by
+   whoever may change it and read by everybody. These three functions are what
+   FST_GROUPS in app-02 calls; they are here rather than there so they sit next
+   to the BUGCFG they operate on.                                          */
+function bugcfgRead(){
+  var t=(BUGCFG.to||'').trim(), k=(BUGCFG.key||'').trim();
+  /* null means "nobody has set this", which is what stops an untouched phone
+     seeding blanks over the farm's real key. Same contract as the other four. */
+  if(!t&&!k) return null;
+  return {to:t,key:k};
+}
+function bugcfgApply(v){
+  if(!v||typeof v!=='object') return;
+  BUGCFG.to=String(v.to||'');
+  BUGCFG.key=String(v.key||'');
+  try{ bugcfgScan(); }catch(e){}   /* on disk now, not in two seconds */
+  /* The point of the whole exercise: a phone that has been sitting on queued
+     reports because it had no key has one now, so send them. */
+  try{ bugFlush(true); }catch(e){}
+}
+function bugcfgRestore(){
+  BUGCFG.to=''; BUGCFG.key='';
+  try{ bugcfgScan(); }catch(e){}
+}
 
 /* The last few uncaught errors. A crew member cannot describe a stack trace and
    should not have to — "it just stopped" plus the exception that actually fired
@@ -8234,7 +8278,10 @@ function bgsRender(){
     +'<div style="font:800 13px \'Archivo\';color:var(--ink)">Where technical bugs go</div>'
     +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:3px;line-height:1.45">'
     +'Crew reports from More → Report a technical bug arrive as email. By default they follow whoever '
-    +'holds the app — hand the app over and the reports follow, no change needed here.</div></div>'
+    +'holds the app — hand the app over and the reports follow, no change needed here.'
+    +'<br><br>Set this up once, on one phone. The key is shared with the whole farm, so everybody '
+    +'else\'s phone picks it up by itself and nobody else has to type anything — and any reports '
+    +'already waiting on their phones go out the moment it reaches them.</div></div>'
     +(edit?('<div class="list" style="margin-top:12px">'
       +'<div class="row" style="display:block"><div style="font:800 11px \'Public Sans\';color:var(--muted);letter-spacing:.3px;margin-bottom:6px">SEND REPORTS TO</div>'
       +'<input class="inv-in" id="bgs-to" style="text-align:left" placeholder="'+esc(((APP_ADMIN&&APP_ADMIN.email)||'').trim()||'the Web3Forms account inbox')+'" value="'+esc(BUGCFG.to||'')+'">'

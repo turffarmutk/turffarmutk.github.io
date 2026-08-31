@@ -639,7 +639,7 @@ service cloud.firestore {
 
        Four small things rather than a list of records, so this block is shaped
        differently: ONE DOCUMENT PER GROUP, and the group's name IS the document
-       id. `farmsettings/spray`, `/mowers`, `/labs`, `/semesters`.
+       id. `farmsettings/spray`, `/mowers`, `/labs`, `/semesters`, `/bugcfg`.
 
        `v` carries the value, and `v: null` means "back to the built-in
        defaults" -- a real answer, not an absence. A reset that travelled as a
@@ -647,8 +647,11 @@ service cloud.firestore {
        still holds its own copy.
 
        Reading is open to everyone signed in. It has to be: the sprayer numbers
-       feed the mix calculator on the phone of whoever is spraying, and the
-       semester dates decide whose weekly hours count today.
+       feed the mix calculator on the phone of whoever is spraying, the
+       semester dates decide whose weekly hours count today, and `bugcfg` is
+       the whole reason a crew member's bug report can leave their phone at
+       all. The access key in `bugcfg` is not a secret worth hiding here -- it
+       only lets a form post to one inbox, and this page is public anyway.
        ------------------------------------------------------------------ */
 
     /* App: fstCanEditKit() -- the sprayer numbers and the mower list. The
@@ -675,6 +678,14 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.app_admin == true;
     }
 
+    /* App: fstCanEditBugs() -- where the crew's bug reports are delivered.
+       Narrower than the two above, and deliberately so: this is not a farm
+       setting, it is who maintains the app. Bill or the App Manager. Faculty
+       edit the rest of Farm settings and not this one. */
+    function canEditBugSettings() {
+      return isAppManager() || (actor() && roleOf(me()) == 'Farm Manager');
+    }
+
     match /farmsettings/{group} {
       allow read: if actor();
 
@@ -682,9 +693,10 @@ service cloud.firestore {
         && (
              ((group == 'spray' || group == 'mowers') && canEditFarmKit())
           || ((group == 'labs'  || group == 'semesters') && canEditFarmLists())
+          || (group == 'bugcfg' && canEditBugSettings())
         );
 
-      /* A group that is not one of the four is not a settings group. Anything
+      /* A group that is not one of the five is not a settings group. Anything
          else here would be a document nothing reads and nothing maintains. */
       allow delete: if false;
     }

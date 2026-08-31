@@ -1106,7 +1106,7 @@ function personHas(x,grant){
 }
 
 /* ---- who may change Farm settings -----------------------------------------
-   Two lines, both read off the ROSTER rather than currentRole. currentRole is
+   Three lines, all read off the ROSTER rather than currentRole. currentRole is
    screen state the database cannot see, so any gate that consults it is
    guaranteed to drift from its transcription in firestore.rules -- the bug
    already caught in schedCanEdit() and trAccess().
@@ -1122,7 +1122,9 @@ function personHas(x,grant){
                        actually spray and mow. Everybody but the undergraduates.
      fstCanEditLists() the labs and the semester dates -- the two lists that
                        decide who belongs where and when the farm is running.
-                       Bill, faculty, or the App Manager. */
+                       Bill, faculty, or the App Manager.
+     fstCanEditBugs()  where the crew's bug reports are delivered. Bill or the
+                       App Manager only -- see the note above the function. */
 function fstRole(){
   if(!SESSION.pid) return null;
   if(typeof personActive==='function'&&!personActive(SESSION.pid)) return null;
@@ -1137,6 +1139,18 @@ function fstCanEditLists(){
   if((typeof rstIsAdmin==='function')&&rstIsAdmin()) return true;
   var r=fstRole();
   return r==='Farm Manager' || r==='Faculty';
+}
+/* Where the crew's bug reports get delivered. Narrower than the other two on
+   purpose: this is not a farm setting, it is who maintains the app, and the
+   screen has always said "ask Bill or the app manager". Faculty are out.
+
+   It reads the roster like its two neighbours. It used to ask currentRole,
+   which is only which screen is showing -- so a manager who had tapped into
+   another view lost the ability to change it, and the database, which cannot
+   see currentRole at all, had nothing it could copy. */
+function fstCanEditBugs(){
+  if((typeof rstIsAdmin==='function')&&rstIsAdmin()) return true;
+  return fstRole()==='Farm Manager';
 }
 function assignsUndergrads(x){
   return personRole(x)==='Farm Manager' || personHas(x,GRANT_ASSIGN_UNDERGRADS);

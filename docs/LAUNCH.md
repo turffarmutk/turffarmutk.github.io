@@ -272,6 +272,11 @@ sending until this is done.
 5. File a test report from **More → Report a technical bug** and confirm it
    arrives.
 
+Do this once, on one phone. The key is shared with the whole farm through the
+same channel that carries the sprayer numbers, so every other phone picks it up
+by itself and nobody else has to type anything. Any reports already waiting on
+those phones go out the moment it lands.
+
 Free tier is 250 reports a month, far more than this farm will file. A copy of
 every report stays on the phone that filed it, and anything that fails to send
 retries by itself when signal returns.
@@ -362,7 +367,9 @@ tab. If an update banner appears in the app, tap Reload.
 
 **Bug reports are not arriving** — More → Farm settings → Bug reports shows
 "Waiting to send" if they are queued. Check the key is pasted correctly and the
-monthly allowance is not spent.
+monthly allowance is not spent. If it works on your phone but the crew's reports
+never appear, check More → Shared database says the farm settings drawer is
+connected — that is what carries the key to their phones.
 
 **`git add` says "does not have a commit checked out"** — there is a nested
 repository inside the project folder, almost always the GitHub repo cloned in by

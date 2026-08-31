@@ -345,6 +345,53 @@ which is exactly how it would have shipped.
 visible somewhere, use `bugToLabel()`, which words itself correctly when no
 address is stored.
 
+### The bug-report key is a farm setting, not a phone setting — 2026-08-30
+**Decision:** the Web3Forms access key rides the `farmsettings` drawer as a
+fifth group, `farmsettings/bugcfg`, alongside the sprayer numbers, the mowers,
+the labs and the semester dates. It is written only by Bill or the App Manager
+and read by every phone.
+**Why:** it used to live in the storage of whichever phone it was pasted into.
+That made "Report a technical bug" a form that looked completely finished and
+delivered nothing. Bill sets it up, Bill's phone starts sending, and the other
+twenty-two go on writing reports down and keeping them — no error, no warning,
+and the one screen that would have said "not set up to send" is a settings
+screen a crew member cannot open. The crew believe they have reported
+something. Nobody has received anything. It is the same shape of failure as a
+nozzle rate fixed on one phone, so it gets the same answer.
+**Don't:** treat the key as a secret that ought to stay off the shared
+database. It only lets a form post to one inbox, and this page is public
+anyway — a key nobody's phone can read is a key that does nothing.
+
+### Who may redirect bug reports is narrower than the rest of Farm settings — 2026-08-30
+**Decision:** `fstCanEditBugs()` is Bill or the App Manager. Faculty edit every
+other part of Farm settings and not this one.
+**Why:** the other four groups are how the farm operates — the sprayer, the
+mowers, the labs, the term dates. This one is who maintains the app, which is
+the hand-off question, not a farm question. It is also the faithful reading of
+what the gate already did (`rstIsAdmin() || currentRole==='manager'`) and of
+what the screen has always told people: "ask Bill or the app manager to finish
+setup."
+**Don't:** widen it to `fstCanEditLists()` just because it now sits in the same
+table. And don't put `currentRole` back into it — that is only which screen is
+showing, so it drifts from `firestore.rules`, which cannot see screens at all.
+
+### `json==='null'` in fstsyncPush() is quoted on purpose — 2026-08-30
+**Decision:** the guard in `fstsyncPush()` compares against the four-character
+string `'null'`, not the value `null`.
+**Why:** `fstValueJson()` returns JSON **text**. It never returns the value
+`null` except from its own catch block. The guard used to say `json===null`,
+so it never once fired, and every phone published a `v:null` document for every
+farm-settings group whether or not a human had touched it — which is why
+`spray`, `mowers`, `labs` and `semesters` all carry `v:null` documents dated
+2026-08-27 that nobody set. Invisible for those four, because "go back to the
+built-in values" changes nothing on a phone already using them. Not invisible
+for `bugcfg`, where the shared copy is the only copy: a freshly installed
+second phone belonging to Bill would have published its nothing and wiped the
+bug-report key off every phone on the farm.
+**Don't:** "correct" the quotes away. `fstsyncSeed()` twenty lines above has
+always compared `fstValueJson(g)==='null'`, quoted, for exactly this reason —
+the two are meant to match.
+
 ### Published as a user site, not a project site — 2026-08-17
 **Decision:** the repo is named `<account>.github.io`, so the app is served
 from the origin root.

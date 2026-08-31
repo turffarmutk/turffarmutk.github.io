@@ -16,6 +16,10 @@
  *   4. Follows the — the address is not a constant. It tracks APP_ADMIN, so the
  *      hand-off       existing "Hand off the app" step redirects bug reports as
  *                     a side effect and nobody has to edit this file.
+ *   4b. Reaches     — the access key is shared with the whole farm, not kept on
+ *      everybody      the one phone it was typed into. Without this the form is
+ *                     built, looks finished, and delivers nothing for anybody
+ *                     except the person who set it up. See section 7.
  *   5. Bill's rows — a task Bill assigned to himself carries a Start button,
  *                    not the rank arrows and bin he uses to direct other
  *                    people. Everyone else's rows keep those controls.
@@ -263,7 +267,54 @@ section('6. the address follows the hand-off');
   b.p.sessionSet('p18'); ok('an undergrad cannot', !b.p.bugCanConfig());
 }
 
-section('7. an untouched config does not freeze the address');
+section('7. the key reaches every phone, not just the one it was typed on');
+{
+  /* THE BUG THIS PINS, because it made the whole form look finished and do
+     nothing. The access key used to live only in the storage of the phone it
+     was pasted into. Bill set it up, Bill's phone sent, and the other
+     twenty-two wrote their reports down and kept them -- with no error, no
+     warning, and the only screen that would have said so being one a crew
+     member is not allowed to open. */
+  const store = {};
+  const b = boot(store, 'ok');
+  b.p.sessionSet('p18');                        /* an undergrad, out in a field */
+  b.win.__get('go')('bugreport');
+  b.doc.getElementById('bug-what').value = 'Clock in does nothing';
+  b.doc.getElementById('bug-send').click();
+  await settle();
+  ok('with no key their report only piles up on their phone',
+     b.p.BUGS.length === 1 && b.p.BUGS[0].status === 'queued' && b.sent.length === 0,
+     b.p.BUGS.length + ' / sent ' + b.sent.length);
+
+  ok('so the setting is shared like the sprayer numbers are',
+     (b.win.__get('FST_GROUPS') || []).some(g => g.id === 'bugcfg'));
+
+  /* Bill's phone put this up; theirs is taking it down. */
+  b.win.__get('fstsyncApplyDoc')('bugcfg', { id: 'bugcfg', v: { to: '', key: 'k-shared' } });
+  await settle();
+  ok('the key arrives from the farm', b.p.bugKey() === 'k-shared', b.p.bugKey());
+  ok('so sending is switched on for them too, with nobody typing anything',
+     b.p.bugConfigured());
+  ok('and the report they had already written sends itself',
+     b.sent.length === 1 && b.p.BUGS[0].status === 'sent',
+     b.sent.length + ' / ' + b.p.BUGS[0].status);
+  ok('it went out with the shared key', b.sent.length === 1 && b.sent[0].body.access_key === 'k-shared');
+  ok('and it is on their phone, so a reload does not lose it again',
+     !!store['ut_bugcfg_v1'] && /k-shared/.test(store['ut_bugcfg_v1'] || ''));
+
+  /* The other half: an undergrad receives the setting but must never push one,
+     or one phone could redirect the whole farm's reports. */
+  ok('an undergrad may not send a setting back up',
+     !b.win.__get('fstGroup')('bugcfg').can());
+  b.p.sessionSet('p07');
+  ok('but Bill may', !!b.win.__get('fstGroup')('bugcfg').can());
+
+  /* "Back to nothing set" travels as a value, like every other reset here. */
+  b.win.__get('fstsyncApplyDoc')('bugcfg', { id: 'bugcfg', v: null });
+  ok('clearing it at the farm clears it here', b.p.bugKey() === '' && !b.p.bugConfigured());
+}
+
+section('8. an untouched config does not freeze the address');
 {
   const store = {};
   const b = boot(store);
@@ -275,7 +326,7 @@ section('7. an untouched config does not freeze the address');
   ok('and clearing it removes the key again', !store['ut_bugcfg_v1'], store['ut_bugcfg_v1']);
 }
 
-section('8. a queued report survives the move to hosting');
+section('9. a queued report survives the move to hosting');
 {
   const store = {};
   const b = boot(store);
@@ -294,7 +345,7 @@ section('8. a queued report survives the move to hosting');
      JSON.stringify(b2.p.BUGS.map(x => x.what)));
 }
 
-section('9. Bill\'s own tasks carry a Start button');
+section('10. Bill\'s own tasks carry a Start button');
 {
   const b = boot({});
   b.p.sessionSet('p07');
@@ -336,7 +387,7 @@ section('9. Bill\'s own tasks carry a Start button');
   ok('and get no Start button', n(crew, '[data-start]') === 0, String(n(crew, '[data-start]')));
 }
 
-section('10. tapping your own task on the board opens it');
+section('11. tapping your own task on the board opens it');
 {
   /* SESSION.pid is a roster id. It used to be called as SESSION.pid(), which
      threw a TypeError out of the board's click handler, so the tap did

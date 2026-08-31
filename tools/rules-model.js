@@ -92,7 +92,7 @@ function Rules(doc, mePid) {
   function canComplete(d) { return onTask(d, me) || assignsUndergrads(me); }
 
   function canEdit(d) {
-    return roleOf(me) === 'Farm Manager'
+    return assignsUndergrads(me)
       || str(d.createdBy) === me
       || (roleOf(me) === 'Faculty'
           && str(d.assignee) !== ''

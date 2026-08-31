@@ -810,6 +810,11 @@ function openTask(id){
  if(t.status==='done'){ rows+=fldRow('Completed by',nameOf(t.completedBy)); rows+=fldRow('Time',fmtTime(t.completedAt)||t.completedAt); }
  else if(isReq){ rows+=fldRow('Requested by',reqByLabel(t.requestedBy)); rows+=fldRow('Students needed',t.students||1); }
  else { rows+=fldRow('Assigned to',taskCrewLabel(t)); rows+=fldRow('When',(isFutureTask(t)?'📅 ':'')+(dueLabel(t)||'Today')); }
+ /* Who put this job on the list. It was never shown before, and its absence
+    is what made five mystery tasks on Dillon's own list unanswerable in
+    August 2026 -- the board could say a job was his, and nothing anywhere in
+    the app could say where it had come from. */
+ rows+=fldRow('Added by',esc(nameOf(t.createdBy)||t.createdBy||'—'));
  rows+=fldRow('↻ Repeat',t.repeat,true);
  var picker= isReq? '<div class="sec">Assign to undergrad</div><div class="chiprow" id="td-people">'+STUDENTS.map(function(s,i){return rosterPill(s,i===0);}).join('')+'</div>':'';
  document.getElementById('td-body').innerHTML=
@@ -821,10 +826,19 @@ function openTask(id){
   +'<div class="sec">Notes</div><div class="list"><div class="fld" style="border-bottom:none;align-items:flex-start"><span class="rs" style="line-height:1.45">'+(t.desc||'—')+'</span></div></div>'
   +picker;
  var act=document.getElementById('td-actions');
- if(t.status==='done') act.innerHTML='<div class="action tap" data-reopen="'+t.id+'" style="background:#e7e9e6;color:#2f3133">Reopen Task</div>';
- else if(isReq) act.innerHTML='<div class="action tap" data-assign="'+t.id+'">Assign Task</div>';
- else if(!t.assignee) act.innerHTML='<div class="action tap" data-claim="'+t.id+'">Claim Task</div>';
- else act.innerHTML='<div class="action tap" data-complete="'+t.id+'">Mark Complete</div>';
+ var main = t.status==='done'?'<div class="action tap" data-reopen="'+t.id+'" style="flex:1;background:#e7e9e6;color:#2f3133">Reopen Task</div>'
+          : isReq?'<div class="action tap" data-assign="'+t.id+'" style="flex:1">Assign Task</div>'
+          : !t.assignee?'<div class="action tap" data-claim="'+t.id+'" style="flex:1">Claim Task</div>'
+          : '<div class="action tap" data-complete="'+t.id+'" style="flex:1">Mark Complete</div>';
+ /* Delete belongs HERE, not only on the board, because this screen is the one
+    place every task can be opened from -- the board, the map, a home-screen
+    widget and the Mine list all end up here. The bin on the board draws on
+    other people's rows only, so before this a job on anybody who is not an
+    undergrad had no delete anywhere in the app. Same rule as the bin
+    (taskCan), same rule the database enforces. */
+ var del=taskCan(SESSION.pid,'delete',t)?'<div class="action tap" data-tdel="'+t.id+'" style="flex:1;background:#fdeceb;color:#c0392b">Delete</div>':'';
+ act.style.display='flex'; act.style.gap='8px';
+ act.innerHTML=main+del;
  var edtBtn=document.getElementById('td-edit');
  if(edtBtn) edtBtn.style.display=(currentRole==='manager'&&!isReq)?'inline-flex':'none';
  show('taskdetail',true);
@@ -880,7 +894,10 @@ document.getElementById('s-taskboard').addEventListener('click',function(e){
  var bb=e.target.closest('[data-board]'); if(bb){var w=bb.getAttribute('data-board');if(w==='assign'||w==='selftask')go('assign');else if(w==='assignlab')openAssignForm();else if(w==='reqct')openCrewReq();return;}
  var ac=e.target.closest('[data-accept]'); if(ac){acceptCrewReq(ac.getAttribute('data-accept'));return;}
  var gr=e.target.closest('[data-req]'); if(gr){openReqForm(gr.getAttribute('data-req')==='undergrad');return;}
- var dl=e.target.closest('[data-del]'); if(dl){e.stopPropagation();var did=dl.getAttribute('data-del');var di=TASKS.findIndex(function(x){return x.id===did;});if(di>=0){var dn=TASKS[di].title;TASKS.splice(di,1);toast('Deleted “'+dn+'”');renderBoard();}return;}
+ /* The bin used to splice the array right here and tell nothing else. It now
+    goes through deleteTask(), which checks who is asking and sends the removal
+    to the shared copy itself -- see the note over that function. */
+ var dl=e.target.closest('[data-del]'); if(dl){e.stopPropagation();var did=dl.getAttribute('data-del');var dt=TASKS.find(function(x){return x.id===did;});if(dt){var dn=dt.title;if(deleteTask(did)){toast('Deleted “'+dn+'”');renderBoard();}else toast('You cannot delete this task');}return;}
  var mv=e.target.closest('[data-move]'); if(mv){e.stopPropagation();moveTask(mv.getAttribute('data-id'),mv.getAttribute('data-move'));return;}
  var claim=e.target.closest('[data-claim]');
  if(claim){e.stopPropagation();var t=TASKS.find(function(x){return x.id===claim.getAttribute('data-claim');});if(t){t.assignee=SESSION.pid;toast('Claimed ✓');renderTasks();}return;}
@@ -895,6 +912,17 @@ document.getElementById('td-actions').addEventListener('click',function(e){
  var cl=e.target.closest('[data-claim]'); if(cl){var t2=TASKS.find(function(x){return x.id===cl.getAttribute('data-claim');});if(t2){t2.assignee=SESSION.pid;t2.status='todo';toast('Claimed ✓');renderBoard();back();}return;}
  var as=e.target.closest('[data-assign]'); if(as){var t3=TASKS.find(function(x){return x.id===as.getAttribute('data-assign');});if(t3){var sel=document.querySelector('#td-people .ppill.on');var who=sel?sel.getAttribute('data-person'):STUDENTS[0];t3.assignee=who;t3.kind='task';t3.status='todo';toast('Assigned to '+nameOf(who)+' ✓');renderBoard();back();}return;}
  var r=e.target.closest('[data-reopen]'); if(r){var t4=TASKS.find(function(x){return x.id===r.getAttribute('data-reopen');});if(t4){t4.status='todo';t4.completedBy=null;toast('Task reopened');renderBoard();back();}return;}
+ /* Asks first, like the Field Log's Delete does, and for the same reason: this
+    takes the job off everybody's board, not just this phone's. */
+ var dd=e.target.closest('[data-tdel]');
+ if(dd){
+   var t5=TASKS.find(function(x){return x.id===dd.getAttribute('data-tdel');}); if(!t5)return;
+   if(!confirm('Delete “'+t5.title+'”?\n\nThis removes the job from everybody\'s board, for good — there is no undo.')) return;
+   var dn5=t5.title;
+   if(deleteTask(t5.id)){ toast('Deleted “'+dn5+'”'); renderBoard(); back(); }
+   else toast('You cannot delete this task');
+   return;
+ }
 });
 document.getElementById('td-body').addEventListener('click',function(e){var p=e.target.closest('#td-people [data-person]');if(!p)return;document.querySelectorAll('#td-people .ppill').forEach(function(x){x.classList.remove('on');});p.classList.add('on');});
 document.getElementById('td-edit').addEventListener('click',function(){if(tdCur)openEditTask(tdCur);});

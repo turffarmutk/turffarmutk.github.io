@@ -1051,7 +1051,8 @@ var WEEKDAYS_FULL=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','
    match it. */
 function boardDefaultDay(){var d=new Date().getDay();return (d===0||d===6)?1:d;}
 var boardDay=boardDefaultDay();
-function boardDayOrd(){var t=asToday0();for(var i=0;i<7;i++){var d=new Date(t);d.setDate(d.getDate()+i);if(d.getDay()===boardDay)return asOrd(d);}return asTodayOrd();}
+function boardOrdFor(dow){var t=asToday0();for(var i=0;i<7;i++){var d=new Date(t);d.setDate(d.getDate()+i);if(d.getDay()===dow)return asOrd(d);}return asTodayOrd();}
+function boardDayOrd(){return boardOrdFor(boardDay);}
 /* The day a task belongs to, as YYYYMMDD. dueAt is the stored field; dueOrd is
    kept because the assign wizard and the day chips do plain integer comparison
    on it, and deriving it here means the two can never disagree. */
@@ -1214,9 +1215,16 @@ function taskCan(actor,action,task){
     case 'complete':
       return taskIsFor(t,me) || assignsUndergrads(me);
 
+    /* Bill, whoever is holding the undergrad-assignment job in his place, the
+       person who raised the job, or faculty over work sitting on their own
+       lab's person. assignsUndergrads() is Bill AND the deputy in one test,
+       which is exactly how 'claim' and 'complete' above already read.
+       Widened on 2026-08-31 to include the deputy: before that, a job that
+       landed on anybody but an undergrad had nobody who could remove it if
+       Bill had not raised it himself. See docs/DECISIONS.md. */
     case 'edit':
     case 'delete':
-      if(role==='Farm Manager') return true;
+      if(assignsUndergrads(me)) return true;
       if(pidOf(t.createdBy)===me) return true;
       if(role==='Faculty' && target && sameLab(me,target)) return true;
       return false;
@@ -1313,6 +1321,81 @@ function moveTask(id,dir){
  var i=TASKS.indexOf(t), j=TASKS.indexOf(sw); TASKS[i]=sw; TASKS[j]=t;
  renderBoard();
 }
+/* Getting rid of a job, from wherever it was reached. ONE function, because
+   until 2026-08-31 the only route was the bin on Bill's board and the code
+   for it lived inside that screen's click handler -- so a job the bin never
+   draws was a job nothing in the app could remove. The bin only draws on
+   somebody ELSE'S row on Bill's board, and that board only lists undergrads,
+   which left every task on a technician, a grad student, faculty or Bill
+   himself undeletable by anybody, forever. See docs/DECISIONS.md.
+
+   Who may: taskCan(), same as everywhere else, and the same answer the
+   database will give when the delete below reaches it.
+
+   The removal is SENT STRAIGHT UP rather than left for the 2-second scan to
+   notice the job has gone missing. tsyncScan() refuses to send anything when
+   the list has emptied completely -- the right call for a list that emptied
+   by accident, the wrong one for the last job somebody deliberately deleted,
+   and on a farm whose board holds five jobs those are the same event.
+   flDelete() sends its own delete for exactly this reason. */
+function deleteTask(id){
+ var t=TASKS.find(function(x){return x.id===id;}); if(!t) return false;
+ if(!taskCan(SESSION.pid,'delete',t)) return false;
+ var i=TASKS.indexOf(t); if(i>=0) TASKS.splice(i,1);
+ /* Off the scan's books before it next runs, so the removal travels as the
+    delete below and never as records the scan has to make a judgement about. */
+ try{ if(typeof TSYNC!=='undefined') delete TSYNC.seen[String(id)]; }catch(e){}
+ var db=(typeof fbDb==='function')?fbDb():null;
+ if(db&&typeof TSYNC_COLL==='string'){
+   try{ db.collection(TSYNC_COLL).doc(String(id)).delete().catch(function(e){ try{ tsyncFail(String(id),e); }catch(_e){} }); }
+   catch(e){ try{ tsyncFail(String(id),e); }catch(_e){} }
+ }
+ try{ storeTouch(); }catch(e){}
+ return true;
+}
+/* THE JOBS THE BOARD CANNOT DRAW.
+   The board shows one day at a time, and only five chips -- Monday to Friday
+   of the run it is on. taskOnDay() draws a job only when its date is an exact
+   match for the chip you are looking at, so two kinds of open job appear on no
+   chip at all, however many you tap:
+
+     - one whose date has passed, or falls outside this run. An overdue job
+       does not turn red and does not move to today. It stops being drawn.
+     - one sitting on somebody the board does not list. That list is the
+       undergraduates plus Bill himself, so every job on a technician, a grad
+       student or faculty is off it.
+
+   Both were invisible to the person running the farm, and until 2026-08-31
+   both were also undeletable, because the bin only draws on a row the board
+   draws. Five mow jobs on Dillon's own list hit both at once, which is what
+   found this. See docs/DECISIONS.md. */
+function boardOffChart(people){
+  var ords=[1,2,3,4,5].map(boardOrdFor);
+  var listed={}; (people||[]).forEach(function(p){ listed[p]=1; });
+  /* Nobody works the weekend, so the chips only run Monday to Friday. An
+     undated job rides on today's chip -- which on a Saturday is no chip at
+     all. Same reading taskOnDay() makes, so the two cannot disagree. */
+  var dow=new Date().getDay(), weekend=(dow===0||dow===6);
+  return TASKS.filter(function(t){
+    if(t.status!=='todo'||t.kind!=='task') return false;
+    var o=taskOrd(t);
+    var onChip=o?(ords.indexOf(o)>=0):!weekend;
+    var whose=pidOf(t.assignee);
+    return !onChip || !whose || !listed[whose];
+  });
+}
+/* Same bin as a board row, because reaching these is the whole point of the
+   section. No rank arrows: these jobs are not in anybody's running order for a
+   day, which is exactly why they are down here rather than up there. */
+function tbOffRow(t){
+  var who=t.assignee?(nameOf(t.assignee)||t.assignee):'Nobody yet';
+  /* dueLabel() only speaks for a job carrying a full timestamp. One carrying
+     just a day still has a day, and saying "no date" about it would be a lie
+     in the one place somebody is trying to work out where a job came from. */
+  var when=dueLabel(t)||(taskOrd(t)?asDateLabel(taskOrd(t)):'No date set');
+  var del='<span class="del tap" data-del="'+t.id+'" title="Delete">🗑</span>';
+  return '<div class="row"><div class="tap" data-task="'+t.id+'" style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+esc(who)+' · '+esc(when)+'</div></div>'+del+'</div>';
+}
 function tbBoardRow(t,n,first,last){
  var num='<span style="width:22px;height:22px;border-radius:7px;background:#2f3133;color:#fff;font:800 12px \'Archivo\';display:flex;align-items:center;justify-content:center;flex:none">'+n+'</span>';
  var up='<span class="rk tap'+(first?' off':'')+'" data-move="up" data-id="'+t.id+'">▲</span>';
@@ -1396,6 +1479,16 @@ function renderTasks(){
             }).join('')+'</div>'
           : '<div class="list"><div class="row" style="border-bottom:none"><div style="flex:1"><div class="rs">All caught up ✓</div></div></div></div>';
    });
+   /* Bill only. Faculty see their own lab and the pool, which is a deliberate
+      scope -- this section is about the farm as a whole having nowhere to put
+      a job that no day shows, and that is the farm manager's problem. */
+   if(currentRole==='manager'){
+     var off=boardOffChart(people);
+     if(off.length){
+       html+='<div class="sec">Not on any day above · '+off.length+'</div>';
+       html+='<div class="list">'+off.map(tbOffRow).join('')+'</div>';
+     }
+   }
  } else if(tbTab==='completed'){
    var ro2=currentRole!=='manager';
    var done=TASKS.filter(function(t){return t.status==='done';});

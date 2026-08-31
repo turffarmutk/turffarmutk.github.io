@@ -148,10 +148,13 @@ service cloud.firestore {
       return onTask(d, me()) || assignsUndergrads(me());
     }
 
-    /* edit / delete — Bill, the person who raised it, or faculty over work
-       sitting on their own lab's person. */
+    /* edit / delete — Bill or whoever is holding the undergrad-assignment job
+       in his place, the person who raised it, or faculty over work sitting on
+       their own lab's person. assignsUndergrads() is Bill AND the deputy in
+       one test, the same way claim and complete above read it. Widened on
+       2026-08-31 to include the deputy — see docs/DECISIONS.md. */
     function canEdit(d) {
-      return roleOf(me()) == 'Farm Manager'
+      return assignsUndergrads(me())
         || str(d.get('createdBy', '')) == me()
         || (roleOf(me()) == 'Faculty'
             && str(d.get('assignee', '')) != ''

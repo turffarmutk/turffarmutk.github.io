@@ -28,6 +28,39 @@ down.
 
 ## Process & project
 
+### A task nobody could delete, and the two holes that made it — 2026-08-31
+**Decision:** three changes, made together because on their own none of them
+fixes it. (1) The task's own screen gained a **Delete**, gated by `taskCan()`,
+and both it and the bin on the board now go through one `deleteTask()` in
+`app-03-people.js`. (2) `taskCan(...,'edit'|'delete',...)` was widened from
+`role==='Farm Manager'` to `assignsUndergrads(me)`, so whoever is holding the
+undergrad-assignment job in Bill's absence can delete as well — mirrored in
+`firestore.rules` and `tools/rules-model.js`, which must always move together.
+(3) Bill's Board tab gained a **"Not on any day above"** section listing open
+jobs no day chip can draw.
+**Why:** five mow jobs surfaced on Dillon's list (see the entry above for where
+they came from) and nothing in the app could remove them. The bin 🗑 draws on
+one row only — somebody else's row on Bill's Board tab — and that board lists
+undergraduates plus Bill himself. Dillon is a Technician, so he never appears
+on it and does not even have a Board tab; that made every task on a technician,
+a grad student or faculty undeletable by anybody. Bill could not reach them
+either, for a second reason: `taskOnDay()` matches one exact date, so a job
+dated outside this Monday-to-Friday run is drawn on no chip at all. And under
+the old permission Dillon could not have deleted them even with a button,
+because he had not created them.
+**Don't:** assume the bin on the board is "the delete". It is one route to a
+function, and a job that route does not draw needs another one — which is why
+Delete now lives on the detail screen, the one place every task can be opened
+from. Don't "simplify" `deleteTask()` back into a splice inside the click
+handler either: it sends the removal to the shared copy itself, because
+`tsyncScan()` refuses to send anything once the list has emptied completely
+(`TSYNC_MAX_DELETE`, and the `!Object.keys(here).length` guard beside it). That
+guard is right — a list that emptied by accident must not wipe the farm — but
+it also means the last job on the board could never be deleted by waiting for
+the scan. `flDelete()` sends its own delete for exactly the same reason. And
+note that widening `taskCan()` means the rules have to be published again
+before the database will accept it: see docs/PUBLISH-THE-RULES.md.
+
 ### A phone's old local tasks surfaced on their own once task sharing went live — 2026-08-31
 **Decision:** the task list's local storage key was bumped from `ut_tasks_v1`
 to `ut_tasks_v2` in `STORE_DEFS` (`UT-TurfFarm-App.html`), the same move

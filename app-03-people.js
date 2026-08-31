@@ -901,6 +901,18 @@ function schedHasAny(pid,d){
 }
 
 /* ---- the profile screen ---- */
+/* True while someone has a day-time box open on their own schedule screen --
+   including the phone's own time wheel, which the OS anchors to that box.
+   Rebuilding the row out from under it (which a remote repaint does) kills
+   the wheel mid-pick, so a repaint arriving from someone else's schedule
+   syncing in has to wait rather than barge in. The data itself is not
+   delayed, only the repaint -- the next thing the person does (pick a time,
+   flip a day, leave and come back) draws with whatever landed meanwhile. */
+function schedIsEditing(){
+  var w=document.getElementById('pf-sched-wrap');
+  var a=document.activeElement;
+  return !!(w&&a&&w.contains(a)&&a.tagName==='INPUT');
+}
 function renderProfileSchedule(){
   var w=document.getElementById('pf-sched-wrap'); if(!w) return;
   if(currentRole!=='undergrad'){ w.style.display='none'; w.innerHTML=''; return; }

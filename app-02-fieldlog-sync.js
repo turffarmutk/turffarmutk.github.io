@@ -802,10 +802,12 @@ function schsyncOnSnapshot(snap){
   if(touched){
     try{ storeTouch(); }catch(e){}
     /* Somebody else's hours changing is exactly the thing the day board is
-       for, so repaint whatever is open rather than waiting for a navigation. */
+       for, so repaint whatever is open rather than waiting for a navigation.
+       The one exception is a person's own schedule screen while they have a
+       time box open -- see schedIsEditing() for why. */
     try{ if(typeof renderAssignPeople==='function') renderAssignPeople(); }catch(e){}
     try{ if(typeof renderTasks==='function') renderTasks(); }catch(e){}
-    try{ if(typeof renderProfileSchedule==='function') renderProfileSchedule(); }catch(e){}
+    try{ if(typeof renderProfileSchedule==='function' && !(typeof schedIsEditing==='function' && schedIsEditing())) renderProfileSchedule(); }catch(e){}
     try{ schsyncRepaint(); }catch(e){}
   }
 }

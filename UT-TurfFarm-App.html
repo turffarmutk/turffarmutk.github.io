@@ -5991,6 +5991,47 @@ function jobPlots(type,name,fallback){
   var fb=(fallback||[]).filter(function(n){return real.indexOf(n)>=0;});
   return fb.length?fb:real;
 }
+/* ---- What a job MAY be put on, as against what it is usually on -----------
+   These two used to be the same list, and that was the bug: jobPlots() decided
+   both what a fairway mow normally covers AND what the map would let anybody
+   tap, so a manager who wanted one extra plot mown on a Friday simply could
+   not ask for it -- the plot was drawn grey and ignored the tap. Reported from
+   the farm 2026-08-30.
+
+   Now the map opens the whole farm and the usual set is a button (see
+   jobQuickSet below). Zones are the one thing not offered everywhere, because
+   they are not ordinary ground: the alleys come with any mowing job, and the
+   gravel only with a job that has business on stone -- a fertilizer run does
+   not, which is the rule jobSpraysGravel() already carries. */
+function jobPickTargets(type,name,fallback){
+  var out=jobAllPlots();
+  if(jobResKind(type,name)==='mow') out=out.concat(jobAlleyZones());
+  if(jobSpraysGravel(type,name))    out=out.concat(jobGravelZones());
+  /* Ground already on the job stays pickable even when it would not be offered
+     today -- an alley unit saved before the zone split, for one. */
+  jobRealPlots(fallback).forEach(function(n){ if(out.indexOf(n)<0) out.push(n); });
+  return out;
+}
+/* The ground this job is USUALLY on, when that is a genuine shortcut rather
+   than the whole farm. Empty means "no quick-select button here": on a spray
+   or a fertiliser run the usual set IS every plot, and a one-tap way to book
+   the entire farm for one is exactly what this app should not offer. */
+function jobQuickSet(type,name,fallback){
+  var q=jobPlots(type,name,fallback)||[];
+  var all=jobPickTargets(type,name,fallback);
+  return (q.length && q.length<all.length) ? q : [];
+}
+/* What that button says it will do, named the way the farm names it. The
+   machine's name comes out of the mower list, so a rename follows through. */
+function jobQuickLabel(type,name,fallback){
+  if(!jobQuickSet(type,name,fallback).length) return '';
+  if(jobIsAlleys(type,name))  return 'All alleys';
+  if(jobIsBorders(type,name)) return 'All borders';
+  var kinds=jobMowerKinds(type,name);
+  if(kinds&&kinds.length===1) return 'All '+kinds[0]+' ground';
+  if(kinds&&kinds.length)     return 'All mowing ground';
+  return 'The usual plots';
+}
 /* Out of a list of plot names somebody saved, the ones still on the map today.
    A plot that has since gone from farm-geo.js is dropped rather than counted:
    left in, it would sit in the "3 / 4 done" total with nothing on screen to
@@ -6066,14 +6107,18 @@ function jobToggle(list,names,select){
 }
 /* A tap resolves to the block's plots when there is one, else the single plot. */
 function jobTapNames(n,info){ return (info&&info.plots&&info.plots.length)?info.plots:[n]; }
-/* ---- Select all (mow jobs) -----------------------------------------------
+/* ---- Quick select ---------------------------------------------------------
    A mow covers whole runs of ground — Bill is normally taking everything the
    machine is set up for, so tapping thirty blocks one at a time is the wrong
-   default. Every other job type is deliberately plot-by-plot: a spray or a
-   fertiliser run is chosen ground, and one careless tap should not be able to
-   book the whole farm.
+   default. The button hands him that usual set in one go; the map still lets
+   him add or drop whatever this particular Friday needs, which is the whole
+   point of the change on 2026-08-30.
 
-   Restricted plots are filtered out, so select-all can never put work on
+   It is never a way to book the entire farm: jobQuickSet() returns nothing on
+   a job whose usual ground is everything, so a spray or a fertiliser run stays
+   deliberately plot-by-plot.
+
+   Restricted plots are filtered out, so quick select can never put work on
    ground a live trial has closed. */
 function jobSelectable(targets,type,name){
   return (targets||[]).filter(function(n){ return jobRes(n,type,name).full.length===0; });
@@ -6082,14 +6127,19 @@ function jobAllOn(list,targets,type,name){
   var sel=jobSelectable(targets,type,name);
   return sel.length>0 && sel.every(function(n){ return list.indexOf(n)>=0; });
 }
-/* Renders the chip and returns nothing — hidden outright on non-mow jobs. */
-function jobSyncAllChip(elId,list,targets,type,name){
+/* Renders the chip and returns nothing — hidden outright when the job has no
+   usual set worth a shortcut. `quick` is that set, worked out once when the
+   picker opens so the button does not follow the selection around. */
+function jobSyncAllChip(elId,list,quick,type,name,fallback){
   var el=document.getElementById(elId); if(!el)return;
-  if(!isMowCat(type)){ el.style.display='none'; return; }
+  if(!quick||!quick.length){ el.style.display='none'; return; }
   el.style.display='';
-  el.textContent=jobAllOn(list,targets,type,name)?'Clear all':'Select all';
+  var n=jobSelectable(quick,type,name).length;
+  el.textContent=jobAllOn(list,quick,type,name)?'Clear'
+                 :((jobQuickLabel(type,name,fallback)||'Select all')+' · '+n);
 }
-/* Flips the whole selectable set on or off. Returns how many are now picked. */
+/* Flips the job's usual set on, or clears the selection outright. Returns how
+   many are now picked. */
 function jobToggleAll(list,targets,type,name){
   var sel=jobSelectable(targets,type,name), on=!jobAllOn(list,targets,type,name);
   jobToggle(list,sel,on);
@@ -6374,9 +6424,17 @@ function jobMapDraw(st,o){
       +'<div class="pp-note">Mown at '+esc(cutText(ALLEY_CUT))+' · one unit, worked in a single pass</div></div>',{maxWidth:280});
   }
   /* Mow jobs draw height blocks instead of numbered plots — work out which
-     plots those blocks swallow so the per-plot pass can skip them. */
-  var bk=(jobIsMowJob(o.jobType,o.jobName)&&(o.targets||[]).length)
-          ? jobCutBlocks(o.jobType,o.jobName,o.targets) : null;
+     plots those blocks swallow so the per-plot pass can skip them.
+
+     `blockOn` is what may merge into a block, and it is not always everything
+     tappable: the assign map now offers the whole farm, and merging all of it
+     by cut height would fuse a fairway into the plot next door and make the
+     two impossible to pick apart. So the picker blocks only the job's usual
+     ground and leaves the rest as single plots. The work map passes nothing
+     and blocks its targets, exactly as before. */
+  var bkOn=o.blockOn||o.targets||[];
+  var bk=(jobIsMowJob(o.jobType,o.jobName)&&bkOn.length)
+          ? jobCutBlocks(o.jobType,o.jobName,bkOn) : null;
   var inBlock={};
   if(bk) bk.blocks.forEach(function(b){ b.plots.forEach(function(n){ inBlock[n]=1; }); });
   /* On a mow job the operator already knows the height and the ground — what

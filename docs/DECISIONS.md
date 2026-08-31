@@ -633,6 +633,36 @@ pin this behaviour — keep them green.
 
 ## Field data & farm constants
 
+### Any plot may be picked; the machine's ground is a button — 2026-08-30
+**Decision:** the plot maps (the assign wizard and Choose plots) offer **every
+plot on the farm**, whatever the job is — `jobPickTargets()`. The ground the
+job is usually on — the machine's plots, the alley zones, the borders, the
+plots saved on the task-list entry — is now a quick-select button instead,
+`jobQuickSet()` / `jobQuickLabel()`, which names the machine off the farm's own
+mower list ("All Fairway Mower ground · 18").
+**Why:** `jobPlots()` decided both at once, so what a job was *usually* on was
+also all it was *allowed* on. A fairway mow offered eighteen plots and nothing
+else; an alley job offered zones and no plots at all; a spray whose task-list
+entry carried three plots offered only those three. Everything else drew grey
+and ignored the tap, with nothing on screen to explain it. Reported from the
+farm on 2026-08-30: Bill could not put a job on ground he wanted mown. The
+usual set is a good default, not a rule — the day it is wrong is exactly the
+day somebody needs to say so.
+Three things stayed deliberately as they were:
+- **No one-tap way to book the whole farm.** The button only appears where the
+  usual set is genuinely narrower, so a spray or a fertiliser run is still
+  chosen plot by plot. That was the original reason select-all was mow-only.
+- **Trial holds still refuse the tap**, on every plot the map now offers, and
+  quick select still steps over closed ground.
+- **Cut-height blocks merge only the usual ground** (`blockOn` in
+  `jobMapDraw`). Merged across the whole farm they would fuse a fairway to
+  whatever sits beside it at the same height and the two could never be picked
+  apart again.
+**Don't:** narrow the map back to the machine's plots "because that is what the
+job is". Narrow the *button*, never the map. And do not drop `blockOn` and let
+the picker block everything it draws — the map still looks right and two plots
+quietly become one. `tools/test-plot-picker.js` pins all of it.
+
 ### The plots picked when a job is assigned ARE the job — 2026-08-30
 **Decision:** `taskPlots()` — the ground an assigned job actually covers —
 returns the plots saved on the task whenever there are any, and only falls

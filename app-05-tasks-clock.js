@@ -318,9 +318,9 @@ document.getElementById('tn-del').addEventListener('click',function(){
 let PICK=[];
 var PICKCTX={type:'',name:''};
 function renderPlotPick(){
- var targets=PICKCTX.targets||(PICKCTX.targets=jobPlots(PICKCTX.type,PICKCTX.name,PICK));
+ var targets=PICKCTX.targets||(PICKCTX.targets=jobPickTargets(PICKCTX.type,PICKCTX.name,PICK));
  var st=jobMapEnsure('pick','ppmap');
- jobMapDraw(st,{mode:'pick',targets:targets,sel:PICK,fitKey:'pp:'+PICKCTX.type+'|'+PICKCTX.name,jobType:PICKCTX.type,jobName:PICKCTX.name,onTap:function(n,info){
+ jobMapDraw(st,{mode:'pick',targets:targets,blockOn:PICKCTX.quick,sel:PICK,fitKey:'pp:'+PICKCTX.type+'|'+PICKCTX.name,jobType:PICKCTX.type,jobName:PICKCTX.name,onTap:function(n,info){
    if(info.blocked){ toast(resStopMsg(info,n)); return; }
    if(info.partial) toast(resAroundMsg(info,n));
    jobTapSelect(PICK,n,info);
@@ -330,23 +330,28 @@ function renderPlotPick(){
    if(pickSelectByName(PICK,n,PICKCTX.type,PICKCTX.name)) renderPlotPick();
  });
  var k=document.getElementById('pp-kind'); if(k)k.textContent=jobKindLabel(PICKCTX.type,PICKCTX.name)||'Plots';
- var c=document.getElementById('pp-count'); if(c)c.textContent=PICK.length+' of '+targets.length+' selected';
- jobSyncAllChip('pp-all',PICK,targets,PICKCTX.type,PICKCTX.name);
+ /* Just how many are picked. It used to read "3 of 18 selected", but the map
+    now offers the whole farm and "3 of 158" is a number nobody needs. */
+ var c=document.getElementById('pp-count'); if(c)c.textContent=PICK.length+' selected';
+ jobSyncAllChip('pp-all',PICK,PICKCTX.quick,PICKCTX.type,PICKCTX.name,PICKCTX.def);
 }
 document.getElementById('pp-all').addEventListener('click',function(){
- var r=jobToggleAll(PICK,PICKCTX.targets,PICKCTX.type,PICKCTX.name);
+ var r=jobToggleAll(PICK,PICKCTX.quick,PICKCTX.type,PICKCTX.name);
  toast(r.on?('Selected '+r.n+(r.skipped?(' · skipped '+r.skipped+' restricted'):'')):'Cleared');
  renderPlotPick();
 });
 var plotPickDone=null;
-/* Keep only plots that exist on the map for this job, so a stale stub list
-   ('11','12') does not survive into a real selection. */
+/* Keep only plots that exist on the map, so a stale stub list ('11','12') does
+   not survive into a real selection.
+
+   The whole farm is tappable. What the job is usually on is worked out ONCE
+   here, from the list the picker opened with rather than from what gets picked
+   afterwards, and becomes the quick-select button. */
 function pickOpen(type,name,list){
  PICKCTX={type:type||'',name:name||''};
- PICKCTX.targets=jobPlots(PICKCTX.type,PICKCTX.name,list);
- /* A trial-dots job carries no plot list, but the picker still has to offer
-    something tappable — e.g. logging where dots actually went. */
- if(!PICKCTX.targets.length) PICKCTX.targets=jobAllPlots();
+ PICKCTX.def=(list||[]).slice();
+ PICKCTX.targets=jobPickTargets(PICKCTX.type,PICKCTX.name,PICKCTX.def);
+ PICKCTX.quick=jobQuickSet(PICKCTX.type,PICKCTX.name,PICKCTX.def);
  PICK=(list||[]).filter(function(n){return PICKCTX.targets.indexOf(n)>=0;});
 }
 function openPlotPick(){plotPickDone=null;pickOpen(FORM.category,FORM.name,FORM.plots);go('plotpick');}
@@ -654,19 +659,23 @@ function openWiz(kind,id){
    ? pk.products.map(function(p){return {name:p.name,rate:p.rate,unit:p.unit};})
    : [mixBlankProduct()];
  if(WIZ.map){
-   /* Work out the tappable plots once, from the job itself — not from what is
-      currently selected, or the map would shrink to the first plot picked.
-      Nothing is pre-selected: the map opens empty and Bill taps what he wants. */
-   WIZ.targets=jobPlots(WIZ.cat,WIZ.name,defPlots);
+   /* The whole farm is tappable — a job is not limited to the ground it
+      usually covers, because the Friday it is not is exactly when somebody
+      needs to say so. What it usually covers becomes the quick-select button
+      instead, worked out once from the job itself rather than from what is
+      currently selected, or the button would follow the selection around. */
+   WIZ.def=(defPlots||[]).slice();
+   WIZ.targets=jobPickTargets(WIZ.cat,WIZ.name,WIZ.def);
+   WIZ.quick=jobQuickSet(WIZ.cat,WIZ.name,WIZ.def);
    WIZ.plots=WIZ.plots.filter(function(n){return WIZ.targets.indexOf(n)>=0;});
  }
  WIZ.step=WIZ.map?'map':'note';
  renderWiz(); document.getElementById('aswiz').classList.add('show');
 }
 function renderWizMap(){
- var targets=WIZ.targets||(WIZ.targets=jobPlots(WIZ.cat,WIZ.name,WIZ.plots));
+ var targets=WIZ.targets||(WIZ.targets=jobPickTargets(WIZ.cat,WIZ.name,WIZ.plots));
  var st=jobMapEnsure('wiz','wzmap');
- jobMapDraw(st,{mode:'pick',targets:targets,sel:WIZ.plots,fitKey:'wz:'+WIZ.kind+':'+WIZ.id,jobType:WIZ.cat,jobName:WIZ.name,onTap:function(n,info){
+ jobMapDraw(st,{mode:'pick',targets:targets,blockOn:WIZ.quick,sel:WIZ.plots,fitKey:'wz:'+WIZ.kind+':'+WIZ.id,jobType:WIZ.cat,jobName:WIZ.name,onTap:function(n,info){
    if(info.blocked){ toast(resStopMsg(info,n)); return; }
    if(info.partial) toast(resAroundMsg(info,n));
    jobTapSelect(WIZ.plots,n,info);
@@ -676,8 +685,8 @@ function renderWizMap(){
    if(pickSelectByName(WIZ.plots,n,WIZ.cat,WIZ.name)) renderWizMap();
  });
  var k=document.getElementById('wz-kind'); if(k)k.textContent=jobKindLabel(WIZ.cat,WIZ.name)||'Plots';
- document.getElementById('wz-count').textContent=WIZ.plots.length+' of '+targets.length+' selected';
- jobSyncAllChip('wz-all',WIZ.plots,targets,WIZ.cat,WIZ.name);
+ document.getElementById('wz-count').textContent=WIZ.plots.length+' selected';
+ jobSyncAllChip('wz-all',WIZ.plots,WIZ.quick,WIZ.cat,WIZ.name,WIZ.def);
 }
 function renderWiz(){
  document.getElementById('wz-title').textContent=WIZ.name;
@@ -719,7 +728,7 @@ document.getElementById('aswiz').addEventListener('click',function(e){
  var wrm=e.target.closest('[data-wzprm]');
  if(wrm){ if(WIZ.products.length>1){ WIZ.products.splice(+wrm.getAttribute('data-wzprm'),1); renderWizSpray(); } return; }
  if(e.target.closest('#wz-all')){
-   var r=jobToggleAll(WIZ.plots,WIZ.targets,WIZ.cat,WIZ.name);
+   var r=jobToggleAll(WIZ.plots,WIZ.quick,WIZ.cat,WIZ.name);
    toast(r.on?('Selected '+r.n+(r.skipped?(' · skipped '+r.skipped+' restricted'):'')):'Cleared');
    renderWizMap(); return;
  }

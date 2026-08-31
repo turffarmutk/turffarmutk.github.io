@@ -2223,7 +2223,7 @@ function invCanEdit(){return currentRole!=='undergrad';}
 function invEnter(){
  var u=document.getElementById('inv-units'); if(u)u.querySelectorAll('span').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-u')===invUnit);});
  document.getElementById('inv-addbtn').style.display=invCanEdit()?'block':'none';
- var rb=document.getElementById('inv-restock'); if(rb)rb.parentElement.style.display=invCanMove()?'block':'none';
+ var rb=document.getElementById('inv-restock'); if(rb)rb.parentElement.style.display=invCanMove()?'flex':'none';
  buildChips(); renderInvList();
 }
 function renderInvAlert(){
@@ -2290,7 +2290,7 @@ function openItem(id){
  document.getElementById('id-actions').innerHTML=
    (invCanMove()
      ? ('<div class="action tap" data-go="invlog" data-mode="restock" data-item="'+it.id+'" style="flex:1">Restock</div>'
-       +'<div class="action tap" data-go="invlog" data-mode="out" data-item="'+it.id+'" style="flex:1;background:#8a3b2f">Take out</div>')
+       +'<div class="action tap" data-go="invlog" data-mode="out" data-item="'+it.id+'" style="flex:1;background:#8a3b2f">Log usage</div>')
      : '')
   +(invCanEdit()
      ? '<div class="action tap" data-go="additem" data-edit="'+it.id+'" style="flex:1;background:#17181a">Edit</div>'

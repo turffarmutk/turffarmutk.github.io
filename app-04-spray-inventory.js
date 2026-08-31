@@ -877,7 +877,7 @@ function completeTask(id,note){ var t=TASKS.find(function(x){return x.id===id;})
 document.getElementById('tb-seg').addEventListener('click',function(e){var sp=e.target.closest('span[data-tab]');if(!sp)return;tbTab=sp.getAttribute('data-tab');renderTasks();});
 document.getElementById('s-taskboard').addEventListener('click',function(e){
  var bd=e.target.closest('[data-bday]'); if(bd){boardDay=parseInt(bd.getAttribute('data-bday'),10);renderTasks();return;}
- var bb=e.target.closest('[data-board]'); if(bb){var w=bb.getAttribute('data-board');if(w==='assign')go('assign');else if(w==='assignlab')openAssignForm();else if(w==='selftask')openSelfTask();else if(w==='reqct')openCrewReq();return;}
+ var bb=e.target.closest('[data-board]'); if(bb){var w=bb.getAttribute('data-board');if(w==='assign'||w==='selftask')go('assign');else if(w==='assignlab')openAssignForm();else if(w==='reqct')openCrewReq();return;}
  var ac=e.target.closest('[data-accept]'); if(ac){acceptCrewReq(ac.getAttribute('data-accept'));return;}
  var gr=e.target.closest('[data-req]'); if(gr){openReqForm(gr.getAttribute('data-req')==='undergrad');return;}
  var dl=e.target.closest('[data-del]'); if(dl){e.stopPropagation();var did=dl.getAttribute('data-del');var di=TASKS.findIndex(function(x){return x.id===did;});if(di>=0){var dn=TASKS[di].title;TASKS.splice(di,1);toast('Deleted “'+dn+'”');renderBoard();}return;}

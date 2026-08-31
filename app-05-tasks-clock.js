@@ -219,7 +219,6 @@ function syncForm(){
  document.getElementById('tn-save').textContent=(req?'Submit request':(asg?'Assign task':(edt?'Save changes':'Save Task')));
 }
 function openAssignForm(){FORM={id:null,mode:'assign',scope:'lab',target:(labMembers()[0]||{}).pid||null,name:'',category:CATEGORIES[0],plots:[],repeat:'None',freq:3,months:[],dueOrd:asTodayOrd()};syncForm();go('tasknew');}
-function openSelfTask(){FORM={id:null,mode:'assign',scope:'self',target:SESSION.pid,name:'',category:CATEGORIES[0],plots:[],repeat:'None',freq:3,months:[],dueOrd:asTodayOrd()};syncForm();go('tasknew');}
 function openEditTask(id){
  var t=TASKS.find(function(x){return x.id===id;}); if(!t) return;
  FORM={id:t.id,mode:'edit',name:t.title,category:t.type,plots:(t.plots||[]).slice(),machine:t.machine||'',machines:[],repeat:'None',freq:3,months:[],dueOrd:t.dueOrd||asTodayOrd(),target:t.assignee||null};
@@ -539,6 +538,17 @@ function renderAssignPeople(){
     same reasoning as boardDayChips() on the task board itself. */
  var days='<div class="chiprow" id="as-days">'+[1,2,3,4,5].map(function(i){var w=WEEKDAYS[i];var isToday=(i===todayDow);return '<span class="chip'+(asDay===i?' on':'')+(isToday?' today':'')+'" data-asday="'+i+'"'+(isToday?' title="Today"':'')+'><span class="dl-s">'+w+'</span><span class="dl-f">'+WEEKDAYS_FULL[i]+'</span>'+(isToday?'<span class="todot"></span>':'')+'</span>';}).join('')+'</div>';
  var dayLabel=WEEKDAYS[asDay]+' · '+asDateLabel(asDayOrd());
+ /* Grad students and technicians reach this same screen from their own
+    "＋ Assign task to me" button, but who else to hand work to is Bill's
+    call, not theirs — so the picker below (every other crew member, the
+    open board) never renders for them. assignEnter() locks asPerson to
+    SELF for this role and it never changes. */
+ if(currentRole!=='manager'){
+   el.innerHTML='<div class="sec">Day board</div>'+days
+     +'<div class="sec">'+dayLabel+'</div>'
+     +'<div class="chiprow"><span class="ppill on"><span class="ppn"><span class="dotsm"></span>'+meName()+'</span><span class="ppt">Assigning to yourself</span></span></div>';
+   return;
+ }
  var open='<span class="ppill open'+(asPerson===OPEN?' on':'')+'" data-person="'+OPEN+'"><span class="ppn"><span class="dotsm"></span>Open board</span><span class="ppt">Anyone can claim</span></span>';
  var self='<span class="ppill'+(asPerson===SELF?' on':'')+'" data-person="'+SELF+'"><span class="ppn"><span class="dotsm"></span>'+meName()+' (you)</span><span class="ppt">Assign to yourself</span></span>';
  var grads=CREW.filter(function(c){return c.role==='Grad student';});
@@ -619,9 +629,11 @@ function renderAssignList(){
 }
 function updateSaveBtn(){var b=document.getElementById('as-save');if(!b)return;b.textContent=PICKS.length?('Save · '+PICKS.length+' task'+(PICKS.length>1?'s':'')):'Save assignments';}
 function assignEnter(){
- asTab='scheduled'; asPerson=null; PICKS=[]; asDay=boardDefaultDay();
+ var mgr=currentRole==='manager';
+ asTab='scheduled'; asPerson=mgr?null:SELF; PICKS=[]; asDay=boardDefaultDay();
  var seg=document.getElementById('as-seg'); if(seg)seg.querySelectorAll('span').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-atab')==='scheduled');});
  var sr=document.getElementById('as-search'); if(sr)sr.value='';
+ var ttl=document.querySelector('#s-assign .hdr .title'); if(ttl)ttl.textContent=mgr?'Assign Tasks':'Assign task to me';
  closeWiz(); renderAssignPeople(); renderAssignList(); updateSaveBtn();
 }
 function removePick(kind,id){var i=PICKS.findIndex(function(p){return p.kind===kind&&p.id===id;});if(i>=0)PICKS.splice(i,1);renderAssignList();updateSaveBtn();}
@@ -785,7 +797,7 @@ function saveAssignments(){
  if(!PICKS.length){toast('Add tasks first');return;}
  var who=asPerson, n=PICKS.length;
  PICKS.forEach(function(p){ if(p.kind==='tpl')commitTpl(p.id,p.note,p.plots,p.dueOrd,p); else if(p.kind==='ev')commitEv(p.id,p.note,p.plots,p.dueOrd,p); else commitTask(p.id,p.note,p.plots,p.dueOrd,p); });
- asPerson=null; PICKS=[]; asTab='scheduled';
+ asPerson=(currentRole==='manager')?null:SELF; PICKS=[]; asTab='scheduled';
  var seg=document.getElementById('as-seg'); if(seg)seg.querySelectorAll('span').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-atab')==='scheduled');});
  var sr=document.getElementById('as-search'); if(sr)sr.value='';
  renderAssignPeople(); renderAssignList(); updateSaveBtn();

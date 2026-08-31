@@ -324,18 +324,14 @@ service cloud.firestore {
     /* ------------------------------------------------------------------
        THE FIELD LOG — drawer 3
 
-       The record that outlives everybody currently on the farm, and the one
-       somebody will read in 2035 to answer a question nobody has thought of
-       yet. Two rules follow from that, and they are the whole block:
-
-       NOTHING IS EVER DELETED. Not by anybody, ever. `allow delete: if false`.
-
-       NOTHING IS EVER EDITED. A correction writes a NEW entry carrying the
-       fix; the only change ever made to an existing entry is the three fields
-       that mark it as superseded by that new one. Dillon, 2026-08-25: the
-       wrong entry stays. The spray entries are the farm's application records,
-       and a log that can be quietly rewritten is worth much less than one
-       where you can see what changed and when.
+       Until 2026-08-31 this drawer was append-only: nothing was ever edited
+       in place and nothing was ever deleted, by anybody, for any reason. Bill
+       and Dillon reversed that on 2026-08-31 so a bad entry — including
+       leftover test data that surfaced on its own when task sharing went
+       live, see docs/DECISIONS.md — could actually be fixed or removed rather
+       than merely corrected around. Read that entry, and the note in
+       docs/DATABASE-SHAPE.md about pesticide recordkeeping requirements,
+       before reversing this again.
 
        Transcribed from flCan() in the app.
        ------------------------------------------------------------------ */
@@ -343,15 +339,15 @@ service cloud.firestore {
       return resource.data;
     }
     /* Who wrote it down, whose work it was, Bill, or faculty over their own
-       lab's person. Mirrors flCan(…,'correct',…) exactly. */
-    function canCorrectLog() {
-      return str(logEntry().get('correctedBy','')) == ''
-        && ( str(logEntry().get('loggedBy','')) == me()
+       lab's person. Mirrors flCan(…,'edit'|'delete',…) exactly — one function
+       for both, because the app uses one function for both. */
+    function canEditLog() {
+      return str(logEntry().get('loggedBy','')) == me()
           || str(logEntry().get('person','')) == me()
           || assignsUndergrads(me())
           || (roleOf(me()) == 'Faculty'
               && str(logEntry().get('person','')) != ''
-              && sameLab(me(), str(logEntry().get('person','')))) );
+              && sameLab(me(), str(logEntry().get('person',''))));
     }
 
     match /fieldlog/{entryId} {
@@ -363,16 +359,17 @@ service cloud.firestore {
         && request.resource.data.id == entryId
         && str(request.resource.data.get('loggedBy','')) == me();
 
-      /* The ONLY permitted change to an entry that already exists: marking it
-         superseded by the correction that replaced it. */
+      /* Edit changes the entry directly, and only the fields the app's own
+         edit form exposes — who wrote it, when, and what task made it stay
+         put. Mirrors FL_EDITABLE in app-02-fieldlog-sync.js exactly. */
       allow update: if actor()
-        && canCorrectLog()
+        && canEditLog()
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['correctedBy', 'correctedAt', 'correctedWho'])
-        && str(request.resource.data.get('correctedWho','')) == me()
-        && str(request.resource.data.get('correctedBy','')) != '';
+             .hasOnly(['plot', 'type', 'op', 'title', 'date', 'ord', 'time',
+                       'person', 'equipment', 'product', 'ai', 'rate',
+                       'amount', 'target', 'notes', 'detail']);
 
-      allow delete: if false;
+      allow delete: if actor() && canEditLog();
     }
 
     /* ------------------------------------------------------------------

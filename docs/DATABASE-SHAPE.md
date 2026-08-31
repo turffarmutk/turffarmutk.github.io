@@ -338,40 +338,51 @@ that two people on different zones of one job write different fields.
 
 ## The field log — drawer 3, built 2026-08-25
 
-The record that outlives everybody currently on the farm. Two rules shape the
-whole drawer, and both are enforced by the database, not just by the app.
+### Edit and Delete are real, since 2026-08-31
 
-### Nothing is ever edited. A correction is a new entry.
+From 2026-08-25 to 2026-08-31 this drawer was append-only: a fix wrote a new
+entry and marked the old one superseded, and nothing was ever deleted, by
+anybody, enforced by the database rules and not just by the app. Dillon
+reversed that on 2026-08-31 — see docs/DECISIONS.md, "Field Log entries can
+now be edited and deleted — 2026-08-31" for why, and for what it costs: this
+gave up the guarantee described below, that the record can never be quietly
+rewritten. Recordkeeping requirements for pesticide applications vary by
+state and have moved at the federal level recently — that was the original
+reasoning for append-only, and it did not go away just because the decision
+did. Read the DECISIONS.md entry before reversing this again.
 
-Dillon, 2026-08-25, choosing between four options: **the wrong entry stays.**
-`flCorrect()` copies the entry, applies the fix, stamps `corrects`,
-`correctionNote`, `correctedAt` and `loggedBy` on the copy, and marks the
-original with `correctedBy` / `correctedAt` / `correctedWho`. The original is
-never touched otherwise.
+What changed in the database:
 
-The feed and the counts read `flLive()` — entries with no `correctedBy` — so a
-wrong mow does not sit in the totals forever. The superseded record is still
-there, linked from the correction that replaced it, and both halves of the pair
-say so on screen. That is the difference between a total that is right and a
-record that is missing something.
+- `allow update` on `fieldlog/{entryId}` now permits changing the entry's own
+  fields directly — `plot`, `type`, `op`, `title`, `date`, `ord`, `time`,
+  `person`, `equipment`, `product`, `ai`, `rate`, `amount`, `target`, `notes`,
+  `detail` (this list is `FL_EDITABLE` in `app-02-fieldlog-sync.js`, and the
+  two must never drift apart) — rather than only the three fields that used to
+  mark an entry superseded.
+- `allow delete` is `canEditLog()` (same people who could correct an entry
+  under the old model), not `if false`.
 
-The reason is **required**. A correction with no sentence saying what was wrong
-is refused by the form. The reason is the part somebody reading this in 2035
-will actually need.
+`flEdit(id, changes)` makes the change in place and calls `flCommit()`.
+`flDelete(id)` removes the entry from this phone and sends a real
+`.delete()` to the shared collection; every other phone drops it locally when
+`flsyncOnSnapshot()`'s `removed` branch confirms the server agrees — the same
+"only if we saw it FROM the server first" guard `tsyncOnSnapshot()` uses for
+tasks, so an entry still going up for the first time can never be mistaken for
+one coming down as deleted.
 
-Why it works this way rather than an edit-in-place: the spray entries are the
-farm's application records, and a log that can be quietly rewritten is worth
-much less than one where you can see what changed and when. Recordkeeping
-requirements for pesticide applications vary by state and have moved at the
-federal level recently, so this is not written against a specific rule — it is
-written so that whatever the rule turns out to be, the record survives it.
+`flCorrect()`, `FL_CORRECTABLE`, and the correction-chain fields (`corrects`,
+`correctionNote`, `correctedAt`, `correctedWho`) are gone from anything written
+from here on. `flSuperseded()` / `flLive()` still exist and still filter a
+`correctedBy` entry out of the feed and the totals, purely so any entry a
+correction made before 2026-08-31 keeps rendering the way it always did.
 
-### Nothing is ever deleted
-
-`allow delete: if false` on `fieldlog/{entryId}`, and no code path in the app
-removes a record from the shared copy. The only permitted change to an existing
-entry is the three fields that mark it superseded, and whoever does it has to
-be named in `correctedWho`.
+Inventory reconciliation (`invReconcileFromLog()`, `invLogChainIds()`) needed
+no change at all: it already worked by summing the stock movements booked
+against an entry's own id, walking backward through `.corrects` only if that
+field is present. Under in-place editing an entry's id never changes and
+`.corrects` is never set, so the chain is always exactly one id long — which is
+the right answer for "how much has this entry's id taken off the shelf so far"
+either way the field log works.
 
 ### The 5,000-entry cap is a phone limit, not a farm limit
 

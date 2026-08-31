@@ -112,8 +112,8 @@ section('1. seeds become the baseline on first run');
      catalog are pre-loaded now, so an empty tasks key is correct, not a bug.
      What still has to be true is that the collection was written at all, and
      that a collection which DOES carry a seed keeps it. */
-  ok('tasks were written, even though empty', Array.isArray(JSON.parse(store['ut_tasks_v1'])),
-     store['ut_tasks_v1']);
+  ok('tasks were written, even though empty', Array.isArray(JSON.parse(store['ut_tasks_v2'])),
+     store['ut_tasks_v2']);
   ok('equipment was seeded', JSON.parse(store['ut_equip_v1']).length > 0,
      String(JSON.parse(store['ut_equip_v1'] || '[]').length));
 }
@@ -123,7 +123,7 @@ section('2. a change survives a reload — the whole point');
   const before = first.p.TASKS.length;
   first.p.TASKS.push({ id: first.p.newId('a'), title: 'Mow the bullpen', status: 'todo', kind: 'task', assignee: 'p07' });
   first.p.storeFlush();
-  ok('the write landed in storage', JSON.parse(store['ut_tasks_v1']).length === before + 1);
+  ok('the write landed in storage', JSON.parse(store['ut_tasks_v2']).length === before + 1);
 
   const second = boot(store);                     /* same storage, fresh page */
   ok('the task is still there after reload', second.p.TASKS.length === before + 1,
@@ -176,7 +176,7 @@ section('5. the backup sweeps everything and leaves the session out');
 
   const p = b.p.bkPayload();
   ok('the payload is stamped', p.meta.app === 'UT Turf Farm' && p.meta.format === 1);
-  ok('it carries the tasks', Array.isArray(p.data['ut_tasks_v1']));
+  ok('it carries the tasks', Array.isArray(p.data['ut_tasks_v2']));
   ok('a plain string stays a string', p.data['ut_theme'] === 'dark', JSON.stringify(p.data['ut_theme']));
   ok('who is signed in is NOT exported', !(b.p.SESSION_KEY in p.data), b.p.SESSION_KEY);
 }
@@ -196,8 +196,8 @@ section('6. export → restore round trip');
   target.win.eval('_bkPending=' + JSON.stringify(payload) + ';');
   try { target.p.bkRestore(); } catch (e) { /* location.reload is not implemented in jsdom */ }
   ok('storage now holds the backup\'s tasks',
-     JSON.parse(targetStore['ut_tasks_v1']).length === 1,
-     String(JSON.parse(targetStore['ut_tasks_v1'] || '[]').length));
+     JSON.parse(targetStore['ut_tasks_v2']).length === 1,
+     String(JSON.parse(targetStore['ut_tasks_v2'] || '[]').length));
 
   const after = boot(targetStore);
   ok('and a reload reads them back', after.p.TASKS.length === 1 && after.p.TASKS[0].title === 'Round trip',

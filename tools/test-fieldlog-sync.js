@@ -1,15 +1,17 @@
 /*
- * The field log: corrections that keep the original, and sharing that cannot
- * lose history.
+ * The field log: editing and deleting an entry, and sharing that carries a
+ * real delete both ways.
  *
- * This is the record that outlives everybody currently on the farm. Two things
- * are worth more here than anywhere else in the app:
+ * Until 2026-08-31 nothing here was ever deleted or edited in place — see
+ * docs/DECISIONS.md, "Field Log entries can now be edited and deleted". Two
+ * things are worth more here than anywhere else in the app, and both
+ * survived that change:
  *
- *   - nothing is ever deleted, and nothing is ever edited in place. A
- *     correction is a NEW entry; the old one is marked, not rewritten.
- *   - the 5,000-entry cap is a phone limit. It must never become a farm limit
- *     by deleting trimmed history off the shared copy — or, just as bad, drag
- *     it back down and trim it again forever.
+ *   - who may edit or delete an entry is one rule (flCan), the same rule the
+ *     database enforces, so the two can never drift apart.
+ *   - the 5,000-entry cap is still a phone limit, not a farm limit. Trimming
+ *     a phone down to the cap must never send a delete to the shared copy —
+ *     only an explicit flDelete() may do that.
  *
  * Run:  node tools/test-fieldlog-sync.js
  */
@@ -102,80 +104,77 @@ ok('flCan() exists', typeof win.flCan === 'function');
 win.sessionSet('p18');
 ok('an undergrad may log the mow they did', win.flCan('p18', 'log', {}) === true);
 ok('so may everybody else', win.flCan('p16', 'log', {}) === true);
-ok('nobody may delete, ever', win.flCan('p07', 'delete', {}) === false);
-{
+['edit', 'delete'].forEach(action => {
   const mine = entry({ person: 'p18', loggedBy: 'p18' });
   const theirs = entry({ person: 'p09', loggedBy: 'p09' });
-  ok('I may correct the entry I wrote', win.flCan('p18', 'correct', mine) === true);
-  ok('I may correct an entry about work I did', win.flCan('p18', 'correct', entry({ person: 'p18', loggedBy: 'p07' })) === true);
-  ok('I may not correct somebody else\'s', win.flCan('p18', 'correct', theirs) === false);
-  ok('Bill may correct anybody\'s', win.flCan('p07', 'correct', theirs) === true);
-  ok('Dillon may, holding the undergrad job', win.flCan('p01', 'correct', theirs) === true);
-  ok('faculty may, over their own lab\'s person', win.flCan('p16', 'correct', entry({ person: 'p09', loggedBy: 'p09' })) === true);
-  ok('but not another lab\'s', win.flCan('p16', 'correct', entry({ person: 'p12', loggedBy: 'p12' })) === false);
-  ok('an already-corrected entry is not corrected again',
-     win.flCan('p07', 'correct', entry({ correctedBy: 'x' })) === false);
-}
+  ok('I may ' + action + ' the entry I wrote', win.flCan('p18', action, mine) === true);
+  ok('I may ' + action + ' an entry about work I did', win.flCan('p18', action, entry({ person: 'p18', loggedBy: 'p07' })) === true);
+  ok('I may not ' + action + ' somebody else\'s', win.flCan('p18', action, theirs) === false);
+  ok('Bill may ' + action + ' anybody\'s', win.flCan('p07', action, theirs) === true);
+  ok('Dillon may, holding the undergrad job', win.flCan('p01', action, theirs) === true);
+  ok('faculty may, over their own lab\'s person', win.flCan('p16', action, entry({ person: 'p09', loggedBy: 'p09' })) === true);
+  ok('but not another lab\'s', win.flCan('p16', action, entry({ person: 'p12', loggedBy: 'p12' })) === false);
+});
 
-/* ------------------------------------- 2. the original is never lost ---- */
-section('2. A correction writes a new entry and keeps the old one');
+/* ------------------------------------------- 2. edit changes it in place ---- */
+section('2. Editing changes the entry itself, and deleting removes it');
 clearLog();
+win.sessionSet('p18');
 {
   const a = entry({ plot: 'B12', person: 'p18', loggedBy: 'p18' });
   FL().push(a);
   win.flCommit();
   const before = FL().length;
 
-  const made = win.flCorrect(a.id, { plot: 'B13' }, 'Logged on B12, the mow was actually B13');
-  ok('a correction was made', !!made);
-  ok('the log GREW — nothing was replaced', FL().length === before + 1, before + ' -> ' + FL().length);
-  ok('the original is still there', !!win.flById(a.id));
-  ok('and still says what it always said', win.flById(a.id).plot === 'B12');
-  ok('the correction carries the fix', made.plot === 'B13');
-  ok('it points at what it replaced', made.corrects === a.id);
-  ok('and the original points forward to it', win.flById(a.id).correctedBy === made.id);
-  ok('who corrected it is recorded', win.flById(a.id).correctedWho === 'p18');
-  ok('and when', !!win.flById(a.id).correctedAt);
-  ok('the reason is kept — the part somebody will need in 2035',
-     /actually B13/.test(made.correctionNote || ''));
+  const made = win.flEdit(a.id, { plot: 'B13' });
+  ok('an edit was made', !!made);
+  ok('the log did NOT grow -- nothing new was written', FL().length === before, before + ' -> ' + FL().length);
+  ok('it is the same id', made.id === a.id);
+  ok('and it is the same object flById(a.id) now returns', win.flById(a.id) === made);
+  ok('the entry now says the fix', win.flById(a.id).plot === 'B13');
+  ok('the old plot value is gone, not kept alongside the new one', made.plot === 'B13' && made.plot !== 'B12');
 }
 {
-  /* The totals have to be right, or the log is not usable as a summary. */
-  const live = win.flLive();
-  ok('only the correction counts in the totals', live.length === 1, String(live.length));
-  ok('and it is the corrected one', live[0].plot === 'B13');
-  const dead = FL().filter(e => e.correctedBy)[0];
-  ok('the superseded entry is still reachable by its id', !!dead && win.flById(dead.id) === dead);
-}
-{
-  /* A correction may not rewrite the record OF the record. */
+  /* Editing may not rewrite the record OF the record. */
   const a = entry({ person: 'p18', loggedBy: 'p18' });
   FL().push(a); win.flCommit();
-  const made = win.flCorrect(a.id, { loggedBy: 'p07', corrects: 'nonsense', id: 'nope' }, 'test');
-  ok('a correction cannot forge who wrote the original', made.loggedBy === 'p18');
-  ok('nor what it corrects', made.corrects === a.id);
-  ok('nor its own id', made.id !== 'nope');
+  const made = win.flEdit(a.id, { loggedBy: 'p07', id: 'nope', plot: 'C1' });
+  ok('editing cannot forge who wrote it', made.loggedBy === 'p18');
+  ok('nor its own id', made.id !== 'nope' && made.id === a.id);
+  ok('but an editable field does change', made.plot === 'C1');
 }
 {
   const a = entry({ person: 'p09', loggedBy: 'p09' });
   FL().push(a); win.flCommit();
-  ok('somebody with no standing gets nothing back', win.flCorrect(a.id, { plot: 'C1' }, 'why') === null);
-  ok('and the entry is untouched', win.flById(a.id).plot === 'B12' && !win.flById(a.id).correctedBy);
+  win.sessionSet('p18');
+  ok('somebody with no standing gets nothing back from an edit', win.flEdit(a.id, { plot: 'C1' }) === null);
+  ok('and the entry is untouched', win.flById(a.id).plot === 'B12');
+  ok('nor may they delete it', win.flDelete(a.id) === false);
+  ok('so it is still there', !!win.flById(a.id));
+}
+{
+  win.sessionSet('p18');
+  const a = entry({ person: 'p18', loggedBy: 'p18' });
+  FL().push(a); win.flCommit();
+  const before = FL().length;
+  ok('somebody with standing can delete it', win.flDelete(a.id) === true);
+  ok('the log shrank by one', FL().length === before - 1);
+  ok('and it is gone for good', !win.flById(a.id));
 }
 
 /* ------------------------------------------- 3. the database agrees ----- */
 section('3. The database says the same thing');
 ok('there is a field log block', /match \/fieldlog\/\{entryId\}/.test(rulesText));
-ok('nothing is ever deleted',
-   /match \/fieldlog\/\{entryId\}[\s\S]*?allow delete: if false;/.test(rulesText));
-ok('the only permitted change is marking it superseded',
-   /hasOnly\(\['correctedBy', 'correctedAt', 'correctedWho'\]\)/.test(rulesText));
-ok('and whoever does it has to own up to it',
-   /str\(request\.resource\.data\.get\('correctedWho',''\)\) == me\(\)/.test(rulesText));
+ok('delete now follows the same rule as edit, not `if false`',
+   /allow delete: if actor\(\) && canEditLog\(\);/.test(rulesText));
+ok('update allows the entry\'s real fields, not just the old supersede fields',
+   /hasOnly\(\['plot', 'type', 'op', 'title', 'date', 'ord', 'time',[\s\S]*?'amount', 'target', 'notes', 'detail'\]\)/.test(rulesText));
+ok('the old supersede-only update rule is gone',
+   !/hasOnly\(\['correctedBy', 'correctedAt', 'correctedWho'\]\)/.test(rulesText));
 ok('the app records who wrote every entry down', /loggedBy:SESSION\.pid|loggedBy:whoId/.test(appText));
 
-/* --------------------------------------------- 4. sharing adds only ----- */
-section('4. Sharing the log can only ever add to the record');
+/* --------------------------------------- 4. sharing carries a real delete */
+section('4. Sharing the log — edits overwrite, deletes really delete');
 clearLog();
 win.sessionSet('p07');
 {
@@ -193,11 +192,19 @@ win.sessionSet('p07');
 {
   reset();
   const a = FL()[0];
-  win.flCorrect(a.id, { plot: 'A9' }, 'wrong plot');
+  win.flEdit(a.id, { plot: 'A9' });
   const ids = wrote('fieldlog').map(w => w.id);
-  ok('a correction writes the new entry AND marks the old', ids.length === 2, ids.join(','));
-  ok('the marked one is the original', ids.indexOf(a.id) >= 0);
-  ok('nothing was deleted', state.deletes.length === 0);
+  ok('editing sends one write, for the same id', ids.length === 1 && ids[0] === a.id, ids.join(','));
+  ok('carrying the new value', wrote('fieldlog')[0].data.plot === 'A9');
+  ok('nothing was deleted by an edit', state.deletes.length === 0);
+}
+{
+  reset();
+  const a = FL()[0];
+  const id = a.id;
+  ok('deleting sends an actual delete', win.flDelete(id) === true);
+  ok('to the field log collection, for that id', state.deletes.some(d => d.coll === 'fieldlog' && d.id === id));
+  ok('and nothing was merely written instead', wrote('fieldlog').length === 0);
 }
 {
   /* An entry from somebody else's phone. */
@@ -206,6 +213,26 @@ win.sessionSet('p07');
   ok('it lands here', !!win.flById('fl-other'));
   reset(); win.flPush();
   ok('and is not sent straight back', wrote('fieldlog').length === 0, wrote('fieldlog').map(w => w.id).join(','));
+}
+{
+  /* The server confirming somebody else deleted an entry this phone has. */
+  reset();
+  ok('this phone still has it', !!win.flById('fl-other'));
+  emit('fieldlog', [{ type: 'removed', id: 'fl-other' }], false);
+  ok('it is removed here too', !win.flById('fl-other'));
+}
+{
+  /* A record this phone has never sent up (FLSYNC.seen has no entry for it
+     yet) must not be mistaken for one the server says is gone — same guard
+     tsync uses for tasks. Pushed straight onto the array, not through
+     flCommit(), so flPush() never runs for it and FLSYNC.seen stays empty. */
+  reset();
+  const a = entry({ id: 'fl-brandnew', plot: 'Z1' });
+  FL().push(a);
+  ok('FLSYNC has not seen it yet', win.FLSYNC.seen['fl-brandnew'] === undefined);
+  emit('fieldlog', [{ type: 'removed', id: 'fl-brandnew' }], false);
+  ok('so an unrelated removed event for that id leaves it alone',
+     !!win.flById('fl-brandnew'));
 }
 
 /* ------------------------------- 5. the cap is a phone limit, not a farm's */
@@ -234,34 +261,46 @@ section('5. The 5,000 cap trims this phone, never the farm');
   ok('a recent entry from somebody else still arrives', !!win.flById('fl-recent'));
 }
 
-/* ------------------------------------------------- 6. the correction UI - */
-section('6. The correction sheet');
+/* ------------------------------------------------- 6. the edit sheet ---- */
+section('6. The edit sheet');
 clearLog();
+win.sessionSet('p07');
 {
-  const a = entry({ person: 'p07', loggedBy: 'p07', product: 'Barricade', amount: '2 gal' });
+  const a = entry({ person: 'p07', loggedBy: 'p07', product: 'Barricade', amount: '2 gal', notes: 'first pass' });
   FL().push(a); win.flCommit();
   win.__FLCUR(a.id);
   win.flxRender();
   const html = win.document.getElementById('flx-body').innerHTML;
-  ok('it explains that the original is kept', /original is kept/i.test(html));
+  ok('it warns that saving replaces the record, with no old value kept',
+     /old value is not kept/i.test(html));
   ok('it offers the plot', /id="flx-plot"/.test(html));
   ok('and the date', /id="flx-date"/.test(html));
   ok('a chemical entry can fix the product', /id="flx-product"/.test(html));
-  ok('and it insists on a reason', /id="flx-why"/.test(html));
+  ok('it offers Notes, pre-filled', /id="flx-notes"/.test(html) && html.indexOf('first pass') >= 0);
+  ok('there is no reason field any more — nothing is kept to hang it on',
+     !/id="flx-why"/.test(html));
 
-  /* A correction with no reason is only half a record. */
-  win.document.getElementById('flx-why').value = '';
+  /* Saving with nothing changed does nothing — there is no reason to require. */
   const before = FL().length;
   win.flxSave();
-  ok('saving with no reason does nothing', FL().length === before);
+  ok('saving with nothing changed does nothing, and does not error', FL().length === before);
+
+  win.document.getElementById('flx-plot').value = 'C1';
+  win.flxSave();
+  ok('an actual change saves onto the SAME entry', win.flById(a.id).plot === 'C1' && FL().length === before);
 }
 {
   const a = win.flById(win.__FLCUR());
-  ok('the detail page offers the button to those permitted',
-     /flCan\(SESSION\.pid,'correct',a\)/.test(appText));
+  ok('the detail page offers Edit to those permitted',
+     /flCan\(SESSION\.pid,'edit',a\)/.test(appText));
+  ok('and Delete to those permitted',
+     /flCan\(SESSION\.pid,'delete',a\)/.test(appText));
+  ok('the old Correct-this button is gone', !/Correct this/.test(appText));
   win.renderFlDetail();
-  ok('and both halves of a correction say so on the page',
-     /This entry was corrected/.test(appText) && /This is a correction/.test(appText));
+  const ab = win.document.getElementById('fld-actions').innerHTML;
+  ok('the page shows exactly Edit and Delete', /id="fld-edit"/.test(ab) && /id="fld-del"/.test(ab));
+  ok('Show on map and Open the task are gone from this page',
+     !/id="fld-map"/.test(ab) && !/id="fld-task"/.test(ab));
 }
 
 /* ------------------------------------------------- 7. the read-out ------ */
@@ -283,7 +322,8 @@ section('7. Ten read-outs, one screen, no switches');
      html.indexOf('id="sdb-test"') >= 0 &&
      html.indexOf('id="sdb-copy"') >= 0 &&
      (html.match(/class="action tap"/g) || []).length === 3);
-  ok('the log read-out still says nothing is ever deleted', /is ever deleted/i.test(html));
+  ok('the log read-out now says who may edit or delete an entry',
+     /edited or deleted/i.test(html));
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

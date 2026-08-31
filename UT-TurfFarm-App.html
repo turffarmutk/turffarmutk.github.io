@@ -1066,15 +1066,20 @@ html[data-size="tablet"] .hdr.hh{gap:15px}
 html[data-size="tablet"] .hdr.hh .hh-r{gap:14px}
 
 /* ---------- 5c. the task board's day strip ----------
-   Seven three-letter chips huddled at the left of a 1400px board is phone
-   layout surviving where it isn't needed. On a rail-equipped shell they share
-   the width equally and spell the day out; the phone keeps Mon/Tue, which is
-   all that fits. Both labels are in the DOM — see boardDayChips(). */
+   Only Mon-Fri ever get a chip here -- nobody works Saturday or Sunday, so
+   there is never a task to add or view on those two days. See
+   boardDayChips() and renderAssignPeople(). Five chips share the row equally
+   at every width, phone included, rather than bunching at the left with
+   empty space beside them; the rail-equipped shell also has room to spell
+   the day out instead of abbreviating it. Both labels are in the DOM and CSS
+   picks one. */
 .dl-f{display:none}
 html[data-size="tablet"] #tb-days .dl-f,
 html[data-size="tablet"] #as-days .dl-f{display:inline}
 html[data-size="tablet"] #tb-days .dl-s,
 html[data-size="tablet"] #as-days .dl-s{display:none}
+#tb-days,#as-days{flex-wrap:nowrap}
+#tb-days .chip,#as-days .chip{flex:1 1 0;min-width:0;text-align:center;overflow:hidden;text-overflow:ellipsis}
 html[data-size="tablet"] #tb-days,
 html[data-size="tablet"] #as-days{
   flex-wrap:nowrap;gap:10px;padding:12px 20px 6px}
@@ -1764,9 +1769,9 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
 <div style="flex:1;overflow-y:auto" id="fst-body"></div>
 </div></section>
 <section class="screen" id="s-flfix"><div class="app field">
-<div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Correct this entry</div></div>
+<div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Edit this entry</div></div>
 <div style="flex:1;overflow-y:auto" id="flx-body"></div>
-<div class="actionbar"><div class="action tap" id="flx-save">Save the correction</div></div>
+<div class="actionbar"><div class="action tap" id="flx-save">Save changes</div></div>
 </div></section>
 <section class="screen" id="s-sharedb"><div class="app field">
 <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Shared database</div></div>
@@ -2682,8 +2687,8 @@ function sdbShareBlocks_raw(){
         +'not worked twice. The others on the job see the claims.'},
    {st:FLSYNC,  summary:flsyncSummary(),  title:'The field log',
     what:'Every mow, spray and application in one place, readable by whoever writes the '
-        +'reports. Nothing in the log is ever deleted — a correction writes a new entry '
-        +'and keeps the old one.'},
+        +'reports. An entry can be edited or deleted by whoever logged it, whoever the work '
+        +'was for, Bill, or faculty over their own lab.'},
    {st:INVSYNC, summary:invsyncSummary(), title:'What is on the shelf',
     what:'Every delivery booked in and every amount taken out, so the number on your phone '
         +'is the number in the chemical building. Stock is kept as a list of what moved '
@@ -6916,7 +6921,12 @@ peApply();
       are not, which is the whole reason for the light touch.
    ============================================================ */
 var STORE_DEFS=[
-  {name:'tasks',      key:'ut_tasks_v1',      label:'Tasks',              get:function(){return TASKS;}},
+  /* Bumped from v1 to v2 on 2026-08-31 — see docs/DECISIONS.md, "A phone's
+     old local tasks surfaced on their own once task sharing went live". A new
+     key means every phone starts this array fresh; the shared copy repopulates
+     it over the wire within seconds, so nothing genuinely on the board is lost
+     — only whatever a phone was still privately holding gets left behind. */
+  {name:'tasks',      key:'ut_tasks_v2',      label:'Tasks',              get:function(){return TASKS;}},
   {name:'inventory',  key:'ut_inventory_v1',  label:'Inventory',          get:function(){return INVENTORY;}},
   {name:'equip',      key:'ut_equip_v1',      label:'Equipment',          get:function(){return EQUIP;}},
   {name:'eqmaint',    key:'ut_eqmaint_v1',    label:'Service history',    get:function(){return EQMAINT;}},

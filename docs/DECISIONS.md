@@ -28,6 +28,26 @@ down.
 
 ## Process & project
 
+### A phone's old local tasks surfaced on their own once task sharing went live — 2026-08-31
+**Decision:** the task list's local storage key was bumped from `ut_tasks_v1`
+to `ut_tasks_v2` in `STORE_DEFS` (`UT-TurfFarm-App.html`), the same move
+already made for the field log (`FL_KEY` → `ut_fieldlog_v3`, 2026-08-25).
+**Why:** four mow jobs appeared on the task board and in the field log with
+nobody having assigned them. The task list's code was cleared to an empty
+seed on 2026-08-24, but nothing ever cleared a phone's own saved copy — so a
+phone still holding old test tasks from before that date, the first time it
+finally got a working connection after task sharing shipped (2026-08-26,
+fixed for real 2026-08-27, see "`json==='null'`" below), uploaded that
+backlog to the shared database in one shot, with no button press anybody on
+another phone could see happen. The field log's key had already been bumped
+for exactly this reason; the task list's key simply never was.
+**Don't:** assume a bump is a one-time fix for whatever key needed it at the
+time — the same gap can exist in any drawer that persists locally and was
+seeded with real (not empty) test data before its first bump. If another
+drawer starts showing records nobody remembers creating, check whether its
+storage key has ever been bumped since the drawer's seed array was last
+cleared.
+
 ### A check must not depend on the clock it happens to run on — 2026-08-30
 **Decision:** `tools/test-weather.js` builds its fake forecast from **local
 midnight** and sets the hours on it — a day period at 07:00 and its night at
@@ -773,6 +793,40 @@ movement off its own id, so asking only the latest entry compares a *difference*
 against a *total* and books the gap a second time. A 20 fl oz spray corrected to
 12 and then corrected again for an unrelated typo would take another 20 off a
 shelf nobody had touched. There is a test for exactly that.
+**Still true after 2026-08-31:** an edit no longer creates a new id, so the
+chain `invLogChainIds()` walks is always exactly one id long — but the same
+function, unchanged, still asks "how much has this id taken off the shelf so
+far" and books the difference. See the entry directly below for why the chain
+can now be length one instead of longer.
+
+### Field Log entries can now be edited and deleted — 2026-08-31
+**Decision:** Field Log entries lost the guarantee described two entries
+above ("Nothing is ever edited... nothing is ever deleted") that stood from
+2026-08-25. `flEdit()` now changes an entry's own fields in place with no
+record of the old value, and `flDelete()` removes an entry from the shared
+database permanently, for anybody `flCan(...,'edit'|'delete',...)` allows —
+the same people who could correct an entry under the old rule (whoever logged
+it, whoever the work was credited to, whoever holds the undergrad job, or
+faculty over their own lab's person). `firestore.rules` was rewritten to
+match: `allow delete` went from `if false` to `canEditLog()`, and `allow
+update` now permits the entry's real fields to change instead of only the
+three fields that used to mark it superseded.
+**Why:** Dillon's call, made after four mow jobs surfaced in the field log
+with nobody having logged them (see the task-sharing entry under Process &
+project) — the field log had no way to remove them, only to correct around
+them and leave the wrong entry sitting in the record forever. He chose to
+give up the append-only guarantee entirely rather than add a narrower
+exception for sync artifacts.
+**Don't:** assume this was free. The original 2026-08-25 reasoning was that
+pesticide application records are the kind of thing recordkeeping law might
+one day require to be tamper-evident, and that reasoning did not stop being
+true — it was a deliberate trade Dillon made with that cost in view, not an
+oversight to "fix" back the other way. If a future recordkeeping requirement
+actually bites, the honest options are re-adding an append-only mode for
+chemical-application entries specifically, or keeping an off-app export of
+the log as the real backstop — not quietly reintroducing `flCorrect()`, which
+`invReconcileFromLog()` and `invLogChainIds()` still tolerate transparently if
+it ever comes back (see the entry above).
 
 ### Stock going below zero warns, it never blocks — 2026-08-25
 **Decision:** taking out more than the record shows is recorded, with a warning

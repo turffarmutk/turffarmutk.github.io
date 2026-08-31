@@ -64,28 +64,27 @@ function flById(id){for(var i=0;i<FIELDLOG.length;i++){if(FIELDLOG[i].id===id)re
 function flCommit(){flStampIds();try{if(FIELDLOG.length>FL_CAP){FIELDLOG.sort((a,b)=>a.ord-b.ord);FIELDLOG.splice(0,FIELDLOG.length-FL_CAP);}localStorage.setItem(FL_KEY,JSON.stringify(FIELDLOG));}catch(e){}try{flPush();}catch(e){}}
 (function(){var r=flLoad();if(r)FIELDLOG=r;flStampWho();flCommit();})();
 /* ============================================================
-   THE FIELD LOG — corrections that keep the original
+   THE FIELD LOG — editing and deleting an entry
    ------------------------------------------------------------
-   Dillon, 2026-08-25: **the wrong entry stays.** Correcting an entry writes a
-   NEW record carrying the fix, and marks the old one as superseded by it.
-   Nothing is ever edited in place and nothing is ever deleted.
-
-   Why, in his words and mine: the spray entries are the farm's application
-   records. A log that can be quietly rewritten is worth much less than one
-   where you can see what changed and when — and this is the record that
-   outlives everybody currently on the farm.
-
-   The feed and the counts show only live entries, so a wrong mow does not sit
-   in the totals forever. The superseded record is still there, reachable from
-   the correction that replaced it, which is the difference between a total
-   that is right and a record that is missing something.
+   Until 2026-08-31 this drawer kept every entry forever: a fix wrote a new
+   record and marked the old one superseded, and nothing was ever deleted, by
+   the app or by the database rules. Dillon reversed that on 2026-08-31 —
+   Edit now changes the entry in place with no trace of the old value, and
+   Delete removes it everywhere, for good. See docs/DECISIONS.md, "Field Log
+   entries can now be edited and deleted — 2026-08-31" for the why and for
+   what this gives up (the append-only guarantee, and the note in
+   docs/DATABASE-SHAPE.md about pesticide recordkeeping requirements — read
+   that entry before reversing this again).
 
    ONE FUNCTION for who may do it, like taskCan() and mapCan(), because the
    database enforces the same rule and two copies would drift.
    ============================================================ */
 
 /* Everybody logs their own work — an undergrad who mowed is exactly the person
-   who should be recording that they mowed. Correcting is narrower. */
+   who should be recording that they mowed. Editing and deleting are narrower,
+   and share one rule: whoever wrote the entry down, whoever the work was
+   credited to, whoever holds the undergrad job, or faculty over their own
+   lab's person. */
 function flCan(actor,action,entry){
   var me=pidOf(actor)||SESSION.pid;
   if(!me||!personActive(me)) return false;
@@ -94,57 +93,58 @@ function flCan(actor,action,entry){
   switch(action){
     case 'log':
       return true;
-    case 'correct':
-      if(e.correctedBy) return false;                  /* correct the correction instead */
+    case 'edit':
+    case 'delete':
       if(pidOf(e.loggedBy)===me) return true;          /* I wrote it down */
       if(pidOf(e.person)===me) return true;            /* the work was mine */
       if(assignsUndergrads(me)) return true;           /* Bill, or whoever holds the job */
       if(role==='Faculty'&&e.person&&sameLab(me,pidOf(e.person))) return true;
       return false;
-    case 'delete':
-      return false;                                     /* never, by anybody */
   }
   return false;
 }
 
-/* What a correction is allowed to change. Deliberately not everything: who
-   wrote the original, when it was written and what it superseded are the
-   record of the record, and a correction that could rewrite those would defeat
-   the point of keeping the original. */
-var FL_CORRECTABLE=['plot','type','op','title','date','ord','time','person',
+/* What Edit is allowed to change. Deliberately not everything: who wrote the
+   entry, when, and where it came from (a task, say) stay put — this is still
+   the record of who logged what, even though the record itself can now
+   change under it. */
+var FL_EDITABLE=['plot','type','op','title','date','ord','time','person',
                     'equipment','product','ai','rate','amount','target','notes','detail'];
 
+/* Kept for any entry a correction made before 2026-08-31 — flLive() still
+   has to leave a superseded original out of the feed and the totals. Nothing
+   written from here on ever sets correctedBy; there is no code path left that
+   does. */
 function flSuperseded(a){ return !!(a&&a.correctedBy); }
-/* The true record: what the farm actually did, with corrected entries replaced
-   by their corrections rather than counted twice. */
 function flLive(){ return FIELDLOG.filter(function(a){ return !flSuperseded(a); }); }
 
-function flCorrect(id,changes,why){
-  var orig=flById(id);
-  if(!orig){ return null; }
-  if(!flCan(SESSION.pid,'correct',orig)){ return null; }
-
-  var copy; try{ copy=JSON.parse(JSON.stringify(orig)); }catch(e){ return null; }
-  copy.id=flNewId();
+/* Changes the entry directly. No new record, nothing kept of the old value —
+   see the header above for why that changed and what it costs. */
+function flEdit(id,changes){
+  var a=flById(id); if(!a) return null;
+  if(!flCan(SESSION.pid,'edit',a)) return null;
   Object.keys(changes||{}).forEach(function(k){
-    if(FL_CORRECTABLE.indexOf(k)>=0) copy[k]=changes[k];
+    if(FL_EDITABLE.indexOf(k)>=0) a[k]=changes[k];
   });
-  var at=new Date().toISOString();
-  copy.corrects=orig.id;
-  copy.correctionOf=orig.ord;
-  copy.correctionNote=(why||'').trim()||null;
-  copy.correctedAt=at;
-  copy.loggedBy=SESSION.pid;
-  delete copy.correctedBy;                 /* the new one is live, not superseded */
-  delete copy.correctedWho;
-  FIELDLOG.push(copy);
-
-  orig.correctedBy=copy.id;
-  orig.correctedAt=at;
-  orig.correctedWho=SESSION.pid;
-
   flCommit();
-  return copy;
+  return a;
+}
+
+/* Removes the entry from this phone and, once the database hears about it,
+   from every other phone too. Same authority as editing it. */
+function flDelete(id){
+  var a=flById(id); if(!a) return false;
+  if(!flCan(SESSION.pid,'delete',a)) return false;
+  var idx=FIELDLOG.indexOf(a);
+  if(idx>=0) FIELDLOG.splice(idx,1);
+  try{ localStorage.setItem(FL_KEY,JSON.stringify(FIELDLOG)); }catch(e){}
+  delete FLSYNC.seen[String(id)];
+  var db=(typeof fbDb==='function')?fbDb():null;
+  if(db){
+    try{ db.collection(FLSYNC_COLL).doc(String(id)).delete().catch(function(e){ flsyncFail(id,e); }); }
+    catch(e){ flsyncFail(id,e); }
+  }
+  return true;
 }
 
 let flState={type:'all',plots:[]};
@@ -233,41 +233,49 @@ function renderFlDetail(){
  body.innerHTML=band+body.innerHTML;
 
  if(ab){
-  var acts='<div class="action tap" id="fld-map" style="flex:1;background:#2f3133">Show on map</div>';
-  if(task)acts+='<div class="action tap" id="fld-task" style="flex:1">Open the task</div>';
-  if(flCan(SESSION.pid,'correct',a))
-    acts+='<div class="action tap" id="fld-fix" style="flex:1;background:#e7e9e6;color:#2f3133">Correct this</div>';
+  var acts='';
+  if(flCan(SESSION.pid,'edit',a))
+    acts+='<div class="action tap" id="fld-edit" style="flex:1;background:#e7e9e6;color:#2f3133">Edit</div>';
+  if(flCan(SESSION.pid,'delete',a))
+    acts+='<div class="action tap" id="fld-del" style="flex:1;background:#fdeceb;color:#c0392b">Delete</div>';
   ab.innerHTML=acts;
  }
 }
 document.getElementById('s-fldetail').addEventListener('click',function(e){
  var a=flById(flCur); if(!a)return;
- if(e.target.closest('#fld-map')){ if(typeof trGoPlot==='function')trGoPlot(a.plot); else go('map'); return; }
- if(e.target.closest('#fld-task')){ if(a.taskId&&typeof openTask==='function')openTask(a.taskId); return; }
- if(e.target.closest('#fld-fix')){ go('flfix'); return; }
+ if(e.target.closest('#fld-edit')){ go('flfix'); return; }
+ if(e.target.closest('#fld-del')){
+   if(!confirm('Delete this entry?\n\nThis removes it from the shared log everywhere, for good — there is no undo.')) return;
+   var title=a.title;
+   if(flDelete(a.id)){ toast('Deleted “'+title+'”'); back(); flRender(); }
+   else toast('You cannot delete this entry');
+   return;
+ }
  var jump=e.target.closest('[data-flgo]');
  if(jump){ var to=jump.getAttribute('data-flgo'); if(flById(to)){ flCur=to; renderFlDetail(); } return; }
 });
 /* ============================================================
    THE FIELD LOG IN THE SHARED DATABASE — drawer 3
    ------------------------------------------------------------
-   The record that matters most long-term, and the one somebody will be reading
-   in 2035 to answer a question nobody has thought of yet. Two things follow
-   from that and they shape everything here.
+   The record most people will read months or years later. Until 2026-08-31
+   nothing here was ever deleted or edited in place — see the note over
+   flCan() above, and docs/DECISIONS.md, for why that changed and what it
+   gives up.
 
-   NOTHING IS EVER DELETED. Not by a scan, not by the app, not by the rules —
-   `allow delete: if false`. A correction writes a new record and marks the old
-   one; see flCorrect(). There is no code path that removes a field log record
-   from the shared copy, deliberately.
+   DELETE IS NOW REAL. flDelete() removes the local copy and sends an actual
+   `.delete()` to the shared collection; flsyncOnSnapshot() below takes an
+   entry off this phone too when the server confirms somebody removed it —
+   the same "only if we saw it FROM the server first" guard tsyncOnSnapshot()
+   uses for tasks, so a record still going up for the first time is never
+   mistaken for one coming down as removed.
 
-   THE 5,000-ENTRY CAP IS A PHONE LIMIT, NOT A FARM LIMIT. flCommit() keeps the
-   newest 5,000 records on the device so a phone does not fill up. Under a
-   naive sync that would be a disaster twice over: the trimmed records would be
-   deleted from the shared copy, and then the listener would drag them back
-   down and the cap would trim them again, forever. So: the sync never deletes,
-   and an arriving record older than the oldest one this phone kept is left
-   where it is. The farm's history lives in the shared copy; the phone carries
-   a window onto it.
+   THE 5,000-ENTRY CAP IS STILL A PHONE LIMIT, NOT A FARM LIMIT. flCommit()
+   keeps the newest 5,000 records on the device so a phone does not fill up.
+   That trim is local only and never sends a delete — an arriving record
+   older than the oldest one this phone kept is simply left alone rather than
+   pulled back down. The farm's history lives in the shared copy; the phone
+   carries a window onto it. A real Delete is the only thing that removes a
+   record from the shared copy itself.
    ============================================================ */
 
 var FLSYNC_COLL='fieldlog';
@@ -347,7 +355,18 @@ function flsyncOnSnapshot(snap){
   var touched=false, oldest=flOldestKeptOrd();
 
   changes.forEach(function(ch){
-    if(ch.type==='removed'){ delete FLSYNC.seen[String(ch.doc.id)]; return; }
+    if(ch.type==='removed'){
+      var rid=String(ch.doc.id);
+      /* Only take it off this phone if this phone had it FROM the server. A
+         record we have never seen from the server is one of ours going up,
+         not one of theirs coming down as deleted — same guard tsync uses. */
+      if(FLSYNC.seen[rid]!==undefined){
+        var gone=flById(rid);
+        if(gone){ var gi=FIELDLOG.indexOf(gone); if(gi>=0){ FIELDLOG.splice(gi,1); touched=true; } }
+      }
+      delete FLSYNC.seen[rid];
+      return;
+    }
     var data; try{ data=ch.doc.data(); }catch(e){ return; }
     if(!data) return;
     data.id=String(ch.doc.id);
@@ -402,7 +421,10 @@ function flsyncFail(id,e){
   FLSYNC.failed[id]=(typeof sdbError==='function')?sdbError(e):String((e&&e.message)||e);
 }
 
-/* Outbound. Writes only — see the note at the top about never deleting. */
+/* Outbound. Sends changed entries up; an actual delete goes through flDelete()
+   instead, which calls the database directly rather than waiting for a scan
+   to notice an entry is gone — see the note over flCan() about why that is
+   safe now (it wasn't, before 2026-08-31). */
 function flPush(){
   if(!FLSYNC.on||!FLSYNC.live||!FLSYNC.ready) return 0;
   var db=fbDb(); if(!db) return 0;
@@ -2304,20 +2326,12 @@ function flxRender(){
 
   body.innerHTML=
      '<div style="margin:14px 16px 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px">'
-    +'<div style="font:800 13px \'Archivo\';color:var(--ink)">The original is kept</div>'
+    +'<div style="font:800 13px \'Archivo\';color:var(--ink)">This changes the entry itself</div>'
     +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:3px;line-height:1.45">'
-    +'This does not change the entry. It writes a new one carrying the fix, and marks the old one as '
-    +'replaced by it. Both stay in the record, and only the corrected version counts in the totals.'
+    +'Saving replaces what is below on this record, everywhere. The old value is not kept anywhere once you save.'
     +'</div></div>'
 
-    +'<div class="sec">What it says now</div><div class="list">'
-    +'<div class="fld"><span class="fl">Entry</span><span class="fv">'+esc(a.title||'')+'</span></div>'
-    +'<div class="fld"><span class="fl">Where</span><span class="fv">'+esc(flRowPlot(a.plot))+'</span></div>'
-    +'<div class="fld"><span class="fl">When</span><span class="fv">'+esc(a.date||'')+(a.time?(' · '+esc(a.time)):'')+'</span></div>'
-    +'<div class="fld" style="border-bottom:none"><span class="fl">Kind</span><span class="fv">'+esc(t.label)+'</span></div>'
-    +'</div>'
-
-    +'<div class="sec">What it should say</div><div class="list">'
+    +'<div class="sec">Edit</div><div class="list">'
     +fld('Where','<select class="inv-in" id="flx-plot" style="max-width:210px">'+flxPlotOptions(a.plot)+'</select>')
     +fld('Date','<input class="inv-in" type="date" id="flx-date" value="'+esc(flxOrdToInput(a.ord))+'" style="max-width:170px">')
     +fld('Time',inp('flx-time',a.time,'7:20 AM'))
@@ -2325,19 +2339,15 @@ function flxRender(){
            +fld('Amount used',inp('flx-amount',a.amount))
            +fld('Rate',inp('flx-rate',a.rate))
            +fld('Target',inp('flx-target',a.target))):'')
-    +'<div class="fld" style="border-bottom:none;align-items:flex-start"><span class="fl">What was wrong</span>'
-    +'<textarea class="inv-in" id="flx-why" rows="3" placeholder="Logged on B12, the mow was actually B13" '
-    +'style="max-width:210px;resize:vertical"></textarea></div>'
+    +'<div class="fld" style="border-bottom:none;align-items:flex-start"><span class="fl">Notes</span>'
+    +'<textarea class="inv-in" id="flx-notes" rows="3" style="max-width:210px;resize:vertical">'+esc(a.notes||'')+'</textarea></div>'
     +'</div>'
     +'<div style="height:22px"></div>';
 }
 
 function flxSave(){
   var a=flById(flCur); if(!a){ toast('That entry is gone'); return; }
-  if(!flCan(SESSION.pid,'correct',a)){ toast('You cannot correct this entry'); return; }
-
-  var why=(document.getElementById('flx-why')||{}).value||'';
-  if(!why.trim()){ toast('Say what was wrong — it is the part somebody will need later'); return; }
+  if(!flCan(SESSION.pid,'edit',a)){ toast('You cannot edit this entry'); return; }
 
   var changes={}, v;
   var g=function(id){ var el=document.getElementById(id); return el?(el.value||'').trim():null; };
@@ -2351,17 +2361,23 @@ function flxSave(){
     var nv=(el.value||'').trim();
     if(nv!==(a[k]||'')) changes[k]=nv||null;
   });
+  v=g('flx-notes'); if(v!==null&&v!==(a.notes||'')) changes.notes=v||null;
 
   if(!Object.keys(changes).length){ toast('Nothing was changed'); return; }
 
-  var made=flCorrect(a.id,changes,why);
-  if(!made){ toast('That could not be corrected'); return; }
-  /* If the amount changed, the shelf is now wrong too. Fix it the way the
-     field log fixes itself - a NEW movement for the difference, with the
-     original left exactly as it was. */
-  try{ invReconcileFromLog(a,made); }catch(e){}
-  flCur=made.id;
-  toast('Corrected ✓ · the original is kept');
+  /* invReconcileFromLog() only reads amounts off the entry it is handed, so a
+     snapshot taken before the edit is enough to satisfy it — nothing about it
+     needs two independent live records any more. */
+  var before=JSON.parse(JSON.stringify(a));
+  var amountChanged=('amount' in changes);
+  var made=flEdit(a.id,changes);
+  if(!made){ toast('That could not be saved'); return; }
+  if(amountChanged){
+    /* The amount on the record changed, so the shelf may need to catch up —
+       one adjusting movement for the difference, same as before 2026-08-31. */
+    try{ invReconcileFromLog(before,made); }catch(e){}
+  }
+  toast('Saved ✓');
   back(); renderFlDetail(); flRender();
 }
 (function(){

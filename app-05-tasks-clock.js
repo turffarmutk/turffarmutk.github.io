@@ -470,7 +470,11 @@ function asDateFromOrd(o){return new Date(Math.floor(o/10000),(Math.floor(o/100)
    dueAt. A job given an hour gets one through the task form instead. */
 function isoFromOrd(o){ var d=asDateFromOrd(o); return d?isoLocal(d,false):null; }
 function asDateLabel(o){var t=asToday0();var to=asOrd(t);if(o===to)return 'Today';var tm=new Date(t);tm.setDate(tm.getDate()+1);if(o===asOrd(tm))return 'Tomorrow';var d=asDateFromOrd(o);return ASDOW[d.getDay()]+', '+ASMON[d.getMonth()]+' '+d.getDate();}
-function asDateOptions(selOrd){var t=asToday0();var arr=[];for(var i=0;i<15;i++){var d=new Date(t);d.setDate(d.getDate()+i);arr.push(asOrd(d));}if(selOrd&&arr.indexOf(selOrd)<0)arr.unshift(selOrd);return arr.map(function(o){return '<option value="'+o+'"'+(o===selOrd?' selected':'')+'>'+asDateLabel(o)+'</option>';}).join('');}
+/* Weekday due dates only -- nobody works Saturday or Sunday, so a task can't
+   be due then. If a task already has a weekend due date from before this
+   changed, selOrd keeps that option in the list rather than silently moving
+   it, so an old record isn't rewritten just by opening the form. */
+function asDateOptions(selOrd){var t=asToday0();var arr=[];for(var i=0;arr.length<15;i++){var d=new Date(t);d.setDate(d.getDate()+i);var dw=d.getDay();if(dw===0||dw===6)continue;arr.push(asOrd(d));}if(selOrd&&arr.indexOf(selOrd)<0)arr.unshift(selOrd);return arr.map(function(o){return '<option value="'+o+'"'+(o===selOrd?' selected':'')+'>'+asDateLabel(o)+'</option>';}).join('');}
 function evSprayOrd(e){return evOrd(e)||asTodayOrd();}
 function isFutureTask(t){var o=taskOrd(t); return !!o&&o>asTodayOrd();}
 /* Bill reads the board to know what to grab on the way out the door -- which
@@ -492,7 +496,7 @@ function areaWithDue(t){return taskBoardSub(t)+(isFutureTask(t)?' · 📅 '+dueL
    All of it is gone. The undergrads say when they are coming in, on their own
    profile, and every screen that needs to know reads schedShiftOn(). One
    answer, given by the people who actually know it. */
-var asDay=new Date().getDay();
+var asDay=boardDefaultDay();
 function asDayOrd(){var t=asToday0();for(var i=0;i<7;i++){var d=new Date(t);d.setDate(d.getDate()+i);if(d.getDay()===asDay)return asOrd(d);}return asTodayOrd();}
 /* The date the day chips are pointing at -- the next occurrence of that
    weekday. Which matters: the schedule is read per DATE, not per weekday, so
@@ -530,8 +534,10 @@ function rosterPill(s,on){ return schedPill(pidOf(s)||s,on,new Date(),true); }
 function renderAssignPeople(){
  var el=document.getElementById('as-people'); if(!el)return;
  var todayDow=new Date().getDay();
- /* Same two-label trick as boardDayChips() — CSS decides which one shows. */
- var days='<div class="chiprow" id="as-days">'+WEEKDAYS.map(function(w,i){var isToday=(i===todayDow);return '<span class="chip'+(asDay===i?' on':'')+(isToday?' today':'')+'" data-asday="'+i+'"'+(isToday?' title="Today"':'')+'><span class="dl-s">'+w+'</span><span class="dl-f">'+WEEKDAYS_FULL[i]+'</span>'+(isToday?'<span class="todot"></span>':'')+'</span>';}).join('')+'</div>';
+ /* Same two-label trick as boardDayChips() — CSS decides which one shows.
+    Nobody works Saturday or Sunday, so those two never get a chip here —
+    same reasoning as boardDayChips() on the task board itself. */
+ var days='<div class="chiprow" id="as-days">'+[1,2,3,4,5].map(function(i){var w=WEEKDAYS[i];var isToday=(i===todayDow);return '<span class="chip'+(asDay===i?' on':'')+(isToday?' today':'')+'" data-asday="'+i+'"'+(isToday?' title="Today"':'')+'><span class="dl-s">'+w+'</span><span class="dl-f">'+WEEKDAYS_FULL[i]+'</span>'+(isToday?'<span class="todot"></span>':'')+'</span>';}).join('')+'</div>';
  var dayLabel=WEEKDAYS[asDay]+' · '+asDateLabel(asDayOrd());
  var open='<span class="ppill open'+(asPerson===OPEN?' on':'')+'" data-person="'+OPEN+'"><span class="ppn"><span class="dotsm"></span>Open board</span><span class="ppt">Anyone can claim</span></span>';
  var self='<span class="ppill'+(asPerson===SELF?' on':'')+'" data-person="'+SELF+'"><span class="ppn"><span class="dotsm"></span>'+meName()+' (you)</span><span class="ppt">Assign to yourself</span></span>';
@@ -613,7 +619,7 @@ function renderAssignList(){
 }
 function updateSaveBtn(){var b=document.getElementById('as-save');if(!b)return;b.textContent=PICKS.length?('Save · '+PICKS.length+' task'+(PICKS.length>1?'s':'')):'Save assignments';}
 function assignEnter(){
- asTab='scheduled'; asPerson=null; PICKS=[]; asDay=new Date().getDay();
+ asTab='scheduled'; asPerson=null; PICKS=[]; asDay=boardDefaultDay();
  var seg=document.getElementById('as-seg'); if(seg)seg.querySelectorAll('span').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-atab')==='scheduled');});
  var sr=document.getElementById('as-search'); if(sr)sr.value='';
  closeWiz(); renderAssignPeople(); renderAssignList(); updateSaveBtn();

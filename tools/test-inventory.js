@@ -77,7 +77,7 @@ const EX = ['INVENTORY','INVMOVES','invQty','invMove','invMovesFor','invSums','i
             'amtBoth','lowList','openItem','sessionSet','currentRole','SESSION','newId','fmt',
             'STORE_DEFS','INV_WHY','renderInvList','renderLowStock',
             'invConvert','invParseAmount','invAmountIn','invUnitChoices','invMovesForRef',
-            'invRefTotal','invReconcileFromLog','FLFORM','FIELDLOG','flSave','flCorrect',
+            'invRefTotal','invReconcileFromLog','FLFORM','FIELDLOG','flSave','flEdit',
             'flnStockAmount','flnProduct','flById',
             'INVSYNC','invsyncOnMoves','invsyncOnItems','invsyncWanted','invsyncSetWanted',
             'invMoveDoc','invItemDoc','invsyncSummary','invMoveById'];
@@ -372,7 +372,7 @@ section('13. when it cannot be sure, it logs anyway and leaves stock alone');
   ok('the tick turned off means the shelf is untouched', near(b.p.invQty(it2), was), b.p.invQty(it2));
 }
 
-section('14. correcting the amount corrects the shelf, without editing anything');
+section('14. editing the amount corrects the shelf, without a second entry');
 {
   const b = boot();
   b.p.sessionSet('p01');
@@ -385,46 +385,57 @@ section('14. correcting the amount corrects the shelf, without editing anything'
   });
   b.p.flSave();
   const orig = b.p.FIELDLOG[b.p.FIELDLOG.length - 1];
+  const origSnapshot = JSON.parse(JSON.stringify(orig));
   const firstMove = b.p.invMovesFor(it.id)[0];
   ok('20 came off to begin with', near(b.p.invQty(it), before - 20), b.p.invQty(it));
 
-  /* It was really 12, not 20. */
-  const corrected = b.p.flCorrect(orig.id, { amount: '12 ' + it.unit }, 'Read the jug wrong');
-  ok('the correction was accepted', !!corrected);
-  b.p.invReconcileFromLog(orig, corrected);
+  /* It was really 12, not 20 — edited in place now, not corrected into a new
+     entry (see docs/DECISIONS.md, "Field Log entries can now be edited and
+     deleted — 2026-08-31"). The reconciler still gets a before/after pair; it
+     just comes from a snapshot taken before the edit rather than a second
+     live record. */
+  const logCountBefore = b.p.FIELDLOG.length;
+  const edited = b.p.flEdit(orig.id, { amount: '12 ' + it.unit });
+  ok('the edit was accepted', !!edited);
+  ok('it is the SAME entry, not a new one',
+     edited.id === orig.id && b.p.FIELDLOG.length === logCountBefore);
+  b.p.invReconcileFromLog(origSnapshot, edited);
 
   ok('the shelf now reflects 12', near(b.p.invQty(it), before - 12), b.p.invQty(it));
   const mv = b.p.invMovesFor(it.id);
   ok('by ADDING a movement, not changing one', mv.length === 2, mv.length);
   ok('the first movement is exactly as it was', near(firstMove.delta, -20), firstMove.delta);
-  ok('and the fix points at the correction', b.p.invRefTotal(corrected.id) !== 0);
+  ok('and the fix points at the entry\'s own id', b.p.invRefTotal(edited.id) !== 0);
 
-  /* Correcting something else must not move stock at all. */
+  /* Editing something else must not move stock at all. */
   const n = b.p.INVMOVES.length;
-  const c2 = b.p.flCorrect(corrected.id, { target: 'Dollar spot' }, 'Missed the target');
-  b.p.invReconcileFromLog(corrected, c2);
-  ok('a correction that leaves the amount alone moves no stock', b.p.INVMOVES.length === n);
+  const beforeTarget = JSON.parse(JSON.stringify(edited));
+  const editedTarget = b.p.flEdit(edited.id, { target: 'Dollar spot' });
+  b.p.invReconcileFromLog(beforeTarget, editedTarget);
+  ok('an edit that leaves the amount alone moves no stock', b.p.INVMOVES.length === n);
 
-  /* Corrected TWICE. Each correction hangs its movement off its own id, so
-     "how much has this job taken off" has to be asked of the whole chain. Ask
-     only the last one and you compare a difference against a total and book
-     the gap a second time — which is how a 20 fl oz spray quietly takes 40. */
-  const c3 = b.p.flCorrect(c2.id, { amount: '30 ' + it.unit }, 'Actually thirty');
-  b.p.invReconcileFromLog(c2, c3);
-  ok('a second correction lands on the right total', near(b.p.invQty(it), before - 30),
+  /* Edited TWICE. Since it is always the same id now, the "chain"
+     invLogChainIds() walks is always length one — but the question is the
+     same one it always answered: how much has THIS id taken off the shelf so
+     far. Ask that wrong and a 20 fl oz spray quietly takes 40. */
+  const beforeThird = JSON.parse(JSON.stringify(editedTarget));
+  const editedAgain = b.p.flEdit(editedTarget.id, { amount: '30 ' + it.unit });
+  b.p.invReconcileFromLog(beforeThird, editedAgain);
+  ok('a second edit lands on the right total', near(b.p.invQty(it), before - 30),
      b.p.invQty(it));
   ok('and still only ever adds movements', b.p.invMovesFor(it.id).length === 3,
      b.p.invMovesFor(it.id).length);
+  ok('the whole thing is still one field log entry', b.p.FIELDLOG.filter(e => e.id === orig.id).length === 1);
 }
 
-section('15. the correction screen really does call the reconciler');
+section('15. the edit screen really does call the reconciler');
 {
   /* Section 14 proves the reconciler is right. This proves it is wired in —
      the two failures look identical from the outside. */
   const i = SRC.indexOf('function flxSave()');
   const src = i < 0 ? '' : SRC.slice(i, i + 2200);
   ok('flxSave exists', i > 0);
-  ok('and reconciles stock after correcting', src.indexOf('invReconcileFromLog') >= 0);
+  ok('and reconciles stock after editing', src.indexOf('invReconcileFromLog') >= 0);
   const j = SRC.indexOf('function flSave()');
   ok('flSave asks how much to take off', SRC.slice(j, j + 3000).indexOf('flnStockAmount') >= 0);
 }

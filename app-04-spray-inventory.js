@@ -2968,7 +2968,10 @@ document.getElementById('s-eqdetail').addEventListener('click',function(e){
    if(mt.status==='down'){
      mt.status='available';mt.flagged=false;
      var p=EQPROBLEMS.find(function(pp){return pp.eq===mt.id&&pp.status==='open';});
-     var tid=null; if(p){p.status='resolved';tid=p.repairTask;var rt=TASKS.find(function(t){return t.id===p.repairTask;});if(rt)rt.status='done';}
+     /* Same completion stamp completeTask() writes -- without it this job
+        would carry status:'done' but no completedAt, and the Completed tab's
+        "today" filter would drop it even though it was just closed. */
+     var tid=null; if(p){p.status='resolved';tid=p.repairTask;var rt=TASKS.find(function(t){return t.id===p.repairTask;});if(rt){rt.status='done';rt.completedBy=rt.assignee||SESSION.pid;rt.completedAt=isoLocal(new Date());}}
      EQMAINT.unshift({id:eqMaintNewId(),eq:mt.id,type:'repair',at:atToday(null),by:SESSION.pid,note:'Repair completed',task:tid});
      toast(mt.name+' back in service ✓');
      stack=stack.filter(function(x){return x!=='eqdetail';});

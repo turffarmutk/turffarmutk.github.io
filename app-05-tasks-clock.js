@@ -474,6 +474,14 @@ function asDateLabel(o){var t=asToday0();var to=asOrd(t);if(o===to)return 'Today
    changed, selOrd keeps that option in the list rather than silently moving
    it, so an old record isn't rewritten just by opening the form. */
 function asDateOptions(selOrd){var t=asToday0();var arr=[];for(var i=0;arr.length<15;i++){var d=new Date(t);d.setDate(d.getDate()+i);var dw=d.getDay();if(dw===0||dw===6)continue;arr.push(asOrd(d));}if(selOrd&&arr.indexOf(selOrd)<0)arr.unshift(selOrd);return arr.map(function(o){return '<option value="'+o+'"'+(o===selOrd?' selected':'')+'>'+asDateLabel(o)+'</option>';}).join('');}
+/* Rolls a Saturday or Sunday forward onto the Monday after it. Used only when
+   a FRESH default due date is being proposed for a brand-new assignment (a
+   spray pulled off the calendar can land on a weekend) -- never applied to an
+   existing task's own due date, which asDateOptions() above already goes out
+   of its way to leave alone. A weekend due date is not just unusual, it is
+   invisible forever: the day board only ever draws Monday-Friday chips, so a
+   job due on a Saturday has no chip that will ever show it. */
+function asNearestWeekday(o){var d=asDateFromOrd(o),dw=d.getDay();if(dw===6)d.setDate(d.getDate()+2);else if(dw===0)d.setDate(d.getDate()+1);return asOrd(d);}
 function evSprayOrd(e){return evOrd(e)||asTodayOrd();}
 function isFutureTask(t){var o=taskOrd(t); return !!o&&o>asTodayOrd();}
 /* Bill reads the board to know what to grab on the way out the door -- which
@@ -664,7 +672,7 @@ function openWiz(kind,id){
       anyone picked it, which is how a "Fertilizer · Spray" job is known to be
       going out through the boom rig. */
    defMach=t.machine||((t.machines||[]).length===1?t.machines[0]:'');}
- else if(kind==='ev'){var ev=EVENTS.find(function(x){return x.id===id;});if(!ev)return;cat='spray';name=ev.title;defPlots=parsePlots({area:ev.title});defDue=evSprayOrd(ev);}
+ else if(kind==='ev'){var ev=EVENTS.find(function(x){return x.id===id;});if(!ev)return;cat='spray';name=ev.title;defPlots=parsePlots({area:ev.title});defDue=asNearestWeekday(evSprayOrd(ev));}
  else{var tk=TASKS.find(function(x){return x.id===id;});if(!tk)return;cat=tk.type;name=tk.title;defPlots=parsePlots(tk);defMow=tk;defMach=tk.machine||'';}
  var pk=getPick(kind,id);
  WIZ={kind:kind,id:id,name:name,cat:cat,map:needsMap(cat,name),plots:(pk&&pk.plots?pk.plots:defPlots).slice(),note:pk?pk.note:'',dueOrd:(pk&&pk.dueOrd)?pk.dueOrd:defDue};

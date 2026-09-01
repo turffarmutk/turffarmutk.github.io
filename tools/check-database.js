@@ -80,10 +80,27 @@ const auth = getAuth();
 
   /* ---- 1. the roster the database is using ------------------------- */
   rule('1. THE ROSTER THE DATABASE IS USING');
+  /* ONE RECORD PER PERSON, in the `roster` collection. This used to read the
+     single document refdata/roster, and went on reading it for a day after
+     the roster was split on 2026-08-31 — so it reported the state of a
+     document nothing writes any more, and told whoever ran it that people
+     were missing who were not missing at all. The old document is closed in
+     firestore.rules; the collection below is the one the app uses. */
   let roster = null;
   try {
-    const snap = await db.doc('refdata/roster').get();
-    roster = snap.exists ? (snap.data() || {}).people || {} : null;
+    const snap = await db.collection('roster').get();
+    if (snap.size) {
+      roster = {};
+      snap.forEach(function (d) {
+        const v = d.data() || {};
+        /* When the database last accepted this person. "They all changed in
+           the same second" means one press of the roster button; a straggler
+           on its own clock is a record that arrived some other way. It is the
+           quickest way to tell a send that landed from one that was refused. */
+        try { v._at = d.updateTime ? d.updateTime.toDate().toISOString() : ''; } catch (e) { v._at = ''; }
+        roster[d.id] = v;
+      });
+    }
   } catch (e) {
     line('Could not read it: ' + (e && e.message));
   }
@@ -100,9 +117,14 @@ const auth = getAuth();
     ids.forEach(function (id) {
       const p = roster[id] || {};
       const off = (p.active === false) ? '   *** SWITCHED OFF — this phone can read NOTHING ***' : '';
-      line('  ' + (who(id) + '                              ').slice(0, 34) +
+      /* Names travel on the record itself since 2026-08-31, so somebody hired
+         through the app has a name here even on a machine that has never had
+         roster-emails.local.json. Fall back to that file for the old records. */
+      const nm = (p.first || p.last) ? ((p.first || '') + ' ' + (p.last || '')).trim() + ' [' + id + ']' : who(id);
+      line('  ' + (nm + '                              ').slice(0, 34) +
            (p.role || '(no role)') + '   lab: ' + (p.lab || '—') +
-           (p.grants && p.grants.length ? '   extra jobs: ' + p.grants.join(', ') : '') + off);
+           (p.grants && p.grants.length ? '   extra jobs: ' + p.grants.join(', ') : '') + off +
+           (p._at ? '   last accepted: ' + p._at : ''));
     });
     const local = Object.keys(NAMES);
     const missing = local.filter(function (id) { return !roster[id]; });

@@ -1407,3 +1407,25 @@ the time clock got added to it.
 **Don't:** let a row go vacuous. Each row carries its own sample record on
 purpose — an earlier draft used whatever the app had seeded, and most
 collections are empty at boot, so it passed while checking almost nothing.
+
+### A weekend due date is not unusual, it is invisible forever — 2026-09-01
+**Decision:** `openWiz()` in `app-05-tasks-clock.js` runs a spray pulled off
+the calendar through `asNearestWeekday()` before using its date as the
+assignment's default due date. `asDateOptions()` itself is untouched — it
+still lets an *existing* task keep a weekend due date rather than silently
+moving it, which is deliberate and predates this entry.
+**Why:** the day board only ever draws Monday–Friday chips (`boardDayOrd()`
+can only equal one of those five). A spray calendared for a Saturday, assigned
+to an undergrad with its date left untouched, produced a task with a due date
+no chip will ever match — not "hard to find," but permanently absent from
+that person's Mine tab with nothing on screen to say why. This is what "Bill
+assigned a task and it never showed up" turned out to be. Unlike a task due
+next week, which simply waits for its week to arrive, a weekend due date never
+resolves on its own.
+**Don't:** "fix" this by also changing `asDateOptions()`'s own selOrd
+fallback. That fallback is what stops an old, already-saved weekend-dated task
+from being silently rewritten the moment somebody opens it to edit something
+else — see the comment above it. The bug was in the FRESH default offered for
+a brand-new assignment, not in how an existing record is preserved, and the
+two must not be conflated. `asNearestWeekday()` only ever touches a default
+being proposed for a new pick, never a task's own stored due date.

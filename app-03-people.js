@@ -1575,7 +1575,12 @@ function renderTasks(){
    }
  } else if(tbTab==='completed'){
    var ro2=currentRole!=='manager';
-   var done=TASKS.filter(function(t){return t.status==='done';});
+   /* "Completed today" means what it says -- only jobs actually finished
+      today, not the whole history of every job ever closed. A task with no
+      completedAt on it was never properly closed and has no day to belong to,
+      so it drops out here rather than pretending to be today's. */
+   var todayOrd=asTodayOrd();
+   var done=TASKS.filter(function(t){return t.status==='done'&&ordOfISO(t.completedAt)===todayOrd;});
    html+='<div class="sec">Completed today · '+done.length+'</div>';
    html+= done.length? '<div class="list">'+done.map(function(t){return ro2?roRow('<span style="color:#2f9e4f;font-size:16px;flex:none;align-self:flex-start;margin-top:1px">✓</span>',t.title,taskBoardSub(t)+' · '+t.completedBy+' · '+t.completedAt):tbDoneRow(t);}).join('')+'</div>'
         : '<div class="sec" style="text-align:center;margin-top:20px">Nothing completed yet</div>';

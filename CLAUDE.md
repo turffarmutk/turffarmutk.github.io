@@ -234,17 +234,17 @@ get wrong.
 
 ## Working inside the app
 
-The app is about 19,500 lines spread over the page and five files beside it.
+The app is about 22,000 lines spread over the page and five files beside it.
 **Work out which file first** — that is most of finding your way around:
 
 | File | Roughly | What is in it |
 |---|---|---|
-| `app-01-shell.js` | 1,700 | Per-person preferences, the phone/roomy shell, notifications, home-screen widgets, theme and colour-blind mode |
-| `app-02-fieldlog-sync.js` | 3,500 | The field log and its corrections; the shared-database drawers, including the roster one; ids and timestamps |
+| `app-01-shell.js` | 1,900 | Per-person preferences, the phone/roomy shell, notifications, home-screen widgets, theme and colour-blind mode |
+| `app-02-fieldlog-sync.js` | 3,600 | The field log and its corrections; the shared-database drawers, including the roster one; ids and timestamps |
 | `app-03-people.js` | 1,600 | The Roster **screen**, labs, session, sign-in, profile, semesters, and who may change what. It no longer owns who is on the farm — the database does, and `RSTSYNC` in `app-02` is what carries it. |
-| `app-04-spray-inventory.js` | 2,900 | Spray mix calculator, undergrad task-work mode, inventory, equipment |
-| `app-05-tasks-clock.js` | 2,200 | Task templates and list, assign wizard, calendar, time clock, weather, rainfall |
-| `UT-TurfFarm-App.html` | 8,800 | Every screen's markup, all the CSS, and three remaining blocks of code: the map, trials, sign-in and boot |
+| `app-04-spray-inventory.js` | 3,200 | Spray mix calculator, undergrad task-work mode, inventory, equipment |
+| `app-05-tasks-clock.js` | 2,700 | Task templates and list, assign wizard, calendar, time clock, weather, rainfall |
+| `UT-TurfFarm-App.html` | 9,400 | Every screen's markup, all the CSS, and three remaining blocks of code: the map, trials, sign-in and boot |
 
 Within a file, navigate by the `/* ===== SECTION ===== */` headings and by
 function name — **not** by line number, which changes the moment either of you

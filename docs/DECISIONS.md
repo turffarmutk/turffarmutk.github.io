@@ -1429,3 +1429,24 @@ else — see the comment above it. The bug was in the FRESH default offered for
 a brand-new assignment, not in how an existing record is preserved, and the
 two must not be conflated. `asNearestWeekday()` only ever touches a default
 being proposed for a new pick, never a task's own stored due date.
+
+### The home screen's task card only repaints when you walk onto it — 2026-09-01
+**Decision:** `tsyncRepaint()` in `UT-TurfFarm-App.html` now also calls
+`hwApply(currentRole)` when the signed-in person's own home screen is the one
+currently on screen, the same guarded pattern it already used for the task
+board and the shared-database screen.
+**Why:** "My tasks today" and the Assigned/Done/Hours strip on Home are built
+once, by `hwApply()`, and `hwApply()` only ever ran from two places: boot, and
+`show()`'s `id.indexOf('home-')===0` line when you navigate onto a home
+screen. Neither of those fires when a task arrives from the server a moment
+*after* you're already sitting on Home — which is the ordinary case, since
+signing in lands you on Home before the first Firestore snapshot is even
+back. Confirmed live: signed in as Barrett Smith against the real database,
+Home said "0 assigned / Nothing assigned to you right now" for a mow job that
+was correctly sitting in `TASKS` and correctly showing on the Task Board
+underneath the whole time. Bill reported this as "tasks don't sync" — they do;
+the one card that greets you first just never found out.
+**Don't:** "fix" this by having `hwApply()` run on a timer, or by having every
+sync module poke Home directly. `tsyncRepaint()` is already the one place
+that knows a redraw is due and already gates it on which screen is active —
+this is one more line in that same gate, not a new mechanism.

@@ -7341,6 +7341,20 @@ function tsyncRepaint(){
     var d=document.getElementById('s-sharedb');
     if(d&&d.classList.contains('active')&&typeof sdbRender==='function') sdbRender();
   }catch(e){}
+  /* The "My tasks today" card on the home screen is drawn once, whenever that
+     screen is entered -- see the id.indexOf('home-')===0 line in show(). A
+     task that arrives from the server a moment AFTER that draw (which is the
+     common case: signing in lands on Home before the first snapshot is even
+     back) never gets redrawn, so the card sits on a stale "0 assigned"
+     forever, even though the task is sitting right there in TASKS and the
+     Task Board itself already has it right. This is what a real sync delay
+     LOOKS like from Home -- "it didn't sync" -- when the data arrived fine
+     and only the card didn't hear about it. */
+  try{
+    var hid='s-'+((typeof HOME_DEST!=='undefined'&&HOME_DEST[currentRole])||'');
+    var h=document.getElementById(hid);
+    if(h&&h.classList.contains('active')&&typeof hwApply==='function') hwApply(currentRole);
+  }catch(e){}
 }
 
 /* One line for the status screen. */

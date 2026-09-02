@@ -7281,10 +7281,19 @@ function tsyncUploadNew(){
     if(TSYNC.seen[id]!==undefined) return;      /* the shared copy already has it */
     var doc=taskDoc(t); if(!doc) return;
     if(!sdbMaySend('task/'+id,'task')) return;   /* the brake — see sdbMaySend() */
-    TSYNC.seen[id]=sdbJson(doc);
+    var mark=sdbJson(doc);
+    TSYNC.seen[id]=mark;
     n++; TSYNC.up++;
-    try{ db.collection(TSYNC_COLL).doc(id).set(doc).catch(function(e){ tsyncFail(id,e); }); }
-    catch(e){ tsyncFail(id,e); }
+    /* A write that never happened must not be remembered as one that did —
+       see the note over tsyncScan()'s own send below. Undoing the mark only
+       when it is still exactly what THIS attempt set keeps a real answer that
+       arrived in the meantime (an upload from another tab, a delete) from
+       being clobbered by a stale retry. */
+    try{ db.collection(TSYNC_COLL).doc(id).set(doc).catch(function(e){
+      tsyncFail(id,e);
+      if(TSYNC.seen[id]===mark) delete TSYNC.seen[id];
+    }); }
+    catch(e){ tsyncFail(id,e); if(TSYNC.seen[id]===mark) delete TSYNC.seen[id]; }
   });
   if(n){ try{ toast(n+' of this phone\'s records sent up'); }catch(e){} }
   return n;
@@ -7303,8 +7312,23 @@ function tsyncScan(){
     if(TSYNC.seen[id]===json) return;
     if(!sdbMaySend('task/'+id,'task')) return;   /* the brake — see sdbMaySend() */
     TSYNC.seen[id]=json; TSYNC.up++;
-    try{ db.collection(TSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ tsyncFail(id,e); }); }
-    catch(e){ tsyncFail(id,e); }
+    /* Marked as sent BEFORE the write confirms, same as every drawer here —
+       otherwise the next tick, two seconds away, sends it again while the
+       first attempt is still in flight. The cost of that is a refusal (rules
+       not published yet, a dropped connection, the brake above) reads as a
+       SUCCESS forever: `seen` already matches `json`, so no future scan ever
+       looks at this record again, and a job that never left the phone sits
+       on the board looking sent. Found 2026-09-02 when a rules refusal during
+       testing left an assigned task invisible on the recipient's board with
+       nothing on screen to say why — see docs/DECISIONS.md. Undoing the mark
+       on failure, guarded so a real answer that arrived in the meantime is
+       never clobbered, is what makes the two-second scan actually retry
+       instead of only ever trying once. */
+    try{ db.collection(TSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){
+      tsyncFail(id,e);
+      if(TSYNC.seen[id]===json) delete TSYNC.seen[id];
+    }); }
+    catch(e){ tsyncFail(id,e); if(TSYNC.seen[id]===json) delete TSYNC.seen[id]; }
   });
 
   var gone=Object.keys(TSYNC.seen).filter(function(id){ return !(id in here); });

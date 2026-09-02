@@ -1450,3 +1450,28 @@ the one card that greets you first just never found out.
 sync module poke Home directly. `tsyncRepaint()` is already the one place
 that knows a redraw is due and already gates it on which screen is active —
 this is one more line in that same gate, not a new mechanism.
+
+### A refused upload was remembered as a sent one — 2026-09-02
+**Decision:** `tsyncScan()` and `tsyncUploadNew()` now undo their own optimistic
+`TSYNC.seen[id]` mark when the write they just made it for actually fails,
+guarded so a real answer that lands in the meantime (a later success, a
+delete) is never clobbered by a stale retry's cleanup.
+**Why:** both functions mark a record `seen` — "the server has this now" —
+*before* `.set()` resolves, so the very next tick, two seconds away, does not
+send the same record twice while the first attempt is still in flight. That
+is the right call when the write is going to succeed. It is the wrong one
+when it is not: a refusal (the published rules not matching the app yet, a
+dropped connection, `sdbMaySend`'s own brake) left `seen` holding a value
+nothing on the server has ever agreed to, and `if(TSYNC.seen[id]===json)
+return;` then skips that record on every scan from then on, forever, in that
+tab. Found live on 2026-09-02: the Firestore rules had not been republished
+after the roster migration, Bill's assignment to an undergrad was refused
+with `permission-denied`, and the task sat "sent" on his phone and absent
+everywhere else, with nothing on any screen saying why. Republishing the
+rules fixed *new* attempts; it could not fix that one, because the app had
+already convinced itself the job was done.
+**Don't:** remove the optimistic mark entirely to "just be safe" — that
+brings back the double-send it was written to prevent. And don't treat this
+as reason to distrust `sdbMaySend()`'s twelve-a-minute brake — it still
+gates every retry this produces, unchanged; this only stops a permanently
+wrong answer from being cached in between brake checks.

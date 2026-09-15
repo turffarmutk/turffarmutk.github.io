@@ -301,5 +301,39 @@ section('7. A blown allowance is explained, not spelled out in code words');
   ok('and that nothing is lost', /nothing is lost/.test(msg), msg);
 }
 
-console.log('\n' + pass + ' passed, ' + fail + ' failed');
-process.exit(fail ? 1 : 0);
+/* 2026-09-15: a used-up allowance reached the app as 'unavailable', and the
+   app said "No connection — try again on wifi" to somebody sitting on wifi.
+   'unavailable' is now double-checked with Google directly. */
+(async () => {
+  section('8. "No connection" is checked before it is believed');
+  const answer = async (fake) => {
+    win.fetch = fake;
+    win.SDB_REACH = { state: 'unknown', at: 0, detail: '' };
+    await win.sdbReachCheck(true);
+    return win.sdbError({ code: 'unavailable' });
+  };
+  let asked = 0;
+  const msg429 = await answer(url => { asked++; return Promise.resolve({ status: 429 }); });
+  ok('Google saying "quota exceeded" is reported as the allowance, not the wifi',
+     /allowance/.test(msg429) && !/wifi/.test(msg429), msg429);
+  const url = String(await new Promise(r => { win.fetch = u => { r(u); return Promise.resolve({ status: 403 }); };
+                                              win.SDB_REACH = { state: 'unknown', at: 0, detail: '' };
+                                              win.sdbReachCheck(true); }));
+  ok('it asks the farm\'s own database', /projects\/utk-turf-farm-app\/databases/.test(url), url);
+  const msgOff = await answer(() => Promise.reject(new TypeError('Failed to fetch')));
+  ok('no answer at all is still called no connection', /No connection/.test(msgOff), msgOff);
+  const msgUp = await answer(() => Promise.resolve({ status: 403 }));
+  ok('an answer of any other kind says the connection is fine',
+     /can reach/.test(msgUp) && !/wifi/.test(msgUp), msgUp);
+
+  asked = 0;
+  win.fetch = () => { asked++; return Promise.resolve({ status: 429 }); };
+  win.SDB_REACH = { state: 'unknown', at: 0, detail: '' };
+  for (let i = 0; i < 50; i++) win.sdbError({ code: 'unavailable' });
+  await win.sdbReachCheck();
+  for (let i = 0; i < 50; i++) win.sdbError({ code: 'unavailable' });
+  ok('seventeen drawers failing at once ask Google once, not over and over', asked === 1, String(asked));
+
+  console.log('\n' + pass + ' passed, ' + fail + ' failed');
+  process.exit(fail ? 1 : 0);
+})();

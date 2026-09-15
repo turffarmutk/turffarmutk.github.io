@@ -2754,15 +2754,79 @@ function sdbError(e){
   if(c==='notallowed') return 'Only Bill or the undergrad-job holder can send the roster';
   if(c.indexOf('permission-denied')>=0) return 'The database refused it — were the rules published?';
   if(c.indexOf('unauthenticated')>=0) return 'Sign in first, then try again';
-  if(c.indexOf('unavailable')>=0) return 'No connection — try again on wifi';
-  /* The free plan allows 50,000 records read and 20,000 written a day, and the
-     count resets at 3am our time. Hitting it does NOT stop the app: every
-     phone keeps its own copy, so people can still clock in, log a spray and
-     see their jobs. What stops is sharing, and nothing is lost -- anything
-     done meanwhile goes up on its own once the allowance comes back. Said in
-     those words because 'resource-exhausted' tells nobody any of that. */
-  if(c.indexOf('resource-exhausted')>=0) return 'The farm has used up its database allowance for today — the app still works and nothing is lost, sharing comes back after 3am';
+  if(c.indexOf('unavailable')>=0){ sdbReachCheck(); return sdbReachWords(); }
+  if(c.indexOf('resource-exhausted')>=0) return SDB_ALLOWANCE_WORDS;
   return 'It did not save: '+c;
+}
+
+/* The free plan allows 50,000 records read and 20,000 written a day, and the
+   count resets at 3am our time. Hitting it does NOT stop the app: every
+   phone keeps its own copy, so people can still clock in, log a spray and
+   see their jobs. What stops is sharing, and nothing is lost -- anything
+   done meanwhile goes up on its own once the allowance comes back. Said in
+   those words because 'resource-exhausted' tells nobody any of that. */
+var SDB_ALLOWANCE_WORDS='The farm has used up its database allowance for today — the app still works and nothing is lost, sharing comes back after 3am';
+
+/* WHEN "NO CONNECTION" IS NOT TRUE                          (2026-09-15)
+   ------------------------------------------------------------------
+   The database library says 'unavailable' for two very different things:
+   this phone has no signal, and Google is turning the farm away because the
+   free allowance is used up. It cannot tell them apart, so for a fortnight
+   the app told Dillon "No connection — try again on wifi" while he sat on
+   perfectly good wifi, and sent him looking at the wrong thing entirely.
+
+   So on 'unavailable' the app asks Google once, directly, with an ordinary
+   web request that goes round the library. Google's answer is unambiguous:
+     - no answer at all          -> genuinely no connection
+     - "429, quota exceeded"      -> the allowance is used up
+     - any other answer (usually "refused, you are not signed in", which is
+       what an anonymous question about the roster SHOULD get) -> the
+       connection is fine and something else is wrong.
+
+   It asks at most once every five minutes however many drawers are failing,
+   because every drawer retries every ten seconds and each of those would
+   otherwise be a question. The anonymous question is refused by the rules
+   before it reads anything, so at worst it costs one read, and when the
+   allowance is used up it costs nothing. */
+var SDB_REACH={state:'unknown', at:0, detail:''};   /* 'offline' | 'blocked' | 'reachable' */
+var SDB_REACH_MS=5*60*1000;
+var _sdbReachP=null;
+function sdbReachCheck(force){
+  if(_sdbReachP) return _sdbReachP;
+  if(!force && SDB_REACH.at && Date.now()-SDB_REACH.at<SDB_REACH_MS) return Promise.resolve(SDB_REACH);
+  var set=function(state,detail){
+    var was=SDB_REACH.state;
+    SDB_REACH={state:state, at:Date.now(), detail:detail};
+    _sdbReachP=null;
+    /* Put the right words on the Shared database screen now, rather than
+       leaving the wrong ones up until the next retry. */
+    if(was!==state){ try{ sdbRender(); }catch(e){} }
+    return SDB_REACH;
+  };
+  if(typeof navigator!=='undefined' && navigator.onLine===false)
+    return Promise.resolve(set('offline','this device says it has no network'));
+  if(typeof fetch!=='function' || typeof FB_CONFIG==='undefined' || !FB_CONFIG.projectId)
+    return Promise.resolve(SDB_REACH);             /* cannot ask: keep the old words */
+  var url='https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(FB_CONFIG.projectId)
+         +'/databases/(default)/documents/roster?pageSize=1&key='+encodeURIComponent(FB_CONFIG.apiKey||'');
+  _sdbReachP=new Promise(function(resolve){
+    /* A request that never comes back is the same as no connection. */
+    var t=setTimeout(function(){ resolve(set('offline','no answer after 15 seconds')); },15000);
+    fetch(url,{cache:'no-store',credentials:'omit'}).then(function(r){
+      clearTimeout(t);
+      if(r.status===429) resolve(set('blocked','Google answered 429, quota exceeded'));
+      else resolve(set('reachable','Google answered '+r.status));
+    }).catch(function(err){
+      clearTimeout(t);
+      resolve(set('offline','no answer: '+String((err&&err.message)||err)));
+    });
+  });
+  return _sdbReachP;
+}
+function sdbReachWords(){
+  if(SDB_REACH.state==='blocked') return SDB_ALLOWANCE_WORDS;
+  if(SDB_REACH.state==='reachable') return 'This phone can reach the database but the app could not talk to it — close the app and open it again';
+  return 'No connection — try again on wifi';
 }
 
 function sdbPush(){
@@ -2779,9 +2843,16 @@ function sdbPush(){
     toast(n+' people sent to the database ✓');
     sdbRender();
   }).catch(function(e){
-    clearTimeout(slow); _sdbBusy=false;
-    toast(sdbError(e));
-    sdbRender();
+    clearTimeout(slow);
+    /* "No connection" is only a guess until Google has been asked directly —
+       wait for that answer so the message is the true one. */
+    var c=String((e&&(e.code||e.message))||'');
+    var asked=(c.indexOf('unavailable')>=0)?sdbReachCheck(true):Promise.resolve();
+    asked.then(function(){
+      _sdbBusy=false;
+      toast(sdbError(e));
+      sdbRender();
+    });
   });
 }
 
@@ -2806,16 +2877,31 @@ function sdbTestNow(){
     SDBTEST={state:'done',ok:ok,text:text};
     try{ sdbRender(); }catch(e){}
   };
-  setTimeout(function(){
-    done(false,'No answer at all after 20 seconds. This phone cannot reach the database on '
-              +'this connection. Try it on cellular instead of wifi — if it works there, the '
-              +'wifi is blocking it.');
-  },20000);
+  /* The library gives the same silence, or the same 'unavailable', for "no
+     signal" and for "the allowance is used up". Ask Google directly before
+     telling anybody to go and find a different network. */
+  var noAnswer=function(what){
+    sdbReachCheck(true).then(function(r){
+      if(r.state==='blocked')
+        done(false,what+' Google was asked directly and said the farm has used up its free '
+                  +'allowance. It is NOT your connection. '+SDB_ALLOWANCE_WORDS+'.');
+      else if(r.state==='reachable')
+        done(false,what+' Google was asked directly and answered, so this connection is '
+                  +'fine — the problem is inside the app. Close it and open it again.');
+      else
+        done(false,what+' Google did not answer a direct question either, so this phone '
+                  +'cannot reach it on this connection. Try it on cellular instead of wifi — '
+                  +'if it works there, the wifi is blocking it.');
+    });
+  };
+  setTimeout(function(){ noAnswer('No answer from the database after 20 seconds.'); },20000);
   try{
     db.collection(TSYNC_COLL).get({source:'server'}).then(function(s){
       done(true,'The database answered in '+(Date.now()-t0)+' milliseconds. It is holding '
                +s.size+' task'+(s.size===1?'':'s')+'.');
     }).catch(function(e){
+      var c=String((e&&(e.code||e.message))||'');
+      if(c.indexOf('unavailable')>=0){ noAnswer('The database could not be reached.'); return; }
       done(false,'It answered in '+(Date.now()-t0)+' milliseconds, and refused: '
                +sdbError(e)+' ['+String((e&&e.code)||'no code')+']');
     });
@@ -2841,6 +2927,9 @@ function sdbDetails(){
   L.push('the database sees you as: '+sdbWhoLine());
   L.push('roster last sent: '+(rosterSentAt()||'never'));
   L.push('connection test: '+(SDBTEST.text||'not run'));
+  L.push('Google, asked directly: '+(SDB_REACH.at
+    ? SDB_REACH.state+' ('+SDB_REACH.detail+', '+new Date(SDB_REACH.at).toLocaleTimeString()+')'
+    : 'not asked'));
   L.push('');
   sdbShareBlocks_raw().forEach(function(o){
     var st=o.st||{}, f=Object.keys(st.failed||{});

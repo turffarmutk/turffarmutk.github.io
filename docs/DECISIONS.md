@@ -1475,3 +1475,22 @@ brings back the double-send it was written to prevent. And don't treat this
 as reason to distrust `sdbMaySend()`'s twelve-a-minute brake — it still
 gates every retry this produces, unchanged; this only stops a permanently
 wrong answer from being cached in between brake checks.
+
+### "No connection" is double-checked with Google before it is shown — 2026-09-15
+**Decision:** when the database library reports `unavailable`, `sdbError()` no
+longer says "No connection — try again on wifi" straight away. `sdbReachCheck()`
+in `UT-TurfFarm-App.html` asks Google once, directly, with a plain web request
+that goes round the library, and the words follow the answer: no answer means
+no connection; a 429 means the free allowance is used up; any other answer means
+the connection is fine and the app itself needs reopening. The Shared database
+screen's connection test and its "copy details" text use the same answer.
+**Why:** the library reports "Google is turning this project away because it
+is over its free limit" as `unavailable`, exactly like "no signal". On
+2026-09-15 Dillon was told to try wifi while sitting on wifi, with the project
+over its no-cost limit, and nothing on screen pointed at the real cause.
+**Don't:** call `sdbReachCheck()` without its five-minute memory, or from
+anywhere that runs on a timer. Seventeen drawers retry every ten seconds when
+the database is down; each asking Google would be a stream of requests from
+every phone. It is only asked when something has already failed, at most once
+every five minutes, and the anonymous question it asks is refused by the rules
+before any record is read.

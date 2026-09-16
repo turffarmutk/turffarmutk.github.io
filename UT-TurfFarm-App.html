@@ -2955,6 +2955,11 @@ function sdbDetails(){
   L.push('talking to the database: '+((typeof sdbNetWords==='function')
     ? sdbNetWords()+' (busiest minute so far: '+SDBNET.peak+')'
     : 'not counted on this device'));
+  /* What the last minute was made of, and what the last pause left behind --
+     see "WHAT A PAUSE LEAVES BEHIND" in app-02. Guarded: that file can be the
+     older copy for a few minutes during any update. */
+  if(typeof sdbNetKindWords==='function'&&typeof sdbNetKindCounts==='function')
+    L.push('the last minute of it: '+sdbNetKindWords(sdbNetKindCounts()));
   L.push('connection test: '+(SDBTEST.text||'not run'));
   L.push('Google, asked directly: '+(SDB_REACH.at
     ? SDB_REACH.state+' ('+SDB_REACH.detail+', '+new Date(SDB_REACH.at).toLocaleTimeString()+')'
@@ -2970,6 +2975,10 @@ function sdbDetails(){
     if(st.err) L.push('   last problem: '+st.err);
     if(f.length) L.push('   first refusal: '+String(st.failed[f[0]]));
   });
+  L.push('');
+  var rep=(typeof sdbNetLastReport==='function')?sdbNetLastReport():'';
+  L.push('LAST TIME SHARING PAUSED ON THIS DEVICE: '+(rep?'':'never'));
+  if(rep) L.push(rep);
   return L.join('\n');
 }
 

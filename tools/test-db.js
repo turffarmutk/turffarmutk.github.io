@@ -189,8 +189,10 @@ ok('opening it renders it', /if\(id==='sharedb'\)sdbRender\(\);/.test(appText));
    that state during an update, so the test is "survive the companion file being
    old", not "survive it being absent forever". */
 {
-  const keep = { words: win.sdbNetWords, ok2: win.sdbNetOk, state: win.SDBNET };
+  const keep = { words: win.sdbNetWords, ok2: win.sdbNetOk, state: win.SDBNET,
+                 kw: win.sdbNetKindWords, kc: win.sdbNetKindCounts, rep: win.sdbNetLastReport };
   win.sdbNetWords = undefined; win.sdbNetOk = undefined; win.SDBNET = undefined;
+  win.sdbNetKindWords = undefined; win.sdbNetKindCounts = undefined; win.sdbNetLastReport = undefined;
   let threw = null;
   try { win.sdbRender(); } catch (e) { threw = String(e); }
   const html = win.document.getElementById('sdb-body').innerHTML;
@@ -201,6 +203,7 @@ ok('opening it renders it', /if\(id==='sharedb'\)sdbRender\(\);/.test(appText));
   try { win.sdbDetails(); } catch (e) { dThrew = String(e); }
   ok('the copy-details text survives it too', dThrew === null, dThrew);
   win.sdbNetWords = keep.words; win.sdbNetOk = keep.ok2; win.SDBNET = keep.state;
+  win.sdbNetKindWords = keep.kw; win.sdbNetKindCounts = keep.kc; win.sdbNetLastReport = keep.rep;
 }
 
 /* 2026-09-16: this screen told Dillon to send the roster while twenty-four

@@ -380,13 +380,15 @@ function sdbLoopReset(){ SDB_LOOP={}; SDB_STUCK={}; }
 var SDBNET_WINDOW_MS=60000;      /* count requests over this long */
 var SDBNET_MAX_PER_MIN=200;      /* past this, stop talking to the database */
 var SDBNET_BUSY=40;              /* above this is worth mentioning on screen */
-var SDBNET={hits:[], paused:false, peak:0, watching:false};
+var SDBNET={hits:[], kinds:[], paused:false, peak:0, watching:false};
 
 /* Every request this page made to the database, newest kept, older than the
-   window thrown away. */
-function sdbNetMark(now){
+   window thrown away. `url` is optional -- it is only used to say what KIND
+   of request it was, for the pause report below. */
+function sdbNetMark(now,url){
   var t=now||Date.now();
   SDBNET.hits.push(t);
+  SDBNET.kinds.push(sdbNetKind(url));
   sdbNetPerMin(t);
   if(SDBNET.hits.length>SDBNET.peak) SDBNET.peak=SDBNET.hits.length;
   if(!SDBNET.paused && SDBNET.hits.length>SDBNET_MAX_PER_MIN) sdbNetPause();
@@ -394,15 +396,120 @@ function sdbNetMark(now){
 function sdbNetPerMin(now){
   var t=now||Date.now(), cut=t-SDBNET_WINDOW_MS, i=0;
   while(i<SDBNET.hits.length && SDBNET.hits[i]<cut) i++;
-  if(i) SDBNET.hits.splice(0,i);
+  if(i){ SDBNET.hits.splice(0,i); SDBNET.kinds.splice(0,i); }
   return SDBNET.hits.length;
 }
+
+/* ============================================================
+   WHAT A PAUSE LEAVES BEHIND                            (2026-09-16)
+   ------------------------------------------------------------
+   On 2026-09-16 Bill's laptop paused itself, with one copy of the app open,
+   and all anybody could say afterwards was "it went past 200". Reopening the
+   app wiped even that. Nobody could tell whether it was reconnecting over and
+   over, sending, or reading -- which are three different bugs.
+
+   So the moment a pause happens, this writes down what the last minute was
+   actually made of, what each drawer was doing, and what the device had just
+   been through (asleep, lost signal, hidden), and keeps it ON THE DEVICE so it
+   survives reopening. The Shared database screen's "copy details" text
+   includes it. It asks the database nothing and costs nothing.
+
+   THE KINDS, read off the address of each request. The app talks to Google in
+   short requests (see experimentalForceLongPolling in fbDb()), and each
+   address says what it was for:
+     - a Listen request with no session id  -> opening a NEW connection
+     - one with RID=rpc                      -> waiting for news
+     - one with TYPE=terminate               -> closing a connection
+     - any other Listen request              -> telling Google what to listen to
+     - a Write request                       -> sending records up
+     - anything else                         -> asking directly (connection
+                                                test, "Google, asked directly")
+   Many NEW connections in a minute means the connection keeps dropping and
+   being remade -- the 2026-09-15 pattern. Many "waiting for news" means
+   Google is answering instantly instead of holding the line open.
+   ============================================================ */
+var SDBNET_PAUSE_KEY='ut_sdb_pause_last';
+var SDBNET_EVENTS=[];            /* {t, what} -- the last few things the device went through */
+var SDBNET_KIND_WORDS={
+  open:'opened a new connection', poll:'waited for news', close:'closed a connection',
+  listen:'told Google what to listen to', write:'sent records up', ask:'asked directly', other:'other'
+};
+function sdbNetKind(url){
+  var u=String(url||'');
+  if(!u) return 'other';
+  if(u.indexOf('/Write/')>=0) return 'write';
+  if(u.indexOf('/Listen/')<0) return 'ask';
+  if(/[?&]TYPE=terminate/.test(u)) return 'close';
+  if(!/[?&]SID=[^&]/.test(u)) return 'open';
+  if(/[?&]RID=rpc/.test(u)) return 'poll';
+  return 'listen';
+}
+function sdbNetKindCounts(){
+  var c={};
+  SDBNET.kinds.forEach(function(k){ c[k]=(c[k]||0)+1; });
+  return c;
+}
+/* "57 opened a new connection, 12 waited for news" -- biggest first. */
+function sdbNetKindWords(c){
+  var ks=Object.keys(c||{}).sort(function(a,b){ return c[b]-c[a]; });
+  if(!ks.length) return 'nothing';
+  return ks.map(function(k){ return c[k]+' '+(SDBNET_KIND_WORDS[k]||k); }).join(', ');
+}
+function sdbNetEvent(what){
+  SDBNET_EVENTS.push({t:Date.now(), what:what});
+  if(SDBNET_EVENTS.length>20) SDBNET_EVENTS.splice(0,SDBNET_EVENTS.length-20);
+}
+/* Everything worth knowing at the moment of a pause, as plain lines. */
+function sdbNetBuildReport(){
+  var now=Date.now(), L=[];
+  L.push('paused at: '+new Date(now).toString());
+  L.push('requests in the minute before: '+SDBNET.hits.length);
+  L.push('what they were: '+sdbNetKindWords(sdbNetKindCounts()));
+  try{ L.push('app version: '+((typeof UT_SW_VERSION!=='undefined'&&UT_SW_VERSION)||'unknown')); }catch(e){}
+  try{ L.push('signed in as: '+((typeof SESSION!=='undefined'&&SESSION.pid)||'nobody')); }catch(e){}
+  try{
+    var inst=!!(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches);
+    L.push('running as: '+(inst?'the installed app':'a browser tab'));
+  }catch(e){}
+  try{ L.push('app open for: '+Math.round((now-(SDBNET_OPENED||now))/60000)+' minutes'); }catch(e){}
+  try{ L.push('on screen: '+(document.visibilityState||'unknown')+' | device says online: '+(navigator.onLine!==false?'yes':'NO')); }catch(e){}
+  try{ L.push('database saved copy: '+(typeof DB_CACHE!=='undefined'?DB_CACHE:'unknown')); }catch(e){}
+  var ev=SDBNET_EVENTS.filter(function(x){ return now-x.t<10*60000; });
+  L.push('in the ten minutes before: '+(ev.length
+    ? ev.map(function(x){ return Math.round((now-x.t)/1000)+'s ago '+x.what; }).join('; ')
+    : 'nothing changed (did not sleep, lose signal, or go in or out of sight)'));
+  /* Borrowed from the page, which is read after this file -- by the time a
+     pause can happen it is there, but an older page might not have it. */
+  try{
+    if(typeof sdbShareBlocks_raw==='function'){
+      sdbShareBlocks_raw().forEach(function(o){
+        var st=o.st||{};
+        L.push('   '+o.title+': '+(st.live?'listening':'NOT listening')+', '+(st.ready?'heard back':'NOT heard back')
+              +(st.err?(' -- '+st.err):'')+' | sent '+(st.up||0)+', received '+(st.down||0));
+      });
+    }
+  }catch(e){}
+  return L.join('\n');
+}
+function sdbNetSaveReport(){
+  var txt; try{ txt=sdbNetBuildReport(); }catch(e){ txt='paused at: '+new Date().toString()+' (the report itself failed: '+String(e&&e.message||e)+')'; }
+  try{ localStorage.setItem(SDBNET_PAUSE_KEY,txt); }catch(e){}
+  return txt;
+}
+/* The last pause on this device, however long ago and across reopening, or ''. */
+function sdbNetLastReport(){
+  try{ return localStorage.getItem(SDBNET_PAUSE_KEY)||''; }catch(e){ return ''; }
+}
+var SDBNET_OPENED=Date.now();
 
 /* Stop THIS device talking to the database, and say so where it will be
    read. Everything else about the app carries on working from the copy on
    the phone -- that is the whole reason it is safe to do this. */
 function sdbNetPause(){
   SDBNET.paused=true;
+  /* Written down FIRST, before the connection is switched off changes what
+     the drawers look like. */
+  sdbNetSaveReport();
   try{
     var db=(typeof fbDb==='function')?fbDb():null;
     if(db&&db.disableNetwork) db.disableNetwork();
@@ -425,7 +532,7 @@ function sdbNetWords(){
   return n+' time'+(n===1?'':'s')+' a minute'+(n>SDBNET_BUSY?' — busier than usual, worth watching':' — normal');
 }
 function sdbNetOk(){ return !SDBNET.paused; }
-function sdbNetReset(){ SDBNET={hits:[], paused:false, peak:0, watching:SDBNET.watching}; }
+function sdbNetReset(){ SDBNET={hits:[], kinds:[], paused:false, peak:0, watching:SDBNET.watching}; }
 
 /* Start counting. The browser hands over every request the page makes,
    including ones made before this ran, so nothing at start-up is missed.
@@ -438,11 +545,26 @@ function sdbNetWatch(){
     var po=new PerformanceObserver(function(list){
       var es=list.getEntries();
       for(var i=0;i<es.length;i++){
-        if(String(es[i].name||'').indexOf('firestore.googleapis.com')>=0) sdbNetMark();
+        var nm=String(es[i].name||'');
+        if(nm.indexOf('firestore.googleapis.com')>=0) sdbNetMark(0,nm);
       }
     });
     po.observe({type:'resource', buffered:true});
     SDBNET.watching=true;
+    /* What the device goes through, for the pause report. A laptop lid closing
+       shows up as nothing at all -- the page simply stops -- so it is caught
+       as a gap in a ten-second tick instead. */
+    try{
+      document.addEventListener('visibilitychange',function(){ sdbNetEvent(document.visibilityState==='hidden'?'went out of sight':'came back on screen'); });
+      window.addEventListener('online',function(){ sdbNetEvent('got signal back'); });
+      window.addEventListener('offline',function(){ sdbNetEvent('lost signal'); });
+      var last=Date.now();
+      setInterval(function(){
+        var n=Date.now();
+        if(n-last>60000) sdbNetEvent('woke up after '+Math.round((n-last)/60000)+' minutes asleep');
+        last=n;
+      },10000);
+    }catch(e){}
     return true;
   }catch(e){ return false; }
 }

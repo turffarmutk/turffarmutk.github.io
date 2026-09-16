@@ -366,6 +366,43 @@ section('7. A blown allowance is explained, not spelled out in code words');
     win.sdbNetReset();
   }
 
+  /* 2026-09-16: Bill's laptop paused and nobody could say what the 200
+     requests WERE. Reopening wiped even the count. */
+  section('9b. A pause writes down what the minute was made of, and keeps it');
+  {
+    const t0 = Date.now();
+    const L = 'https://firestore.googleapis.com/google.firestore.v1.Firestore/Listen/channel?';
+    ok('a Listen request with no session is a new connection', win.sdbNetKind(L + 'RID=58618&CVER=22&zx=a&t=1') === 'open');
+    ok('RID=rpc is waiting for news', win.sdbNetKind(L + 'RID=rpc&SID=abc&TYPE=xmlhttp&zx=a') === 'poll');
+    ok('TYPE=terminate is closing', win.sdbNetKind(L + 'RID=5&SID=abc&TYPE=terminate') === 'close');
+    ok('a numbered request on an open session is telling Google what to listen to', win.sdbNetKind(L + 'RID=58619&SID=abc&AID=3') === 'listen');
+    ok('a Write request is sending', win.sdbNetKind('https://firestore.googleapis.com/google.firestore.v1.Firestore/Write/channel?RID=1&SID=x') === 'write');
+    ok('anything else is asking directly', win.sdbNetKind('https://firestore.googleapis.com/v1/projects/p/databases/(default)/documents/roster?pageSize=1') === 'ask');
+
+    try { win.localStorage.removeItem(win.SDBNET_PAUSE_KEY); } catch (e) {}
+    ok('with no pause yet the details say never', /PAUSED ON THIS DEVICE: never/.test(win.sdbDetails()));
+
+    win.sdbNetReset();
+    win.SDBNET.watching = true;
+    win.fbDb = () => ({ disableNetwork() { return Promise.resolve(); } });
+    win.sdbNetEvent('woke up after 42 minutes asleep');
+    for (let i = 0; i < 180; i++) win.sdbNetMark(t0 + i * 100, L + 'RID=' + i + '&CVER=22');
+    for (let i = 180; i < 210; i++) win.sdbNetMark(t0 + i * 100, L + 'RID=rpc&SID=s&TYPE=xmlhttp');
+    ok('it paused', win.SDBNET.paused === true);
+    const rep = win.sdbNetLastReport();
+    ok('the pause left a report on the device', rep.length > 0);
+    ok('the report says what the requests were, biggest first',
+       /what they were: 180 opened a new connection, 21 waited for news/.test(rep), rep.split('\n')[2]);
+    ok('it says what the device had just been through', /woke up after 42 minutes asleep/.test(rep));
+    ok('it lists each drawer', /Tasks: /.test(rep));
+
+    win.sdbNetReset();                 /* reopening the app */
+    ok('reopening the app does not wipe it', win.sdbNetLastReport() === rep);
+    const d = win.sdbDetails();
+    ok('and the copy-details text carries it', d.indexOf(rep) >= 0);
+    try { win.localStorage.removeItem(win.SDBNET_PAUSE_KEY); } catch (e) {}
+  }
+
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })();

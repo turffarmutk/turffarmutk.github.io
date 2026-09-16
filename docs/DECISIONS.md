@@ -1534,6 +1534,24 @@ database, and so does the first one after it.
 cost of on is one hidden window silencing every other copy with nothing on
 screen to say so.
 
+### A pause writes down what caused it, and keeps it — 2026-09-16
+**Decision:** when `sdbNetPause()` fires it first saves a report on the device
+(`ut_sdb_pause_last`): the last minute's requests sorted into kinds (new
+connection, waiting for news, closing, listening, sending, asking directly),
+whether the device had just slept, lost signal or been hidden, installed app or
+browser tab, and each drawer's state. It survives reopening, and the Shared
+database screen's copied details include it.
+**Why:** Bill's laptop paused on 2026-09-16 with one copy open and nothing else
+running, and nobody could say what the 200 requests were. Reopening wiped the
+count. "Reconnecting over and over", "sending" and "reading" are three
+different bugs, and guessing between them had already sent us the wrong way
+once that day.
+**Don't:** clear the report when the app reopens. Reopening is the first thing
+anybody does, so a report that doesn't survive it is useless. And don't read
+the kinds as exact: they come from how Google's addresses look (see
+`sdbNetKind()`), and a library update could change those. If a report says
+everything was "other", check the addresses before trusting it.
+
 ### A failed task send waits before it tries again — 2026-09-16
 **Decision:** a task whose send fails waits 10 seconds, then twice as long after
 each further failure, up to 5 minutes (`tsyncWaiting()`), before `tsyncScan()`

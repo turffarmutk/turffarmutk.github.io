@@ -1494,3 +1494,24 @@ the database is down; each asking Google would be a stream of requests from
 every phone. It is only asked when something has already failed, at most once
 every five minutes, and the anonymous question it asks is refused by the rules
 before any record is read.
+
+### A device that talks to the database too often pauses itself — 2026-09-16
+**Decision:** `sdbNetWatch()` in `app-02-fieldlog-sync.js` counts every request
+this device makes to the database, using the browser's own record of its
+requests rather than anything the database library reports. The count is shown
+on the Shared database screen in plain words ("11 times a minute — normal").
+Past `SDBNET_MAX_PER_MIN` (200 in a minute) that one device stops talking to
+the database, every drawer's line says so, and reopening the app clears it.
+**Why:** `sdbMaySend()` watches records going UP. On 2026-09-15 the farm's
+whole day of allowance — 2.2 million reads against fifty thousand — went on
+something it cannot see: one device re-making its connection over and over,
+each time re-registering all seventeen drawers, each registration costing a
+roster lookup inside the rules. Almost nothing was sent, no drawer reported an
+error, and that device's own counts on screen stayed small. Nothing in the app
+could see it, because nothing in the app was counting. Measured for comparison
+the next morning on a signed-in browser: 18 requests in 86 minutes.
+**Don't:** raise the limit to get a device working again. A device past 200 a
+minute is a device with something wrong, and the limit is already five times a
+busy phone. Don't count with a wrapper around the database library either —
+the library believed it was idle throughout 2026-09-15; the browser's own
+record of its requests is the thing that cannot be fooled.

@@ -334,6 +334,38 @@ section('7. A blown allowance is explained, not spelled out in code words');
   for (let i = 0; i < 50; i++) win.sdbError({ code: 'unavailable' });
   ok('seventeen drawers failing at once ask Google once, not over and over', asked === 1, String(asked));
 
+  /* 2026-09-16: 2.2 million reads in a morning, from ONE device, with almost
+     nothing sent and every drawer's own counts looking calm. The send brake
+     cannot see that; this counts what the device says to the database. */
+  section('9. A device that talks to the database far too often pauses itself');
+  {
+    const t0 = Date.now();
+    win.sdbNetReset();
+    win.SDBNET.watching = true;
+    let disabled = 0;
+    win.fbDb = () => ({ disableNetwork() { disabled++; return Promise.resolve(); } });
+
+    for (let i = 0; i < 30; i++) win.sdbNetMark(t0 + i * 100);
+    ok('an ordinary minute is called normal', /normal/.test(win.sdbNetWords()), win.sdbNetWords());
+    ok('and it is not paused', win.sdbNetOk() === true && disabled === 0);
+
+    for (let i = 30; i < 260; i++) win.sdbNetMark(t0 + i * 100);
+    ok('past two hundred in a minute it stops talking to the database', disabled === 1, String(disabled));
+    ok('the screen says it is paused, in words', /PAUSED/.test(win.sdbNetWords()), win.sdbNetWords());
+    ok('it says nothing is lost', /Nothing is lost/.test(win.sdbNetWords()), win.sdbNetWords());
+    ok('every drawer says so too, not just the one line',
+       /paused on this device/.test(win.sdbStuckNote()), win.sdbStuckNote());
+
+    /* The same requests spread over an hour are ordinary use, not a runaway. */
+    win.sdbNetReset();
+    disabled = 0;
+    for (let i = 0; i < 600; i++) win.sdbNetMark(t0 + i * 10000);
+    ok('the same number of requests spread over an hour is left alone',
+       win.sdbNetOk() === true && disabled === 0, win.sdbNetWords());
+
+    win.sdbNetReset();
+  }
+
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })();

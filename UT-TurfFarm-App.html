@@ -2583,6 +2583,7 @@ function sdbRender(){
     +sdbStatusRow('Signed in as', SESSION.pid?(meName()+' · '+SESSION.pid):'Nobody', !!SESSION.pid)
     +sdbStatusRow('The database sees you as', sdbWhoLine(), sdbWhoOk()?true:(SDBWHO.state==='checking'?null:false))
     +sdbStatusRow('Working copy on this phone', cache, DB_CACHE==='on'?true:null)
+    +sdbStatusRow('Talking to the database', sdbNetWords(), sdbNetOk()?true:false)
     +sdbStatusRow('Roster last sent', at?(at.slice(0,10)+' at '+at.slice(11,16)):'Never', at?true:false);
 
   var btn = can
@@ -2926,6 +2927,7 @@ function sdbDetails(){
   L.push('signed in to the app as: '+(SESSION.pid||'nobody'));
   L.push('the database sees you as: '+sdbWhoLine());
   L.push('roster last sent: '+(rosterSentAt()||'never'));
+  L.push('talking to the database: '+sdbNetWords()+' (busiest minute so far: '+SDBNET.peak+')');
   L.push('connection test: '+(SDBTEST.text||'not run'));
   L.push('Google, asked directly: '+(SDB_REACH.at
     ? SDB_REACH.state+' ('+SDB_REACH.detail+', '+new Date(SDB_REACH.at).toLocaleTimeString()+')'

@@ -327,11 +327,125 @@ function sdbMaySend(key,what){
 function sdbStuckCount(){ return Object.keys(SDB_STUCK).length; }
 /* What every *syncSummary() adds, so a stuck record cannot go unnoticed. */
 function sdbStuckNote(){
+  /* A paused device is said on EVERY drawer, not only on the one line at the
+     top of the screen, because the question somebody asks is "why has my
+     field log stopped" and that is where they will be looking. */
+  var note=(typeof SDBNET==='object'&&SDBNET&&SDBNET.paused)
+    ? ' · sharing paused on this device — close the app and open it again' : '';
   var n=sdbStuckCount();
-  if(!n) return '';
-  return ' · '+n+' stuck in a loop and stopped — report this';
+  if(n) note=' · '+n+' stuck in a loop and stopped — report this'+note;
+  return note;
 }
 function sdbLoopReset(){ SDB_LOOP={}; SDB_STUCK={}; }
+
+/* ============================================================
+   HOW MUCH THIS DEVICE IS TALKING TO THE DATABASE     (2026-09-16)
+   ------------------------------------------------------------
+   The brake above watches RECORDS GOING UP. On 2026-09-15 the farm's whole
+   day of allowance went on something it cannot see: 2.2 million records
+   READ, with almost nothing sent, on one device, while every drawer on that
+   device's own screen looked calm and its counts stayed small. The reads
+   were not records arriving — they were the connection to the database being
+   made over and over, each time re-registering all seventeen drawers, and
+   each registration costing a lookup of the person in the roster.
+
+   Nothing in the app could see that, because the app never asks the
+   question. This does. The browser times every request a page makes, so
+   counting the ones that went to the database needs no cooperation from the
+   database library and cannot be fooled by a library that thinks it is idle.
+
+   TWO JOBS, AND THE SECOND ONE IS THE POINT:
+
+   1. It puts a number on the Shared database screen — "talking to the
+      database 11 times a minute" — so a phone behaving badly can be SEEN,
+      by anybody, without a laptop or a console login.
+
+   2. Past SDBNET_MAX_PER_MIN it stops that one device talking to the
+      database at all. The farm keeps working: every phone holds its own
+      copy, so people still clock in, log sprays and read their jobs, and
+      anything done meanwhile goes up when sharing resumes. One device pauses
+      itself instead of every device losing the day.
+
+   The numbers come from watching a real phone: an idle one signed in and
+   sitting there makes about ten to twelve requests a minute, and a busy one
+   perhaps three times that. Two hundred is a long way past anything real use
+   produces and still stops a runaway inside a minute — about 200 reads
+   instead of a day's fifty thousand.
+
+   Reopening the app clears it, exactly like the send brake. That is
+   deliberate: if the cause was this device's stored copy, reopening is also
+   the thing most likely to fix it, and a paused device that can never try
+   again is a device somebody has to be told how to rescue.
+   ============================================================ */
+var SDBNET_WINDOW_MS=60000;      /* count requests over this long */
+var SDBNET_MAX_PER_MIN=200;      /* past this, stop talking to the database */
+var SDBNET_BUSY=40;              /* above this is worth mentioning on screen */
+var SDBNET={hits:[], paused:false, peak:0, watching:false};
+
+/* Every request this page made to the database, newest kept, older than the
+   window thrown away. */
+function sdbNetMark(now){
+  var t=now||Date.now();
+  SDBNET.hits.push(t);
+  sdbNetPerMin(t);
+  if(SDBNET.hits.length>SDBNET.peak) SDBNET.peak=SDBNET.hits.length;
+  if(!SDBNET.paused && SDBNET.hits.length>SDBNET_MAX_PER_MIN) sdbNetPause();
+}
+function sdbNetPerMin(now){
+  var t=now||Date.now(), cut=t-SDBNET_WINDOW_MS, i=0;
+  while(i<SDBNET.hits.length && SDBNET.hits[i]<cut) i++;
+  if(i) SDBNET.hits.splice(0,i);
+  return SDBNET.hits.length;
+}
+
+/* Stop THIS device talking to the database, and say so where it will be
+   read. Everything else about the app carries on working from the copy on
+   the phone -- that is the whole reason it is safe to do this. */
+function sdbNetPause(){
+  SDBNET.paused=true;
+  try{
+    var db=(typeof fbDb==='function')?fbDb():null;
+    if(db&&db.disableNetwork) db.disableNetwork();
+  }catch(e){}
+  try{ console.warn('Shared database: paused on this device — '+SDBNET.peak+' requests in a minute.'); }catch(e){}
+  try{ if(typeof toast==='function') toast('Sharing paused on this device — it was talking to the database far too often. Everything still works.'); }catch(e){}
+  try{
+    var d=document.getElementById('s-sharedb');
+    if(d&&d.classList.contains('active')&&typeof sdbRender==='function') sdbRender();
+  }catch(e){}
+}
+/* Plain words for the screen. Said as a rate because "460 in a minute" means
+   something to anybody, and 'excessive request volume' means nothing. */
+function sdbNetWords(){
+  if(SDBNET.paused)
+    return 'PAUSED on this device — it was talking to the database '+SDBNET.peak
+          +' times a minute, far more than normal. Nothing is lost; close the app and open it again.';
+  if(!SDBNET.watching) return 'Not being counted on this device';
+  var n=sdbNetPerMin();
+  return n+' time'+(n===1?'':'s')+' a minute'+(n>SDBNET_BUSY?' — busier than usual, worth watching':' — normal');
+}
+function sdbNetOk(){ return !SDBNET.paused; }
+function sdbNetReset(){ SDBNET={hits:[], paused:false, peak:0, watching:SDBNET.watching}; }
+
+/* Start counting. The browser hands over every request the page makes,
+   including ones made before this ran, so nothing at start-up is missed.
+   A browser too old for it simply does not count, and says so rather than
+   claiming everything is fine. */
+function sdbNetWatch(){
+  if(SDBNET.watching) return false;
+  if(typeof PerformanceObserver!=='function') return false;
+  try{
+    var po=new PerformanceObserver(function(list){
+      var es=list.getEntries();
+      for(var i=0;i<es.length;i++){
+        if(String(es[i].name||'').indexOf('firestore.googleapis.com')>=0) sdbNetMark();
+      }
+    });
+    po.observe({type:'resource', buffered:true});
+    SDBNET.watching=true;
+    return true;
+  }catch(e){ return false; }
+}
 /* ============================================================
    THE FIELD LOG IN THE SHARED DATABASE — drawer 3
    ------------------------------------------------------------
@@ -3591,3 +3705,9 @@ function newId(prefix){
 }
 function esc(s){return (s==null?'':(''+s)).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 btn('equipment','Report a Problem',null,'Problem reported ✓');
+
+/* Start counting what this device says to the database. At the END of the
+   file because everything it needs is defined above it, and it is the last
+   thing here that does rather than declares. Safe before sign-in: it counts
+   requests, and asks the database nothing. */
+sdbNetWatch();

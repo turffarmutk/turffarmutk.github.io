@@ -3522,6 +3522,26 @@ function mapChrome(m){
   /* bottomright is already the attribution default, but say it out loud so a
      future map that sets it differently still ends up in the right corner. */
   try{ if(m.attributionControl) m.attributionControl.setPosition('bottomright'); }catch(e){}
+  /* A satellite photo that fails to download is otherwise never asked for
+     again, and the gap shows as a flat green square for as long as the map is
+     open. Out in the field one bar of signal drops a photo or two on every
+     pan, so each one gets three more tries, spaced out to let the signal come
+     back. Hooked here so every map gets it without each one remembering to. */
+  try{ m.on('layeradd',function(ev){
+    var lyr=ev.layer;
+    if(!(lyr instanceof L.TileLayer)||lyr._retryWired) return;
+    lyr._retryWired=true;
+    lyr.on('tileerror',function(te){
+      var img=te.tile, n=(img._tries||0)+1;
+      if(!img||n>3) return;
+      img._tries=n;
+      setTimeout(function(){
+        if(!img.parentNode) return;              /* panned away meanwhile */
+        var src=lyr.getTileUrl(te.coords);
+        img.src=''; img.src=src;
+      },[2000,5000,12000][n-1]);
+    });
+  }); }catch(e){}
   return m;
 }
 
@@ -6440,9 +6460,17 @@ function jobMapEnsure(key,elId){
     try{st.map.remove();}catch(e){}
     delete JOBMAP[key];
   }
-  var m=mapChrome(L.map(el,{minZoom:13,maxZoom:18,zoomControl:false,renderer:L.canvas()}));
+  /* These are the maps people tap individual plots on, so they go two levels
+     closer than the Farm Map. At the old cap of 18 a CAFS or SF plot was a
+     sliver about as wide as a fingertip, and picking one out of its row was
+     guesswork. The photo stops getting sharper at 19 and just enlarges past
+     it, which is fine: the plot outlines are drawn, not photographed, so they
+     stay crisp. zoomSnap 0.25 lets the map open filling the screen instead of
+     rounding down a whole level, which on a phone left the farm a small patch
+     in the middle of the picture. */
+  var m=mapChrome(L.map(el,{minZoom:13,maxZoom:20,zoomSnap:0.25,zoomControl:false,renderer:L.canvas()}));
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    {maxZoom:18,maxNativeZoom:19,attribution:'Imagery © Esri, Maxar'}).addTo(m);
+    {maxZoom:20,maxNativeZoom:19,attribution:'Imagery © Esri, Maxar'}).addTo(m);
   st=JOBMAP[key]={map:m,g:L.layerGroup().addTo(m),lg:L.layerGroup(),fitted:false};
   m.on('zoomend',function(){ jobLabelSync(st); });
   jobLabelSync(st);

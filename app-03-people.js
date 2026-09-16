@@ -1137,6 +1137,29 @@ function boardDefaultDay(){var d=new Date().getDay();return (d===0||d===6)?1:d;}
 var boardDay=boardDefaultDay();
 function boardOrdFor(dow){var t=asToday0();for(var i=0;i<7;i++){var d=new Date(t);d.setDate(d.getDate()+i);if(d.getDay()===dow)return asOrd(d);}return asTodayOrd();}
 function boardDayOrd(){return boardOrdFor(boardDay);}
+/* The Completed tab reads the same chips looking BACK. On the Board, "Mon" on a
+   Wednesday means next Monday, because that is the next Monday there is work
+   for -- but nothing has been completed next Monday, so on Completed it means
+   the Monday just gone. The chips then always read as the last five working
+   days, which is the question Bill is asking there: what got done Tuesday? */
+function boardPastOrdFor(dow){var t=asToday0();for(var i=0;i<7;i++){var d=new Date(t);d.setDate(d.getDate()-i);if(d.getDay()===dow)return asOrd(d);}return asTodayOrd();}
+/* The working day a finished job is filed under. There are no weekend chips,
+   so a job somebody finished on a Saturday or Sunday is filed under the Friday
+   before it -- the alternative is that it vanishes from the tab altogether.
+   The row still says which day it really was. A job with no completedAt was
+   never properly closed and has no day, so it is 0 and shows under none. */
+function taskDoneOrd(t){
+  var d=parseISO(t&&t.completedAt); if(!d) return 0;
+  d=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  var w=d.getDay(); if(w===6)d.setDate(d.getDate()-1); else if(w===0)d.setDate(d.getDate()-2);
+  return asOrd(d);
+}
+/* "2:14p", with the real day in front when it was a weekend filed under Friday. */
+function taskDoneWhen(t){
+  var d=parseISO(t&&t.completedAt); if(!d) return '';
+  var w=d.getDay(), tm=fmtTime(t.completedAt);
+  return ((w===0||w===6)?WEEKDAYS[w]+' ':'')+(tm||'');
+}
 /* The day a task belongs to, as YYYYMMDD. dueAt is the stored field; dueOrd is
    kept because the assign wizard and the day chips do plain integer comparison
    on it, and deriving it here means the two can never disagree. */
@@ -1156,7 +1179,12 @@ function tbPoolRow(t){
  return '<div class="row"><div class="tap" data-task="'+t.id+'" style="flex:1"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+esc(taskBoardSub(t))+'</div></div><span class="pill tap" data-claim="'+t.id+'" style="background:var(--acc);color:#fff;padding:5px 12px;font-size:10.5px">Claim</span></div>';
 }
 function tbDoneRow(t){
- return '<div class="row tap" data-task="'+t.id+'"><span style="color:#2f9e4f;font-size:16px;flex:none">✓</span><div style="flex:1"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+esc(taskBoardSub(t))+' · '+t.completedBy+' · '+t.completedAt+'</div></div></div>';
+ return '<div class="row tap" data-task="'+t.id+'"><span style="color:#2f9e4f;font-size:16px;flex:none">✓</span><div style="flex:1"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+esc(tbDoneSub(t))+'</div></div></div>';
+}
+/* completedBy is a roster id and completedAt a timestamp; both used to be
+   printed raw, so the row read "p18 · 2026-09-16T14:02:11". */
+function tbDoneSub(t){
+ return [taskBoardSub(t),nameOf(t.completedBy)||'',taskDoneWhen(t)].filter(Boolean).join(' · ');
 }
 function tbReqRow(t){
  var needs=(t.students&&t.students>1)?' · needs '+t.students:'';
@@ -1575,15 +1603,17 @@ function renderTasks(){
    }
  } else if(tbTab==='completed'){
    var ro2=currentRole!=='manager';
-   /* "Completed today" means what it says -- only jobs actually finished
-      today, not the whole history of every job ever closed. A task with no
-      completedAt on it was never properly closed and has no day to belong to,
-      so it drops out here rather than pretending to be today's. */
-   var todayOrd=asTodayOrd();
-   var done=TASKS.filter(function(t){return t.status==='done'&&ordOfISO(t.completedAt)===todayOrd;});
-   html+='<div class="sec">Completed today · '+done.length+'</div>';
-   html+= done.length? '<div class="list">'+done.map(function(t){return ro2?roRow('<span style="color:#2f9e4f;font-size:16px;flex:none;align-self:flex-start;margin-top:1px">✓</span>',t.title,taskBoardSub(t)+' · '+t.completedBy+' · '+t.completedAt):tbDoneRow(t);}).join('')+'</div>'
-        : '<div class="sec" style="text-align:center;margin-top:20px">Nothing completed yet</div>';
+   /* One day at a time, picked with the same day chips as Board and Mine --
+      only jobs actually finished on that day, not the whole history of every
+      job ever closed. Filed by when the job was FINISHED, not when it was due:
+      a Monday job done on Wednesday is Wednesday's work. See taskDoneOrd(). */
+   showDays=true;
+   var doneOrd=boardPastOrdFor(boardDay);
+   var done=TASKS.filter(function(t){return t.status==='done'&&taskDoneOrd(t)===doneOrd;})
+     .sort(function(a,b){return (''+(a.completedAt||'')).localeCompare(''+(b.completedAt||''));});
+   html+='<div class="sec" style="color:#2f3133">'+WEEKDAYS[boardDay]+' · '+asDateLabel(doneOrd)+' · '+done.length+' completed</div>';
+   html+= done.length? '<div class="list">'+done.map(function(t){return ro2?roRow('<span style="color:#2f9e4f;font-size:16px;flex:none;align-self:flex-start;margin-top:1px">✓</span>',esc(t.title),esc(tbDoneSub(t))):tbDoneRow(t);}).join('')+'</div>'
+        : '<div class="sec" style="text-align:center;margin-top:20px">'+(doneOrd===asTodayOrd()?'Nothing completed yet today':'Nothing completed this day')+'</div>';
  } else if(tbTab==='requests'){
    if(currentRole==='manager'){
      var fromCrew=TASKS.filter(function(t){return t.kind==='request'&&!t.assignee&&t.origin!=='manager';});

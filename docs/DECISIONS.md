@@ -1602,3 +1602,55 @@ towards the one action that could do damage.
 the red warning on every phone for the first seconds after it opens, which
 trains everybody to ignore it. And don't delete `rosterSentAt()`: the first
 migration still needs a device to know it has done it.
+
+### The plot-picking maps zoom closer than the Farm Map — 2026-09-16
+
+**Decision:** the maps built by `jobMapEnsure()` — assigning a task, the plot
+picker, the task detail map and the crew's work map — go to zoom 20 and snap in
+quarter steps. The Farm Map, the trial pin map and everything else stay at 18.
+
+**Why:** these are the maps where somebody taps one plot. At 18 a CAFS or SF
+plot is roughly fingertip-wide and picking one out of a row was guesswork. The
+photo is only sharp to 19 and is enlarged beyond that, which is acceptable
+because the plot outlines are drawn on top and stay sharp. Quarter-step zoom
+lets the map open filling a phone screen instead of rounding a whole level out.
+
+**Don't:** "tidying" the four maps back to one matching `maxZoom:18`.
+That brings back the bug. The Farm Map was capped at 18 on 2026-08-26 for its
+own reasons; it was not a rule that every map must match.
+
+### Completed tasks are shown one day at a time, looking back — 2026-09-16
+
+**Decision:** the Completed tab on the Task Board uses the same Mon–Fri chips as
+Board and Mine, but on Completed a chip means the most recent such day (today
+or earlier), where on Board it means the next one. Jobs are filed by the day
+they were **finished**, not the day they were due. A job finished on a Saturday
+or Sunday is filed under the Friday before, and its row says the real day.
+
+**Why:** nothing has been completed next Monday, so the forward-looking reading
+would leave most chips permanently empty. There are no weekend chips, and
+without the Friday rule weekend work would vanish from the tab.
+
+**Don't:** swapping `boardPastOrdFor()` for `boardDayOrd()` so the two
+tabs "agree", or filtering on `dueAt` instead of `completedAt`.
+
+### Map photos are fetched openly, and saving one can never cost it — 2026-09-16
+
+**Decision:** the offline worker (`tools/build-sw.js`, which writes `sw.js`)
+asks the Esri imagery server for each satellite photo as an open (cors)
+request, keeps only photos it can read, and saves them in the background where
+any failure is ignored. The photo cache was renamed `ut-turf-tiles-v2` so every
+phone throws the old one away. Every map also asks again for a photo that fails
+to download: three more tries, after 2, 5 and 12 seconds (`mapChrome()`).
+
+**Why:** the map showed flat green squares where photos should be. The map's
+own request gets a sealed reply the phone cannot measure, so storage booked
+every photo at several megabytes: 30 photos of about 10 KB each booked 225 MB.
+Once a phone ran out of room, saving failed, and the old code then threw away
+the photo it had just downloaded. With open requests the same 30 photos take
+0.4 MB. The retry covers the other cause: one bar of signal in the field.
+
+**Don't:** go back to `caches.put(req, await fetch(req))` in one step, or cache
+a reply whose `type` is `'opaque'`. Either brings the green squares back, and
+nothing shows an error when it happens. If `TILES` is renamed again, keep the
+`k !== TILES` in `activate` or the photos get deleted on every update.

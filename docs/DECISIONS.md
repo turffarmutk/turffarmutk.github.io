@@ -1534,3 +1534,24 @@ together. They are *served* together and *cached* separately — the page comes
 down fresh while the old companion file is still in the phone's offline copy.
 And don't rely on the checks to catch it: all 2,229 of them passed, because
 they glue the current files together and the mixed state never arises.
+
+### "Send the roster" follows the database, not this device — 2026-09-16
+**Decision:** the Shared database screen asks `rosterInDb()` — is the roster in
+the database — instead of `rosterSentAt()`, which only ever said whether
+somebody pressed the button **on this device**. The answer comes from the
+roster drawer's `seen` list, which holds what the server has agreed to, and it
+has three states: yes, no, and "this device has not heard back yet". Only a
+definite no shows the red warning. `rosterSentAt()` survives as a footnote on
+that row and in the copied details, where it is labelled as this device's own
+history.
+**Why:** on 2026-09-16 Dillon's laptop said "Send the roster first. Until it is
+up there, the database refuses everything" on every drawer, while the same
+screen showed 24 people arriving from the database, 87 machines, 31 tasks and a
+connection test answering in 5 milliseconds. The laptop had simply never
+pressed the button. Worse than noise: pressing it rewrites the farm's roster
+from whatever that device happens to be holding, so the screen was pushing him
+towards the one action that could do damage.
+**Don't:** treat "not heard back yet" as "the database is empty" — that puts
+the red warning on every phone for the first seconds after it opens, which
+trains everybody to ignore it. And don't delete `rosterSentAt()`: the first
+migration still needs a device to know it has done it.

@@ -175,7 +175,12 @@ ok('opening it renders it', /if\(id==='sharedb'\)sdbRender\(\);/.test(appText));
   win.sdbRender();
   const html = win.document.getElementById('sdb-body').innerHTML;
   ok('it renders something', html.length > 200);
-  ok('it says the roster has never been sent', /Never/.test(html));
+  /* Was "it says the roster has never been sent", which is this DEVICE's
+     history and not the farm's -- see section 6b and the 2026-09-16 entry in
+     docs/DECISIONS.md. Before the drawer has heard back, the honest answer is
+     that we do not know yet. */
+  ok('before the database has answered, it says so rather than guessing',
+     /Waiting to hear back/.test(html), win.rosterDbWords());
   ok('it names what is wrong when the library is missing', /did not load/i.test(html));
 }
 /* 2026-09-16: this screen borrowed a line of words from app-02, unguarded, and
@@ -196,6 +201,37 @@ ok('opening it renders it', /if\(id==='sharedb'\)sdbRender\(\);/.test(appText));
   try { win.sdbDetails(); } catch (e) { dThrew = String(e); }
   ok('the copy-details text survives it too', dThrew === null, dThrew);
   win.sdbNetWords = keep.words; win.sdbNetOk = keep.ok2; win.SDBNET = keep.state;
+}
+
+/* 2026-09-16: this screen told Dillon to send the roster while twenty-four
+   people were arriving from the database on the same screen. It was reading a
+   note THIS DEVICE wrote when somebody pressed the button HERE. */
+section('6b. "Send the roster" follows the database, not this device');
+{
+  const R = win.RSTSYNC;
+  const render = () => { win.sdbRender(); return win.document.getElementById('sdb-body').innerHTML; };
+
+  R.ready = true; R.seen = {}; for (let i = 1; i <= 24; i++) R.seen['p' + i] = '{}';
+  try { win.localStorage.removeItem('ut_roster_sent'); } catch (e) {}
+  let html = render();
+  ok('a device that never pressed the button is not told to press it',
+     !/Send the roster first/.test(html));
+  ok('it says how many people the database is holding', /24 people/.test(html), win.rosterDbWords());
+  ok('and the button offers to send it AGAIN, not for the first time',
+     !/>Send the roster to the database</.test(html), win.rosterDbWords());
+
+  R.ready = true; R.seen = {};
+  html = render();
+  ok('an empty database really does warn', /Send the roster first/.test(html));
+  ok('and says so in the status row', /NOT there yet/.test(win.rosterDbWords()), win.rosterDbWords());
+
+  R.ready = false; R.seen = {};
+  html = render();
+  ok('a device still connecting is not told the database is empty',
+     !/Send the roster first/.test(html) && /Waiting to hear back/.test(win.rosterDbWords()),
+     win.rosterDbWords());
+
+  R.ready = true; for (let i = 1; i <= 24; i++) R.seen['p' + i] = '{}';
 }
 
 ok('every failure has words a person can act on',

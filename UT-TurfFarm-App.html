@@ -2569,12 +2569,21 @@ function sdbWhoOk(){
   return SDBWHO.state==='ok'&&!!SDBWHO.pid&&(!SESSION.pid||SDBWHO.pid===SESSION.pid);
 }
 
+/* Said as a count, because "24 people" is checkable by anybody who works here
+   and "synced" is not. */
+function rosterDbWords(){
+  var inDb=rosterInDb(), at=rosterSentAt();
+  var note=at?(' · last sent from this device '+at.slice(0,10)):'';
+  if(inDb===null) return 'Waiting to hear back from the database'+note;
+  if(inDb===false) return 'NOT there yet — nobody has sent it. Until it is, the database refuses everything'+note;
+  return 'There — '+rosterInDbCount()+' people. Nothing to send from this device'+note;
+}
+
 function sdbRender(){
   var body=document.getElementById('sdb-body'); if(!body) return;
   sdbWhoRefresh();
   var loaded=dbConfigured();
   var can=rosterCanPush();
-  var at=rosterSentAt();
   var cache=(DB_CACHE==='on')?'On — the app works with no signal'
           :(DB_CACHE==='unknown')?'Not started yet'
           :('Off — this device will need signal ('+DB_CACHE+')');
@@ -2592,10 +2601,14 @@ function sdbRender(){
     +sdbStatusRow('Talking to the database',
         (typeof sdbNetWords==='function')?sdbNetWords():'Not counted on this device — the app is still updating',
         (typeof sdbNetOk==='function')?(sdbNetOk()?true:false):null)
-    +sdbStatusRow('Roster last sent', at?(at.slice(0,10)+' at '+at.slice(11,16)):'Never', at?true:false);
+    /* The farm's answer, not this device's. See rosterInDb(). "Last sent" is
+       kept, but as a footnote to it rather than as the headline, because
+       nobody needs to send a roster that is already there. */
+    +sdbStatusRow('The farm\'s people in the database', rosterDbWords(), rosterInDb());
 
   var btn = can
-    ? '<div class="action tap" id="sdb-push" style="margin:14px 16px 0">'+(at?'Send the roster again':'Send the roster to the database')+'</div>'
+    ? '<div class="action tap" id="sdb-push" style="margin:14px 16px 0">'
+      +((rosterInDb()===false)?'Send the roster to the database':'Send the roster again')+'</div>'
     : '<div style="margin:14px 16px 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px;'
       +'font:600 11.5px \'Public Sans\';color:var(--muted);line-height:1.45">'
       +'Only Bill, or whoever is holding the undergrad-assignment job, can send the roster. '
@@ -2655,7 +2668,10 @@ function sdbRender(){
    red line here instead of taking the other nine with it. */
 function sdbShareBlock(o){
   var st=o.st||{};
-  var sent=rosterSentAt();
+  /* The question is whether the DATABASE has the roster, not whether this
+     device once sent it — see rosterInDb(). Only a definite "no" warns: a
+     drawer that has not heard back yet is connecting, not broken. */
+  var sent=(rosterInDb()!==false);
   var failed=Object.keys(st.failed||{});
   /* GREEN MEANS IT IS WORKING, and `live` alone does not mean that -- it is
      set the moment the app ASKS to listen. `ready` is the honest one: the
@@ -2934,7 +2950,8 @@ function sdbDetails(){
   L.push('working copy on this phone: '+DB_CACHE);
   L.push('signed in to the app as: '+(SESSION.pid||'nobody'));
   L.push('the database sees you as: '+sdbWhoLine());
-  L.push('roster last sent: '+(rosterSentAt()||'never'));
+  L.push('the farm\'s people in the database: '+rosterDbWords());
+  L.push('roster last sent from THIS device: '+(rosterSentAt()||'never'));
   L.push('talking to the database: '+((typeof sdbNetWords==='function')
     ? sdbNetWords()+' (busiest minute so far: '+SDBNET.peak+')'
     : 'not counted on this device'));
@@ -8898,6 +8915,33 @@ function rosterPayload(){
            updatedAt:new Date().toISOString(), updatedBy:SESSION.pid||null };
 }
 
+/* IS THE FARM'S LIST OF PEOPLE IN THE DATABASE?          (2026-09-16)
+   -----------------------------------------------------------------------
+   The question this screen is really asking, and `rosterSentAt()` below has
+   never been able to answer it. That one reads a note THIS DEVICE wrote to
+   itself when somebody pressed the button HERE, so a laptop that never
+   pressed it says "never" forever -- even with the roster plainly in the
+   database and twenty-four people arriving on that same screen. Dillon hit
+   exactly that on 2026-09-16 and was told to press a button that rewrites
+   the farm's roster from whatever this device happens to be holding.
+
+   The honest answer comes from the roster drawer: `seen` is what the SERVER
+   has agreed to, so anything in it came down from the database.
+
+   Three answers, not two. `null` means "this device has not heard back yet"
+   and must not be read as "the database is empty" -- that mistake is what
+   would put the red warning on a phone that is merely still connecting.
+   Guarded, because RSTSYNC lives in app-02-fieldlog-sync.js. */
+function rosterInDb(){
+  var st=(typeof RSTSYNC==='object'&&RSTSYNC)?RSTSYNC:null;
+  if(!st||!st.ready) return null;
+  return rosterInDbCount()>0;
+}
+function rosterInDbCount(){
+  var st=(typeof RSTSYNC==='object'&&RSTSYNC)?RSTSYNC:null;
+  if(!st) return 0;
+  try{ return Object.keys(st.seen||{}).length; }catch(e){ return 0; }
+}
 function rosterSentAt(){
   try{ return localStorage.getItem(ROSTER_SENT_KEY)||null; }catch(e){ return null; }
 }

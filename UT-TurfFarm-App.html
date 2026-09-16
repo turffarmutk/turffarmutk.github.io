@@ -7272,9 +7272,23 @@ var TSYNC={
   seen:{},         /* id -> the record this device and the server last agreed on */
   err:null,        /* the last thing that went wrong, in words */
   up:0, down:0,    /* records sent / received, for the status screen */
-  failed:{}        /* id -> why it would not save */
+  failed:{},       /* id -> why it would not save */
+  retry:{}         /* id -> {n: failures in a row, at: not before this time} */
 };
 var _tsyncNextTry=0;
+
+/* A SEND THAT FAILED WAITS BEFORE IT TRIES AGAIN — 2026-09-16.
+   Without this a failed task went straight back out on the next scan, two
+   seconds later, every two seconds. sdbMaySend() reads a record going up
+   thirteen times in a minute as two devices fighting over it, so half a
+   minute of bad connection was enough to park the task as "stuck in a loop"
+   until the app was reopened -- while the person who assigned it had been
+   told "Assigned ✓". Ten seconds, then doubling, never more than five
+   minutes apart: at most six tries a minute, so the brake is left for real
+   loops. */
+var TSYNC_RETRY_FIRST_MS=10000;
+var TSYNC_RETRY_MAX_MS=300000;
+function tsyncWaiting(id){ var r=TSYNC.retry[id]; return !!r&&Date.now()<r.at; }
 
 /* On, always — see "SHARING IS NOT OPTIONAL" over flsyncWanted(). */
 function tsyncWanted(){ return true; }
@@ -7304,6 +7318,8 @@ function tsyncJson(t){ var d=taskDoc(t); return d?sdbJson(d):null; }
 
 function tsyncFail(id,e){
   TSYNC.failed[id]=(typeof sdbError==='function')?sdbError(e):String((e&&e.message)||e);
+  var n=((TSYNC.retry[id]&&TSYNC.retry[id].n)||0)+1;
+  TSYNC.retry[id]={n:n, at:Date.now()+Math.min(TSYNC_RETRY_MAX_MS, TSYNC_RETRY_FIRST_MS*Math.pow(2,n-1))};
 }
 
 /* ---- attaching ---- */
@@ -7326,7 +7342,7 @@ function tsyncStart(){
 function tsyncStop(){
   try{ if(TSYNC.unsub) TSYNC.unsub(); }catch(e){}
   TSYNC.unsub=null; TSYNC.live=false; TSYNC.ready=false;
-  TSYNC.seen={}; TSYNC.failed={};
+  TSYNC.seen={}; TSYNC.failed={}; TSYNC.retry={};
 }
 function tsyncOnError(e){
   TSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
@@ -7372,6 +7388,7 @@ function tsyncOnSnapshot(snap){
     var json=sdbJson(data);
     TSYNC.seen[id]=json;             /* agreed BEFORE anything reads it — no echo */
     delete TSYNC.failed[id];
+    delete TSYNC.retry[id];
     TSYNC.down++;
     var by=tsyncIndex();
     if(by[id]===undefined){ TASKS.push(data); touched=true; }
@@ -7397,6 +7414,7 @@ function tsyncUploadNew(){
     if(!t||!t.id) return;
     var id=String(t.id);
     if(TSYNC.seen[id]!==undefined) return;      /* the shared copy already has it */
+    if(tsyncWaiting(id)) return;                 /* failed recently — see tsyncWaiting() */
     var doc=taskDoc(t); if(!doc) return;
     if(!sdbMaySend('task/'+id,'task')) return;   /* the brake — see sdbMaySend() */
     var mark=sdbJson(doc);
@@ -7407,7 +7425,9 @@ function tsyncUploadNew(){
        when it is still exactly what THIS attempt set keeps a real answer that
        arrived in the meantime (an upload from another tab, a delete) from
        being clobbered by a stale retry. */
-    try{ db.collection(TSYNC_COLL).doc(id).set(doc).catch(function(e){
+    try{ db.collection(TSYNC_COLL).doc(id).set(doc).then(function(){
+      delete TSYNC.retry[id]; delete TSYNC.failed[id];
+    }).catch(function(e){
       tsyncFail(id,e);
       if(TSYNC.seen[id]===mark) delete TSYNC.seen[id];
     }); }
@@ -7428,6 +7448,7 @@ function tsyncScan(){
   Object.keys(here).forEach(function(id){
     var json=tsyncJson(here[id]); if(json===null) return;
     if(TSYNC.seen[id]===json) return;
+    if(tsyncWaiting(id)) return;                 /* failed recently — see tsyncWaiting() */
     if(!sdbMaySend('task/'+id,'task')) return;   /* the brake — see sdbMaySend() */
     TSYNC.seen[id]=json; TSYNC.up++;
     /* Marked as sent BEFORE the write confirms, same as every drawer here —
@@ -7442,7 +7463,9 @@ function tsyncScan(){
        on failure, guarded so a real answer that arrived in the meantime is
        never clobbered, is what makes the two-second scan actually retry
        instead of only ever trying once. */
-    try{ db.collection(TSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){
+    try{ db.collection(TSYNC_COLL).doc(id).set(JSON.parse(json)).then(function(){
+      delete TSYNC.retry[id]; delete TSYNC.failed[id];
+    }).catch(function(e){
       tsyncFail(id,e);
       if(TSYNC.seen[id]===json) delete TSYNC.seen[id];
     }); }
@@ -8783,9 +8806,19 @@ function fbDb(){
        whole app down with it. */
     try{ _fbDb.settings({experimentalForceLongPolling:true}); }catch(e){}
     try{
-      /* synchronizeTabs so two open tabs on one machine share the copy rather
-         than one of them silently losing it. */
-      _fbDb.enablePersistence({synchronizeTabs:true})
+      /* EACH OPEN COPY TALKS TO THE DATABASE FOR ITSELF — 2026-09-16.
+         synchronizeTabs used to be on, and it means only ONE open copy of the
+         app on a computer talks to the database; every other copy passes its
+         reads and writes through that one. When that one copy has its
+         connection switched off -- the runaway pause does exactly that -- or
+         is left open somewhere nobody is looking, like an installed app still
+         running in the background, every copy opened afterwards sends nothing
+         at all and answers "unavailable". Bill's laptop sat like that on
+         2026-09-16 with a task for Garrett that could not leave it, and
+         closing and reopening the app did not help. Off, a second copy simply
+         takes the saved copy over and connects on its own. See
+         docs/DECISIONS.md. */
+      _fbDb.enablePersistence({synchronizeTabs:false})
         .then(function(){ DB_CACHE='on'; })
         .catch(function(e){ DB_CACHE=(e&&e.code)||'off'; });
     }catch(e){ DB_CACHE='off'; }

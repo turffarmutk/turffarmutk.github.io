@@ -1516,6 +1516,35 @@ busy phone. Don't count with a wrapper around the database library either —
 the library believed it was idle throughout 2026-09-15; the browser's own
 record of its requests is the thing that cannot be fooled.
 
+### Every open copy of the app talks to the database for itself — 2026-09-16
+**Decision:** `fbDb()` turns on the saved copy with `synchronizeTabs:false`, not
+`true`.
+**Why:** with it on, only ONE open copy of the app on a computer talks to the
+database and every other copy goes through it. On 2026-09-16 Bill's laptop, running
+the installed app, had that one copy paused by `sdbNetPause()`, which switches its
+connection off. Every copy opened afterwards made **zero requests** and got
+`unavailable`, even after the browser was quit, because the installed app can
+stay running on its own. Bill's task for Garrett could not leave the laptop, and
+the screen told him to reopen the app, which did nothing. Reproduced the same
+day in two tabs with the farm's own copy of the library (12.18): with it on, the
+second tab gets `unavailable` in 11 ms and makes no requests, and still does
+after the first tab is closed. With it off, the second tab reaches the
+database, and so does the first one after it.
+**Don't:** turn it back on to save a few reads when two windows are open. The
+cost of on is one hidden window silencing every other copy with nothing on
+screen to say so.
+
+### A failed task send waits before it tries again — 2026-09-16
+**Decision:** a task whose send fails waits 10 seconds, then twice as long after
+each further failure, up to 5 minutes (`tsyncWaiting()`), before `tsyncScan()`
+or `tsyncUploadNew()` offers it again.
+**Why:** after the 2026-09-02 fix a failed send went back out on the very next
+scan, every two seconds. `sdbMaySend()` reads 13 sends in a minute as a loop and
+stops the record until the app is reopened, so half a minute of failure turned
+into a task parked for good, while the assigner had been told "Assigned ✓".
+**Don't:** exempt retries from `sdbMaySend()` instead. The brake is right about
+real loops; the retries just should never look like one.
+
 ### A screen must survive a companion file being older than the page — 2026-09-16
 **Decision:** anything a screen borrows from `app-01`…`app-05` is called
 through `typeof fn==='function'` and falls back to words that say the app is

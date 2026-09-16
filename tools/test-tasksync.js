@@ -36,6 +36,7 @@ function docRef(coll) {
   return id => ({
     id: String(id),
     set(data) {
+      if (coll === 'tasks' && state.refuse) { state.writes.push({ id: String(id), data }); return Promise.reject({ code: 'permission-denied' }); }
       if (coll === 'tasks') { state.writes.push({ id: String(id), data }); state.docs[String(id)] = data; }
       return Promise.resolve();
     },
@@ -300,5 +301,41 @@ section('9. Stopping still cleans up properly');
   ok('and a scan sends nothing', state.writes.length === 0 && state.deletes.length === 0);
 }
 
-console.log('\n' + pass + ' passed, ' + fail + ' failed');
-process.exit(fail ? 1 : 0);
+/* ------------------------------------ 10. a failed send waits its turn -- */
+/* 2026-09-16. A failed task used to go straight back out every two seconds,
+   and thirteen tries in a minute is what sdbMaySend() calls a loop -- so half
+   a minute of bad connection parked Bill's task for Garrett until the app was
+   reopened. The write failing is asynchronous, hence the awaits. */
+const settle = () => new Promise(r => setTimeout(r, 0));
+(async () => {
+  section('10. A send that failed waits before trying again');
+  win.TSYNC.on = true; win.TSYNC.live = true; win.TSYNC.ready = true;
+  win.TSYNC.seen = {}; win.TSYNC.failed = {}; win.TSYNC.retry = {}; win.TSYNC.err = null;
+  win.sdbLoopReset();
+  setTasks([job('r1')]);
+  state.refuse = true;
+  reset(); win.tsyncScan(); await settle();
+  ok('the first try goes out', state.writes.length === 1);
+  ok('and its failure is recorded', !!win.TSYNC.failed.r1);
+
+  reset();
+  for (let i = 0; i < 30; i++) win.tsyncScan();    /* a minute of two-second scans */
+  await settle();
+  ok('it is NOT re-sent on every scan straight after', state.writes.length === 0, state.writes.length + ' re-sends');
+  ok('so the loop brake never mistakes it for a loop', win.sdbStuckCount() === 0);
+
+  win.TSYNC.retry.r1.at = Date.now() - 1;          /* the wait is over */
+  reset(); win.tsyncScan(); await settle();
+  ok('once the wait is over it tries again', state.writes.length === 1);
+  ok('and waits longer after a second failure',
+     win.TSYNC.retry.r1.n === 2 && win.TSYNC.retry.r1.at - Date.now() > win.TSYNC_RETRY_FIRST_MS);
+
+  state.refuse = false;
+  win.TSYNC.retry.r1.at = Date.now() - 1;
+  reset(); win.tsyncScan(); await settle();
+  ok('when the connection is back it goes up', state.writes.length === 1 && !!state.docs.r1);
+  ok('and getting through clears the wait and the refusal', !win.TSYNC.retry.r1 && !win.TSYNC.failed.r1);
+
+  console.log('\n' + pass + ' passed, ' + fail + ' failed');
+  process.exit(fail ? 1 : 0);
+})();

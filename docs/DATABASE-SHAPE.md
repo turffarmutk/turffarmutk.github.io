@@ -243,7 +243,7 @@ It has to be local anyway: a farm with no signal cannot fetch a library before
 it can read its own task list.
 
 **`fbDb()` is the one handle**, made on first use, exactly like `fbAuth()`. It
-turns on `enablePersistence({synchronizeTabs:true})` in the constructor rather
+turns on `enablePersistence({synchronizeTabs:false})` in the constructor rather
 than at a call site, because it must run before the first read or write and a
 caller who forgot would silently produce an app that needs bars.
 

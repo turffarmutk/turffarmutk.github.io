@@ -1515,3 +1515,22 @@ minute is a device with something wrong, and the limit is already five times a
 busy phone. Don't count with a wrapper around the database library either —
 the library believed it was idle throughout 2026-09-15; the browser's own
 record of its requests is the thing that cannot be fooled.
+
+### A screen must survive a companion file being older than the page — 2026-09-16
+**Decision:** anything a screen borrows from `app-01`…`app-05` is called
+through `typeof fn==='function'` and falls back to words that say the app is
+still updating. `sdbRender()` and `sdbDetails()` do this for the traffic meter
+that lives in `app-02-fieldlog-sync.js`; `tools/test-db.js` renders the screen
+with those functions removed and fails if it throws or draws nothing.
+**Why:** the meter shipped the same day it was written, and the Shared database
+screen called `sdbNetWords()` — which lives in a different file — without a
+guard. A phone that had the new page beside the previous copy of `app-02`, the
+ordinary state for a few minutes during any update, threw on that line and drew
+**an entirely blank screen**: no error, no explanation, nothing. Dillon opened
+it and found nothing there. Every phone passes through that mixed state on
+every single update, so this is not an edge case, it is the rollout.
+**Don't:** conclude the guard is unnecessary because the files are published
+together. They are *served* together and *cached* separately — the page comes
+down fresh while the old companion file is still in the phone's offline copy.
+And don't rely on the checks to catch it: all 2,229 of them passed, because
+they glue the current files together and the mixed state never arises.

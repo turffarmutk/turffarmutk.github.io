@@ -2583,7 +2583,15 @@ function sdbRender(){
     +sdbStatusRow('Signed in as', SESSION.pid?(meName()+' · '+SESSION.pid):'Nobody', !!SESSION.pid)
     +sdbStatusRow('The database sees you as', sdbWhoLine(), sdbWhoOk()?true:(SDBWHO.state==='checking'?null:false))
     +sdbStatusRow('Working copy on this phone', cache, DB_CACHE==='on'?true:null)
-    +sdbStatusRow('Talking to the database', sdbNetWords(), sdbNetOk()?true:false)
+    /* GUARDED, and it must stay guarded. This row's words live in
+       app-02-fieldlog-sync.js, a DIFFERENT file. During an update a phone can
+       hold the new page beside an older copy of that file for a few minutes —
+       and an unguarded call there does not spoil one row, it throws and leaves
+       this whole screen BLANK, which is exactly what happened on 2026-09-16.
+       Anything this screen borrows from another file gets this treatment. */
+    +sdbStatusRow('Talking to the database',
+        (typeof sdbNetWords==='function')?sdbNetWords():'Not counted on this device — the app is still updating',
+        (typeof sdbNetOk==='function')?(sdbNetOk()?true:false):null)
     +sdbStatusRow('Roster last sent', at?(at.slice(0,10)+' at '+at.slice(11,16)):'Never', at?true:false);
 
   var btn = can
@@ -2927,7 +2935,9 @@ function sdbDetails(){
   L.push('signed in to the app as: '+(SESSION.pid||'nobody'));
   L.push('the database sees you as: '+sdbWhoLine());
   L.push('roster last sent: '+(rosterSentAt()||'never'));
-  L.push('talking to the database: '+sdbNetWords()+' (busiest minute so far: '+SDBNET.peak+')');
+  L.push('talking to the database: '+((typeof sdbNetWords==='function')
+    ? sdbNetWords()+' (busiest minute so far: '+SDBNET.peak+')'
+    : 'not counted on this device'));
   L.push('connection test: '+(SDBTEST.text||'not run'));
   L.push('Google, asked directly: '+(SDB_REACH.at
     ? SDB_REACH.state+' ('+SDB_REACH.detail+', '+new Date(SDB_REACH.at).toLocaleTimeString()+')'

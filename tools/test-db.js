@@ -178,6 +178,26 @@ ok('opening it renders it', /if\(id==='sharedb'\)sdbRender\(\);/.test(appText));
   ok('it says the roster has never been sent', /Never/.test(html));
   ok('it names what is wrong when the library is missing', /did not load/i.test(html));
 }
+/* 2026-09-16: this screen borrowed a line of words from app-02, unguarded, and
+   a phone that had the new page beside an older copy of that file drew NOTHING
+   AT ALL -- no error on screen, just an empty page. Every screen has minutes in
+   that state during an update, so the test is "survive the companion file being
+   old", not "survive it being absent forever". */
+{
+  const keep = { words: win.sdbNetWords, ok2: win.sdbNetOk, state: win.SDBNET };
+  win.sdbNetWords = undefined; win.sdbNetOk = undefined; win.SDBNET = undefined;
+  let threw = null;
+  try { win.sdbRender(); } catch (e) { threw = String(e); }
+  const html = win.document.getElementById('sdb-body').innerHTML;
+  ok('an older companion file does not blank the screen', threw === null, threw);
+  ok('and the screen still draws', html.length > 200, String(html.length));
+  ok('it says that row is not being counted yet', /still updating/.test(html), html.slice(0, 200));
+  let dThrew = null;
+  try { win.sdbDetails(); } catch (e) { dThrew = String(e); }
+  ok('the copy-details text survives it too', dThrew === null, dThrew);
+  win.sdbNetWords = keep.words; win.sdbNetOk = keep.ok2; win.SDBNET = keep.state;
+}
+
 ok('every failure has words a person can act on',
    ['nodb', 'notallowed', 'permission-denied', 'unauthenticated', 'unavailable']
      .every(c => win.sdbError({ code: c }) && !/^It did not save/.test(win.sdbError({ code: c }))));

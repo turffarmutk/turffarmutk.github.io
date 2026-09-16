@@ -38,3 +38,6 @@ ziajuYl3
 *firebase-adminsdk*.json
 *serviceAccount*.json
 service-account*.json
+
+# Local-only: which command opens the app for a preview on this machine.
+.claude/launch.json

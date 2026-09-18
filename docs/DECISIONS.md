@@ -1072,6 +1072,24 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### Every page but Home, Tasks and the Map is "Coming Soon" for the crew — 2026-09-18
+**Decision:** Inventory, Trials, Equipment, Field Log, Time Clock, Calendar and
+Weather open faded under a "Coming Soon" card for everyone except the Farm
+Manager and whoever holds the App Manager post (`CS_LOCKED` / `csApply()` in
+`app-01-shell.js`). Their entries on the bottom bar, the rail and More are dimmed
+but still tappable. The pages still load and sync underneath; only the screen is
+covered.
+**Why:** those pages need serious refining before the crew relies on them, and
+Bill and Dillon still need to use them to do that. Asking by job rather than by
+name means a new Farm Manager or App Manager is let through without a code edit.
+Undergrads can still clock in and out from the Home screen's clock widget, which
+is not covered.
+**Don't:** mistake the cover for a bug, or hide the pages from the nav instead —
+a missing page looks broken, a labelled one does not. To release a page, take
+its screen name off `CS_LOCKED`; to release them all, delete the block and the
+`csApply()` line in `show()`. This is a courtesy, not security: the database
+rules are unchanged.
+
 ### A name on the Task Board is coloured by where that person is in their day — 2026-09-18
 **Decision:** on the Board tab each name gets a highlight (`tbPersonState()`
 in `app-03-people.js`). **Orange** means scheduled and not clocked in yet.

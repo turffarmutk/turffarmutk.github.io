@@ -596,6 +596,17 @@ body{background:#0f1011;display:flex;align-items:center;justify-content:center;f
 .tabs{flex:none}
 .tab,.hub,.tap,[data-go],[data-toast]{cursor:pointer}
 .tap:active{opacity:.6}
+/* Coming Soon: pages not yet released to the crew (csApply() in app-01). The
+   cover washes the page out and swallows taps; the header and bottom bar sit
+   outside it so you can always leave. Nav entries for those pages are dimmed
+   but still tappable, so tapping one explains itself rather than doing nothing. */
+.cs-cover{position:absolute;left:0;right:0;z-index:40;display:flex;align-items:center;justify-content:center;
+  padding:24px;background:rgba(233,235,231,.78);-webkit-backdrop-filter:grayscale(1) blur(1.5px);backdrop-filter:grayscale(1) blur(1.5px)}
+.cs-card{background:#fff;border-radius:16px;padding:22px 24px;max-width:300px;text-align:center;box-shadow:0 6px 22px rgba(0,0,0,.14)}
+.cs-ic{font-size:34px;line-height:1}
+.cs-t{font:900 22px 'Archivo',sans-serif;color:#17181a;margin-top:8px}
+.cs-s{font:600 12.5px 'Public Sans',sans-serif;color:#5f6368;line-height:1.5;margin-top:6px}
+.tab.cs-soon,#rail .rl-item.cs-soon,.row.cs-soon{opacity:.45}
 .rolecard{display:flex;align-items:center;gap:12px;background:#fff;border-radius:14px;padding:14px 15px;box-shadow:0 4px 14px rgba(0,0,0,.18)}
 .app.field::-webkit-scrollbar{width:0}
 #toast{position:absolute;left:50%;bottom:86px;transform:translateX(-50%) translateY(10px);background:#17181a;color:#fff;font:700 12.5px 'Public Sans';padding:10px 16px;border-radius:22px;opacity:0;transition:.2s;pointer-events:none;z-index:50;white-space:nowrap}

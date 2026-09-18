@@ -167,6 +167,14 @@ This is the phase that decides whether the app survives. Work through the hardco
 | Plot geometry & splits | `PLOTS_DATA` + localStorage | grad | per trial |
 | Trials | `TRIALS` | grad/faculty | per season |
 | Mowers, cut heights, irrigation blocks | hardcoded | tech | seasonally |
+| Which pages the crew may open ("Coming Soon", `CS_LOCKED`) | hardcoded | whoever finishes a page | once per page, then never |
+
+The "Coming Soon" list (added 2026-09-18) is in code on purpose: it is a
+temporary launch gate, not a farm setting, and it disappears once every page is
+released. **If I leave before that, it becomes a trap.** Pages would stay
+covered for the crew with nobody able to lift the cover. Releasing one is
+deleting one word in `app-01-shell.js`; see `docs/DECISIONS.md` for exactly
+where. Clear this list before handing the app over.
 
 **The rule to apply while building each one:** anything a farm employee would reasonably want to change without asking permission belongs in the database with an edit screen. Anything that is genuinely structural — the map projection, the spray math itself — can stay in code, and gets documented instead.
 

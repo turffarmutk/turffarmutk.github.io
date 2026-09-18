@@ -6,6 +6,10 @@ The farm's app: tasks, crew, equipment, inventory, trials and the farm map.
 member. On a phone, open it and use *Add to Home Screen*; it then works with no
 signal.
 
+**Not every page is open yet.** Since 2026-09-18 the crew get Home, Tasks and
+the Farm Map; every other page shows faded under a "Coming Soon" card for
+everyone except the Farm Manager and the App Manager. See `docs/DECISIONS.md`.
+
 New here? Read [`docs/SUCCESSION.md`](docs/SUCCESSION.md) first. It explains why
 the app is built the way it is and what has to stay true for it to outlive the
 person who wrote it.

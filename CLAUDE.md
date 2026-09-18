@@ -271,6 +271,15 @@ one is reached from, ask: *what links to this?* — and check that link exists a
 both widths. `tools/test-responsive.js` section 6b does this for everything
 behind More; the rest is yours to check by opening the app twice.
 
+**Most pages are covered for the crew, on purpose.** Since 2026-09-18, anyone
+who is not the Farm Manager or the App Manager sees every page except Home,
+Tasks and the Farm Map faded, under a "Coming Soon" card (`CS_LOCKED` and
+`csApply()` in `app-01-shell.js`). If you sign in as a crew member to test
+Inventory, Equipment, Time Clock and the rest, you will hit that cover. It is
+not a bug. Test those pages signed in as Bill (`p07`) or Dillon (`p01`), and
+check the cover separately as a crew member. Take a page off `CS_LOCKED` only
+when Dillon says it is ready.
+
 - Make small, targeted edits. Most things that break here break because
   something was rewritten wholesale rather than adjusted.
 - **Watch the order things are written in.** A line that runs while the app is

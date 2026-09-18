@@ -186,7 +186,7 @@ function renderTabs(){
  var dest=SCREEN_DEST[scr.id.replace(/^s-/,'')];
  target.innerHTML=labels.map(function(l){
    var d=nm[l],on=!!(d&&dest&&d===dest);
-   return '<div class="tab'+(on?' on':'')+'"><span class="te">'+(TAB_EMOJI[l]||'•')+'</span>'+l+'</div>';
+   return '<div class="tab'+(on?' on':'')+(d&&csLocked(d)?' cs-soon':'')+'"><span class="te">'+(TAB_EMOJI[l]||'•')+'</span>'+l+'</div>';
  }).join('');
 }
 
@@ -248,7 +248,7 @@ function renderRail(){
   var pages=(NAV_OPTIONS[role]||[]).filter(function(l){ return nm[l]; });
 
   function item(o){
-    return '<div class="rl-item'+(o.on?' on':'')+(o.bell?' bellwrap':'')+'"'
+    return '<div class="rl-item'+(o.on?' on':'')+(o.bell?' bellwrap':'')+(o.dest&&csLocked(o.dest)?' cs-soon':'')+'"'
          + ' data-rail="'+o.k+'" data-dest="'+o.dest+'">'
          + '<span class="rl-ic">'+o.ic+'</span>'
          + '<span class="rl-label">'+esc(o.label)+'</span></div>';
@@ -319,6 +319,7 @@ function adaptiveResize(){
   /* The banner can rewrap at any width, so re-measure even when the size band
      hasn't changed — otherwise the rail floats off the bottom of the header. */
   railTop();
+  try{csPlace(document.querySelector('.screen.active'));}catch(e){}
   if(!APP_SIZE_APPLY()) return;
   renderRail();
   /* moreEnter() decides which More rows to show by size band (see moreEnter),
@@ -365,6 +366,7 @@ function moreEnter(){ var role=currentRole,nav=navMap[role]||{},chosen=navChosen
     var d=r.getAttribute('data-go');
     if(MORE_ALWAYS[d]){ r.style.display=''; return; }
     r.style.display=(reachable[d]&&!onNav[d])?'':'none';
+    r.classList.toggle('cs-soon',csLocked(d));
   });
   /* The one row on this screen that depends on the HAT rather than the job.
      Hiding it is a courtesy, not a lock - admRender() checks again. */
@@ -1774,6 +1776,62 @@ document.getElementById('s-navtabs').addEventListener('click',function(e){
  navSetChosen(arr);
  renderNavSettings();
 });
+/* ================= Coming Soon =================
+   Dillon, 2026-09-18: Home, Tasks and the Farm Map are ready for the crew.
+   Every other page still needs serious refining, so for everyone except Bill
+   and Dillon those pages open faded, under a "Coming Soon" card. The page is
+   still drawn underneath, so the crew can see what is on the way; the cover
+   just stops them tapping into half-finished work. The header and the bottom
+   bar stay live on top of it, so nobody is trapped on a covered page.
+
+   "Bill" and "Dillon" are asked as JOBS, not names: whoever the roster says is
+   the Farm Manager, and whoever holds the App Manager post. A successor in
+   either chair sees everything without anyone editing this.
+
+   Releasing a page is taking its screen name off CS_LOCKED. Every screen
+   inside a page rolls up to it through SCREEN_DEST, so one word covers the
+   whole page, detail screens and all. When the list is empty, delete this
+   block and the csApply() call in show(). See docs/DECISIONS.md. */
+var CS_LOCKED={inventory:1,trial:1,equipment:1,fieldlog:1,timeclock:1,calendar:1,weather:1};
+/* trialpin is a Trials screen that SCREEN_DEST never listed, so it would slip
+   past the cover without this. */
+var CS_EXTRA={trialpin:'trial'};
+function csExempt(){
+  if(currentRole==='manager') return true;
+  try{ if(typeof rstIsAdmin==='function'&&rstIsAdmin()) return true; }catch(e){}
+  try{ if(SESSION.pid&&APP_ADMIN.pid&&SESSION.pid===APP_ADMIN.pid) return true; }catch(e){}
+  return false;
+}
+/* Is this page (a screen id or a page's home screen) covered for whoever is
+   signed in right now. */
+function csLocked(id){
+  var page=SCREEN_DEST[id]||CS_EXTRA[id]||id;
+  return !!CS_LOCKED[page]&&!csExempt();
+}
+/* Put the cover on the screen being opened, or take it off. It sits between
+   the header and the bottom bar, measured each time because headers differ
+   in height and the text-size setting changes them. */
+function csApply(el,id){
+  var cov=el.querySelector(':scope > .cs-cover');
+  if(!csLocked(id)){ if(cov) cov.remove(); el.classList.remove('cs-lock'); return; }
+  if(!cov){
+    cov=document.createElement('div'); cov.className='cs-cover';
+    cov.innerHTML='<div class="cs-card"><div class="cs-ic">🚧</div>'
+      +'<div class="cs-t">Coming Soon</div>'
+      +'<div class="cs-s">This page is still being worked on. It will open for everyone once it is ready.</div></div>';
+    el.appendChild(cov);
+  }
+  el.classList.add('cs-lock');
+  csPlace(el);
+}
+function csPlace(el){
+  var cov=el&&el.querySelector(':scope > .cs-cover'); if(!cov) return;
+  var box=el.getBoundingClientRect();
+  var hd=el.querySelector('.hdr'), tb=el.querySelector('.tabs');
+  var top=hd?Math.max(0,Math.round(hd.getBoundingClientRect().bottom-box.top)):0;
+  var bot=(tb&&tb.offsetHeight)?Math.max(0,Math.round(box.bottom-tb.getBoundingClientRect().top)):0;
+  cov.style.top=top+'px'; cov.style.bottom=bot+'px';
+}
 const hubMap={'Tasks':'taskboard','Farm Map':'map','Inventory':'inventory','Equipment':'equipment','Field Log':'fieldlog','Time Sheet':'timeclock','Time Clock':'timeclock'};
 function show(id,push){ const el=document.getElementById('s-'+id); if(!el)return;
   const cur=document.querySelector('.screen.active');
@@ -1792,6 +1850,7 @@ function show(id,push){ const el=document.getElementById('s-'+id); if(!el)return
      below to pick which home layout to paint. */
   if(id==='profile')fillProfile(); if(id==='profedit')renderProfEdit(); if(id==='roster')rstRender(); if(id==='rosteredit')rstEditRender(); if(id==='adminxfer')axfRender(); if(id==='spraysettings')sprRender(); if(id==='farmsettings')fstRender(); if(id==='bugreport')bugRender(); if(id==='bugsettings')bgsRender(); if(id==='sharedb')sdbRender(); if(id==='admin')admRender(); if(id==='flfix')flxRender(); if(id==='mowersettings')mwsRender(); if(id==='labsettings')lbsRender(); if(id==='semsettings')smsRender(); if(id==='roles')authRenderAccount();
   if(id==='login')authRenderLogin(); if(id==='notifications'){setSeen(Date.now());setTimeout(updateBellBadges,0);} if(id==='home-manager')renderHomeNotif(); if(id==='weather')wxEnter(); if(id==='map')mapEnter(); if(id==='taskboard')boardEnter(); if(id==='templates')renderTemplates(); if(id==='assign')assignEnter(); if(id==='plotpick')renderPlotPick(); if(id==='taskwork')renderTaskWork(); if(id==='inventory')invEnter(); if(id==='lowstock')renderLowStock(); if(id==='additem')renderAddItem(); if(id==='invlog')renderInvLog(); if(id==='itemdetail')0; if(id==='equipment')equipEnter(); if(id==='eqreport')renderEqReport(); if(id==='eqmaint')renderEqMaint(); if(id==='eqedit')renderEqEdit(); if(id==='eqsched')renderEqSched(); if(id==='calendar')calEnter(); if(id==='caladd')renderCalAdd(); if(id==='timeclock')tcEnter(); if(id==='tcperson')tcRenderPerson(); if(id==='fieldlog')fieldlogEnter(); if(id==='flexport')renderFlExport(); if(id==='flnew')renderFlNew(); if(id==='fldetail')renderFlDetail(); if(id==='more')moreEnter(); if(id==='trial')trialsEnter(); if(id==='trialdetail')trRenderDetail(); if(id==='trialedit')trRenderEdit(); if(id==='trialres')trRenderRes(); if(id==='trialpin')trRenderPin(); if(id==='navsettings')renderPrefsHub(); if(id==='notifsettings')renderNotifSettings(); if(id==='powersettings')renderPowerSettings(); if(id==='navtabs')renderNavSettings(); if(id==='homescreen')renderHomeSettings(); if(id==='theme')renderTheme(); if(id.indexOf('home-')===0)hwApply(r||currentRole); renderTabs();
+  try{csApply(el,id);}catch(e){}
   try{updateBellBadges();}catch(e){}
   try{syncBack(el);}catch(e){}
   try{navSyncHistory();}catch(e){}

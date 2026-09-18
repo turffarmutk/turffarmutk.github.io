@@ -85,7 +85,7 @@ show up." Never edit `sw.js` by hand; this command writes it.
 npm test
 ```
 
-33 sets of automated checks, about 1,900 in total, in roughly a minute. They
+39 sets of automated checks, about 2,300 in total, in a minute or so. They
 run several at a time (`tools/run-tests.js`); `npm run test:serial` runs them
 one after another instead, which is slower but easier to read when two of them
 disagree.
@@ -124,6 +124,14 @@ Two traps when you do this:
   already fixed, you are looking at a stale copy. Use a fresh port number, or
   add `?fresh=1` to the end of the address, and check again before believing
   it.
+- **The app's own offline copy is worse, and `?fresh=1` does not beat it.**
+  Once the page has been opened on a port, the offline copy on that port
+  hands over the app files it saved — and it can save an *old* file under the
+  *new* version number, because it picks them up from the browser's cache
+  when it installs. On 2026-09-18 that hid a finished change for half an hour
+  of testing. **A port the browser has never opened is the only sure way.**
+  Before trusting what you see, run `typeof someNewFunction` in the page: if
+  it says `undefined`, you are not looking at your change.
 - **The console keeps old messages** from before your fix. Confirm an error is
   really still happening rather than reading history.
 
@@ -204,9 +212,10 @@ that is still yours to do.
 **Search `docs/DECISIONS.md` first.**
 
 This app contains an unusual number of things that look like mistakes and are
-deliberate: the CAFS alleyway split, the SF4/SF9 plot swap, the missing task
-priority field, saving by scanning instead of on every change, sharing having
-no off switch. Every one of them is a trap for someone tidying up.
+deliberate: the CAFS alleyway split, the alleys being one painted shape that
+finishes at 80% rather than ten zones that finish at 100%, the SF4/SF9 plot
+swap, the missing task priority field, saving by scanning instead of on every
+change, sharing having no off switch. Every one of them is a trap for someone tidying up.
 
 That file is the only place the reasoning survives. When you make a choice a
 future person could mistake for a bug, add the entry **in the same change**,
@@ -292,7 +301,9 @@ account — a deliberate choice, explained in `docs/BACKEND-STEPS.md`. Phones
 keep working with no signal and catch up later.
 
 Records are moved over one group at a time: tasks, calendar, equipment, field
-log, inventory, map, and — since 2026-08-31 — **the roster**.
+log, inventory, map, — since 2026-08-31 — **the roster**, and — since
+2026-09-18 — **alley paint** (what has been mown on the alleys; see
+`docs/DECISIONS.md`).
 
 **The roster is not just another drawer.** Every rule in `firestore.rules`
 goes through `rec()`, which reads it, so a mistake there does not break one
@@ -309,7 +320,10 @@ Each group is **four things that change together**:
 4. **a row in the table at the top of `tools/test-sync-settles.js`**, which is
    what proves the drawer can ever stop talking.
 
-Never do one without the other three. Number 4 is the newest and it is there
+Never do one without the other three. **And none of it is live until Dillon
+publishes the rules by hand** (`docs/PUBLISH-THE-RULES.md`) — pushing the app
+does not change what the database accepts. Until then the database refuses
+the new drawer, so the rules go up *before* the push, and you tell him so. Number 4 is the newest and it is there
 because of the worst day this app has had — see below.
 
 **THE TWO TRAPS THAT SPENT 4.4 MILLION READS IN AN AFTERNOON.** Both look like
@@ -339,6 +353,10 @@ which screen is showing.
 
 The one number worth watching on the free plan is how much the app *reads*.
 Fetch what changed, never the whole farm every time someone opens the app.
+A drawer whose records pile up forever — one per finished job, say — should
+listen only to the ones still in use, the way alley paint listens only to
+`open` records. Otherwise every phone reads the farm's whole history every
+time the app opens.
 
 ---
 

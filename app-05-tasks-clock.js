@@ -144,15 +144,21 @@ let FORM={id:null,mode:'template',students:1,name:'',category:CATEGORIES[0],plot
 /* "Plots 14, 15" — except the alley network, which reads as zones. */
 function areaLabel(pl){
  if(!pl||!pl.length) return '';
- if(pl.length===1&&pl[0]===ALLEY_UNIT) return 'Alleys & borders';
+ /* The alleys are one shape since 2026-09-18; the ten old zone codes on an
+    older task read as that one shape too. */
+ if(typeof jobAlleyMerge==='function') pl=jobAlleyMerge(pl);
+ var alley=pl.indexOf(ALLEY_UNIT)>=0;
+ pl=pl.filter(function(n){return n!==ALLEY_UNIT;});
+ if(!pl.length) return alley?'Alleys & borders':'';
+ var tail=alley?' + Alleys & borders':'';
  var zn=pl.filter(function(n){return typeof jobIsZone==='function'&&jobIsZone(n);});
- if(zn.length===pl.length) return zn.length===1?jobZoneName(zn[0]):('Alleys & borders · '+zn.length+' zones');
+ if(zn.length===pl.length) return (zn.length===1?jobZoneName(zn[0]):(zn.length+' alley zones'))+tail;
  /* A spray can now cover plots AND alley ground in one job, so the label names
     both rather than printing a zone code in the middle of a plot list. */
  var plots=pl.filter(function(n){return zn.indexOf(n)<0;});
  var head='Plots '+plots.join(', ');
- if(!zn.length) return head;
- return head+' + '+(zn.length===1?jobZoneName(zn[0]):(zn.length+' alley zones'));
+ if(!zn.length) return head+tail;
+ return head+' + '+(zn.length===1?jobZoneName(zn[0]):(zn.length+' alley zones'))+tail;
 }
 function plotsLabel(arr){return arr&&arr.length?(areaLabel(arr)+' ›'):'Tap to choose ›';}
 /* Show the machine picker when the task has a machine list, or for any

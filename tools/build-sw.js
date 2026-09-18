@@ -175,7 +175,13 @@ self.addEventListener('fetch', e => {
       catch (err) { return new Response('', { status: 504 }); }
       /* Only a real, readable photo is worth keeping; a sealed fallback would
          bring the storage problem straight back. */
-      if (res.ok && res.type !== 'opaque') e.waitUntil(tileKeep(url, res.clone()));
+      /* waitUntil only asks the phone to stay awake long enough to finish
+         saving. If a browser refuses that request, the photo must still go
+         to the map, so a refusal is ignored rather than allowed to throw. */
+      if (res.ok && res.type !== 'opaque') {
+        const keep = tileKeep(url, res.clone());
+        try { e.waitUntil(keep); } catch (err) {}
+      }
       return res;
     })());
     return;

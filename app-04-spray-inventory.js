@@ -851,6 +851,8 @@ function openTask(id){
 }
 function plotsSummary(a){
  if(!a||!a.length)return '—';
+ /* The alleys are one shape: "ALLEYS" is a code, not a place anybody knows. */
+ if(typeof jobAlleyMerge==='function'){ a=jobAlleyMerge(a); if(a.indexOf(ALLEY_UNIT)>=0&&typeof areaLabel==='function') return areaLabel(a); }
  /* Mixed plot-and-zone jobs count the zones separately — "CAFS1, CAFS2, AZ06"
     reads as three plots when one of them is an acre and a half of gravel. */
  if(typeof jobIsZone==='function'){
@@ -1011,7 +1013,8 @@ var twBrief=false;
    subscription to what everyone else on the task is doing. All of it is torn
    down on the way out (see show()), so nothing keeps watching the satellites
    after the person has moved on. */
-var TW={dot:null,cov:null,res:null,onFix:null,onCrew:null,me:true,track:true,taskId:null,held:false,lastPaint:0,lastCheck:0,map:null};
+var TW={dot:null,cov:null,res:null,onFix:null,onCrew:null,me:true,track:true,taskId:null,held:false,lastPaint:0,lastCheck:0,map:null,
+        pl:null,onPaint:null,painting:false};
 
 /* ---- locate control, work map ----
    Same three-state button the farm map uses, so finding yourself works the same
@@ -1054,6 +1057,13 @@ function twStop(){
   if(TW.dot){ TW.dot.remove(); TW.dot=null; }
   if(TW.cov){ TW.cov.remove(); TW.cov=null; }
   if(TW.res){ TW.res.remove(); TW.res=null; }
+  /* Alley paint: close off the GPS stroke so it is saved and shared, drop any
+     finger stroke still under a finger, and give the map back its dragging. */
+  if(TW.taskId) paintSeal(TW.taskId,false);
+  paintHandCancel();
+  twPaintMode(false);
+  if(TW.onPaint){ paintOff(TW.onPaint); TW.onPaint=null; }
+  if(TW.pl){ TW.pl.remove(); TW.pl=null; }
   TW.map=null;
   crewHeartbeat(null,false);
   proxSetTask(null);
@@ -1090,7 +1100,15 @@ function twStart(t,st){
   }); }catch(e){} }
 
   if(TW.me && !TW.dot){ GEO.follow=true; TW.dot=geoDot(st.map,{follow:true}); }
-  if(TW.track && !TW.cov) TW.cov=covLayer(st.map,t.id);
+  var paintJob=taskIsPaint(t);
+  if(paintJob){
+    /* The alleys are painted, not zoned: everybody's paint, always drawn --
+       tracking off only stops THIS phone adding to it. */
+    if(!TW.pl) TW.pl=paintLayer(st.map,t.id);
+    twPaintBind(st.map);
+    if(!TW.onPaint){ TW.onPaint=function(){ if(TW.pl) TW.pl.redraw(); twPaintStatus(t); }; paintOn(TW.onPaint); }
+  }
+  else if(TW.track && !TW.cov) TW.cov=covLayer(st.map,t.id);
   twLocatePaint();
 
   if(!TW.onFix){
@@ -1100,6 +1118,13 @@ function twStart(t,st){
        mower can cover anyway. */
     TW.onFix=function(pos){
       if(!pos||!TW.track||TW.taskId!==t.id) return;
+      if(paintJob){
+        if(!paintGps(t.id,pos,covDeckFt(t))) return;
+        var pnow=Date.now();
+        if(pnow-(TW.lastPaint||0)>=TW_PAINT_MS){ TW.lastPaint=pnow; if(TW.pl) TW.pl.redraw(); }
+        if(pnow-(TW.lastCheck||0)>=TW_CHECK_MS){ TW.lastCheck=pnow; twPaintStatus(t); }
+        return;
+      }
       if(!covPush(t.id,pos)) return;
       var now=Date.now();
       if(now-(TW.lastPaint||0)>=TW_PAINT_MS){ TW.lastPaint=now; if(TW.cov) TW.cov.redraw(); }
@@ -1127,6 +1152,18 @@ function twStart(t,st){
 /* The row under the chips: who else is on this job and what they hold. */
 function twCrewRow(t){
   var el=document.getElementById('tw-crew'); if(!el) return;
+  /* On the alleys there is nothing to claim: the row names whoever else has
+     painted in the last ten minutes, so you know somebody is out there. */
+  if(taskIsPaint(t)){
+    var pr=paintRecent(t.id,SESSION.pid);
+    if(!pr.length){ el.style.display='none'; return; }
+    el.innerHTML='<div class="list" style="margin:0">'+pr.map(function(w){
+      return '<div class="row"><span class="tr-resic" style="color:#fff;background:'+crewColor(w)+'">'+esc(initOf(w))+'</span>'
+        +'<div style="flex:1"><div class="rt">'+esc(nameOf(w))+'</div><div class="rs">painting the alleys \u00b7 their paint shows on your map</div></div></div>';
+    }).join('')+'</div>';
+    el.style.display='';
+    return;
+  }
   var others=crewOthers(t.id);
   var mineHeld=[]; var me=SESSION.pid;
   var db=crewLoad(), rec=db[t.id];
@@ -1184,9 +1221,101 @@ function twHandIn(t,sp){
   back();
 }
 
+/* ---- the alleys: painted, not ticked --------------------------------------
+   Where the job stands: how much of the alleys is painted, and any ordinary
+   plots on the same job. It can be finished once PAINT_DONE_PCT is painted
+   and every plot is checked -- Dillon, 2026-09-18, so nobody has to chase
+   the last few feet of paint to close the job. */
+function twPaintState(t){
+  var all=taskPlots(t), openAll=taskOpenPlots(t);
+  var open=openAll.filter(function(n){ return n!==ALLEY_UNIT; });
+  var done=(t.donePlots||[]).filter(function(p){ return open.indexOf(p)>=0; }).length;
+  var pct=paintPct(t.id);
+  var alleyOk=pct>=PAINT_DONE_PCT;
+  /* Rounded DOWN, so 79.9% never reads as the 80% that finishes the job --
+     but a first strip of paint says "<1%", not a "0%" that looks broken. */
+  var pctTxt=(pct>0&&pct<0.01)?'<1%':(Math.floor(pct*100)+'%');
+  return {pct:pct,pctTxt:pctTxt,need:Math.round(PAINT_DONE_PCT*100)+'%',
+          open:open,done:done,shut:all.length-openAll.length,alleyOk:alleyOk,
+          ready:alleyOk&&done>=open.length};
+}
+/* The progress chip and the finish button, redrawn without redrawing the map
+   -- this runs every few seconds while the GPS paints. */
+function twPaintStatus(t){
+  if(!t||workTaskId!==t.id||twBrief) return;
+  var s=twPaintState(t);
+  var pg=document.getElementById('tw-progress');
+  if(pg) pg.textContent=s.pctTxt+' mown'+(s.open.length?(' \u00b7 '+s.done+' / '+s.open.length+' plots'):'')
+                        +(s.shut?(' \u00b7 '+s.shut+' restricted'):'');
+  var badge=document.querySelector('#twmap .resbadge[data-plot="'+ALLEY_UNIT+'"] b');
+  if(badge&&/mown$/.test(badge.textContent)) badge.textContent=s.pctTxt+' mown';
+  var un=document.getElementById('tw-undo'); if(un) un.style.display=paintCanUndo(t.id)?'':'none';
+  twCrewRow(t);
+  var btn=document.getElementById('tw-complete'); if(!btn) return;
+  btn.style.opacity='1';
+  if(s.ready){ btn.textContent='Finish \u2014 '+s.pctTxt+' of the alleys mown \u2713'; btn.style.background='#2f9e4f'; return; }
+  btn.style.background='#c2c7cd';
+  btn.textContent=!s.alleyOk
+    ? ('Mow '+s.need+' of the alleys to finish ('+s.pctTxt+' so far)')
+    : ('Check off all plots to finish ('+s.done+'/'+s.open.length+')');
+}
+/* Painting by hand. While it is on, one finger paints and the map does not
+   move; two fingers still pinch to zoom. Off, the map pans as normal. */
+function twPaintMode(on){
+  TW.painting=!!on;
+  var m=TW.map;
+  if(m){
+    try{ if(on) m.dragging.disable(); else m.dragging.enable(); }catch(e){}
+    /* Leaflet lets the browser pan the page when its own dragging is off,
+       and a browser pan cancels the finger stroke half way. */
+    try{ m.getContainer().style.touchAction=on?'none':''; }catch(e){}
+  }
+  var c=document.getElementById('tw-paint'); if(c) c.classList.toggle('on',TW.painting);
+}
+function twPaintBind(map){
+  var el=map&&map.getContainer(); if(!el||el._twPaint) return; el._twPaint=true;
+  var ptrs={}, raf=0;
+  function at(e){
+    var r=el.getBoundingClientRect(), ll=map.containerPointToLatLng(L.point(e.clientX-r.left,e.clientY-r.top));
+    return [ll.lat,ll.lng];
+  }
+  function draw(){ raf=0; if(TW.pl) TW.pl.redraw(); }
+  function nPtr(){ return Object.keys(ptrs).length; }
+  el.addEventListener('pointerdown',function(e){
+    if(!TW.painting||!TW.taskId) return;
+    ptrs[e.pointerId]=1;
+    /* A second finger is a pinch, not paint: drop the stroke it interrupted. */
+    if(nPtr()>1){ paintHandCancel(); draw(); return; }
+    var t=TASKS.find(function(x){return x.id===TW.taskId;});
+    paintHandStart(TW.taskId,at(e),covDeckFt(t));
+    if(!raf) raf=requestAnimationFrame(draw);
+  },true);
+  el.addEventListener('pointermove',function(e){
+    if(!TW.painting||!ptrs[e.pointerId]||nPtr()>1) return;
+    if(paintHandMove(at(e))&&!raf) raf=requestAnimationFrame(draw);
+  },true);
+  el.addEventListener('pointerup',function(e){
+    if(!ptrs[e.pointerId]) return;
+    delete ptrs[e.pointerId];
+    if(nPtr()) return;
+    /* Where the finger lifted is part of the stroke too: a quick flick can
+       end well past the last move the browser reported. */
+    if(TW.painting&&PAINT.hand){ paintHandMove(at(e)); paintHandEnd(); }   /* saves, shares, redraws */
+    else paintHandCancel();
+  },true);
+  el.addEventListener('pointercancel',function(e){
+    delete ptrs[e.pointerId]; paintHandCancel(); draw();
+  },true);
+  /* A tap while painting is a dab of paint, not a plot being ticked. */
+  el.addEventListener('click',function(e){ if(TW.painting){ e.stopPropagation(); e.stopImmediatePropagation(); } },true);
+}
+
 function renderTaskWork(){
  var t=TASKS.find(function(x){return x.id===workTaskId;}); if(!t)return;
  if(!t.donePlots)t.donePlots=[];
+ /* The paint buttons belong to the alleys; renderTaskPaint turns them back on. */
+ ['tw-paint','tw-undo'].forEach(function(id){ var c=document.getElementById(id); if(c) c.style.display='none'; });
+ if(TW.painting&&!taskIsPaint(t)) twPaintMode(false);
  document.getElementById('tw-title').textContent=t.title;
  var brief=document.getElementById('tw-brief'),wrap=document.getElementById('tw-mapwrap'),chips=document.getElementById('tw-chips');
  if(twBrief){
@@ -1229,6 +1358,7 @@ function renderTaskWork(){
  }
  var plots=taskPlots(t), open=taskOpenPlots(t);
  var shut=plots.length-open.length;
+ if(plots.indexOf(ALLEY_UNIT)>=0){ renderTaskPaint(t,plots); return; }
  /* Zones finished by anyone on this task count towards the job, not just the
     ones this phone ticked — that is the whole point of sharing the map. */
  crewDoneList(t.id).forEach(function(u){ if(t.donePlots.indexOf(u)<0 && open.indexOf(u)>=0) t.donePlots.push(u); });
@@ -1309,14 +1439,58 @@ function renderTaskWork(){
  btn.textContent='Check off all '+unit+' to finish ('+done+'/'+open.length+')';
  btn.style.background='#c2c7cd';
 }
+/* The work map for a job with the alleys on it. */
+function renderTaskPaint(t,plots){
+ var kEl=document.getElementById('tw-kind'); if(kEl) kEl.textContent='Alleys';
+ var hintEl=document.getElementById('tw-hint');
+ if(hintEl) hintEl.textContent=TW.painting
+   ? 'Drag a finger over what you mowed \u00b7 tap Paint by hand again to move the map'
+   : (TW.track?'Your GPS paints the alleys as you mow \u00b7 Paint by hand where it missed'
+              :'GPS paint is off \u00b7 use Paint by hand to mark what you mowed');
+ var st=jobMapEnsure('work','twmap');
+ twStart(t,st);
+ twLocatePaint();
+ var trChip=document.getElementById('tw-track'); if(trChip){ trChip.classList.toggle('on',!!TW.track); trChip.style.display=''; }
+ var pc=document.getElementById('tw-paint'); if(pc){ pc.style.display=''; pc.classList.toggle('on',!!TW.painting); }
+ jobMapDraw(st,{mode:'work',paint:true,targets:plots,done:t.donePlots,fitKey:'tw:'+t.id,jobType:t.type,jobName:t.title,taskId:t.id,onTap:function(n,info){
+   if(TW.painting) return;
+   if(info.alley){ toast('Paint the alleys as you mow \u00b7 '+Math.round(PAINT_DONE_PCT*100)+'% finishes the job'); return; }
+   if(info.blocked){ toast(resStopMsg(info,n)); return; }
+   if(info.partial) toast(resAroundMsg(info,n));
+   jobTapSelect(t.donePlots,n,info);
+   renderTaskWork();
+ }});
+ if(TW.pl) TW.pl.redraw();
+ var noGround=(typeof jobNoGround==='function')?jobNoGround(t.type,t.title,parsePlots(t)):'';
+ if(noGround){
+   if(hintEl) hintEl.textContent=noGround;
+   if(kEl) kEl.textContent='No ground';
+   var nb=document.getElementById('tw-complete');
+   nb.textContent='Nothing to check off \u2014 tell Bill'; nb.style.background='#c2c7cd'; nb.style.opacity='1';
+   return;
+ }
+ twPaintStatus(t);
+}
 document.getElementById('s-taskwork').addEventListener('click',function(e){
  var tc=e.target.closest('[data-twchip]');
  if(tc){
    var k=tc.getAttribute('data-twchip'), wt=TASKS.find(function(x){return x.id===workTaskId;});
    if(k==='track'){
      TW.track=!TW.track;
-     if(!TW.track){ if(TW.cov){TW.cov.remove();TW.cov=null;} toast('Coverage tracking off · tap zones to check them off'); }
-     else toast('Coverage tracking on');
+     var pj=wt&&taskIsPaint(wt);
+     if(!TW.track){
+       if(TW.cov){TW.cov.remove();TW.cov=null;}
+       if(pj) paintSeal(wt.id,false);
+       toast(pj?'GPS paint off \u00b7 paint by hand what you mow':'Coverage tracking off · tap zones to check them off');
+     }
+     else toast(pj?'GPS paint on':'Coverage tracking on');
+   }
+   if(k==='paint'&&wt){
+     twPaintMode(!TW.painting);
+     toast(TW.painting?'Painting \u00b7 drag a finger over what you mowed':'Painting off \u00b7 the map moves again');
+   }
+   if(k==='undo'&&wt){
+     toast(paintUndo(wt.id)?'Your last hand paint is gone':'Nothing of yours to undo');
    }
    if(wt) renderTaskWork();
    return;
@@ -1334,6 +1508,14 @@ document.getElementById('s-taskwork').addEventListener('click',function(e){
       Log entry for work nobody did. Say why instead. */
    var ng=(typeof jobNoGround==='function')?jobNoGround(ct.type,ct.title,parsePlots(ct)):'';
    if(ng){ toast(ng); return; }
+   if(taskIsPaint(ct)){
+     /* Close off the stroke still being drawn so the last minute counts. */
+     paintSeal(ct.id,false);
+     var ps=twPaintState(ct);
+     if(!ps.alleyOk){ toast(ps.pctTxt+' mown so far \u00b7 '+ps.need+' finishes it. Your paint is saved, so whoever picks this up sees only what is left'); return; }
+     if(!ps.ready){ toast('Check off every plot first'); return; }
+     openDoneSheet(workTaskId); return;
+   }
    var sp=twSplit(ct);
    var zoneJob=sp.open.length&&sp.open.every(jobIsZone);
    var word=zoneJob?'zone':'plot';

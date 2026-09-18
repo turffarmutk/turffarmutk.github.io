@@ -485,6 +485,23 @@ service cloud.firestore {
     }
 
     /* ------------------------------------------------------------------
+       ALLEY PAINT — added 2026-09-18
+
+       What has been mown on the alleys, painted by GPS or by hand, one
+       record per task. Same gate as the crew claims above, for the same
+       reason: the people painting are the people on the job. The app has no
+       separate rule of its own -- whoever can open the job's work map can
+       paint on it, and that is whoever is on the job. Phones only ever
+       LIST the records still open (`where open == true`), which is what
+       keeps a finished job from being read again on every phone forever.
+       ------------------------------------------------------------------ */
+    match /paint/{taskId} {
+      allow read: if actor();
+      allow create, update: if actor() && onThisJob(taskId);
+      allow delete: if false;
+    }
+
+    /* ------------------------------------------------------------------
        THE FIELD LOG — drawer 3
 
        Until 2026-08-31 this drawer was append-only: nothing was ever edited
@@ -1053,7 +1070,7 @@ service cloud.firestore {
     /* ------------------------------------------------------------------
        EVERYTHING ELSE IS CLOSED.
 
-       Every drawer now has one: tasks, the map, crew claims, the field log,
+       Every drawer now has one: tasks, the map, crew claims, alley paint, the field log,
        inventory, the weekly schedules, the time clock, the task list, the
        trials, farm settings, equipment and the calendar. Anything NOT listed
        above is still refused, which is what we want and what should stay true

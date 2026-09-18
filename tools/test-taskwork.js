@@ -92,6 +92,17 @@ function mowTask(id, title) {
   TASKS.push(t);
   return t;
 }
+/* A weed spray. Since 2026-09-18 the gravel between the CAFS plots (AZ11) is
+   the only piece of ground still worked as a claimable zone -- the grass
+   alleys are one painted shape now (see tools/test-paint.js) -- so the claim
+   and hand-in checks below run on a spray that has the gravel on it. */
+function weedTask(id, plots) {
+  const t = { id: id, title: 'Herbicide spray', type: 'Spray', area: 'Weed spray',
+              plots: plots.slice(), donePlots: [], status: 'todo', kind: 'task',
+              assignee: win.SESSION.pid, desc: '' };
+  TASKS.push(t);
+  return t;
+}
 function labels() { return win.MOWER_CFG.map(m => m.slice()); }
 function restore(saved) { win.MOWER_CFG.length = 0; saved.forEach(m => win.MOWER_CFG.push(m.slice())); }
 
@@ -222,9 +233,9 @@ section('3. a claim from a phone whose clock runs fast still expires');
 
 section('4. ground held by somebody else is not a dead end');
 {
-  const t = mowTask('tw-4', 'Rotary - Alleys');
+  const t = weedTask('tw-4', ['AZ11']);
   const zones = win.taskPlots(t);
-  ok('the alleys job is worked in zones', zones.length > 0 && zones.every(win.jobIsZone),
+  ok('the gravel on a weed spray is worked as a zone', zones.length > 0 && zones.every(win.jobIsZone),
      zones.length + ' zones');
 
   /* A co-worker is genuinely out on every zone. */
@@ -252,7 +263,9 @@ section('4. ground held by somebody else is not a dead end');
 
 section('5. finishing your part when somebody else still holds the rest');
 {
-  const t = mowTask('tw-5', 'Rotary - Alleys');
+  /* The gravel and two plots nobody has closed to herbicide. */
+  const open2 = win.jobAllPlots().filter(n => win.jobRes(n, 'Spray', 'Herbicide spray').full.length === 0).slice(0, 2);
+  const t = weedTask('tw-5', ['AZ11'].concat(open2));
   const zones = win.taskPlots(t);
   const me = win.SESSION.pid;
   const db = win.crewLoad();
@@ -270,12 +283,13 @@ section('5. finishing your part when somebody else still holds the rest');
   ok('two zones are recorded as mine', sp.mine.length === 2, sp.mine.join(','));
   ok('the button offers to hand that part in', /hand in my part/i.test(txt('tw-complete')),
      txt('tw-complete'));
-  ok('and says how much', /\(2 zones\)/.test(txt('tw-complete')), txt('tw-complete'));
+  /* Plots and a zone together count as plots. */
+  ok('and says how much', /\(2 plots\)/.test(txt('tw-complete')), txt('tw-complete'));
 
   const before = FIELDLOG.length;
   doc.getElementById('tw-complete').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
   const added = FIELDLOG.slice(before);
-  ok('their two zones go on the Field Log', added.length === 2, added.length + ' entries');
+  ok('their two pieces go on the Field Log', added.length === 2, added.length + ' entries');
   ok('credited to them', added.every(e => e.person === me),
      added.map(e => e.person).join(','));
   ok('and marked as one person\'s share, not the whole job',
@@ -362,15 +376,12 @@ section('7. the job is the ground the manager picked, not the whole machine');
   ok('so checking off what he was given finishes the job',
      /^Finish — all/.test(txt('tw-complete')), txt('tw-complete'));
 
-  /* Alley and border jobs resolve their ground the same way, and lost a
-     part-selection the same way. */
-  const az = win.jobPlots('Mow', 'Alley', []);
-  if (az.length > 2) {
-    const t2 = mowTask('tw-7b', 'Alley');
-    t2.plots = az.slice(0, 2);
-    ok('an alley job keeps its picked zones too', win.taskPlots(t2).length === 2,
-       win.taskPlots(t2).join(','));
-  }
+  /* An alley job saved before 2026-09-18 carries zone codes. Those now mean
+     the one alley shape, not a job with no ground. */
+  const t2 = mowTask('tw-7b', 'Rotary - Alleys');
+  t2.plots = ['AZ01', 'AZ02'];
+  ok('an older alley job with zone codes reads as the one alley shape',
+     win.taskPlots(t2).join(',') === win.ALLEY_UNIT, win.taskPlots(t2).join(','));
 
   /* What must NOT change: picking nothing still means the machine's ground.
      That is how "mow the rotary plots" is assigned in one tap. */

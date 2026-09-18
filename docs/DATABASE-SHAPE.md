@@ -371,6 +371,24 @@ ground, and being out on the mow is exactly who this is for. A task with no
 record in the database yet is not a reason to refuse, since tasks and the map are
 separate drawers and either may reach the database first.
 
+### `paint/{taskId}` — what has been mown on the alleys (2026-09-18)
+
+The alleys are one shape, and what has been mown on them is paint: GPS strokes
+as the mower drives, and finger strokes where the GPS missed. One document per
+task:
+
+| Field | What |
+|---|---|
+| `open` | `true` while the task is open. Phones listen with `where open == true`, so a finished job stops being read by every phone every time the app opens. |
+| `strokes` | `{ strokeId: {who, at, how:'gps'\|'hand', w, pts, del?} }`. `w` is the deck width in feet; `pts` is `"lat,lng;lat,lng;…"` because the database cannot hold a list of lists. |
+
+A stroke is never edited once written. The one change is `del: true`, from
+Undo, and it only goes one way. Writes merge and name only the strokes that
+changed, at most once per task every ten seconds. A GPS stroke is closed off
+and sent once a minute, so another phone sees a mower's paint within about a
+minute. Same write gate as `crew/`: being on the job. See `docs/DECISIONS.md`,
+2026-09-18.
+
 ### Ten read-outs, one screen, no switches
 
 **More → Admin → Shared database** shows one line per drawer — connecting, so

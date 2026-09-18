@@ -54,6 +54,8 @@ const fakeDb = {
                                    commit() { w.forEach(([r, d]) => r.set(d)); return Promise.resolve(); } }; },
   collection(name) {
     return { doc: id => docRef(name, id),
+             /* The alley paint listens only to open records. */
+             where() { return this; },
              get() { return Promise.resolve({ size: 0, forEach() {} }); },
              onSnapshot(opts, next, err) { (state.listeners[name] = state.listeners[name] || []).push({ next, err }); return () => { state.listeners[name] = []; }; } };
   },
@@ -168,7 +170,11 @@ const DRAWERS = [
   { name: 'studies',            coll: 'trials',     push: 'trsyncPush', local: () => L().TRIALS,
     sample: { id: 'zz1', title: 'Test study', lab: 'Sorochan', removed: false, restrictions: [] } },
   { name: 'the task list',      coll: 'tasks',      push: 'tsyncScan', local: () => L().TASKS,
-    sample: { id: 'zz1', title: 'Test task', createdBy: P, status: 'open' } }
+    sample: { id: 'zz1', title: 'Test task', createdBy: P, status: 'open' } },
+  /* One record per task rather than a list, so `local` lists the tasks held. */
+  { name: 'alley paint',        coll: 'paint',      push: 'psyncPush', local: () => Object.keys(win.paintLoad()).map(id => ({ id })),
+    sample: { id: 'zz1', open: true,
+              strokes: { 'p07-a1': { who: P, at: 1758200000000, how: 'hand', w: 6, pts: '35.901600,-83.959400;35.901610,-83.959380' } } } }
 ];
 
 /* Every drawer has to be attached and to have heard from the server before it

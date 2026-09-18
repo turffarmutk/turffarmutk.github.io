@@ -169,7 +169,7 @@ ok('zone work estimates are sane (3-70 min)',
    zf.every(f => f.properties.est_min >= 3 && f.properties.est_min <= 70),
    zf.map(f => f.properties.est_min).join(','));
 
-section('Alley job resolves to zones');
+section('Alley job resolves to one painted shape');
 /* A fixture, not a seed row. Demo tasks were removed from the app on
    2026-08-24 — only equipment, the roster and the task catalog ship
    pre-loaded now — so this test brings the two-person alley job it needs.
@@ -193,13 +193,18 @@ const C_NAME = 'Somebody Else';
 ok('taskIsFor matches the helper', win.taskIsFor(alleyTask, B_NAME), B_NAME);
 ok('taskIsFor rejects someone not on the job', !win.taskIsFor(alleyTask, C_NAME));
 
+/* Since 2026-09-18 the alley job is ONE shape, painted as it is mown, not
+   ten zones ticked off -- Dillon's call. The zones below are still real
+   ground: the gravel (AZ11) is worked as a zone on weed sprays, and the
+   claim and coverage machinery is exercised on that. */
 const targets = win.taskPlots(alleyTask);
-ok('alley job targets 10 zones, not one unit', targets.length === 10 && targets.every(win.jobIsZone),
-   targets.length + ' targets');
-ok('area label reads as zones', win.areaLabel(targets) === 'Alleys & borders · 10 zones', win.areaLabel(targets));
-ok('plot summary reads as acres', /10 zones · 10\.0 acres/.test(win.plotsSummary(targets)),
-   win.plotsSummary(targets));
-ok('legacy ALLEYS unit still labels', win.areaLabel(['ALLEYS']) === 'Alleys & borders');
+ok('alley job targets the one alley shape', targets.length === 1 && targets[0] === win.ALLEY_UNIT,
+   targets.join(','));
+ok('and it is a painted job', win.taskIsPaint(alleyTask));
+ok('area label reads as the alleys', win.areaLabel(targets) === 'Alleys & borders', win.areaLabel(targets));
+ok('plot summary reads as the alleys', win.plotsSummary(targets) === 'Alleys & borders', win.plotsSummary(targets));
+ok('the old ten zone codes still label as the alleys',
+   win.areaLabel(['AZ01', 'AZ02', 'AZ03']) === 'Alleys & borders', win.areaLabel(['AZ01', 'AZ02', 'AZ03']));
 
 section('Claims stop the double mow');
 const TID = 't21';
@@ -259,9 +264,9 @@ ok('mowing the zone covers most of it', pct > 0.85, (pct * 100).toFixed(1) + '%'
 const untouched = win.covZonePct(TID, 'AZ02');
 ok('a zone nobody drove stays at 0%', untouched < 0.02, (untouched * 100).toFixed(1) + '%');
 
-const crossed = win.covRecalc(TID, targets);
+const crossed = win.covRecalc(TID, [zoneId, 'AZ02']);
 ok('the mown zone auto-completes', crossed.indexOf(zoneId) >= 0, crossed.join(','));
-ok('auto-complete fires once, not every fix', win.covRecalc(TID, targets).indexOf(zoneId) < 0);
+ok('auto-complete fires once, not every fix', win.covRecalc(TID, [zoneId, 'AZ02']).indexOf(zoneId) < 0);
 
 ok('deck width comes off the machine, not a guess',
    win.covDeckFt({ title: 'Weedeat' }) === 3 &&
@@ -343,7 +348,7 @@ ok('permission-denied has copy for the user',
    (win.GEO.err = 'denied', /turn it on/.test(win.geoErrText())));
 win.GEO.err = null;
 
-section('Work screen renders the zone job');
+section('Work screen renders the alley job');
 let renderErr = null;
 try {
   win.geoSim(null);                    /* back to the real (stubbed) watch */
@@ -352,21 +357,26 @@ try {
   win.twBrief = false;
   win.renderTaskWork();
 } catch (e) { renderErr = e.message + ' @ ' + (e.stack || '').split('\n')[1]; }
-ok('renderTaskWork survives a zone job', !renderErr, renderErr);
-ok('chip row says Zones, not Plots',
-   win.document.getElementById('tw-kind').textContent === 'Zones',
+ok('renderTaskWork survives the alley job', !renderErr, renderErr);
+ok('chip row says Alleys',
+   win.document.getElementById('tw-kind').textContent === 'Alleys',
    win.document.getElementById('tw-kind').textContent);
-ok('progress counts zones',
-   /\/ 10 done/.test(win.document.getElementById('tw-progress').textContent),
+ok('progress is how much is mown',
+   /^0% mown/.test(win.document.getElementById('tw-progress').textContent),
    win.document.getElementById('tw-progress').textContent);
-ok('hint tells them to take a zone',
-   /paints itself/.test(win.document.getElementById('tw-hint').textContent),
+ok('hint says the GPS paints it',
+   /GPS paints the alleys/.test(win.document.getElementById('tw-hint').textContent),
    win.document.getElementById('tw-hint').textContent);
-ok('crew row shows the other person on the job',
-   win.document.getElementById('tw-crew').innerHTML.indexOf(B_LABEL) >= 0);
-ok('finish button counts zones',
-   /zones to finish/.test(win.document.getElementById('tw-complete').textContent),
+ok('the Paint by hand button is showing',
+   win.document.getElementById('tw-paint').style.display !== 'none');
+ok('finish button asks for 80%',
+   /Mow 80% of the alleys to finish/.test(win.document.getElementById('tw-complete').textContent),
    win.document.getElementById('tw-complete').textContent);
+/* The other person on the job shows up once they have painted something. */
+win.paintAdd('t21', { sid: 'b-1', who: B_NAME, at: Date.now(), how: 'gps', w: 6,
+                      pts: [[35.9016, -83.9594], [35.90165, -83.9594]] });
+ok('crew row shows the other person once they are painting',
+   win.document.getElementById('tw-crew').innerHTML.indexOf(B_LABEL) >= 0);
 
 /* and a plain plot job still behaves the way it always did */
 let plotErr = null;
@@ -377,49 +387,55 @@ ok('plot job chip row still says its own kind',
    win.document.getElementById('tw-kind').textContent !== 'Zones',
    win.document.getElementById('tw-kind').textContent);
 
-section('Tapping a zone: claim, then done');
+section('Tapping a zone: claim, then done (the gravel, on a weed spray)');
+if (!win.TASKS.some(t => t.id === 'tg')) win.TASKS.push({
+  id:'tg', title:'Herbicide spray', area:'CAFS alleyways', plots:['AZ11'], deckFt:20,
+  assignee:'p18', helpers:['p20'], status:'todo', kind:'task', type:'Spray', repeat:'None', desc:''
+});
+const gravelTask = win.TASKS.find(t => t.id === 'tg');
 /* Grab the tap handler the work screen hands to the map, and use it the way a
    thumb would. */
 let lastDraw = null;
 const realDraw = win.jobMapDraw;
 win.jobMapDraw = function (st, o) { lastDraw = o; return realDraw.call(this, st, o); };
-win.workTaskId = 't21';
-alleyTask.donePlots = [];
-win.crewUncomplete('t21', 'AZ07');
+win.workTaskId = 'tg';
+gravelTask.donePlots = [];
 win.renderTaskWork();
 const tap = lastDraw && lastDraw.onTap;
 ok('work map exposes a tap handler', typeof tap === 'function');
-ok('taskId is passed to the map so it can show claims', lastDraw.taskId === 't21');
+ok('taskId is passed to the map so it can show claims', lastDraw.taskId === 'tg');
 
 const zoneInfo = { blocked: false, partial: false, zone: true, taken: false, claim: null, res: { full: [], pin: [] } };
-tap('AZ03', zoneInfo);
+tap('AZ11', zoneInfo);
 ok('first tap claims, does not complete',
-   win.crewClaim('t21', 'AZ03') && alleyTask.donePlots.indexOf('AZ03') < 0);
-tap('AZ03', { ...zoneInfo, claim: win.crewClaim('t21', 'AZ03') });
-ok('second tap completes it', alleyTask.donePlots.indexOf('AZ03') >= 0 && !!win.crewDoneBy('t21', 'AZ03'));
-tap('AZ03', zoneInfo);
-ok('third tap reopens it', alleyTask.donePlots.indexOf('AZ03') < 0 && !win.crewDoneBy('t21', 'AZ03'));
+   win.crewClaim('tg', 'AZ11') && gravelTask.donePlots.indexOf('AZ11') < 0);
+tap('AZ11', { ...zoneInfo, claim: win.crewClaim('tg', 'AZ11') });
+ok('second tap completes it', gravelTask.donePlots.indexOf('AZ11') >= 0 && !!win.crewDoneBy('tg', 'AZ11'));
+tap('AZ11', zoneInfo);
+ok('third tap reopens it', gravelTask.donePlots.indexOf('AZ11') < 0 && !win.crewDoneBy('tg', 'AZ11'));
 
 /* the other person's ground is not tappable */
-win.crewTake('t21', 'AZ05', B_NAME);
+win.crewTake('tg', 'AZ11', B_NAME);
 win.renderTaskWork();
 let blockedToast = '';
 const t0 = win.toast; win.toast = (m) => { blockedToast = m; };
-lastDraw.onTap('AZ05', { blocked: false, partial: false, zone: true, taken: true,
-                         claim: win.crewClaim('t21', 'AZ05'), res: { full: [], pin: [] } });
+lastDraw.onTap('AZ11', { blocked: false, partial: false, zone: true, taken: true,
+                         claim: win.crewClaim('tg', 'AZ11'), res: { full: [], pin: [] } });
 win.toast = t0;
 ok('tapping a claimed zone is refused with a name',
-   blockedToast.indexOf(B_LABEL + ' is on') === 0 && alleyTask.donePlots.indexOf('AZ05') < 0, blockedToast);
+   blockedToast.indexOf(B_LABEL + ' is on') === 0 && gravelTask.donePlots.indexOf('AZ11') < 0, blockedToast);
+win.crewDrop('tg', 'AZ11', B_NAME);
 win.jobMapDraw = realDraw;
 
 section('GPS finishes a zone without anyone tapping');
-alleyTask.donePlots = [];
-win.COV['t21'] = null; win.covFor('t21', 6);
-win.workTaskId = 't21';
+gravelTask.donePlots = [];
+win.twStop();
+win.COV['tg'] = null; win.covFor('tg', 20);
+win.workTaskId = 'tg';
 win.renderTaskWork();                      /* installs the fix handler */
-const walkZone = win.jobZoneFeature('AZ04');
+const walkZone = win.jobZoneFeature('AZ11');
 const wb = turf.bbox(walkZone);
-const deckD = 6 / 295445.9;
+const deckD = 20 / 295445.9;
 let n = 0;
 const t1 = Date.now();
 for (let x = wb[0]; x <= wb[2]; x += deckD * 0.9) {
@@ -429,7 +445,7 @@ for (let x = wb[0]; x <= wb[2]; x += deckD * 0.9) {
   }
   n++;
 }
-const fixes = win.COV['t21'].track.length;
+const fixes = win.COV['tg'].track.length;
 const perFix = (Date.now() - t1) / fixes;
 ok('a full zone of driving stays cheap per fix (<8 ms)', perFix < 8, perFix.toFixed(2) + ' ms/fix over ' + fixes + ' fixes');
 /* force the throttled check that a real session would hit a few seconds in */
@@ -439,18 +455,36 @@ win.geoSim(wb[1], wb[0] + deckD, 15);
 ok('the zone re-measure is fast enough to run on a phone (<1500 ms)',
    Date.now() - t2 < 1500, (Date.now() - t2) + ' ms');
 ok('driving the zone checks it off on its own',
-   alleyTask.donePlots.indexOf('AZ04') >= 0,
-   'coverage ' + Math.round(win.covPct('t21', 'AZ04') * 100) + '%');
+   gravelTask.donePlots.indexOf('AZ11') >= 0,
+   'coverage ' + Math.round(win.covPct('tg', 'AZ11') * 100) + '%');
 ok('and records it as GPS, not a tap',
-   (win.crewDoneBy('t21', 'AZ04') || {}).how === 'gps');
-ok('a zone that was never driven stays open', alleyTask.donePlots.indexOf('AZ01') < 0);
+   (win.crewDoneBy('tg', 'AZ11') || {}).how === 'gps');
 
 /* leaving the screen must hand back anything claimed but unfinished */
-win.crewTake('t21', 'AZ10', ME);
-win.TW.taskId = 't21';
+win.crewTake('tg', 'B12', ME);
+win.TW.taskId = 'tg';
 win.twStop();
-ok('walking away releases an unfinished claim', win.crewClaim('t21', 'AZ10') === null);
-ok('walking away does not undo finished ground', !!win.crewDoneBy('t21', 'AZ04'));
+ok('walking away releases an unfinished claim', win.crewClaim('tg', 'B12') === null);
+ok('walking away does not undo finished ground', !!win.crewDoneBy('tg', 'AZ11'));
+
+section('GPS paints the alleys as the mower drives');
+{
+  win.twStop();
+  win.workTaskId = 't21';
+  win.TW.track = true;
+  win.renderTaskWork();                    /* installs the fix handler for the alley job */
+  const before = win.paintPct('t21');
+  /* Drive the length of the A Block alleys, the way the rotary actually runs. */
+  const ab = turf.bbox(win.jobZoneFeature('AZ10'));
+  const midX = (ab[0] + ab[2]) / 2;
+  for (let s = 0; s <= 120; s++) win.geoSim(ab[1] + (ab[3] - ab[1]) * s / 120, midX, 12);
+  win.TW.taskId = 't21';
+  win.twStop();                            /* leaving closes off the stroke */
+  const gps = Object.values(win.paintLoad()['t21'].strokes).filter(x => x.how === 'gps' && x.who === ME);
+  ok('driving left GPS paint on the task', gps.length > 0, gps.length + ' strokes');
+  ok('and the percentage went up', win.paintPct('t21') > before,
+     (before * 100).toFixed(2) + '% -> ' + (win.paintPct('t21') * 100).toFixed(2) + '%');
+}
 
 section('Assigning the job still works');
 /* Bill picks ground in "pick" mode, where claims are irrelevant and no taskId
@@ -458,10 +492,10 @@ section('Assigning the job still works');
 let pickErr = null;
 try {
   const st = win.jobMapEnsure('pick-test', 'twmap');
-  win.jobMapDraw(st, { mode: 'pick', targets: targets, sel: ['AZ01', 'AZ02'],
+  win.jobMapDraw(st, { mode: 'pick', targets: targets.concat(['AZ11']), sel: [win.ALLEY_UNIT],
                        jobType: 'Mow', jobName: 'Rotary - Alleys', fitKey: 'pick' });
 } catch (e) { pickErr = e.message + ' @ ' + (e.stack || '').split('\n')[1]; }
-ok('the assign wizard can draw zones with no task attached', !pickErr, pickErr);
+ok('the assign wizard can draw the alleys and a zone with no task attached', !pickErr, pickErr);
 
 section('The GPS watch is shared, not fought over');
 win.GEO.holds = 0; win.GEO.sim = null; win.GEO.watch = null;

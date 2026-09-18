@@ -264,8 +264,8 @@ ok('the drawer never calls delete either', state.deletes.length === 0);
 section('7. The read-out, and no switches');
 ok('it has a read-out on the Shared database screen', /st:EVSYNC,\s*summary:evsyncSummary\(\)/.test(appText));
 ok('the read-out is in the list', /st:EQSYNC[\s\S]{0,1200}st:EVSYNC/.test(appText));
-ok('thirteen drawers now, and every one of them on',
-   (appText.match(/summary:[a-z]+syncSummary\(\)/g) || []).length === 13);
+ok('fourteen drawers now (alley paint made fourteen), and every one of them on',
+   (appText.match(/summary:[a-z]+syncSummary\(\)/g) || []).length === 14);
 ok('it says in plain words what is being shared', /five people keeping five versions/.test(appText));
 ok('and that a removal sticks', /stays gone instead of coming back/.test(appText));
 ok('the summary reads in plain words', /this phone keeps its own month/.test(appText));

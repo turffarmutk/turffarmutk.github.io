@@ -121,14 +121,27 @@ ok('the farm has a fairway mowing job to assign', !!fairwayTpl,
      win.pickSelectByName(w.plots, offMachine, w.cat, w.name) === true && w.plots.indexOf(offMachine) >= 0,
      w.plots.join(','));
 
-  /* Alleys are mown ground, so a mowing job can reach them; a fertiliser run
-     has no business on gravel and still cannot. */
-  ok('a mowing job can also reach the alley zones',
-     w.targets.filter(win.jobIsZone).length === win.jobAlleyZones().length,
-     String(w.targets.filter(win.jobIsZone).length));
+  /* The grass alleys belong to the alley job alone (2026-09-18) -- a fairway
+     mow used to be offered all ten pieces. A fertiliser run has no business on
+     gravel; a weed spray gets the gravel and nothing else. */
+  ok('a fairway mow is offered no alley ground',
+     w.targets.filter(win.jobIsZone).length === 0,
+     String(w.targets.filter(win.jobIsZone).join(',')));
+  ok('a fairway mow is not offered the alley shape either',
+     w.targets.indexOf(win.ALLEY_UNIT) < 0);
+  /* And since the same day the alleys are ONE shape to pick, not ten pieces. */
+  const alleyPick = win.jobPickTargets('Mow', 'Rotary - Alleys', []);
+  ok('the alley job is offered the alleys as one shape',
+     alleyPick.indexOf(win.ALLEY_UNIT) >= 0 && alleyPick.filter(win.jobIsZone).length === 0,
+     alleyPick.filter(n => n === win.ALLEY_UNIT || win.jobIsZone(n)).join(','));
+  ok('its quick button picks that one shape',
+     win.jobQuickSet('Mow', 'Rotary - Alleys', []).join(',') === win.ALLEY_UNIT
+     && win.jobQuickLabel('Mow', 'Rotary - Alleys', []) === 'All alleys');
   ok('a fertiliser run is offered no gravel',
      win.jobPickTargets('Fertilizer', 'Granular fert', []).filter(win.jobIsZone).length === 0);
-  ok('a herbicide spray still is', win.jobPickTargets('Spray', 'Herbicide spray', []).filter(win.jobIsZone).length > 0);
+  const weedPick = win.jobPickTargets('Spray', 'Herbicide spray', []).filter(win.jobIsZone);
+  ok('a herbicide spray is offered the gravel and no grass alleys',
+     weedPick.length > 0 && weedPick.every(win.jobZoneIsGravel), weedPick.join(','));
 }
 
 section('2. what the job is usually on is a button, not a boundary');

@@ -1648,7 +1648,7 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
 <section class="screen" id="s-taskwork">
 <div class="app field">
             <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" id="tw-title" style="flex:1">Task</div></div>
-            <div class="mapchips" id="tw-chips"><span class="on" id="tw-kind">Plots</span><span id="tw-progress">0 / 0 done</span><span id="tw-track" data-twchip="track">Track</span></div>
+            <div class="mapchips" id="tw-chips"><span class="on" id="tw-kind">Plots</span><span id="tw-progress">0 / 0 done</span><span id="tw-track" data-twchip="track">Track</span><span id="tw-paint" data-twchip="paint" style="display:none">Paint by hand</span><span id="tw-undo" data-twchip="undo" style="display:none">Undo</span></div>
             <div id="tw-crew" style="display:none"></div>
             <div id="tw-brief" style="flex:1;min-height:0;overflow:auto;display:none"></div>
             <div class="mapvp" id="tw-mapwrap" style="position:relative;flex:1;min-height:0;background:#6f8a5f">
@@ -2718,6 +2718,10 @@ function sdbShareBlocks_raw(){
    {st:CSYNC,   summary:csyncSummary(),   title:'Who is working where',
     what:'When two or three people share a mow, each claims a zone so the same ground is '
         +'not worked twice. The others on the job see the claims.'},
+   {st:PSYNC,   summary:psyncSummary(),   title:'Alley paint',
+    what:'What has been mown on the alleys, painted by GPS or by hand. It belongs to the '
+        +'task, so two people on the alleys see each other\'s paint and whoever picks the '
+        +'job up tomorrow sees only what is left.'},
    {st:FLSYNC,  summary:flsyncSummary(),  title:'The field log',
     what:'Every mow, spray and application in one place, readable by whoever writes the '
         +'reports. An entry can be edited or deleted by whoever logged it, whoever the work '
@@ -5878,6 +5882,509 @@ function crewColor(who) {
 }
 
 /* ============================================================
+   ALLEY PAINT · what has actually been mown on the alleys
+   ------------------------------------------------------------
+   Dillon, 2026-09-18: the alleys are ONE shape, not ten zones. What has been
+   mown is whatever has been painted on it -- by the phone's GPS as the mower
+   drives, or by a finger where the GPS got it wrong. The job can be finished
+   once PAINT_DONE_PCT of the alleys is painted, so nobody has to chase the
+   last few feet of paint to close it.
+
+   Paint belongs to the TASK, not to the person or the phone. That is what
+   lets two people mow at once and see each other's paint, and lets Bill hand
+   an unfinished alley job to somebody else tomorrow: they open the same task
+   and the ground still unpainted is what is left.
+
+   The shape of the record, one per task, in the shared database as
+   paint/{taskId}:
+     open     true while the task is open. Phones only listen to open ones, so
+              a finished job stops costing a read on every phone that opens
+              the app.
+     strokes  { strokeId: {who, at, how:'gps'|'hand', w:<ft wide>, pts, del?} }
+              pts is "lat,lng;lat,lng;..." -- the database cannot hold a list
+              of lists.
+
+   A stroke is never changed once it is written. The only edit is `del`, set
+   by Undo, and it only ever goes one way. That is what lets an arriving record
+   be applied completely every time without fighting what this phone has not
+   sent yet (see psyncOnSnapshot).
+   ============================================================ */
+var PAINT_KEY = 'utturf_paint_v1';
+var PAINT_DONE_PCT = 0.80;          /* Dillon: 80% of the alleys finishes the job */
+var PAINT_CELL_M = 1;               /* the grid the percentage is measured on, metres */
+var PAINT_SEAL_MS = 60 * 1000;      /* a GPS stroke is closed off and shared once a minute */
+var PAINT_SEAL_PTS = 150;
+var PAINT_GAP_FT = 60;              /* a jump longer than this is the GPS dropping out */
+var PAINT_HAND_STEP_M = 0.8;        /* finger points closer than this add nothing */
+var PAINT_SEND_GAP_MS = 10 * 1000;  /* one send per task per ten seconds, at most */
+var PAINT_COLOR = '#2f9e4f';
+
+var PAINT = { db: null, live: {}, hand: null, cov: {}, dec: {}, subs: [] };
+
+function paintLoad() {
+  if (PAINT.db) return PAINT.db;
+  try { PAINT.db = JSON.parse(localStorage.getItem(PAINT_KEY) || '{}') || {}; }
+  catch (e) { PAINT.db = {}; }
+  return PAINT.db;
+}
+function paintSave() {
+  try { localStorage.setItem(PAINT_KEY, JSON.stringify(PAINT.db || {})); } catch (e) {}
+}
+function paintRec(taskId, make) {
+  var db = paintLoad();
+  if (!db[taskId] && make) db[taskId] = { open: true, strokes: {} };
+  return db[taskId] || null;
+}
+function paintOn(fn)  { if (PAINT.subs.indexOf(fn) < 0) PAINT.subs.push(fn); }
+function paintOff(fn) { var i = PAINT.subs.indexOf(fn); if (i >= 0) PAINT.subs.splice(i, 1); }
+function paintEmit()  { PAINT.subs.slice().forEach(function (f) { try { f(); } catch (e) {} }); }
+
+function paintSid() {
+  return (SESSION.pid || 'x') + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+}
+function paintEnc(pts) {
+  return pts.map(function (p) { return (+p[0]).toFixed(6) + ',' + (+p[1]).toFixed(6); }).join(';');
+}
+function paintDec(s) {
+  if (!s) return [];
+  return String(s).split(';').map(function (x) { var q = x.split(','); return [+q[0], +q[1]]; })
+    .filter(function (p) { return isFinite(p[0]) && isFinite(p[1]); });
+}
+/* Decoded points, kept per stroke. A stroke never changes, so neither does this. */
+function paintPts(sid, s) {
+  if (!PAINT.dec[sid]) PAINT.dec[sid] = paintDec(s.pts);
+  return PAINT.dec[sid];
+}
+
+/* Every stroke that still counts, oldest first -- sealed ones, the GPS stroke
+   still being drawn, and a finger stroke still under the finger. */
+function paintStrokes(taskId) {
+  var out = [], rec = paintRec(taskId, false);
+  if (rec) Object.keys(rec.strokes || {}).forEach(function (sid) {
+    var s = rec.strokes[sid];
+    if (!s || s.del) return;
+    out.push({ sid: sid, who: s.who, at: s.at, how: s.how, w: +s.w || COV_DEFAULT_DECK_FT, pts: paintPts(sid, s) });
+  });
+  var lv = PAINT.live[taskId];
+  if (lv && lv.pts.length) out.push({ sid: lv.sid, who: lv.who, at: lv.at, how: 'gps', w: lv.w, pts: lv.pts, live: true });
+  var hd = PAINT.hand;
+  if (hd && hd.taskId === taskId && hd.pts.length) out.push({ sid: hd.sid, who: hd.who, at: hd.at, how: 'hand', w: hd.w, pts: hd.pts, live: true });
+  out.sort(function (a, b) { return (a.at || 0) - (b.at || 0); });
+  return out;
+}
+
+/* ---- the grid -------------------------------------------------------------
+   The alleys are ~40,500 square metres in a 450 x 400 m box. Every square
+   metre inside the shape is a cell; a stroke marks the cells within half its
+   width; the percentage is marked cells over all cells. Built once, by
+   scanning each row across the shape, because testing 180,000 points against
+   a 1,400-corner outline one at a time would stall a phone for seconds.
+
+   The alleys, not the whole stroke, is what counts: driving down the road from
+   the shop paints the road on the map (that is where the mower went) and adds
+   nothing to the percentage. */
+var PAINT_GRID = null;
+function paintGrid() {
+  if (PAINT_GRID) return PAINT_GRID;
+  if (typeof ALLEYS_DATA === 'undefined' || !ALLEYS_DATA.features || !ALLEYS_DATA.features.length) return null;
+  var polys = [];
+  ALLEYS_DATA.features.forEach(function (f) {
+    var g = f.geometry || {};
+    if (g.type === 'Polygon') polys.push(g.coordinates);
+    else if (g.type === 'MultiPolygon') g.coordinates.forEach(function (p) { polys.push(p); });
+  });
+  var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  polys.forEach(function (p) { p.forEach(function (r) { r.forEach(function (c) {
+    if (c[0] < x0) x0 = c[0]; if (c[0] > x1) x1 = c[0];
+    if (c[1] < y0) y0 = c[1]; if (c[1] > y1) y1 = c[1];
+  }); }); });
+  if (!isFinite(x0)) return null;
+  var kx = 111320 * Math.cos(((y0 + y1) / 2) * Math.PI / 180), ky = 110540, C = PAINT_CELL_M;
+  var cols = Math.ceil((x1 - x0) * kx / C) + 1, rows = Math.ceil((y1 - y0) * ky / C) + 1;
+  var inside = new Uint8Array(rows * cols), total = 0;
+  /* Each polygon in metres, as flat edge lists. */
+  var edges = polys.map(function (p) {
+    var e = [];
+    p.forEach(function (r) {
+      for (var i = 0; i < r.length - 1; i++) {
+        e.push([(r[i][0] - x0) * kx, (r[i][1] - y0) * ky, (r[i + 1][0] - x0) * kx, (r[i + 1][1] - y0) * ky]);
+      }
+    });
+    return e;
+  });
+  for (var row = 0; row < rows; row++) {
+    var y = (row + 0.5) * C;
+    edges.forEach(function (e) {
+      var xs = [];
+      for (var i = 0; i < e.length; i++) {
+        var a = e[i];
+        if ((a[1] > y) !== (a[3] > y)) xs.push(a[0] + (y - a[1]) * (a[2] - a[0]) / (a[3] - a[1]));
+      }
+      xs.sort(function (p, q) { return p - q; });
+      for (var j = 0; j + 1 < xs.length; j += 2) {
+        var c0 = Math.max(0, Math.ceil(xs[j] / C - 0.5)), c1 = Math.min(cols - 1, Math.floor(xs[j + 1] / C - 0.5));
+        for (var col = c0; col <= c1; col++) {
+          var k = row * cols + col;
+          if (!inside[k]) { inside[k] = 1; total++; }
+        }
+      }
+    });
+  }
+  PAINT_GRID = { x0: x0, y0: y0, kx: kx, ky: ky, cols: cols, rows: rows, inside: inside, total: total };
+  return PAINT_GRID;
+}
+
+/* Mark the alley cells a stroke covers, from point `from` on. */
+function paintMark(g, c, pts, wFt, from) {
+  if (!pts || !pts.length) return;
+  var C = PAINT_CELL_M, r = Math.max(0.5, (wFt || COV_DEFAULT_DECK_FT) * 0.3048 / 2), r2 = r * r;
+  function xy(p) { return [(p[1] - g.x0) * g.kx, (p[0] - g.y0) * g.ky]; }
+  var start = Math.max(0, from || 0);
+  var last = pts.length === 1 ? 0 : pts.length - 2;
+  for (var i = start; i <= last; i++) {
+    var a = xy(pts[i]), b = xy(pts[Math.min(i + 1, pts.length - 1)]);
+    var dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy;
+    var cA = Math.max(0, Math.floor((Math.min(a[0], b[0]) - r) / C)), cB = Math.min(g.cols - 1, Math.floor((Math.max(a[0], b[0]) + r) / C));
+    var rA = Math.max(0, Math.floor((Math.min(a[1], b[1]) - r) / C)), rB = Math.min(g.rows - 1, Math.floor((Math.max(a[1], b[1]) + r) / C));
+    for (var row = rA; row <= rB; row++) {
+      for (var col = cA; col <= cB; col++) {
+        var k = row * g.cols + col;
+        if (!g.inside[k] || c.hit[k]) continue;
+        var px = (col + 0.5) * C, py = (row + 0.5) * C;
+        var t = L2 ? Math.max(0, Math.min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / L2)) : 0;
+        var qx = a[0] + t * dx - px, qy = a[1] + t * dy - py;
+        if (qx * qx + qy * qy <= r2) { c.hit[k] = 1; c.n++; }
+      }
+    }
+  }
+}
+
+/* The cells painted so far on this task. Kept between calls and topped up with
+   whatever is new; rebuilt from scratch only when a stroke has been undone,
+   because un-painting a cell cannot be done without knowing who else painted
+   it. */
+function paintCov(taskId) {
+  var g = paintGrid(); if (!g) return null;
+  var list = paintStrokes(taskId), c = PAINT.cov[taskId];
+  var ids = {}; list.forEach(function (s) { ids[s.sid] = 1; });
+  var gone = c && Object.keys(c.applied).some(function (sid) { return !ids[sid]; });
+  if (!c || gone) c = PAINT.cov[taskId] = { hit: new Uint8Array(g.rows * g.cols), n: 0, applied: {}, upto: {} };
+  list.forEach(function (s) {
+    if (s.live) {
+      /* A stroke still being drawn grows; mark only its new part. */
+      var from = Math.max(0, (c.upto[s.sid] || 0) - 1);
+      paintMark(g, c, s.pts, s.w, from);
+      c.upto[s.sid] = s.pts.length;
+      return;
+    }
+    if (c.applied[s.sid]) return;
+    paintMark(g, c, s.pts, s.w, 0);
+    c.applied[s.sid] = 1;
+  });
+  /* Live strokes are never in `applied`; only sealed ones are. A finger stroke
+     that was cancelled mid-draw therefore has to be forgotten by rebuilding. */
+  Object.keys(c.upto).forEach(function (sid) { if (!ids[sid]) { delete c.upto[sid]; c.stale = true; } });
+  if (c.stale) { delete PAINT.cov[taskId]; return paintCov(taskId); }
+  return c;
+}
+function paintPct(taskId) {
+  var g = paintGrid(), c = paintCov(taskId);
+  return (g && c && g.total) ? Math.min(1, c.n / g.total) : 0;
+}
+
+/* Put a finished stroke on the task and share it. */
+function paintAdd(taskId, s) {
+  var rec = paintRec(taskId, true), sid = s.sid;
+  var out = { who: s.who, at: s.at, how: s.how, w: s.w, pts: paintEnc(s.pts) };
+  rec.strokes[sid] = out;
+  PAINT.dec[sid] = paintDec(out.pts);
+  paintSave();
+  try { psyncPush(); } catch (e) {}
+  paintEmit();
+}
+
+/* ---- GPS strokes ----------------------------------------------------------
+   The same filters as the coverage track: a fix too vague to trust does not
+   paint, and jitter under a step is ignored. A stroke is closed off and shared
+   every minute, and a new one carries on from its last point so the paint has
+   no gaps. A jump longer than PAINT_GAP_FT is the GPS coming back after a
+   dropout, and joining the dots would paint a straight line across ground
+   nobody mowed -- so it starts a fresh stroke instead. */
+function paintGps(taskId, pos, wFt) {
+  if (!pos || !pos.lat) return false;
+  if (pos.acc && pos.acc > COV_MAX_ACC_FT) return false;
+  var p = [pos.lat, pos.lng], now = Date.now(), lv = PAINT.live[taskId];
+  if (lv && lv.pts.length) {
+    var d = ftBetween(lv.pts[lv.pts.length - 1], p);
+    if (d < COV_MIN_STEP_FT) return false;
+    if (d > PAINT_GAP_FT) { paintSeal(taskId, false); lv = null; }
+  }
+  if (!lv) lv = PAINT.live[taskId] = { sid: paintSid(), who: SESSION.pid, at: now, w: wFt || COV_DEFAULT_DECK_FT, pts: [] };
+  lv.pts.push(p);
+  if (lv.pts.length >= PAINT_SEAL_PTS || now - lv.at >= PAINT_SEAL_MS) paintSeal(taskId, true);
+  return true;
+}
+function paintSeal(taskId, carry) {
+  var lv = PAINT.live[taskId]; if (!lv) return;
+  delete PAINT.live[taskId];
+  if (lv.pts.length >= 2) paintAdd(taskId, { sid: lv.sid, who: lv.who, at: lv.at, how: 'gps', w: lv.w, pts: lv.pts });
+  if (carry && lv.pts.length) {
+    PAINT.live[taskId] = { sid: paintSid(), who: lv.who, at: Date.now(), w: lv.w, pts: [lv.pts[lv.pts.length - 1]] };
+  }
+}
+/* Anything still being drawn is closed off before the phone might be put away,
+   so at most the last few seconds are lost if the app is then killed. */
+function paintSealAll() { Object.keys(PAINT.live).forEach(function (id) { paintSeal(id, false); }); }
+try {
+  document.addEventListener('visibilitychange', function () { if (document.hidden) paintSealAll(); });
+  window.addEventListener('pagehide', paintSealAll);
+} catch (e) {}
+
+/* ---- finger strokes ------------------------------------------------------ */
+function paintHandStart(taskId, p, wFt) {
+  PAINT.hand = { taskId: taskId, sid: paintSid(), who: SESSION.pid, at: Date.now(), how: 'hand', w: wFt || COV_DEFAULT_DECK_FT, pts: [p] };
+}
+function paintHandMove(p) {
+  var hd = PAINT.hand; if (!hd) return false;
+  if (ftBetween(hd.pts[hd.pts.length - 1], p) * 0.3048 < PAINT_HAND_STEP_M) return false;
+  hd.pts.push(p);
+  return true;
+}
+function paintHandEnd() {
+  var hd = PAINT.hand; PAINT.hand = null;
+  if (!hd || !hd.pts.length) return false;
+  paintAdd(hd.taskId, hd);
+  return true;
+}
+function paintHandCancel() { PAINT.hand = null; }
+
+/* Undo takes back this person's most recent FINGER stroke. GPS paint is not
+   offered: it is the record of where the mower actually went. */
+function paintUndo(taskId) {
+  var rec = paintRec(taskId, false); if (!rec) return false;
+  var me = SESSION.pid, best = null;
+  Object.keys(rec.strokes).forEach(function (sid) {
+    var s = rec.strokes[sid];
+    if (!s || s.del || s.how !== 'hand' || s.who !== me) return;
+    if (!best || (s.at || 0) >= (rec.strokes[best].at || 0)) best = sid;
+  });
+  if (!best) return false;
+  var s = JSON.parse(JSON.stringify(rec.strokes[best]));
+  s.del = true;
+  rec.strokes[best] = s;
+  paintSave();
+  try { psyncPush(); } catch (e) {}
+  paintEmit();
+  return true;
+}
+function paintCanUndo(taskId) {
+  var rec = paintRec(taskId, false), me = SESSION.pid;
+  return !!rec && Object.keys(rec.strokes).some(function (sid) {
+    var s = rec.strokes[sid]; return s && !s.del && s.how === 'hand' && s.who === me;
+  });
+}
+/* Who has painted on this job in the last ten minutes, for the crew row.
+   A timestamp from a phone whose clock runs fast counts as now, not as never. */
+function paintRecent(taskId, me) {
+  var now = Date.now(), out = {};
+  paintStrokes(taskId).forEach(function (s) {
+    if (!s.who || s.who === me) return;
+    if (now - Math.min(now, s.at || 0) <= 10 * 60 * 1000) out[s.who] = 1;
+  });
+  return Object.keys(out);
+}
+
+/* ---- drawing the paint ----------------------------------------------------
+   Its own map pane, above the plots, so redrawing the plots underneath never
+   buries it. A line is drawn as wide as the machine's deck at the current
+   zoom, so the paint on screen is the width of the cut. */
+function paintLayer(map, taskId) {
+  if (!map) return null;
+  try {
+    if (!map.getPane('twpaint')) {
+      var pn = map.createPane('twpaint');
+      pn.style.zIndex = 450; pn.style.pointerEvents = 'none';
+    }
+  } catch (e) {}
+  var rend = L.canvas({ pane: 'twpaint' });
+  var g = L.layerGroup().addTo(map);
+  function redraw() {
+    g.clearLayers();
+    var z = map.getZoom(), lat = 35.9;
+    try { lat = map.getCenter().lat; } catch (e) {}
+    var mpp = 40075016.686 * Math.cos(lat * Math.PI / 180) / Math.pow(2, z + 8);
+    paintStrokes(taskId).forEach(function (s) {
+      var px = Math.max(2, s.w * 0.3048 / mpp);
+      var o = { renderer: rend, pane: 'twpaint', interactive: false, color: PAINT_COLOR, opacity: 0.72,
+                weight: px, lineCap: 'round', lineJoin: 'round' };
+      if (s.pts.length === 1) L.circle(s.pts[0], { renderer: rend, pane: 'twpaint', interactive: false, stroke: false,
+        radius: s.w * 0.3048 / 2, fillColor: PAINT_COLOR, fillOpacity: 0.72 }).addTo(g);
+      else L.polyline(s.pts, o).addTo(g);
+    });
+  }
+  map.on('zoomend', redraw);
+  redraw();
+  return { layer: g, redraw: redraw,
+           remove: function () { try { map.off('zoomend', redraw); map.removeLayer(g); } catch (e) {} } };
+}
+
+/* ============================================================
+   ALLEY PAINT IN THE SHARED DATABASE
+   ------------------------------------------------------------
+   Copies the crew-claims drawer above, with two differences that both exist
+   to keep the read bill down:
+     - Phones listen only to records still `open`. A finished alley job drops
+       out of every phone's list, instead of being read again every time
+       somebody opens the app for the rest of the farm's life.
+     - One send per task per ten seconds. A person painting by hand can make
+       twenty strokes a minute; they go up together.
+
+   An arriving record is applied completely. The one thing that does not come
+   over is a stroke this phone has Undone and not yet sent -- Undo only goes
+   one way, so the send that follows makes the two agree, and they stay agreed.
+   Strokes this phone has that the server does not are this phone's unsent
+   work, and they stay. tools/test-sync-settles.js and tools/test-paint.js
+   prove the drawer goes quiet.
+   ============================================================ */
+var PSYNC_COLL = 'paint';
+var PSYNC_RETRY_MS = 10000;
+var PSYNC = { on: false, live: false, ready: false, seen: {}, err: null, up: 0, down: 0, failed: {}, lastSent: {} };
+var _psyncNextTry = 0;
+
+/* On, always — see "SHARING IS NOT OPTIONAL" over flsyncWanted(). */
+function psyncHydrate() { PSYNC.on = true; }
+function psyncStart() {
+  if (PSYNC.live) return true;
+  if (Date.now() < _psyncNextTry) return false;
+  var db = fbDb();
+  if (!db || !SESSION.pid) {
+    PSYNC.err = db ? 'Nobody is signed in yet' : 'The database code did not load on this device';
+    _psyncNextTry = Date.now() + PSYNC_RETRY_MS; return false;
+  }
+  try {
+    PSYNC.unsub = db.collection(PSYNC_COLL).where('open', '==', true).onSnapshot(snapOpts(), psyncOnSnapshot, function (e) {
+      PSYNC.err = (typeof sdbError === 'function') ? sdbError(e) : String(e && e.message || e);
+      PSYNC.live = false; PSYNC.ready = false; _psyncNextTry = Date.now() + PSYNC_RETRY_MS;
+    });
+    PSYNC.live = true; PSYNC.err = null;
+    return true;
+  } catch (e) {
+    PSYNC.err = (typeof sdbError === 'function') ? sdbError(e) : String(e && e.message || e);
+    _psyncNextTry = Date.now() + PSYNC_RETRY_MS;
+    return false;
+  }
+}
+function psyncStop() {
+  try { if (PSYNC.unsub) PSYNC.unsub(); } catch (e) {}
+  PSYNC.unsub = null; PSYNC.live = false; PSYNC.ready = false; PSYNC.seen = {};
+}
+
+/* Saves to the phone and redraws. It never sends: a record arriving is the
+   thing a send causes, and sending from here would close the circle that cost
+   the farm 4.4 million reads on 2026-08-31. */
+function psyncOnSnapshot(snap) {
+  /* Green on the Shared database screen means the server has answered. */
+  try { if (!snap.metadata || !snap.metadata.fromCache) PSYNC.ready = true; } catch (e) {}
+  var changes; try { changes = snap.docChanges(); } catch (e) { return; }
+  if (!changes.length) return;
+  var db = paintLoad(), touched = false;
+  changes.forEach(function (ch) {
+    var id = String(ch.doc.id);
+    if (ch.type === 'removed') {
+      /* Out of the open list: the job is finished. Nothing left to paint. */
+      delete PSYNC.seen[id];
+      if (db[id]) { delete db[id]; delete PAINT.cov[id]; touched = true; }
+      return;
+    }
+    var data; try { data = ch.doc.data(); } catch (e) { return; }
+    if (!data) return;
+    var strokes = data.strokes || {}, seen = {};
+    Object.keys(strokes).forEach(function (sid) { seen[sid] = sdbJson(strokes[sid]); });
+    PSYNC.seen[id] = { open: data.open !== false, strokes: seen };
+    PSYNC.down++;
+    var rec = db[id] || (db[id] = { open: true, strokes: {} });
+    Object.keys(strokes).forEach(function (sid) {
+      var mine = rec.strokes[sid], theirs = strokes[sid];
+      if (mine && mine.del && !theirs.del) return;          /* my Undo, not sent yet */
+      if (mine && sdbJson(mine) === seen[sid]) return;
+      rec.strokes[sid] = JSON.parse(JSON.stringify(theirs));
+      delete PAINT.dec[sid];
+      touched = true;
+    });
+    if (data.open === false && rec.open !== false) { rec.open = false; touched = true; }
+  });
+  if (touched) { paintSave(); paintEmit(); }
+}
+
+/* A finished task closes its record, whichever phone finished it. */
+function paintCloseDone() {
+  if (typeof TASKS === 'undefined') return;
+  var db = paintLoad(), ch = false;
+  Object.keys(db).forEach(function (id) {
+    if (db[id].open === false) return;
+    var t = TASKS.find(function (x) { return x.id === id; });
+    if (t && t.status === 'done') { db[id].open = false; ch = true; }
+  });
+  if (ch) paintSave();
+}
+
+/* Only strokes that differ from what the server last said are named, so two
+   people painting the same job never overwrite each other. */
+function psyncPush() {
+  if (!PSYNC.on || !PSYNC.live) return 0;
+  var fdb = fbDb(); if (!fdb) return 0;
+  var db = paintLoad(), wrote = 0, now = Date.now();
+  Object.keys(db).forEach(function (tid) {
+    var rec = db[tid], seen = PSYNC.seen[tid];
+    if (rec.open === false) {
+      /* Close it if the server still has it open; otherwise there is nothing
+         to say, and the phone's copy can go. */
+      if (!seen || !seen.open) { delete db[tid]; delete PAINT.cov[tid]; paintSave(); return; }
+    }
+    seen = seen || { open: null, strokes: {} };
+    if (now - (PSYNC.lastSent[tid] || 0) < PAINT_SEND_GAP_MS) return;
+    var payload = { strokes: {} }, any = false;
+    if (rec.open !== false) Object.keys(rec.strokes || {}).forEach(function (sid) {
+      if (PSYNC.failed[tid + '/' + sid]) return;
+      if (seen.strokes[sid] !== sdbJson(rec.strokes[sid])) { payload.strokes[sid] = rec.strokes[sid]; any = true; }
+    });
+    var wantOpen = rec.open !== false;
+    if (seen.open !== wantOpen && !PSYNC.failed[tid + '/#open']) { payload.open = wantOpen; any = true; }
+    if (!any) return;
+    if (!sdbMaySend('paint/' + tid, 'alley paint')) return;   /* the brake — see sdbMaySend() */
+    var next = { open: wantOpen, strokes: {} };
+    Object.keys(seen.strokes).forEach(function (sid) { next.strokes[sid] = seen.strokes[sid]; });
+    Object.keys(payload.strokes).forEach(function (sid) { next.strokes[sid] = sdbJson(payload.strokes[sid]); });
+    PSYNC.seen[tid] = next;
+    PSYNC.lastSent[tid] = now;
+    wrote++; PSYNC.up++;
+    try {
+      fdb.collection(PSYNC_COLL).doc(String(tid)).set(payload, { merge: true }).catch(function (e) {
+        /* Refused is refused: remember it, so the refusal coming back as a
+           snapshot does not start the same send again every two seconds. */
+        var why = (typeof sdbError === 'function') ? sdbError(e) : String(e && e.message || e);
+        Object.keys(payload.strokes).forEach(function (sid) { PSYNC.failed[tid + '/' + sid] = why; });
+        if ('open' in payload) PSYNC.failed[tid + '/#open'] = why;
+      });
+    } catch (e) { PSYNC.err = String(e && e.message || e); }
+  });
+  return wrote;
+}
+
+function psyncTick() {
+  if (!PSYNC.on) return;
+  if (!PSYNC.live) psyncStart();
+  paintCloseDone();
+  psyncPush();
+}
+function psyncSummary() {
+  if (!PSYNC.on) return 'Off — paint stays on this phone';
+  if (PSYNC.err) return PSYNC.err;
+  if (!PSYNC.live) return 'Connecting…';
+  return PSYNC.up + ' sent · ' + PSYNC.down + ' received' + sdbStuckNote();
+}
+
+/* ============================================================
    JOB MAP · real farm geometry behind the task screens
    Used by the crew task-work screen and the assign wizard's plot picker.
    A mowing job resolves its plots from the mower assigned in Farm info, so a
@@ -5905,18 +6412,37 @@ function jobGravelZones(){ return Object.keys(GRAVEL_ZONES).filter(function(z){ 
 function jobSpraysGravel(type,name){
   return ['pesticide','herbicide','fungicide','insecticide'].indexOf(jobResKind(type,name))>=0;
 }
-/* The alley job used to be one check box over ten acres. It now resolves to the
-   zones in ALLEY_ZONES, so the ground can be split between two people, claimed
-   a zone at a time, and shown as progress. ALLEY_UNIT is kept for any task
-   saved before the split. */
+/* The ground of the alley job: ONE shape, ALLEY_UNIT, the whole of
+   ALLEYS_DATA.
+
+   History, because it went round in a circle. The alley job started as one
+   check box over ten acres. It was then cut into ten zones (AZ01-AZ10) so two
+   people could split it and it could show progress. On 2026-09-18 Dillon asked
+   for one shape again -- but with the progress kept, which is now PAINT: the
+   GPS and a finger paint what was mown, the percentage painted is the
+   progress, and two people share one job by seeing each other's paint instead
+   of claiming zones. See "ALLEY PAINT" above.
+
+   AZ01-AZ10 stay in farm-geo.js: the field log names them on entries written
+   before the change, and those still have to read as a place. The gravel,
+   AZ11, is untouched -- still its own zone, on weed sprays only. */
 function jobAlleyZones(){
-  if(typeof ALLEY_ZONES==='undefined'||!ALLEY_ZONES.features.length) return [ALLEY_UNIT];
-  /* Gravel alleyways live in this list because they are alley ground with a
-     real footprint, but the alley job is a MOWING job and there is nothing on
-     gravel to cut. They reach the crew through spray jobs instead. */
-  return ALLEY_ZONES.features.map(function(f){ return f.properties.zone; })
-                             .filter(function(z){ return !jobZoneIsGravel(z); });
+  return [ALLEY_UNIT];
 }
+/* Grass alley zones saved on a task before 2026-09-18 now mean the one alley
+   shape. Gravel stays a zone of its own. */
+function jobIsGrassZone(id){ return jobIsZone(id) && !jobZoneIsGravel(id); }
+function jobAlleyMerge(list){
+  var out=[], had=false;
+  (list||[]).forEach(function(n){
+    if(n===ALLEY_UNIT||jobIsGrassZone(n)){ if(!had){ had=true; out.push(ALLEY_UNIT); } return; }
+    out.push(n);
+  });
+  return out;
+}
+/* Is this job painted rather than ticked? True when its ground includes the
+   alley shape. Used by the work screen. */
+function taskIsPaint(t){ return !!t && taskPlots(t).indexOf(ALLEY_UNIT)>=0; }
 function jobZoneFeature(id){
   if(typeof ALLEY_ZONES==='undefined') return null;
   var out=null;
@@ -6177,12 +6703,17 @@ function jobPlots(type,name,fallback){
 
    Now the map opens the whole farm and the usual set is a button (see
    jobQuickSet below). Zones are the one thing not offered everywhere, because
-   they are not ordinary ground: the alleys come with any mowing job, and the
-   gravel only with a job that has business on stone -- a fertilizer run does
-   not, which is the rule jobSpraysGravel() already carries. */
+   they are not ordinary ground: the grass alleys come only with the alley job
+   itself (Rotary - Alleys), and the gravel only with a job that has business
+   on stone -- a fertilizer run does not, which is the rule jobSpraysGravel()
+   already carries.
+
+   The alleys used to come with ANY mowing job, so a fairway or greens mow
+   offered ten alley pieces nobody would ever put on it. Dillon asked on
+   2026-09-18 for them to belong to the alley job alone. */
 function jobPickTargets(type,name,fallback){
   var out=jobAllPlots();
-  if(jobResKind(type,name)==='mow') out=out.concat(jobAlleyZones());
+  if(jobIsAlleys(type,name)) out=out.concat(jobAlleyZones());
   if(jobSpraysGravel(type,name))    out=out.concat(jobGravelZones());
   /* Ground already on the job stays pickable even when it would not be offered
      today -- an alley unit saved before the zone split, for one. */
@@ -6215,7 +6746,9 @@ function jobQuickLabel(type,name,fallback){
    tap, and the job could never be finished. */
 function jobRealPlots(list){
   var all=jobAllPlots();
-  return (list||[]).filter(function(n){ return all.indexOf(n)>=0 || jobIsZone(n); });
+  return jobAlleyMerge(list).filter(function(n){
+    return all.indexOf(n)>=0 || jobIsZone(n) || (n===ALLEY_UNIT && typeof ALLEYS_DATA!=='undefined');
+  });
 }
 /* Why a job has no ground on it, in words the person on the map can act on,
    or '' when it has some. A mow job that narrows to a machine is the case
@@ -6588,14 +7121,20 @@ function jobMapDraw(st,o){
         +'</div></div>',{maxWidth:280});
     });
   }
-  /* Legacy single-unit alley job, for any task saved before the zone split. */
+  /* The alleys, as one shape. On the assign map it is picked like a plot. On
+     the work map (o.paint) it is never ticked: it is drawn as ground still to
+     do, the paint goes over it in its own layer (paintLayer), and the badge
+     says how much is painted. */
   if(tset[ALLEY_UNIT] && typeof ALLEYS_DATA!=='undefined'){
-    var aHit=(o.mode==='pick')?!!sset[ALLEY_UNIT]:!!dset[ALLEY_UNIT];
-    var aStyle=aHit?{color:'#1e6b2e',weight:2,fillColor:'#2f9e4f',fillOpacity:.72}
+    var aPaint=!!o.paint&&o.mode!=='pick';
+    var aPct=aPaint&&o.taskId?paintPct(o.taskId):0;
+    var aHit=aPaint?false:((o.mode==='pick')?!!sset[ALLEY_UNIT]:!!dset[ALLEY_UNIT]);
+    var aStyle=aPaint?{color:'#ff8200',weight:2,fillColor:'#ffb266',fillOpacity:.34}
+              :aHit?{color:'#1e6b2e',weight:2,fillColor:'#2f9e4f',fillOpacity:.72}
                    :{color:'#2f9e4f',weight:2,fillColor:'#3cbf5a',fillOpacity:.45};
     var aLyr=L.geoJSON(ALLEYS_DATA,{style:aStyle,interactive:true});
     aLyr.addTo(st.g);
-    if(o.onTap) aLyr.on('click',function(){ o.onTap(ALLEY_UNIT,{blocked:false,partial:false,res:{full:[],pin:[]}}); });
+    if(o.onTap) aLyr.on('click',function(){ o.onTap(ALLEY_UNIT,{blocked:false,partial:false,alley:true,res:{full:[],pin:[]}}); });
     try{ var ab=aLyr.getBounds(); jb=L.latLngBounds(ab.getSouthWest(),ab.getNorthEast()); }catch(e){}
     var ac=null; try{ ac=aLyr.getBounds().getCenter(); }catch(e){}
     /* Alleys carry a cut height, but it only goes on the badge for rotary work
@@ -6603,10 +7142,12 @@ function jobMapDraw(st,o){
     var aCut=jobShowsCut(o.jobType,o.jobName);
     if(ac) L.marker([ac.lat,ac.lng],{icon:L.divIcon({className:'resbadge-wrap',
       html:'<div class="resbadge" data-plot="'+ALLEY_UNIT+'">'+(aHit?'<b class="ck">✓</b>':'')
+        +(aPaint?('<b style="background:#2f9e4f">'+((aPct>0&&aPct<0.01)?'<1':Math.floor(aPct*100))+'% mown</b>'):'')
         +(aCut?('<b style="background:#1e6b2e">'+esc(cutText(ALLEY_CUT))+'</b>'):'')+'<b>Alleys &amp; borders</b></div>',
       iconSize:[0,0]}),interactive:false,keyboard:false}).addTo(st.g);
-    aLyr.bindPopup('<div class="plotpop"><div class="pp-title">Alleys &amp; borders</div>'
-      +'<div class="pp-note">Mown at '+esc(cutText(ALLEY_CUT))+' · one unit, worked in a single pass</div></div>',{maxWidth:280});
+    if(!aPaint) aLyr.bindPopup('<div class="plotpop"><div class="pp-title">Alleys &amp; borders</div>'
+      +'<div class="pp-note">Mown at '+esc(cutText(ALLEY_CUT))+' · one shape · the crew paint what they mow, '
+      +'and '+Math.round(PAINT_DONE_PCT*100)+'% painted finishes the job</div></div>',{maxWidth:280});
   }
   /* Mow jobs draw height blocks instead of numbered plots — work out which
      plots those blocks swallow so the per-plot pass can skip them.
@@ -7203,6 +7744,7 @@ function storeScan(){
   try{ tsyncTick(); }catch(e){}
   try{ msyncTick(); }catch(e){}
   try{ csyncTick(); }catch(e){}
+  try{ psyncTick(); }catch(e){}
   try{ flsyncTick(); }catch(e){}
   try{ invsyncTick(); }catch(e){}
   try{ schsyncTick(); }catch(e){}
@@ -7240,6 +7782,7 @@ function storeHydrate(){
   try{ tsyncHydrate(); }catch(e){}
   try{ msyncHydrate(); }catch(e){}
   try{ csyncHydrate(); }catch(e){}
+  try{ psyncHydrate(); }catch(e){}
   try{ flsyncHydrate(); }catch(e){}
   try{ invsyncHydrate(); }catch(e){}
   try{ schsyncHydrate(); }catch(e){}

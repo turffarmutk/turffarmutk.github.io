@@ -716,6 +716,58 @@ job is". Narrow the *button*, never the map. And do not drop `blockOn` and let
 the picker block everything it draws — the map still looks right and two plots
 quietly become one. `tools/test-plot-picker.js` pins all of it.
 
+### The alleys are one shape, painted as they are mown — 2026-09-18
+**Decision:** the alley job's ground is ONE shape, `ALLEY_UNIT` (all of
+`ALLEYS_DATA`), not the ten zones AZ01–AZ10. What has been mown is **paint**:
+the phone's GPS paints a deck-wide stroke as the mower drives, and "Paint by
+hand" lets a person drag a finger over ground the GPS missed (Undo takes back
+their own last finger stroke; GPS paint cannot be undone). The job can be
+finished once **80%** of the alleys is painted (`PAINT_DONE_PCT`), so nobody
+chases the last few feet. The paint lives in the shared database as
+`paint/{taskId}`, so two people see each other's paint, and when Bill hands an
+unfinished alley job to somebody else the next day (Edit → change the
+person), they see only what is left. The field log entry says how much was
+mown ("Alleys 93% mown").
+**Why:** Dillon asked for one shape, but also for two people at once and for
+partial days to carry over. Zones gave those by cutting the ground up; paint
+gives them without cutting it up.
+**Things that look wrong and are not:**
+- **AZ01–AZ10 are still in `farm-geo.js`.** Old field log entries name them.
+  A task saved with those codes now reads as the one shape (`jobAlleyMerge`).
+- **AZ11, the CAFS gravel, is still a zone** that is claimed and ticked, on
+  weed sprays only. The claim / hand-in machinery is its alone now.
+- **The percentage is measured on a one-metre grid**, not with polygon maths,
+  because intersecting hundreds of strokes with a 1,400-corner outline would
+  stall a phone. Paint off the alleys (the road from the shop) is drawn but
+  never counted.
+- **Phones listen only to `open` paint records.** A finished task closes its
+  record, which drops it from every phone. Listening to the whole collection
+  would read every alley job ever mown each time anybody opened the app.
+- **One send per task per ten seconds.** Finger painting makes many strokes a
+  minute, and the loop brake (`sdbMaySend`) stops a record for good at twelve.
+- **A stroke never changes once written; Undo only sets `del`, one way.** That
+  is what lets an arriving record be applied completely without fighting this
+  phone's unsent work — the rule from 2026-08-31.
+**Don't:** go back to ten zones to get "progress" — the percentage is the
+progress. Don't list the whole `paint` collection. Don't send from
+`psyncOnSnapshot`. `tools/test-paint.js` and the row in
+`tools/test-sync-settles.js` pin it. **The rules file gained a `paint` block —
+it does nothing until it is published** (`docs/PUBLISH-THE-RULES.md`); until
+then paint stays on each phone and the Shared database screen says it was
+refused.
+
+### The grass alleys are offered on the alley job and nowhere else — 2026-09-18
+**Decision:** `jobPickTargets()` adds the alleys only when `jobIsAlleys()`
+— the Rotary - Alleys job. It used to add them to *every* mowing job, so a
+fairway or greens mow was offered ten alley pieces. (Later the same day the
+ten pieces became one shape — see the entry above.) The CAFS gravel (AZ11) is
+unchanged: weed sprays only, per the AZ06/AZ11 entry below.
+**Why:** Dillon asked for it. Nobody puts alley ground on a fairway mow, and
+offering it only made a wrong tap possible.
+**Don't:** read this as undoing "any plot may be picked" above. That entry is
+about *plots*, and every plot is still offered on every job. Only the alley
+zones are narrowed. `tools/test-plot-picker.js` section 1 pins it.
+
 ### The plots picked when a job is assigned ARE the job — 2026-08-30
 **Decision:** `taskPlots()` — the ground an assigned job actually covers —
 returns the plots saved on the task whenever there are any, and only falls
@@ -983,8 +1035,9 @@ stated area, B18 ~77%.
 "CAFS surrounds"** (67,955 sq ft) is grass, rings the CAFS block, is mowable, and
 counts in the `Alleys` total. **AZ11 "CAFS alleyways"** (63,517 sq ft) is gravel
 — defined as every square foot inside the surrounds boundary that isn't a plot.
-`GRAVEL_ZONES={AZ11:1}` drives it: `jobAlleyZones()` filters gravel out so the
-alley *mow* job never offers it, while `jobSpraysGravel()` makes it pickable on
+`GRAVEL_ZONES={AZ11:1}` drives it: the alley *mow* job never offers it (since
+2026-09-18 that job is the one `ALLEYS_DATA` shape, which never included the
+gravel), while `jobSpraysGravel()` makes it pickable on
 pesticide/herbicide/fungicide/insecticide — never fertilizer or wetting agent.
 **Why:** you mow grass and you spray gravel, and the app has to know which is
 which. AZ11 was briefly and wrongly named "CAFS alleys" and marked gravel, which

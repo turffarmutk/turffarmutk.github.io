@@ -3044,6 +3044,11 @@ function flAddFromTask(t){
  if(!t||t._logged)return false;
  var type=flClassify(t); if(!type)return false;
  var plots=parsePlots(t);
+ /* Old alley tasks carry ten zone codes; since 2026-09-18 they are one shape. */
+ if(typeof jobAlleyMerge==='function') plots=jobAlleyMerge(plots);
+ /* An alley job closes at 80% painted, not 100%, so the log says how much. */
+ var alleyNote=(typeof paintPct==='function'&&typeof ALLEY_UNIT!=='undefined'&&plots.indexOf(ALLEY_UNIT)>=0)
+   ? ('Alleys '+Math.floor(paintPct(t.id)*100)+'% mown') : '';
  /* Ground somebody already handed in on their way off the job (see
     flAddPartFromTask) is on the log under their name. Logging it again when
     the job finally closes would double-count the acre and credit it to the
@@ -3079,7 +3084,7 @@ function flAddFromTask(t){
    dueAt:t.dueAt||null,due:dueLabel(t)||null,repeat:(t.repeat&&t.repeat!=='None')?t.repeat:null,
    product:mx?mx.productName:null,rate:mx?mx.rateText:null,amount:mx?mx.productText:null,
    closedBy:(t.closedBy&&t.closedBy!==by)?t.closedBy:null,
-   notes:(t.desc||'')+(mx?((t.desc?'\n':'')+'Mix: '+mx.line):'')
+   notes:[t.desc||'',mx?('Mix: '+mx.line):'',(alleyNote&&p===ALLEY_UNIT)?alleyNote:''].filter(Boolean).join('\n')
  });});
  t._logged=true; flCommit(); return true;
 }

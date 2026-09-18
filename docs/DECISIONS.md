@@ -1091,8 +1091,10 @@ its screen name off `CS_LOCKED`; to release them all, delete the block and the
 rules are unchanged.
 
 ### A name on the Task Board is coloured by where that person is in their day — 2026-09-18
-**Decision:** on the Board tab each name gets a highlight (`tbPersonState()`
-in `app-03-people.js`). **Orange** means scheduled and not clocked in yet.
+**Decision:** on the Board tab each name's text is coloured (`tbPersonState()`
+in `app-03-people.js`). Only the text: the same day a highlighted bar with a
+background was tried, and Dillon asked for plain coloured names back, as the
+schedule's green name used to be. **Orange** means scheduled and not clocked in yet.
 **Green** means on the clock now. **Red** means clocked out today, or the shift
 has ended. A person with no shift and no punch stays plain grey. Clocking in
 beats everything else, so somebody who comes in early, or comes in when they

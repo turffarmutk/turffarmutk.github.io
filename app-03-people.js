@@ -1515,7 +1515,7 @@ function tbBoardRow(t,n,first,last){
  var del='<span class="del tap" data-del="'+t.id+'" title="Delete">🗑</span>';
  return '<div class="row">'+num+'<div class="tap" data-task="'+t.id+'" style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+areaWithDue(t)+'</div></div><span style="display:flex;flex-direction:column;gap:4px;flex:none">'+up+dn+'</span>'+del+'</div>';
 }
-/* Where somebody is in their day, for the highlight on their name on the Board
+/* Where somebody is in their day, for the colour of their name on the Board
    tab. Dillon, 2026-09-18:
      sched (orange)  scheduled, and not here yet
      on    (green)   on the clock right now
@@ -1525,7 +1525,7 @@ function tbBoardRow(t,n,first,last){
    scheduled person whose start time has passed with no clock-in stays orange
    (still expected) until the shift's end, then goes red.
    Punches exist only for today, so any other day on the chips is orange or
-   nothing. Returns null for nobody-expected-and-nobody-came: no highlight.
+   nothing. Returns null for nobody-expected-and-nobody-came: plain grey.
    The colour-blind palette swaps these three for amber, blue and vermillion
    and gives each dot its own shape; the words under the name say it outright
    either way. That CSS sits with the colour-blind rules in the page. */
@@ -1618,12 +1618,12 @@ function renderTasks(){
    people.forEach(function(s){
      var mine=TASKS.filter(function(t){return taskIsFor(t,s)&&t.status==='todo'&&t.kind==='task'&&taskOnDay(t);});
      var slabel=(isMe(s)?nameOf(s)+' (you)':nameOf(s));
-     /* Where they are in their day, as a highlight on their name: orange
+     /* Where they are in their day, as the colour of their name: orange
         before they arrive, green while on the clock, red once they have
-        clocked out or the shift is over. See tbPersonState(). No highlight
+        clocked out or the shift is over. See tbPersonState(). Plain grey
         means they are not down for this day and have not punched. */
      var bst=tbPersonState(s,bDate);
-     html+='<div class="sec'+(bst?(' tbp tbp-'+bst.k):'')+'">'+esc(slabel)+' · '+mine.length+(mine.length===1?' task':' tasks')
+     html+='<div class="sec'+(bst?(' tbp-'+bst.k):'')+'">'+esc(slabel)+' · '+mine.length+(mine.length===1?' task':' tasks')
           +(bst?('<div class="tbp-sub"><span class="tbp-dot"></span>'+esc(bst.txt)+'</div>'):'')
           +'</div>';
      /* Bill's own section is his work, not his paperwork. Everyone else's rows

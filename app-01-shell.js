@@ -1526,7 +1526,7 @@ var CB_MAP={
  '#517c96':'#56849e','#22a5c4':'#56b4e9','#0f8a78':'#009e73','#b07d3e':'#a07c2e',
  '#d17a00':'#e69f00','#7c5cbf':'#cc79a7','#3cbf5a':'#3fbfae','#d55e00':'#d55e00',
  /* Already colour-blind safe, and chosen by hand for the task board's name
-    highlights (see .tbp-* in the page), so they must come through unchanged. */
+    colours (see .tbp-* in the page), so they must come through unchanged. */
  '#e69f00':'#e69f00','#0072b2':'#0072b2','#8c6d00':'#8c6d00',
  '#fbf3d9':'#fbf3d9','#e8f4fc':'#e8f4fc','#fdf0e6':'#fdf0e6'
 };

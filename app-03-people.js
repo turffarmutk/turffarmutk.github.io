@@ -1515,8 +1515,58 @@ function tbBoardRow(t,n,first,last){
  var del='<span class="del tap" data-del="'+t.id+'" title="Delete">🗑</span>';
  return '<div class="row">'+num+'<div class="tap" data-task="'+t.id+'" style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+areaWithDue(t)+'</div></div><span style="display:flex;flex-direction:column;gap:4px;flex:none">'+up+dn+'</span>'+del+'</div>';
 }
+/* Where somebody is in their day, for the highlight on their name on the Board
+   tab. Dillon, 2026-09-18:
+     sched (orange)  scheduled, and not here yet
+     on    (green)   on the clock right now
+     off   (red)     clocked out today, or the shift has ended
+   Being on the clock wins over everything, so somebody who clocks in early, or
+   comes in on a day they were not down for, shows green -- they are here. A
+   scheduled person whose start time has passed with no clock-in stays orange
+   (still expected) until the shift's end, then goes red.
+   Punches exist only for today, so any other day on the chips is orange or
+   nothing. Returns null for nobody-expected-and-nobody-came: no highlight.
+   The colour-blind palette swaps these three for amber, blue and vermillion
+   and gives each dot its own shape; the words under the name say it outright
+   either way. That CSS sits with the colour-blind rules in the page. */
+function tbPersonState(pid,d){
+  var sh=schedShiftOn(pid,d);
+  var span=sh?(schedFmt(sh.start)+'–'+schedFmt(sh.end)):'';
+  var today=asOrd(d)===asTodayOrd();
+  var tc=(today&&typeof window.tcBoardState==='function')?window.tcBoardState(pid):null;
+  if(tc&&tc.state==='on') return {k:'on',txt:'Clocked in '+tc.at+(sh?' · scheduled '+span:'')};
+  if(tc&&tc.state==='off') return {k:'off',txt:'Clocked out '+tc.at+(sh?' · scheduled '+span:'')};
+  if(!sh) return null;
+  if(today){
+    var n=new Date(), now=n.getHours()*60+n.getMinutes();
+    if(now>=schedToMin(sh.end)) return {k:'off',txt:'Shift over · scheduled '+span};
+    if(now>=schedToMin(sh.start)) return {k:'sched',txt:'Not clocked in yet · scheduled '+span};
+  }
+  return {k:'sched',txt:'Scheduled '+span};
+}
+/* The colours move on their own -- a shift ends, somebody on another phone
+   clocks in -- and the board is otherwise only drawn when you open it. Once a
+   minute, if the Board tab is showing today and any name's colour would now
+   be different, draw it again. Comparing first means a board nobody is
+   changing is left alone, so it does not jump under a thumb mid-scroll. */
+var _tbStateSig='';
+function tbStateSig(){
+  if(tbTab!=='board'||boardDayOrd()!==asTodayOrd()) return '';
+  var d=asDateFromOrd(boardDayOrd());
+  return STUDENTS.map(function(s){var st=tbPersonState(s,d);return st?st.k+st.txt:'';}).join('|');
+}
+function tbRefreshIfChanged(){
+  try{
+    var scr=document.getElementById('s-taskboard');
+    if(!scr||!scr.classList.contains('active')) return;
+    var sig=tbStateSig();
+    if(sig&&sig!==_tbStateSig) renderBoard();
+  }catch(e){}
+}
+setInterval(tbRefreshIfChanged,60000);
 function renderTasks(){
  var body=document.getElementById('tb-body'); if(!body)return;
+ try{ _tbStateSig=tbStateSig(); }catch(e){ _tbStateSig=''; }
  var daysbar=document.getElementById('tb-daysbar');
  var showDays=false;
  var html='';
@@ -1568,13 +1618,13 @@ function renderTasks(){
    people.forEach(function(s){
      var mine=TASKS.filter(function(t){return taskIsFor(t,s)&&t.status==='todo'&&t.kind==='task'&&taskOnDay(t);});
      var slabel=(isMe(s)?nameOf(s)+' (you)':nameOf(s));
-     /* The hours they told us they would be here, under their name. Green
-        means in; no line under the name means they are not down for this day.
-        Same schedShiftOn() the assign screen reads, so the two boards cannot
-        tell Bill different things about the same person on the same day. */
-     var bsh=schedShiftOn(s,bDate);
-     html+='<div class="sec"'+(bsh?' style="color:#2f9e4f"':'')+'>'+esc(slabel)+' · '+mine.length+(mine.length===1?' task':' tasks')
-          +(bsh?('<div style="font:800 10px \'Public Sans\';color:#2f9e4f;letter-spacing:.3px;margin-top:2px;text-transform:none">In '+esc(schedFmt(bsh.start))+'–'+esc(schedFmt(bsh.end))+'</div>'):'')
+     /* Where they are in their day, as a highlight on their name: orange
+        before they arrive, green while on the clock, red once they have
+        clocked out or the shift is over. See tbPersonState(). No highlight
+        means they are not down for this day and have not punched. */
+     var bst=tbPersonState(s,bDate);
+     html+='<div class="sec'+(bst?(' tbp tbp-'+bst.k):'')+'">'+esc(slabel)+' · '+mine.length+(mine.length===1?' task':' tasks')
+          +(bst?('<div class="tbp-sub"><span class="tbp-dot"></span>'+esc(bst.txt)+'</div>'):'')
           +'</div>';
      /* Bill's own section is his work, not his paperwork. Everyone else's rows
         keep the manager controls — rank arrows and a bin — because that is him

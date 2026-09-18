@@ -76,7 +76,8 @@ const EX = ['SCHEDULES','FARM_SEMS','SCHED_DAYS','SESSION','STUDENTS','PEOPLE',
             'schedPill','schedSortForDay','tcCanPunchFor','tcCanEditPunches',
             'STORE_DEFS','SHIFT','WEEKCREW','ROSTER','rstFind','nameOf',
             'tcPunchDocs','tcApplyRemote','tcDropRemote','tcSummary','tcShift','tcToggleClock',
-            'SCHSYNC','TCSYNC','schsyncSummary','tcsyncSummary','assignsUndergrads'];
+            'SCHSYNC','TCSYNC','schsyncSummary','tcsyncSummary','assignsUndergrads',
+            'tbPersonState','CB_MAP'];
 
 /* The app is one file with no exports, so booting it in jsdom and reading the
    globals back out is the only way to test what it actually does. */
@@ -195,6 +196,48 @@ section('3. the day board asks one question, and gets one answer');
   ok('scheduled people sort to the front',
      p.schedSortForDay(['p21', 'p18'], thu).join(',') === 'p18,p21',
      p.schedSortForDay(['p21', 'p18'], thu).join(','));
+}
+
+section('3b. the task board colours each name by where they are in their day');
+{
+  /* A fresh app, so the punches below cannot leak into section 5's check
+     that the clock starts empty. Dillon, 2026-09-18: orange before they
+     arrive, green on the clock, red clocked out or shift over. */
+  const c = boot({});
+  const w = c.win, q = c.p;
+  w.eval("schedSave('p18','Fall 2026',(function(){var d=schedDefault();d.Thu={on:true,start:'09:00',end:'12:00'};return d;})());");
+  const thu = new Date(2026, 9, 15);
+  const fri = new Date(2026, 9, 16);
+  const now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const iso = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+
+  const fut = q.tbPersonState('p18', thu);
+  ok('scheduled on a day still to come is orange', !!fut && fut.k === 'sched', JSON.stringify(fut));
+  ok('and says the hours', !!fut && fut.txt.indexOf('9:00a–12:00p') >= 0, fut && fut.txt);
+  ok('not scheduled and not in is no highlight at all', q.tbPersonState('p18', fri) === null);
+  ok('nobody has punched today yet, so p21 is blank today', q.tbPersonState('p21', today) === null);
+
+  w.eval("tcApplyRemote([{id:'pu-tb1',pid:'p21',date:'" + iso + "',in:'08:00',out:null}]);");
+  const on = q.tbPersonState('p21', today);
+  ok('on the clock is green, even with no schedule', !!on && on.k === 'on', JSON.stringify(on));
+  ok('with the time they came in', !!on && on.txt.indexOf('8:00a') >= 0, on && on.txt);
+
+  w.eval("tcApplyRemote([{id:'pu-tb1',pid:'p21',date:'" + iso + "',in:'08:00',out:'11:30'}]);");
+  const off = q.tbPersonState('p21', today);
+  ok('clocked out is red', !!off && off.k === 'off', JSON.stringify(off));
+  ok('with the time they left', !!off && off.txt.indexOf('11:30a') >= 0, off && off.txt);
+
+  w.eval("tcApplyRemote([{id:'pu-tb2',pid:'p21',date:'" + iso + "',in:'12:30',out:null}]);");
+  ok('back from lunch is green again', (q.tbPersonState('p21', today) || {}).k === 'on');
+
+  /* The colour-blind copy of the stylesheet runs every colour through CB_MAP.
+     These have to come out unchanged or the hand-picked palette is lost. */
+  ['#e69f00', '#0072b2', '#8c6d00', '#fbf3d9', '#e8f4fc', '#fdf0e6', '#d55e00'].forEach(h => {
+    ok('colour-blind palette keeps ' + h, q.CB_MAP && q.CB_MAP[h] === h);
+  });
+  ok('the colour-blind board colours exist', /body\.cb \.tbp-sched\{/.test(HTML) &&
+     /body\.cb \.tbp-on\{/.test(HTML) && /body\.cb \.tbp-off\{/.test(HTML));
+  ok('no errors in the second boot', c.errs.length === 0, c.errs[0]);
 }
 
 section('4. THE WIPE — the time clock keeps its history across a pay period');

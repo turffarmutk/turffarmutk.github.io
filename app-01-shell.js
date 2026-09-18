@@ -1522,7 +1522,11 @@ var CB_MAP={
  '#fdeceb':'#fdf0e6','#eafaef':'#e6f5f1','#fef1dc':'#fbf3d9',
  '#eef4ff':'#e8f4fc','#cfe0ff':'#bfe0f5','#ffcf9e':'#f5dca8',
  '#517c96':'#56849e','#22a5c4':'#56b4e9','#0f8a78':'#009e73','#b07d3e':'#a07c2e',
- '#d17a00':'#e69f00','#7c5cbf':'#cc79a7','#3cbf5a':'#3fbfae','#d55e00':'#d55e00'
+ '#d17a00':'#e69f00','#7c5cbf':'#cc79a7','#3cbf5a':'#3fbfae','#d55e00':'#d55e00',
+ /* Already colour-blind safe, and chosen by hand for the task board's name
+    highlights (see .tbp-* in the page), so they must come through unchanged. */
+ '#e69f00':'#e69f00','#0072b2':'#0072b2','#8c6d00':'#8c6d00',
+ '#fbf3d9':'#fbf3d9','#e8f4fc':'#e8f4fc','#fdf0e6':'#fdf0e6'
 };
 /* which shape a status dot gets, keyed off its ORIGINAL color */
 var CB_SHAPE={'#c0392b':'cb-sq','#e8341f':'cb-sq','#9a5b00':'cb-di','#b26a00':'cb-di','#ff8200':'cb-di',

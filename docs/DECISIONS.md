@@ -1072,6 +1072,33 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### A name on the Task Board is coloured by where that person is in their day — 2026-09-18
+**Decision:** on the Board tab each name gets a highlight (`tbPersonState()`
+in `app-03-people.js`). **Orange** means scheduled and not clocked in yet.
+**Green** means on the clock now. **Red** means clocked out today, or the shift
+has ended. A person with no shift and no punch stays plain grey. Clocking in
+beats everything else, so somebody who comes in early, or comes in when they
+were not scheduled, shows green. If their start time passes and they have not
+clocked in, they stay orange ("not clocked in yet") until the shift ends, then
+go red. Clocking out for lunch turns a name red, and clocking back in turns it
+green again. Any day other than today can only be orange or grey, because
+nobody has clocked in on it yet. Dillon asked for all of this, including that
+unscheduled people stay grey until they clock in.
+**Why:** Bill can see who has actually turned up, not only who said they would.
+With the colour-blind palette on, the usual colour swap would turn red and
+orange into two nearly identical oranges, and those are exactly the two
+colours this feature needs people to tell apart. So colour-blind mode uses
+three hand-picked colours instead: amber, blue and vermillion. Each dot also
+gets its own shape (diamond, circle, square), and the words under every name
+say what the colour means.
+**Don't:** remove the identity entries at the bottom of `CB_MAP` (colours that
+map to themselves, like `'#0072b2':'#0072b2'`). They look pointless. But the
+colour-blind copy of the stylesheet sends *every* colour through `CB_MAP`,
+including the hand-picked ones, and without those entries it would shift them
+a second time. Also don't read the board's colours from `currentRole` or from
+the phone's own punches only: `window.tcBoardState()` reads the shared time
+clock, so a clock-in on someone else's phone reaches Bill's board.
+
 ### A claim expires on the clock of the phone READING it — 2026-08-30
 **Decision:** `crewLive()` decides whether a claim on a zone is still live.
 A timestamp dated in this phone's future is not used for arithmetic at all;

@@ -509,6 +509,26 @@
   body.cb .dot.cb-tr{border-radius:0;clip-path:polygon(50% 0%,100% 100%,0% 100%)} /* scheduled event */
   body.cb .plot.restrict{border-style:dashed;border-width:3px}
   body.cb .pill{border:1px solid currentColor}
+  /* ---- task board: each name highlighted by where that person is in their day ----
+     orange = scheduled, not here yet · green = on the clock · red = clocked out or
+     shift over. tbPersonState() in app-03-people.js decides which. */
+  .screen .sec.tbp{margin:16px 14px 8px!important;padding:7px 10px 7px 11px;border-radius:10px;border-left:4px solid}
+  .tbp-sched{background:#fef1dc;color:#b26a00!important;border-left-color:#ff8200!important}
+  .tbp-on{background:#eafaef;color:#2f7d3a!important;border-left-color:#2f9e4f!important}
+  .tbp-off{background:#fdeceb;color:#c0392b!important;border-left-color:#c0392b!important}
+  .tbp-sub{font:800 10px 'Public Sans';letter-spacing:.3px;margin-top:3px;text-transform:none;display:flex;align-items:center;gap:6px}
+  .tbp-dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none}
+  /* Colour-blind palette: the standard remap would turn red and orange into two
+     near-identical oranges, which is the one pair this highlight exists to tell
+     apart. So these three are set by hand -- amber, blue, vermillion, the
+     Okabe-Ito colours -- and each dot gets a shape: diamond, circle, square.
+     Every colour here is also listed in CB_MAP as mapping to itself, or the
+     colour-blind copy of this stylesheet would shift them a second time. */
+  body.cb .tbp-sched{background:#fbf3d9;color:#8c6d00!important;border-left-color:#e69f00!important}
+  body.cb .tbp-on{background:#e8f4fc;color:#0072b2!important;border-left-color:#0072b2!important}
+  body.cb .tbp-off{background:#fdf0e6;color:#d55e00!important;border-left-color:#d55e00!important}
+  body.cb .tbp-sched .tbp-dot{border-radius:1px;transform:rotate(45deg);width:7px;height:7px}
+  body.cb .tbp-off .tbp-dot{border-radius:1px}
   .thsw{width:100%;aspect-ratio:1;border-radius:12px;border:2px solid var(--line);position:relative;display:flex;align-items:center;justify-content:center}
   .thsw.on{border-color:var(--acc);box-shadow:0 0 0 3px rgba(255,130,0,.22)}
   .thsw .ck{color:#fff;font:900 18px 'Archivo';display:none;text-shadow:0 1px 3px rgba(0,0,0,.45)}

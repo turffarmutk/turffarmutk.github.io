@@ -1825,6 +1825,19 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
             span:sh?(t12(sh.start)+' – '+t12(sh.end)):'',
             scheduledToday:!!sh};
   };
+  /* The task board colours each name by where that person is in their day,
+     and whether they are on the clock is only known in here. 'on' while a
+     punch is open, 'off' once they have clocked out today (the time is their
+     last clock-out), null if they have not punched today at all. Today only:
+     the board's other days are in the future, where nobody has punched yet. */
+  window.tcBoardState=function(name){
+    var n=pidOf(name); if(!n) return null;
+    var op=openPunch(n);
+    if(op) return {state:'on',at:t12(op.in)};
+    var outs=punchesFor(n,todayISO()).map(function(p){return p.out;}).filter(Boolean).sort();
+    if(outs.length) return {state:'off',at:t12(outs[outs.length-1])};
+    return {state:null,at:''};
+  };
   window.tcToggleClock=function(name){
     var n=pidOf(name)||SESSION.pid;
     if(openPunch(n))clockOut(n); else clockIn(n);

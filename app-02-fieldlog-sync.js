@@ -1345,6 +1345,9 @@ function tcsyncRepaint(){
   try{
     var d=document.getElementById('s-sharedb');
     if(d&&d.classList.contains('active')&&typeof sdbRender==='function') sdbRender();
+    /* Somebody clocking in on their own phone turns their name green on Bill's
+       task board. Drawing only -- nothing here sends. */
+    if(typeof tbRefreshIfChanged==='function') tbRefreshIfChanged();
   }catch(e){}
 }
 function tcsyncSummary(){

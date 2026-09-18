@@ -1672,6 +1672,11 @@ lets the map open filling a phone screen instead of rounding a whole level out.
 That brings back the bug. The Farm Map was capped at 18 on 2026-08-26 for its
 own reasons; it was not a rule that every map must match.
 
+**Update 2026-09-18:** the Farm Map now goes to 20 as well. Dillon found it
+stopped three or four clicks short of the Assign Task map, and he wanted to see
+single plots there too. The trial pin map is still at 18. The Farm Map snaps in
+whole steps, not quarter steps, so the way it opens is unchanged.
+
 ### Completed tasks are shown one day at a time, looking back — 2026-09-16
 
 **Decision:** the Completed tab on the Task Board uses the same Mon–Fri chips as

@@ -3555,9 +3555,13 @@ function mapEnter(){
   mfWire();
   if(_appmap){ setTimeout(function(){_appmap.invalidateSize();updateView();try{trMapPins();}catch(e){}},60); return; }
   if(!el || typeof L==='undefined') return;
-  _appmap=mapChrome(L.map(el,{minZoom:13,maxZoom:18,zoomControl:false,renderer:L.canvas()}));
+  /* Goes to 20, the same as the plot-picking maps. At 18 you could not get
+     close enough to read a single plot, while the Assign Task map went two
+     levels further. Past 19 the photo is only enlarged, not sharper; the plot
+     outlines are drawn on top, so they stay crisp. */
+  _appmap=mapChrome(L.map(el,{minZoom:13,maxZoom:20,zoomControl:false,renderer:L.canvas()}));
   _appmap.on('popupopen',function(e){_pop=e.popup;});
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:18,maxNativeZoom:19,attribution:'Imagery \u00a9 Esri, Maxar'}).addTo(_appmap);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:20,maxNativeZoom:19,attribution:'Imagery \u00a9 Esri, Maxar'}).addTo(_appmap);
   buildLayers();
   _plots.addTo(_appmap); if(_parents)_parents.addTo(_appmap);
   _alleys=L.geoJSON(ALLEYS_DATA,{style:{color:'#2f9e4f',weight:1,fillColor:'#3cbf5a',fillOpacity:0.42}});

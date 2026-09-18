@@ -1707,3 +1707,22 @@ the photo it had just downloaded. With open requests the same 30 photos take
 a reply whose `type` is `'opaque'`. Either brings the green squares back, and
 nothing shows an error when it happens. If `TILES` is renamed again, keep the
 `k !== TILES` in `activate` or the photos get deleted on every update.
+
+### An update is applied on opening if nobody has touched anything yet — 2026-09-18
+
+**Decision:** when the app opens and a newer version is waiting, or finishes
+downloading in the first 20 seconds, it switches to it straight away, as long
+as nobody has tapped or typed yet. After that, the "A new version is ready"
+bar works exactly as before. An open app also checks for a new version when its
+window comes back to the front, at most every 30 minutes, and `sw.js` is always
+checked against the website rather than a browser-kept copy
+(`updateViaCache:'none'`).
+
+**Why:** Dillon's installed desktop app loaded the old version however many
+times he quit it. A waiting version only takes over when every window using the
+app is closed, and quitting an installed app does not reliably count as that.
+Reloading before anybody has done anything costs nothing, so there was no
+reason to make people wait.
+
+**Don't:** make updates silent at any other moment. The reason the bar exists
+still holds: a reload in the middle of a spray record loses work.

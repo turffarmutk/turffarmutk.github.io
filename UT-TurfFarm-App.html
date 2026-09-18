@@ -8758,6 +8758,14 @@ function bkSectionHtml(){
    background and then waits; the crew get a bar offering to reload. Taking
    the page out from under somebody halfway through a spray record to install
    a version they did not ask for is worse than being a day behind.
+
+   ONE EXCEPTION, added 2026-09-18: in the first moments after the app opens,
+   before anybody has tapped or typed, there is nothing to take out from under
+   anyone, so a waiting update is applied straight away. Before this, the only
+   routes to a new version were the Reload button or every window being
+   closed -- and the installed desktop app kept loading the old version however
+   many times it was quit, because quitting it did not close it as far as the
+   browser was concerned. See docs/DECISIONS.md.
    ======================================================================= */
 var UT_SW_VERSION = null;
 
@@ -8804,11 +8812,31 @@ function pwaUpdateBar(onReload){
     if(e.data&&e.data.version) UT_SW_VERSION=e.data.version;
   });
 
-  navigator.serviceWorker.register('sw.js',{scope:'./'}).then(function(reg){
+  /* Has anybody done anything yet? Until they have, reloading costs nothing. */
+  var touched=false, opened=Date.now();
+  function markTouched(){ touched=true; }
+  ['pointerdown','keydown'].forEach(function(t){ window.addEventListener(t,markTouched,{capture:true,once:true}); });
+  function untouched(){ return !touched && (Date.now()-opened)<20000; }
+
+  /* updateViaCache 'none': always ask the website itself whether sw.js has
+     changed, never a copy the browser kept. Chrome does this anyway; saying so
+     makes every browser do it. */
+  navigator.serviceWorker.register('sw.js',{scope:'./',updateViaCache:'none'}).then(function(reg){
     function offer(worker){
       if(!worker) return;
+      if(untouched()){ worker.postMessage('SKIP_WAITING'); return; }
       pwaUpdateBar(function(){ worker.postMessage('SKIP_WAITING'); });
     }
+    /* A desktop app is left open for days and only looks for a new version
+       when it is opened. Look again whenever the window comes back to the
+       front, at most every half hour, so "I pushed a fix" reaches it the same
+       day instead of whenever somebody next restarts the computer. */
+    var lastCheck=Date.now();
+    document.addEventListener('visibilitychange',function(){
+      if(document.visibilityState!=='visible'||Date.now()-lastCheck<1800000) return;
+      lastCheck=Date.now();
+      try{ reg.update().catch(function(){}); }catch(e){}
+    });
     /* Already waiting from a previous visit. */
     if(reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
 

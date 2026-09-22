@@ -443,3 +443,18 @@ and search for `isWorkUpdate`. If it is gone, do not publish; ask why.
 exactly the way a student uses it and fails if the rules would refuse any of
 it.
 
+---
+
+## And again on 2026-09-22 — handing in part of a job
+
+A student who cannot finish a job can now submit the plots they did, and the
+rest waits on your board for Bill to hand to somebody. The student's side of
+that is a completion that also says "this was partial" and "these plots were
+left", so two words were added to the list of what a finish may change:
+`partial` and `leftPlots`.
+
+**Until you publish, "Submit my part" is refused** the same way plot ticks were:
+the job looks finished on the student's phone and then comes back open. Publish
+this file before the app goes out, as before. Bill's side (assigning the rest)
+needs nothing new — he could already create and edit jobs.
+

@@ -889,7 +889,10 @@ function completeTask(id,note){ var t=TASKS.find(function(x){return x.id===id;})
  /* Who did the work and who closed the job are not always the same person —
     Bill clears a job an undergrad finished. The log credits the worker and
     keeps the closer beside it, so neither is guessed at later. */
- t.completedBy=t.assignee||SESSION.pid; t.closedBy=SESSION.pid; t.completedAt=isoLocal(new Date()); t.completedNote=note||''; var _flg=flAddFromTask(t); closeDoneSheet(); toast(_flg?'Complete ✓ · logged to Field Log':'Marked complete ✓'); renderBoard(); back(); }
+ t.completedBy=t.assignee||SESSION.pid; t.closedBy=SESSION.pid; t.completedAt=isoLocal(new Date()); t.completedNote=note||''; var _flg=flAddFromTask(t); closeDoneSheet();
+ if(t.partial) toast('Your part is in ✓ · '+(t.leftPlots||[]).length+' left for Bill to hand out');
+ else toast(_flg?'Complete ✓ · logged to Field Log':'Marked complete ✓');
+ renderBoard(); back(); }
 document.getElementById('tb-seg').addEventListener('click',function(e){var sp=e.target.closest('span[data-tab]');if(!sp)return;tbTab=sp.getAttribute('data-tab');renderTasks();});
 document.getElementById('s-taskboard').addEventListener('click',function(e){
  var bd=e.target.closest('[data-bday]'); if(bd){boardDay=parseInt(bd.getAttribute('data-bday'),10);renderTasks();return;}
@@ -900,6 +903,8 @@ document.getElementById('s-taskboard').addEventListener('click',function(e){
     goes through deleteTask(), which checks who is asking and sends the removal
     to the shared copy itself -- see the note over that function. */
  var dl=e.target.closest('[data-del]'); if(dl){e.stopPropagation();var did=dl.getAttribute('data-del');var dt=TASKS.find(function(x){return x.id===did;});if(dt){var dn=dt.title;if(deleteTask(did)){toast('Deleted “'+dn+'”');renderBoard();}else toast('You cannot delete this task');}return;}
+ var rs=e.target.closest('[data-rest]'); if(rs){e.stopPropagation();openRestSheet(rs.getAttribute('data-rest'));return;}
+ var rd=e.target.closest('[data-restdrop]'); if(rd){e.stopPropagation();dropRest(rd.getAttribute('data-restdrop'));return;}
  var mv=e.target.closest('[data-move]'); if(mv){e.stopPropagation();moveTask(mv.getAttribute('data-id'),mv.getAttribute('data-move'));return;}
  var claim=e.target.closest('[data-claim]');
  if(claim){e.stopPropagation();var t=TASKS.find(function(x){return x.id===claim.getAttribute('data-claim');});if(t){t.assignee=SESSION.pid;toast('Claimed ✓');renderTasks();}return;}
@@ -1356,6 +1361,149 @@ function twHandIn(t,sp){
   back();
 }
 
+/* ===================== PART-FINISHED JOBS =====================
+   Dillon, 2026-09-22: a student who cannot finish a job submits what they
+   did, and Bill hands the rest to somebody -- the same day or another.
+
+   THE STUDENT'S HALF. The job is COMPLETED, as far as it went: status done,
+   credited to them, and only the plots they ticked go on the Field Log
+   (flAddFromTask reads `partial`). It is marked partial:true and carries the
+   plots nobody got to as leftPlots. Completing rather than leaving it open
+   is deliberate: it is the only move the database lets a student make on a
+   job that closes their part (isCompletion() in firestore.rules), their
+   record of the day stays true, and the leftover becomes a job of its own
+   that can go to anyone on any day without disturbing theirs.
+
+   THE MANAGER'S HALF. Bill's board lists every partial job whose rest has
+   not been dealt with (restAssigned unset) under "Left over". "Assign the
+   rest" makes a NEW job holding only leftPlots, for whoever and whichever day
+   he picks, and stamps its id on the old one as restAssigned. "Leave it"
+   stamps 'none'. Either way it drops off the list.
+
+   Offered only when nobody else is out on the same job: with a helper still
+   working, "the rest" is theirs, and "Hand in my part" above is the right
+   move. Paint (alley) jobs and trial dots are not plot lists and are not
+   offered it. */
+var partSheet=null, partTaskId=null;
+function ensurePartSheet(){
+  if(partSheet) return;
+  partSheet=document.createElement('div'); partSheet.id='partsheet';
+  partSheet.innerHTML='<div class="ds-back"></div><div class="ds-card">'
+    +'<div class="ds-title">Submit what you finished?</div><div class="ds-sub" id="ps-sub"></div>'
+    +'<textarea class="ds-in" id="ps-note" placeholder="Why are you stopping? e.g. ran out of time, rain, mower down (optional)"></textarea>'
+    +'<div class="ds-btns"><div class="ds-cancel tap">Keep working</div><div class="ds-confirm part tap">Submit my part</div></div></div>';
+  app.appendChild(partSheet);
+  partSheet.querySelector('.ds-back').addEventListener('click',closePartSheet);
+  partSheet.querySelector('.ds-cancel').addEventListener('click',closePartSheet);
+  partSheet.querySelector('.ds-confirm').addEventListener('click',function(){
+    var t=TASKS.find(function(x){return x.id===partTaskId;}); if(!t) return;
+    submitPart(t,document.getElementById('ps-note').value.trim());
+  });
+}
+function openPartSheet(t,sp){
+  ensurePartSheet(); partTaskId=t.id;
+  var n=sp.done.length, all=sp.open.length, left=all-n;
+  document.getElementById('ps-sub').textContent=n+' of '+all+' done. '+(left===1?'The other one goes':'The other '+left+' go')+' back to Bill to hand out.';
+  document.getElementById('ps-note').value='';
+  partSheet.classList.add('show');
+}
+function closePartSheet(){ if(partSheet) partSheet.classList.remove('show'); }
+function submitPart(t,note){
+  var sp=twSplit(t);
+  if(!sp.done.length){ closePartSheet(); toast('Tick off what you finished first'); return; }
+  t.partial=true;
+  t.leftPlots=sp.free.slice();
+  closePartSheet();
+  completeTask(t.id,note);
+}
+/* Bill's board: part-finished jobs whose rest nobody has dealt with yet. */
+function tbLeftovers(){
+  return taskInOrder(TASKS.filter(function(t){
+    return t.status==='done'&&t.partial&&(t.leftPlots||[]).length&&!t.restAssigned;
+  }));
+}
+function tbLeftRow(t){
+  var lp=t.leftPlots||[], did=(t.donePlots||[]).filter(function(p){return lp.indexOf(p)<0;}).length;
+  var who=nameOf(t.completedBy)||t.completedBy||'Somebody';
+  var sub=who+' did '+did+' · '+t.leftPlots.length+' left · '+plotsSummaryText(t.leftPlots);
+  return '<div class="row" style="align-items:flex-start"><div class="tap" data-task="'+t.id+'" style="flex:1;min-width:0">'
+    +'<div class="rt">'+esc(t.title)+'</div><div class="rs">'+esc(sub)+'</div>'
+    +(t.completedNote?'<div class="rs" style="margin-top:3px;color:#9a5b00">“'+esc(t.completedNote)+'”</div>':'')
+    +'</div><span style="display:flex;flex-direction:column;gap:6px;flex:none;align-items:flex-end">'
+    +'<span class="pill tap" data-rest="'+t.id+'" style="background:var(--acc);color:#fff;padding:5px 12px;font-size:10.5px">Assign the rest ›</span>'
+    +'<span class="tap" data-restdrop="'+t.id+'" style="font:700 10.5px \'Public Sans\';color:var(--muted)">Leave it</span>'
+    +'</span></div>';
+}
+function plotsSummaryText(list){
+  if(typeof areaLabel==='function'){ var a=areaLabel(list); if(a) return a; }
+  return list.join(', ');
+}
+var restSheet=null, REST=null;   /* {id, who, ord} while the hand-out sheet is open */
+function ensureRestSheet(){
+  if(restSheet) return;
+  restSheet=document.createElement('div'); restSheet.id='restsheet';
+  restSheet.innerHTML='<div class="ds-back"></div><div class="ds-card">'
+    +'<div class="ds-title">Assign the rest</div><div class="ds-sub" id="rs-sub"></div>'
+    +'<div class="ds-lbl">When</div><select class="inv-sel" id="rs-when" style="width:100%;max-width:none"></select>'
+    +'<div class="ds-lbl">Who</div><div class="chiprow" id="rs-people" style="padding:0"></div>'
+    +'<div class="ds-btns"><div class="ds-cancel tap">Cancel</div><div class="ds-confirm part tap">Assign</div></div></div>';
+  app.appendChild(restSheet);
+  restSheet.querySelector('.ds-back').addEventListener('click',closeRestSheet);
+  restSheet.querySelector('.ds-cancel').addEventListener('click',closeRestSheet);
+  restSheet.querySelector('#rs-when').addEventListener('change',function(){ REST.ord=parseInt(this.value,10)||REST.ord; renderRestPeople(); });
+  restSheet.querySelector('#rs-people').addEventListener('click',function(e){
+    var p=e.target.closest('[data-person]'); if(!p) return;
+    REST.who=p.getAttribute('data-person'); renderRestPeople();
+  });
+  restSheet.querySelector('.ds-confirm').addEventListener('click',function(){
+    if(!REST||!REST.who){ toast('Pick who gets it'); return; }
+    var nt=assignRest(REST.id,REST.who,REST.ord); if(!nt) return;
+    closeRestSheet();
+    toast('The rest is with '+nameOf(REST.who)+' · '+asDateLabel(REST.ord));
+    renderBoard();
+  });
+}
+/* The people for the chosen day -- the pills show that day's hours, so
+   picking "tomorrow" shows who is actually in tomorrow. */
+function renderRestPeople(){
+  var el=document.getElementById('rs-people'); if(!el) return;
+  var d=asDateFromOrd(REST.ord);
+  el.innerHTML=STUDENTS.map(function(s){ return schedPill(pidOf(s)||s,REST.who===(pidOf(s)||s),d,true); }).join('');
+}
+function openRestSheet(id){
+  var t=TASKS.find(function(x){return x.id===id;}); if(!t) return;
+  ensureRestSheet();
+  REST={id:id,who:null,ord:asTodayOrd()};
+  var dw=asDateFromOrd(REST.ord).getDay(); if(dw===0||dw===6) REST.ord=asNearestWeekday(REST.ord);
+  document.getElementById('rs-sub').textContent=t.title+' · '+t.leftPlots.length+' left · '+plotsSummaryText(t.leftPlots);
+  document.getElementById('rs-when').innerHTML=asDateOptions(REST.ord);
+  renderRestPeople();
+  restSheet.classList.add('show');
+}
+function closeRestSheet(){ if(restSheet) restSheet.classList.remove('show'); }
+/* The new job: the same work, only the ground that is left. Carries over
+   what the job IS (machine, tank, note, its place on the task list) and
+   nothing about how the first attempt went. */
+function assignRest(id,who,ord){
+  var t=TASKS.find(function(x){return x.id===id;}); if(!t||!(t.leftPlots||[]).length) return null;
+  var left=t.leftPlots.slice();
+  var nt={createdBy:SESSION.pid,id:newId('t'),title:t.title,area:plotsSummaryText(left),plots:left,
+          badge:{t:'Rest of job',bg:'#fef1dc',fg:'#9a5b00'},type:t.type,dueAt:isoFromOrd(ord),dueOrd:ord,
+          repeat:'None',status:'todo',kind:'task',assignee:who,assignedBy:SESSION.pid,desc:t.desc||'',restOf:t.id};
+  if(t.machine) nt.machine=t.machine;
+  if(t.tplId) nt.tplId=t.tplId;
+  if(t.mix) nt.mix=JSON.parse(JSON.stringify(t.mix));
+  TASKS.push(nt);
+  t.restAssigned=nt.id;
+  return nt;
+}
+function dropRest(id){
+  var t=TASKS.find(function(x){return x.id===id;}); if(!t) return;
+  if(!confirm('Leave the rest of “'+t.title+'” undone?\n\n'+t.leftPlots.length+' plots will not be handed to anyone.')) return;
+  t.restAssigned='none';
+  toast('Left undone'); renderBoard();
+}
+
 /* ---- the alleys: painted, not ticked --------------------------------------
    Where the job stands: how much of the alleys is painted, and any ordinary
    plots on the same job. It can be finished once PAINT_DONE_PCT is painted
@@ -1571,6 +1719,14 @@ function renderTaskWork(){
    return;
  }
 
+ /* Some done and nobody else out on the rest: they may stop here and hand
+    what is left back to Bill -- see openPartSheet(). Nothing done yet, and
+    there is nothing to hand in, so it stays the grey "keep going" button. */
+ if(done>0&&!sp.held.length){
+   btn.textContent='Submit '+done+' of '+open.length+' done ›';
+   btn.style.background='var(--acc)';
+   return;
+ }
  btn.textContent='Check off all '+unit+' to finish ('+done+'/'+open.length+')';
  btn.style.background='#c2c7cd';
 }
@@ -1667,6 +1823,7 @@ document.getElementById('s-taskwork').addEventListener('click',function(e){
        toast('Every '+word+' is with '+who+' right now');
        back(); return;
      }
+     if(sp.done.length&&!sp.held.length){ openPartSheet(ct,sp); return; }
      toast('Check off every '+word+' first'); return;
    }
    openDoneSheet(workTaskId);return;}

@@ -339,7 +339,10 @@ section('6. an ordinary job is untouched by any of this');
   /* Check one off and the count moves, which is the whole point of the screen. */
   t.donePlots.push(plots[0]);
   win.renderTaskWork();
-  ok('checking one off is counted', /\(1\//.test(txt('tw-complete')), txt('tw-complete'));
+  /* Since 2026-09-22 a job with some ground done offers "Submit 1 of 24 done"
+     -- a student may stop and hand the rest back to Bill (PART-FINISHED JOBS,
+     app-04). The count is still on the button; only the wording moved. */
+  ok('checking one off is counted', /Submit 1 of \d+ done/.test(txt('tw-complete')), txt('tw-complete'));
 
   t.donePlots = win.taskOpenPlots(t).slice();
   win.renderTaskWork();

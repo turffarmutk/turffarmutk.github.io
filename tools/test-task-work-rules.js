@@ -20,6 +20,9 @@
  * uses the mirror in tools/rules-model.js, and checks that mirror's field
  * lists against firestore.rules itself so the two cannot quietly drift.
  *
+ * Sections 7 and 8 cover part-finished jobs (Dillon, 2026-09-22): a student
+ * submits what they did, and Bill hands the rest to somebody.
+ *
  * Run:  node tools/test-task-work-rules.js
  */
 const fs = require('fs');
@@ -70,7 +73,7 @@ win.confirm = () => true;
 
 const scripts = require('./_app').appScripts(win.document);
 try {
-  win.eval(scripts.join('\n;\n') + '\n;window.__w={TASKS:TASKS,setBrief:function(b){twBrief=b;}};');
+  win.eval(scripts.join('\n;\n') + '\n;window.__w={TASKS:TASKS,FIELDLOG:FIELDLOG,setBrief:function(b){twBrief=b;}};');
 } catch (e) { console.log('app script threw: ' + e.message); fail++; }
 
 const TASKS = (win.__w && win.__w.TASKS) || [];
@@ -172,6 +175,82 @@ section('6. what working a job still may NOT do');
   ok('or to what the job is', !model.isWorkUpdate(server, retitled, STUDENT));
   const reassigned = Object.assign(doc(t), { donePlots: ['P1'], assignee: 'p19' });
   ok('or to who is on it', !model.isWorkUpdate(server, reassigned, STUDENT));
+}
+
+section('7. a student submits a part-finished job, and Bill hands out the rest');
+{
+  const FIELDLOG = win.__w.FIELDLOG;
+  win.sessionSet(STUDENT, { quiet: true });
+  const t = assigned('wr-7', { plots: ['P1', 'P2'], area: 'Plots P1, P2' });
+  const server = doc(t);
+  win.openTaskWork(t.id);
+  win.renderTaskWork();
+  const btn = win.document.getElementById('tw-complete');
+  ok('with nothing ticked, the button still says keep going', /Check off all/.test(btn.textContent), btn.textContent);
+  win.jobTapSelect(t.donePlots, 'P1', {});
+  win.renderTaskWork();
+  ok('one ticked: the button offers to submit it', /Submit 1 of 2 done/.test(btn.textContent), btn.textContent);
+
+  btn.click();
+  const sheet = win.document.getElementById('partsheet');
+  ok('pressing it asks first, it does not submit on the spot',
+     sheet && sheet.classList.contains('show') && t.status === 'todo');
+  ok('and says what goes back to Bill', /1 of 2 done\. The other one goes back to Bill/.test(win.document.getElementById('ps-sub').textContent),
+     win.document.getElementById('ps-sub').textContent);
+  win.document.getElementById('ps-note').value = 'Ran out of time';
+  const logBefore = FIELDLOG.length;
+  sheet.querySelector('.ds-confirm').click();
+
+  const after = doc(t);
+  ok('the student\'s part is closed and credited to them', t.status === 'done' && t.completedBy === STUDENT);
+  ok('marked part-finished, with the plot nobody got to', t.partial === true && JSON.stringify(t.leftPlots) === '["P2"]',
+     JSON.stringify(t.leftPlots));
+  ok('the reason is kept', t.completedNote === 'Ran out of time');
+  ok('the database accepts it from the student', model.completionFieldsOk(server, after, STUDENT), why(server, after));
+  const logged = FIELDLOG.slice(logBefore).filter(e => e.taskId === t.id).map(e => e.plot);
+  ok('the Field Log gets only the plot actually done', JSON.stringify(logged) === '["P1"]', JSON.stringify(logged));
+
+  /* Bill's side. */
+  win.sessionSet('p07', { quiet: true });
+  ok('it is waiting on Bill\'s board', win.tbLeftovers().some(x => x.id === t.id));
+  win.goRoot('taskboard'); win.__w.setBrief(false);
+  win.renderBoard();
+  const body = win.document.getElementById('tb-body').textContent;
+  ok('under "Left over", with who, what is left and why',
+     /Left over — needs someone/.test(body) && /did 1 · 1 left/.test(body) && /Ran out of time/.test(body));
+
+  const beforeBill = doc(t);
+  const d1 = new win.Date(); d1.setDate(d1.getDate() + 1);
+  const tomorrow = win.asNearestWeekday(win.asOrd(d1));
+  const nt = win.assignRest(t.id, 'p19', tomorrow);
+  ok('assigning the rest makes a new job with only what was left',
+     nt && JSON.stringify(nt.plots) === '["P2"]' && nt.assignee === 'p19' && nt.status === 'todo');
+  ok('for the day Bill picked', nt.dueOrd === tomorrow);
+  ok('carrying the same work', nt.title === t.title && nt.type === t.type && nt.restOf === t.id);
+  ok('the old job says where its rest went', t.restAssigned === nt.id);
+  ok('and it drops off the "Left over" list', !win.tbLeftovers().some(x => x.id === t.id));
+  const R = model.rosterDoc(win.PEOPLE || []);
+  ok('the database lets Bill create it for that student', model.rulesCan(R, 'p07', 'assign', nt) && model.rulesCan(R, 'p07', 'create', nt));
+  ok('and mark the old one', model.rulesCan(R, 'p07', 'edit', beforeBill));
+
+  const t2 = assigned('wr-8', { status: 'done', partial: true, leftPlots: ['P2'], donePlots: ['P1'], completedBy: STUDENT });
+  win.dropRest(t2.id);
+  ok('"Leave it" takes it off the list without making a job', t2.restAssigned === 'none' && !win.tbLeftovers().some(x => x.id === t2.id));
+}
+
+section('8. nobody submits part of a job somebody else is still out on');
+{
+  win.sessionSet(STUDENT, { quiet: true });
+  const t = assigned('wr-9', { plots: ['P1', 'P2'], helpers: ['p19'] });
+  win.openTaskWork(t.id);
+  win.renderTaskWork();
+  win.jobTapSelect(t.donePlots, 'P1', {});
+  const realClaim = win.crewClaim;
+  win.crewClaim = (id, u) => (u === 'P2' ? { who: 'p19' } : null);
+  win.renderTaskWork();
+  const btn = win.document.getElementById('tw-complete');
+  ok('with a helper on the rest, "Submit" is not offered', !/Submit 1 of/.test(btn.textContent), btn.textContent);
+  win.crewClaim = realClaim;
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

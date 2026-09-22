@@ -1196,7 +1196,8 @@ function tbDoneRow(t){
 /* completedBy is a roster id and completedAt a timestamp; both used to be
    printed raw, so the row read "p18 · 2026-09-16T14:02:11". */
 function tbDoneSub(t){
- return [taskBoardSub(t),nameOf(t.completedBy)||'',taskDoneWhen(t)].filter(Boolean).join(' · ');
+ var part=t.partial?('Part done · '+(t.leftPlots||[]).length+' left'+(t.restAssigned&&t.restAssigned!=='none'?' (reassigned)':'')):'';
+ return [part,taskBoardSub(t),nameOf(t.completedBy)||'',taskDoneWhen(t)].filter(Boolean).join(' · ');
 }
 function tbReqRow(t){
  var needs=(t.students&&t.students>1)?' · needs '+t.students:'';
@@ -1654,6 +1655,14 @@ function renderTasks(){
    if(currentRole==='manager'&&SESSION.pid&&people.indexOf(SESSION.pid)<0){ people.unshift(SESSION.pid); }
    var bDate=asDateFromOrd(boardDayOrd());
    var bIn=schedCrewOn(bDate).length;
+   /* Part-finished jobs waiting for Bill to hand out the rest -- at the top,
+      whatever day is showing, because they are waiting on him right now.
+      See PART-FINISHED JOBS in app-04. */
+   if(currentRole==='manager'){
+     var lefts=tbLeftovers();
+     if(lefts.length) html+='<div class="sec" style="color:#9a5b00">Left over — needs someone · '+lefts.length+'</div>'
+                          +'<div class="list">'+lefts.map(tbLeftRow).join('')+'</div>';
+   }
    html+='<div class="sec" style="color:#2f3133">'+WEEKDAYS[boardDay]+' · '+asDateLabel(boardDayOrd())
         +(bIn?(' <span style="color:#2f9e4f">· '+bIn+' in</span>'):'')+'</div>';
    people.forEach(function(s){

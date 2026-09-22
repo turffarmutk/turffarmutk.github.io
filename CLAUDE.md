@@ -369,7 +369,9 @@ The permission that fixes it is **`isWorkUpdate()`** in the tasks section of
   `mix` and their own entry in `eqUsed`, and nothing else in the same write.
 - `isCompletion()` — also accepts `completedNote`, `_logged` and those same
   progress fields, because the last tick and Finish go up in **one** write
-  (the phone sends every two seconds, not on every tap).
+  (the phone sends every two seconds, not on every tap). And `partial` /
+  `leftPlots`, which is a student submitting a part-finished job for Bill to
+  hand out the rest (PART-FINISHED JOBS in `app-04`).
 
 The rules for anyone touching these:
 

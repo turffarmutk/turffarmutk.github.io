@@ -686,10 +686,17 @@ body{background:#0f1011;display:flex;align-items:center;justify-content:center;f
 .minimap .mplot span{font:800 11px 'Archivo';color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.55)}
 .minimap .mplot.on{background:rgba(72,159,223,.68);border-color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.45) inset}
 /* Complete confirm sheet */
-#donesheet{position:absolute;inset:0;display:none;z-index:60}
-#donesheet.show{display:block}
-#donesheet .ds-back{position:absolute;inset:0;background:rgba(0,0,0,.42)}
-#donesheet .ds-card{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;padding:18px 18px 20px}
+/* Above the map. Leaflet's own layers stack at 400-1000, so at the old 60 the
+   work map drew straight over the top half of these sheets -- title and all --
+   on the one screen they are opened from most. */
+#donesheet,#partsheet,#restsheet{position:absolute;inset:0;display:none;z-index:1200}
+#donesheet.show,#partsheet.show,#restsheet.show{display:block}
+#donesheet .ds-back,#partsheet .ds-back,#restsheet .ds-back{position:absolute;inset:0;background:rgba(0,0,0,.42)}
+#donesheet .ds-card,#partsheet .ds-card,#restsheet .ds-card{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;padding:18px 18px 20px;max-height:86%;overflow:auto}
+/* Part-finished jobs: the student's "why I stopped" box and Bill's hand-out sheet */
+.ds-in{width:100%;box-sizing:border-box;margin-top:12px;border:1px solid var(--line);border-radius:11px;padding:10px 12px;font:600 13.5px 'Public Sans';color:var(--ink);background:var(--card);resize:vertical;min-height:62px}
+.ds-lbl{font:800 11px 'Public Sans';letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+.ds-confirm.part{background:var(--acc)}
 .ds-title{font:800 16px 'Archivo';color:#2f3133}
 .ds-sub{font:600 13px 'Public Sans';color:#6b7280;margin-top:3px}
 .ds-btns{display:flex;gap:10px;margin-top:16px}

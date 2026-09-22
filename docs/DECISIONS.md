@@ -1875,3 +1875,35 @@ seem to do nothing.
   only thing that travels.
 - Writing `rank` onto every job to "tidy up". One database write per job from
   every phone, for an order that already reads the same everywhere.
+
+### A part-finished job is completed as far as it went; Bill hands out the rest — 2026-09-22
+
+**Decided:** once a student has ticked at least one plot, the work map's button
+offers "Submit N of M done". Confirming (with an optional reason) COMPLETES the
+job, credited to them, marked `partial:true`, with the plots nobody got to in
+`leftPlots`. Only the ticked plots go on the Field Log. Bill's board shows every
+such job under "Left over — needs someone" until he either presses "Assign the
+rest" (a NEW job with only `leftPlots`, for the person and day he picks, badged
+"Rest of job", linked back by `restOf`) or "Leave it". Either stamps
+`restAssigned` on the old job, which takes it off the list.
+
+**Why:** Dillon asked for students to be able to hand in a half-done job and for
+Bill to give the remainder to someone else the same day or the next. Completing
+the student's part rather than leaving the job open keeps their record true
+(what they did, when, and why they stopped), and it is the only thing the
+database lets a student do that closes their part — a student may not reassign
+or create jobs. The leftover as a job of its own can go to anybody on any day
+without rewriting the first one.
+
+**Not offered** when a helper is still out on the same job (their part is "the
+rest"; "Hand in my part" covers that), nor on alley paint or trial-dot jobs,
+which are not plot lists.
+
+**Likely mistakes:**
+- Removing `partial` or `leftPlots` from `isCompletion()` in `firestore.rules`:
+  every "Submit my part" would be refused. See "The third trap" in CLAUDE.md.
+- Logging every plot of a partial job. `flAddFromTask()` logs `donePlots`
+  minus `leftPlots` for a partial job, on purpose.
+- Lowering the sheets' z-index. At 60 the Leaflet map drew over the top half of
+  every bottom sheet on the work map, including "Mark task complete?". They sit
+  at 1200.

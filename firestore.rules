@@ -366,12 +366,16 @@ service cloud.firestore {
              creator was refused: completeTask() writes both on every
              finish (_logged is the guard that stops a job going into the
              Field Log twice). tools/test-task-work-rules.js now runs the
-             real finish past this list. completedBy must be somebody who was actually on the job,
+             real finish past this list.
+             partial and leftPlots (2026-09-22) are a student submitting a
+             part-finished job: their part closes, and the plots nobody got
+             to wait for Bill to hand out. See PART-FINISHED JOBS, app-04. completedBy must be somebody who was actually on the job,
              or the person pressing the button. --- */
       function isCompletion() {
         return changed().hasOnly(['status', 'completedBy', 'completedAt', 'closedBy',
                                   'completedNote', '_logged', 'done', 'units', 'updatedAt',
-                                  'donePlots', 'doneTrials', 'mix', 'eqUsed'])
+                                  'donePlots', 'doneTrials', 'mix', 'eqUsed',
+                                  'partial', 'leftPlots'])
           && eqPickOk()
           && canComplete(resource.data)
           && str(request.resource.data.get('completedBy', '')) != ''

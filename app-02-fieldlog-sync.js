@@ -3047,6 +3047,9 @@ function flAddFromTask(t){
  if(!t||t._logged)return false;
  var type=flClassify(t); if(!type)return false;
  var plots=parsePlots(t);
+ /* A part-finished job logs the ground that was actually done, not the whole
+    job -- the rest is somebody else's job now (see PART-FINISHED JOBS). */
+ if(t.partial){ var lp=t.leftPlots||[]; plots=(t.donePlots||[]).filter(function(p){ return lp.indexOf(p)<0; }); if(!plots.length){ t._logged=true; return false; } }
  /* Old alley tasks carry ten zone codes; since 2026-09-18 they are one shape. */
  if(typeof jobAlleyMerge==='function') plots=jobAlleyMerge(plots);
  /* An alley job closes at 80% painted, not 100%, so the log says how much. */
@@ -3087,7 +3090,8 @@ function flAddFromTask(t){
    dueAt:t.dueAt||null,due:dueLabel(t)||null,repeat:(t.repeat&&t.repeat!=='None')?t.repeat:null,
    product:mx?mx.productName:null,rate:mx?mx.rateText:null,amount:mx?mx.productText:null,
    closedBy:(t.closedBy&&t.closedBy!==by)?t.closedBy:null,
-   notes:[t.desc||'',mx?('Mix: '+mx.line):'',(alleyNote&&p===ALLEY_UNIT)?alleyNote:''].filter(Boolean).join('\n')
+   notes:[t.desc||'',mx?('Mix: '+mx.line):'',(alleyNote&&p===ALLEY_UNIT)?alleyNote:'',
+          t.partial?('Part of the job: '+plots.length+' done, '+(t.leftPlots||[]).length+' handed back'+(t.completedNote?(' — '+t.completedNote):'')):''].filter(Boolean).join('\n')
  });});
  t._logged=true; flCommit(); return true;
 }

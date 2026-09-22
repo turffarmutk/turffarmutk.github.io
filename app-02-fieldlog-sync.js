@@ -3443,53 +3443,90 @@ document.getElementById('s-flexport').addEventListener('change',function(e){
 document.getElementById('fx-csv').addEventListener('click',function(){ flDoExport('csv'); });
 document.getElementById('fx-html').addEventListener('click',function(){ flDoExport('html'); });
 
-/* ---- Field Log: log an operation (entry form) ---- */
-const FL_OPS=[
- {id:'reelmow',label:'Reel Mow',feed:'mow',eq:true},
- {id:'rotarymow',label:'Rotary Mow',feed:'mow',eq:true},
- {id:'weedeat',label:'Weedeat / Trim',feed:'mow',eq:true},
- {id:'spray_fung',label:'Spray Pesticide — Fungicide',feed:'spray',chem:true,pest:true},
- {id:'spray_herb',label:'Spray Pesticide — Herbicide',feed:'spray',chem:true,pest:true},
- {id:'spray_ins',label:'Spray Pesticide — Insecticide',feed:'spray',chem:true,pest:true},
- {id:'spray_fert',label:'Spray Fertilizer',feed:'fert',chem:true},
- {id:'gran_fert',label:'Fertilize — Granular',feed:'fert',chem:true},
- {id:'aeration',label:'Aeration',feed:'cult'},
- {id:'topdress',label:'Topdress',feed:'cult'},
- {id:'verticut',label:'Verticut / Dethatch',feed:'cult'},
- {id:'irrigation',label:'Irrigation',feed:'irrig'},
- {id:'handwater',label:'Handwater',feed:'irrig'},
- {id:'traffic',label:'Traffic / Wear sim',feed:'misc'},
- {id:'paintdots',label:'Paint Trial Dots',feed:'misc'},
- {id:'other',label:'Other operation',feed:'misc'}
-];
-function flOp(id){return FL_OPS.find(function(o){return o.id===id;});}
+/* ---- Field Log: log an operation (entry form) ----
+   Redesigned 2026-09-22 to match the Task Board: pick a category (the same 6
+   tiles at the top of the Field Log), pick a real task name in that
+   category, pick who did it and when, then plots and notes. See
+   docs/DECISIONS.md.
+
+   FL_CAT_TASKCAT is the one place that says which Task Board category feeds
+   which Field Log category. It is 1:1 on purpose -- CATEGORIES (app-05) was
+   folded from 9 down to 7 so every category but Maintenance has exactly one
+   match here. Maintenance is left out: it gets its own log on the Equipment
+   page, never this one. A task template also carries its own logField flag
+   (app-05) for a finer override than category alone. */
+const FL_CAT_TASKCAT={spray:'Spray',fert:'Fertilize',cult:'Cultivation',mow:'Mow',irrig:'Irrigation',misc:'Miscellaneous'};
 function flCanChem(){return currentRole==='tech'||currentRole==='grad'||currentRole==='manager';}
+/* TEMPLATES/tplLive() live in app-05, loaded after this file -- safe to call
+   here because this only runs when someone opens the screen, long after
+   every file has finished loading (never at load time). See
+   tools/test-load-order.js. */
+function flTemplatesFor(cat){
+  var taskCat=FL_CAT_TASKCAT[cat]; if(!taskCat) return [];
+  return tplLive().filter(function(t){return t.category===taskCat && t.logField!==false;});
+}
+/* Everyone active on the roster, not just grads/techs (CREW) -- most field
+   work is credited to an undergrad, and this is who did the work, not who's
+   assigned it. rstActive()/pName() live in app-03, loaded after this file;
+   same runtime-only-call rule as above. */
+function flPersonPool(){
+  return rstSort(rstActive()).map(function(p){return {pid:p.id,name:pName(p),role:p.role};});
+}
+/* asDateOptions() (app-05) is for scheduling work forward and skips weekends
+   -- wrong here, since this field is picking a day work ALREADY happened,
+   which includes weekends, and "entering this afterwards" means a day in the
+   past. Walks back 30 days plus today; reuses the same ord math and label
+   the rest of the app already uses. */
+function flDateOptions(selOrd){
+  var t=asToday0(), arr=[];
+  for(var i=0;i<31;i++){ var d=new Date(t); d.setDate(d.getDate()-i); arr.push(asOrd(d)); }
+  if(selOrd&&arr.indexOf(selOrd)<0) arr.push(selOrd);
+  return arr.map(function(o){return '<option value="'+o+'"'+(o===selOrd?' selected':'')+'>'+asDateLabel(o)+'</option>';}).join('');
+}
 /* productId / amtNum / amtUnit / takeStock were added 2026-08-25 so a spray can
    come off the shelf. `product` and `amount` are still here and still hold the
    same strings they always did - the detail line, the export columns and the
    correction screen all read them, and none of that had to change. */
-let FLFORM={op:'',plots:[],day:28,time:'',product:'',productId:null,ai:'',amount:'',
-            amtNum:'',amtUnit:'',takeStock:true,rate:'',target:'',equipment:'',notes:''};
-function openFlNew(){FLFORM={op:'',plots:[],day:28,time:'',product:'',productId:null,ai:'',
-   amount:'',amtNum:'',amtUnit:'',takeStock:true,rate:'',target:'',equipment:'',notes:''};go('flnew');}
+let FLFORM={category:'',tplId:'',plots:[],person:'',dueOrd:0,product:'',productId:null,ai:'',amount:'',
+            amtNum:'',amtUnit:'',takeStock:true,rate:'',target:'',machine:'',notes:''};
+function openFlNew(){FLFORM={category:'',tplId:'',plots:[],person:SESSION.pid,dueOrd:asTodayOrd(),product:'',productId:null,ai:'',
+   amount:'',amtNum:'',amtUnit:'',takeStock:true,rate:'',target:'',machine:'',notes:''};go('flnew');}
 function renderFlNew(){
  var body=document.getElementById('fln-body'); if(!body)return;
  var canChem=flCanChem();
- var op=flOp(FLFORM.op);
- var opts='<option value="" '+(FLFORM.op?'':'selected')+' disabled>Choose an operation…</option>'+FL_OPS.map(function(o){
-   var lock=(o.chem&&!canChem);
-   return '<option value="'+o.id+'"'+(FLFORM.op===o.id?' selected':'')+(lock?' disabled':'')+'>'+esc(o.label)+(lock?' (locked)':'')+'</option>';
- }).join('');
- var chemNote=canChem?'':'<div style="margin:0 18px 4px;font:600 11px \'Public Sans\';color:#b26a00">Chemical &amp; fertilizer ops are limited to techs, grads, and Bill.</div>';
+ var isChem=(FLFORM.category==='spray'||FLFORM.category==='fert');
+ var tpl=FLFORM.tplId?tplFind(FLFORM.tplId):null;
+ var chemNote=canChem?'':'<div style="margin:0 18px 4px;font:600 11px \'Public Sans\';color:#b26a00">Spray and Fertilize entries are limited to techs, grads, and Bill.</div>';
+
+ var catRow='<div class="chiprow" id="fln-catrow" style="padding:0 16px 4px">'+FL_CATS.map(function(k){
+   var t=FL_TYPES[k], locked=(k==='spray'||k==='fert')&&!canChem;
+   return '<span class="chip'+(FLFORM.category===k?' on':'')+'" data-flcat="'+k+'"'+(locked?' style="opacity:.5"':'')+'>'+esc(t.label)+'</span>';
+ }).join('')+'</div>';
+
+ var names=FLFORM.category?flTemplatesFor(FLFORM.category):[];
+ var nameBlock;
+ if(!FLFORM.category) nameBlock='<div class="rs" style="padding:8px 16px;color:var(--muted)">Pick a category above first.</div>';
+ else if(!names.length) nameBlock='<div class="rs" style="padding:8px 16px;color:var(--muted)">No task names are set up for this category yet — ask Bill to add one on the Task Board.</div>';
+ else nameBlock='<div class="list" id="fln-namelist">'+names.map(function(t){
+   return '<div class="fld tap" data-fltpl="'+t.id+'"><span class="fl">'+esc(t.name)+'</span><span class="fv"'+(FLFORM.tplId===t.id?' style="color:#2f7d3a"':'')+'>'+(FLFORM.tplId===t.id?'Selected ✓':'›')+'</span></div>';
+ }).join('')+'</div>';
+
+ var personPool=flPersonPool();
+ var personRow='<div class="chiprow" id="fln-person" style="padding:0 16px 8px">'+personPool.map(function(c){return crewPill(c,FLFORM.person===c.pid);}).join('')+'</div>';
+
+ var whenRow='<div class="list"><div class="fld" style="border-bottom:none"><span class="fl">Date</span><select class="inv-sel" id="fln-when" style="max-width:180px">'+flDateOptions(FLFORM.dueOrd||asTodayOrd())+'</select></div></div>';
+
  var selChips=FLFORM.plots.length?('<div class="chiprow" style="padding:0 0 8px">'+FLFORM.plots.map(function(p){return '<span class="chip on" data-flplot="'+p+'">'+flPlotLabel(p)+' ✕</span>';}).join('')+'</div>'):'';
  var whereBlock='<div style="padding:0 16px">'+selChips
    +'<div class="fl-search" style="position:relative;margin:0"><input class="inv-search" id="fln-plotsearch" placeholder="Search a plot… e.g. 14, Greenhouse" autocomplete="off" style="width:100%"><div id="fln-plotsug" class="fl-sug" style="display:none"></div></div>'
    +'<div class="action tap" id="fln-mapbtn" style="background:#489FDF;color:#fff;margin-top:8px">Choose on map</div></div>';
+
  var chemRows='';
- if(op&&op.chem){
+ if(isChem&&tpl){
    var pit=flnProduct();
    var uOpts=flnUnitChoices().map(function(u){
      return '<option'+((FLFORM.amtUnit||'')===u?' selected':'')+'>'+esc(u)+'</option>';}).join('');
+   var showPest=(FLFORM.category==='spray');
    chemRows=''
     +'<div class="sec" style="margin:12px 18px 7px">Chemical application record</div><div class="list">'
     +'<div class="fld" style="position:relative"><span class="fl">Product *</span>'
@@ -3500,22 +3537,37 @@ function renderFlNew(){
     +'<span style="display:flex;align-items:center;gap:6px">'
     +'<input class="inv-in" id="fln-amtnum" inputmode="decimal" value="'+esc(FLFORM.amtNum)+'" placeholder="12" style="max-width:74px">'
     +'<select class="inv-sel" id="fln-amtunit" style="max-width:92px">'+uOpts+'</select></span></div>'
-    +'<div class="fld"'+(op.pest?'':' style="border-bottom:none"')+'><span class="fl">Rate</span><input class="inv-in" id="fln-rate" value="'+esc(FLFORM.rate)+'" placeholder="e.g. 3.6 fl oz/M" style="max-width:175px"></div>'
-    +(op.pest?'<div class="fld" style="border-bottom:none"><span class="fl">Target pest/weed</span><input class="inv-in" id="fln-target" value="'+esc(FLFORM.target)+'" placeholder="e.g. Dollar spot" style="max-width:175px"></div>':'')
+    +'<div class="fld"'+(showPest?'':' style="border-bottom:none"')+'><span class="fl">Rate</span><input class="inv-in" id="fln-rate" value="'+esc(FLFORM.rate)+'" placeholder="e.g. 3.6 fl oz/M" style="max-width:175px"></div>'
+    +(showPest?'<div class="fld" style="border-bottom:none"><span class="fl">Target pest/weed</span><input class="inv-in" id="fln-target" value="'+esc(FLFORM.target)+'" placeholder="e.g. Dollar spot (optional)" style="max-width:175px"></div>':'')
     +'</div>'
     +(pit?('<div class="list" style="margin-top:10px"><div class="fld tap" id="fln-takestock" style="border-bottom:none">'
        +'<span class="fl">Take it out of stock</span>'
        +'<span class="fv" style="color:'+(FLFORM.takeStock?'#2f7d3a':'var(--muted)')+'">'+(FLFORM.takeStock?'Yes':'No')+'</span></div></div>'):'')
     +'<div id="fln-stocknote">'+flnStockNoteHTML()+'</div>';
  }
- var eqRow=(op&&op.eq)?'<div class="sec" style="margin:12px 18px 7px">Equipment</div><div class="list"><div class="fld" style="border-bottom:none"><span class="fl">Machine used</span><input class="inv-in" id="fln-eq" value="'+esc(FLFORM.equipment)+'" placeholder="e.g. Toro 3 reel" style="max-width:175px"></div></div>':'';
+
+ /* Equipment now comes from the machines already on file for the chosen task
+    (app-05's tplMachineList()) instead of a separate yes/no flag -- one less
+    list to keep in sync, and it covers every category, not just Mow. Hidden
+    entirely when the task has no machines on file and no equipment note. */
+ var eqRow='';
+ if(tpl&&((tpl.machines&&tpl.machines.length)||tpl.eqNote)){
+   var mOpts=(tpl.machines&&tpl.machines.length)?tplMachineList(tpl.machines).map(function(e){return '<option value="'+e.id+'"'+(FLFORM.machine===e.id?' selected':'')+'>'+esc(e.name)+'</option>';}).join(''):'';
+   eqRow='<div class="sec" style="margin:12px 18px 7px">Equipment</div>'
+     +(mOpts?('<div class="list"><div class="fld" style="border-bottom:none"><span class="fl">Machine used</span><select class="inv-sel" id="fln-eq" style="max-width:175px"><option value="">— None —</option>'+mOpts+'</select></div></div>'):'')
+     +(tpl.eqNote?'<div style="margin:2px 18px 0;font:600 11px \'Public Sans\';color:#b26a00">Equipment on file: '+esc(tpl.eqNote)+' — not in the equipment roster yet.</div>':'');
+ }
+
  body.innerHTML=
    chemNote
-  +'<div class="sec" style="margin:12px 18px 7px">Operation</div><div class="list">'
-  +'<div class="fld"><span class="fl">Operation type *</span><select class="inv-sel" id="fln-op" style="max-width:210px">'+opts+'</select></div>'
-  +'<div class="fld"><span class="fl">Person</span><span class="fv">'+meName()+' (you)</span></div>'
-  +'<div class="fld" style="border-bottom:none"><span class="fl">Date / time</span><span class="fv" style="color:var(--muted)">Set automatically on save</span></div>'
-  +'</div>'
+  +'<div class="sec" style="margin:12px 18px 7px">Category *</div>'
+  +catRow
+  +'<div class="sec" style="margin:12px 18px 7px">Task name *</div>'
+  +nameBlock
+  +'<div class="sec" style="margin:12px 18px 7px">Person</div>'
+  +personRow
+  +'<div class="sec" style="margin:12px 18px 7px">Date</div>'
+  +whenRow
   +'<div class="sec" style="margin:12px 18px 7px">Where * <span style="color:var(--muted);font-weight:600">· '+FLFORM.plots.length+' selected</span></div>'
   +whereBlock
   +eqRow
@@ -3617,7 +3669,8 @@ function flReadInputs(){
  FLFORM.amount=FLFORM.amtNum?((FLFORM.amtNum+' '+(FLFORM.amtUnit||'')).trim()):'';
  if((v=g('fln-rate'))!==undefined)FLFORM.rate=v.trim();
  if((v=g('fln-target'))!==undefined)FLFORM.target=v.trim();
- if((v=g('fln-eq'))!==undefined)FLFORM.equipment=v.trim();
+ if((v=g('fln-eq'))!==undefined)FLFORM.machine=v;
+ if((v=g('fln-when'))!==undefined&&v)FLFORM.dueOrd=parseInt(v,10)||FLFORM.dueOrd;
  if((v=g('fln-notes'))!==undefined)FLFORM.notes=v.trim();
 }
 function flnRenderSug(q){
@@ -3629,6 +3682,13 @@ function flnRenderSug(q){
  box.style.display='block';
 }
 document.getElementById('s-flnew').addEventListener('click',function(e){
+ var cc=e.target.closest('[data-flcat]'); if(cc){
+   var k=cc.getAttribute('data-flcat');
+   if((k==='spray'||k==='fert')&&!flCanChem()){toast('Spray and Fertilize entries are limited to techs, grads, and Bill');return;}
+   flReadInputs(); FLFORM.category=k; FLFORM.tplId=''; FLFORM.machine=''; renderFlNew(); return;
+ }
+ var tc=e.target.closest('[data-fltpl]'); if(tc){flReadInputs();FLFORM.tplId=tc.getAttribute('data-fltpl');FLFORM.machine='';renderFlNew();return;}
+ var pr=e.target.closest('[data-person]'); if(pr&&pr.closest('#fln-person')){flReadInputs();FLFORM.person=pr.getAttribute('data-person');renderFlNew();return;}
  var mb=e.target.closest('#fln-mapbtn'); if(mb){flReadInputs();openFlPlotPick();return;}
  var pp=e.target.closest('[data-flprod]'); if(pp){flnPickProduct(pp.getAttribute('data-flprod'));return;}
  var ts=e.target.closest('#fln-takestock'); if(ts){flReadInputs();FLFORM.takeStock=!FLFORM.takeStock;renderFlNew();return;}
@@ -3648,31 +3708,39 @@ document.getElementById('s-flnew').addEventListener('input',function(e){
  else if(e.target.id==='fln-amtnum'){ flReadInputs(); flnPaintStockNote(); }
 });
 document.getElementById('s-flnew').addEventListener('change',function(e){
- if(e.target.id==='fln-op'){flReadInputs();FLFORM.op=e.target.value;renderFlNew();return;}
+ if(e.target.id==='fln-when'){FLFORM.dueOrd=parseInt(e.target.value,10)||FLFORM.dueOrd;return;}
+ if(e.target.id==='fln-eq'){FLFORM.machine=e.target.value;return;}
  if(e.target.id==='fln-amtunit'){ flReadInputs(); flnPaintStockNote(); return; }
 });
 function flSave(){
  flReadInputs();
- var op=flOp(FLFORM.op);
- if(!op){toast('Pick an operation type');return;}
- if(op.chem&&!flCanChem()){toast('Not permitted to log chemical applications');return;}
+ var cat=FLFORM.category;
+ if(!cat){toast('Pick a category');return;}
+ var tpl=FLFORM.tplId?tplFind(FLFORM.tplId):null;
+ if(!tpl){toast('Pick a task name');return;}
+ var isChem=(cat==='spray'||cat==='fert');
+ if(isChem&&!flCanChem()){toast('Not permitted to log chemical applications');return;}
+ if(!FLFORM.person){toast('Pick who did this');return;}
  if(!FLFORM.plots.length){toast('Pick at least one plot / area');return;}
- if(op.chem&&(!FLFORM.product||!FLFORM.amount)){toast('Product and amount are required');return;}
- /* the record stores the id; the detail line keeps the readable name */
- var whoId=SESSION.pid, who=meName();
- var title=(op.chem&&FLFORM.product)?FLFORM.product:op.label;
+ if(isChem&&(!FLFORM.product||!FLFORM.amount)){toast('Product and amount are required');return;}
+ /* the record stores the ids; the detail line keeps the readable names */
+ var loggedBy=SESSION.pid;             /* always the real signed-in person -- see docs/DECISIONS.md */
+ var personId=FLFORM.person;           /* who gets credit -- editable, defaults to loggedBy */
+ var eq=(typeof EQUIP!=='undefined'?EQUIP:[]).find(function(e){return e.id===FLFORM.machine;});
+ var equipmentStr=eq?eq.name:'';
+ var title=(isChem&&FLFORM.product)?FLFORM.product:tpl.name;
  var bits=[];
- if(op.chem){ if(FLFORM.ai)bits.push(FLFORM.ai); if(FLFORM.rate)bits.push(FLFORM.rate); if(FLFORM.amount)bits.push(FLFORM.amount+' used'); if(op.pest&&FLFORM.target)bits.push('target: '+FLFORM.target); }
- if(op.eq&&FLFORM.equipment)bits.push(FLFORM.equipment);
- bits.push(who);
+ if(isChem){ if(FLFORM.ai)bits.push(FLFORM.ai); if(FLFORM.rate)bits.push(FLFORM.rate); if(FLFORM.amount)bits.push(FLFORM.amount+' used'); if(cat==='spray'&&FLFORM.target)bits.push('target: '+FLFORM.target); }
+ if(equipmentStr)bits.push(equipmentStr);
+ bits.push(nameOf(personId)||meName());
  var detail=bits.join(' · ');
  var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
- var now=new Date();
- var date=MON[now.getMonth()]+' '+now.getDate();
- var ord=now.getFullYear()*10000+(now.getMonth()+1)*100+now.getDate();
+ var d=asDateFromOrd(FLFORM.dueOrd||asTodayOrd());
+ var date=MON[d.getMonth()]+' '+d.getDate();
+ var ord=asOrd(d);
  var time=nowTime();
  FLFORM.plots.forEach(function(p){
-   FIELDLOG.push({plot:p,type:op.feed,title:title,detail:detail,date:date,ord:ord,op:op.label,product:FLFORM.product||null,ai:FLFORM.ai||null,amount:FLFORM.amount||null,rate:FLFORM.rate||null,target:FLFORM.target||null,equipment:FLFORM.equipment||null,notes:FLFORM.notes||'',person:whoId,loggedBy:whoId,time:time,source:'manual'});
+   FIELDLOG.push({plot:p,type:cat,title:title,detail:detail,date:date,ord:ord,op:tpl.name,product:FLFORM.product||null,ai:FLFORM.ai||null,amount:FLFORM.amount||null,rate:FLFORM.rate||null,target:FLFORM.target||null,equipment:equipmentStr||null,notes:FLFORM.notes||'',person:personId,loggedBy:loggedBy,time:time,source:'manual'});
  });
  flCommit();                                    /* stamps the ids we need below */
 
@@ -3686,14 +3754,14 @@ function flSave(){
     Nothing here can stop the save: the entry is already committed above. If
     the product is unmatched or the unit will not convert, flnStockAmount()
     returns null and the shelf is simply left alone. */
- var _msg=op.chem?'Logged ✓ · chemical record saved':'Operation logged ✓';
+ var _msg=isChem?'Logged ✓ · chemical record saved':'Operation logged ✓';
  try{
    var _take=flnStockAmount(), _pit=flnProduct();
    if(_take!==null && _take>0 && _pit){
      var _made=FIELDLOG.slice(-FLFORM.plots.length);
      var _warn=invNegWarn(_pit,-_take);          /* BEFORE the movement lands */
      invMove(_pit.id, -_take, 'out',
-       {ref:(_made[0]&&_made[0].id)||null, note:'Field log · '+op.label});
+       {ref:(_made[0]&&_made[0].id)||null, note:'Field log · '+tpl.name});
      flCommit();                                 /* the ref may have stamped an id */
      _msg+=' · '+fmt(_take)+' '+_pit.unit+' off the shelf';
      if(_warn) _msg=_warn;

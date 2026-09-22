@@ -294,7 +294,7 @@ section('11. logging a spray takes it off the shelf');
   const before = b.p.invQty(it), logged = b.p.FIELDLOG.length;
 
   Object.assign(b.p.FLFORM, {
-    op: 'spray_fung', plots: ['14'], product: it.name, productId: it.id,
+    category: 'spray', tplId: 'tpl10', person: 'p01', plots: ['14'], product: it.name, productId: it.id,
     amtNum: '12', amtUnit: it.unit, takeStock: true
   });
   b.p.flSave();
@@ -319,7 +319,7 @@ section('12. three plots, one tank — the shelf is charged ONCE');
   const before = b.p.invQty(it), logged = b.p.FIELDLOG.length;
 
   Object.assign(b.p.FLFORM, {
-    op: 'spray_fung', plots: ['14', '15', '16'], product: it.name, productId: it.id,
+    category: 'spray', tplId: 'tpl10', person: 'p01', plots: ['14', '15', '16'], product: it.name, productId: it.id,
     amtNum: '10', amtUnit: it.unit, takeStock: true
   });
   b.p.flSave();
@@ -340,7 +340,7 @@ section('13. when it cannot be sure, it logs anyway and leaves stock alone');
      blocked in a field. */
   let logged = b.p.FIELDLOG.length;
   Object.assign(b.p.FLFORM, {
-    op: 'spray_fung', plots: ['14'], product: 'Something not on the list',
+    category: 'spray', tplId: 'tpl10', person: 'p01', plots: ['14'], product: 'Something not on the list',
     productId: null, amtNum: '8', amtUnit: 'fl oz', takeStock: true
   });
   b.p.flSave();
@@ -353,7 +353,7 @@ section('13. when it cannot be sure, it logs anyway and leaves stock alone');
     logged = b.p.FIELDLOG.length;
     const before = b.p.invQty(bagged);
     Object.assign(b.p.FLFORM, {
-      op: 'spray_fung', plots: ['14'], product: bagged.name, productId: bagged.id,
+      category: 'spray', tplId: 'tpl10', person: 'p01', plots: ['14'], product: bagged.name, productId: bagged.id,
       amtNum: '3', amtUnit: 'fl oz', takeStock: true
     });
     b.p.flSave();
@@ -365,7 +365,7 @@ section('13. when it cannot be sure, it logs anyway and leaves stock alone');
   const it2 = b.p.INVENTORY.find(x => x.unit === 'fl oz') || b.p.INVENTORY[1];
   const was = b.p.invQty(it2);
   Object.assign(b.p.FLFORM, {
-    op: 'spray_fung', plots: ['14'], product: it2.name, productId: it2.id,
+    category: 'spray', tplId: 'tpl10', person: 'p01', plots: ['14'], product: it2.name, productId: it2.id,
     amtNum: '5', amtUnit: it2.unit, takeStock: false
   });
   b.p.flSave();
@@ -380,7 +380,7 @@ section('14. editing the amount corrects the shelf, without a second entry');
   const before = b.p.invQty(it);
 
   Object.assign(b.p.FLFORM, {
-    op: 'spray_fung', plots: ['14'], product: it.name, productId: it.id,
+    category: 'spray', tplId: 'tpl10', person: 'p01', plots: ['14'], product: it.name, productId: it.id,
     amtNum: '20', amtUnit: it.unit, takeStock: true
   });
   b.p.flSave();

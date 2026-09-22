@@ -29,7 +29,11 @@ document.getElementById('s-lowstock').addEventListener('click',function(e){var r
 app.addEventListener('click',function(e){var m=e.target.closest('[data-mode]');if(m){window.ilMode=m.getAttribute('data-mode');window.ilItem=m.getAttribute('data-item')||null;}var ed=e.target.closest('[data-edit]');if(ed){window.aiEdit=ed.getAttribute('data-edit');return;}var addNav=e.target.closest('[data-go="additem"]');if(addNav)window.aiEdit=null;},true);
 
 /* ---- Task templates: Add / Edit form ---- */
-const CATEGORIES=['Mow','Paint','Spray','Fertilize','Aeration','Cultivation','Irrigation','Maintenance','Miscellaneous'];
+/* Paint and Aeration folded into Miscellaneous/Cultivation on 2026-09-22 so
+   every category but Maintenance lines up 1:1 with a Field Log category --
+   see docs/DECISIONS.md. Maintenance stays: it feeds the Equipment page's
+   own log, never the Field Log. */
+const CATEGORIES=['Mow','Spray','Fertilize','Cultivation','Irrigation','Maintenance','Miscellaneous'];
 function isMowCat(cat){ return /mow/i.test(cat||''); }
 const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const FREQS=[2,3,4,5,6];
@@ -49,38 +53,42 @@ function loadTemplates(){try{return JSON.parse(localStorage.getItem(TPL_KEY)||'n
 /* Task list — sourced from the Tasks sheet of Farm_info.xlsx.
    machines[] = equipment IDs valid for that task; eqNote = raw text when no
    machine in the equipment roster matches. */
+/* logField: does a Field Log manual entry offer this task as something to
+   log? True everywhere except Maintenance, which gets its own log on the
+   Equipment page instead (see docs/DECISIONS.md, 2026-09-22). Bill or Dillon
+   can flip it per task from the "Add to the task list" form. */
 const TASK_SEED=[
- {id:'tpl1', category:'Mow',           name:'Rotary - Plots',       machines:['e3','e4','e5']},
- {id:'tpl2', category:'Mow',           name:'Rotary - Alleys',      machines:['e3','e4','e5']},
- {id:'tpl3', category:'Mow',           name:'Rotary - Borders',     machines:['e3','e4','e5']},
- {id:'tpl4', category:'Mow',           name:'Walk - Dennis',        machines:['e13','e14','e15']},
- {id:'tpl5', category:'Mow',           name:'Fairway',              machines:['e1']},
- {id:'tpl6', category:'Mow',           name:'2653',                 machines:['e10']},
- {id:'tpl7', category:'Mow',           name:'Greens - Triplex',     machines:['e9','e8']},
- {id:'tpl8', category:'Mow',           name:'Greens - Walk',        machines:['e6','e7']},
- {id:'tpl9', category:'Paint',         name:'Trial Dots',           machines:[], eqNote:'Paint Gun'},
- {id:'tpl10',category:'Spray',         name:'Pesticide - Boom',     machines:['e2']},
+ {id:'tpl1', category:'Mow',           name:'Rotary - Plots',       machines:['e3','e4','e5'], logField:true},
+ {id:'tpl2', category:'Mow',           name:'Rotary - Alleys',      machines:['e3','e4','e5'], logField:true},
+ {id:'tpl3', category:'Mow',           name:'Rotary - Borders',     machines:['e3','e4','e5'], logField:true},
+ {id:'tpl4', category:'Mow',           name:'Walk - Dennis',        machines:['e13','e14','e15'], logField:true},
+ {id:'tpl5', category:'Mow',           name:'Fairway',              machines:['e1'], logField:true},
+ {id:'tpl6', category:'Mow',           name:'2653',                 machines:['e10'], logField:true},
+ {id:'tpl7', category:'Mow',           name:'Greens - Triplex',     machines:['e9','e8'], logField:true},
+ {id:'tpl8', category:'Mow',           name:'Greens - Walk',        machines:['e6','e7'], logField:true},
+ {id:'tpl9', category:'Miscellaneous', name:'Trial Dots',           machines:[], eqNote:'Paint Gun', logField:true},
+ {id:'tpl10',category:'Spray',         name:'Pesticide - Boom',     machines:['e2'], logField:true},
  /* Small runs where the leftover has nowhere to go: no 20-gal boom charge,
     mix only what the ground needs. See the spray mix calculator. */
- {id:'tpl29',category:'Spray',         name:'Pesticide - Boom (Precise)', machines:['e2']},
- {id:'tpl11',category:'Spray',         name:'Pesticide - Backpack', machines:['e43','e44','e45','e46','e47']},
- {id:'tpl12',category:'Spray',         name:'Fertilizer',           machines:['e2']},
- {id:'tpl13',category:'Spray',         name:'Fertilizer',           machines:['e43','e44','e45','e46','e47']},
- {id:'tpl14',category:'Fertilize',     name:'Granular',             machines:['e28','e29']},
- {id:'tpl15',category:'Aeration',      name:'Tractor-Mounted',      machines:['e23','e22','e30']},
- {id:'tpl16',category:'Miscellaneous', name:'Traffic Plots',        machines:['e31']},
- {id:'tpl17',category:'Cultivation',   name:'Bleckavate',           machines:['e23','e22','e33']},
- {id:'tpl18',category:'Cultivation',   name:'Fraise Mow',           machines:['e23','e22','e32']},
- {id:'tpl19',category:'Irrigation',    name:'Valve - Fix',          machines:[]},
- {id:'tpl20',category:'Irrigation',    name:'Head - Fix',           machines:[]},
- {id:'tpl21',category:'Maintenance',   name:'Reels - Grind',        machines:['e35','e36']},
- {id:'tpl22',category:'Maintenance',   name:'Bed Knife - Grind',    machines:['e34']},
- {id:'tpl23',category:'Maintenance',   name:'Reels - Backlap',      machines:[]},
- {id:'tpl24',category:'Maintenance',   name:'Oil Change',           machines:[]},
- {id:'tpl25',category:'Cultivation',   name:'Topdress - Rotary',    machines:['e49','e24']},
- {id:'tpl26',category:'Cultivation',   name:'Topdress - Drop',      machines:['e49','e25']},
- {id:'tpl27',category:'Mow',           name:'Weedeat',              machines:['e57','e59','e60','e61']},
- {id:'tpl28',category:'Irrigation',    name:'Hand Water',           machines:[]}
+ {id:'tpl29',category:'Spray',         name:'Pesticide - Boom (Precise)', machines:['e2'], logField:true},
+ {id:'tpl11',category:'Spray',         name:'Pesticide - Backpack', machines:['e43','e44','e45','e46','e47'], logField:true},
+ {id:'tpl12',category:'Spray',         name:'Fertilizer',           machines:['e2'], logField:true},
+ {id:'tpl13',category:'Spray',         name:'Fertilizer',           machines:['e43','e44','e45','e46','e47'], logField:true},
+ {id:'tpl14',category:'Fertilize',     name:'Granular',             machines:['e28','e29'], logField:true},
+ {id:'tpl15',category:'Cultivation',   name:'Tractor-Mounted',      machines:['e23','e22','e30'], logField:true},
+ {id:'tpl16',category:'Miscellaneous', name:'Traffic Plots',        machines:['e31'], logField:true},
+ {id:'tpl17',category:'Cultivation',   name:'Bleckavate',           machines:['e23','e22','e33'], logField:true},
+ {id:'tpl18',category:'Cultivation',   name:'Fraise Mow',           machines:['e23','e22','e32'], logField:true},
+ {id:'tpl19',category:'Irrigation',    name:'Valve - Fix',          machines:[], logField:true},
+ {id:'tpl20',category:'Irrigation',    name:'Head - Fix',           machines:[], logField:true},
+ {id:'tpl21',category:'Maintenance',   name:'Reels - Grind',        machines:['e35','e36'], logField:false},
+ {id:'tpl22',category:'Maintenance',   name:'Bed Knife - Grind',    machines:['e34'], logField:false},
+ {id:'tpl23',category:'Maintenance',   name:'Reels - Backlap',      machines:[], logField:false},
+ {id:'tpl24',category:'Maintenance',   name:'Oil Change',           machines:[], logField:false},
+ {id:'tpl25',category:'Cultivation',   name:'Topdress - Rotary',    machines:['e49','e24'], logField:true},
+ {id:'tpl26',category:'Cultivation',   name:'Topdress - Drop',      machines:['e49','e25'], logField:true},
+ {id:'tpl27',category:'Mow',           name:'Weedeat',              machines:['e57','e59','e60','e61'], logField:true},
+ {id:'tpl28',category:'Irrigation',    name:'Hand Water',           machines:[], logField:true}
 ];
 /* Filled in place rather than reassigned: STORE_DEFS, the sync module and a
    dozen closures all hold this one array, and swapping it for a new one would
@@ -88,10 +96,24 @@ const TASK_SEED=[
 var TEMPLATES=[];
 (function(){
   var stored=loadTemplates();
-  if(stored&&stored.length){ stored.forEach(function(t){ if(t) TEMPLATES.push(t); }); return; }
-  TASK_SEED.forEach(function(t){
-    TEMPLATES.push({id:t.id,name:t.name,category:t.category,plots:[],repeat:'As needed',freq:null,months:[],
-                    machines:(t.machines||[]).slice(),machine:'',eqNote:t.eqNote||''});
+  if(stored&&stored.length){ stored.forEach(function(t){ if(t) TEMPLATES.push(t); }); }
+  else{
+    TASK_SEED.forEach(function(t){
+      TEMPLATES.push({id:t.id,name:t.name,category:t.category,plots:[],repeat:'As needed',freq:null,months:[],
+                      machines:(t.machines||[]).slice(),machine:'',eqNote:t.eqNote||'',logField:t.logField!==false});
+    });
+  }
+  /* A phone (or the shared database) can still be holding a template saved
+     before 2026-09-22, when Paint and Aeration were their own categories and
+     logField didn't exist. Fold those in on the way out of storage so a task
+     saved under the old names still shows up under the new ones instead of
+     silently vanishing from every category list -- see docs/DECISIONS.md.
+     The corrected category is only written back to storage the next time
+     that template is actually edited and saved. */
+  TEMPLATES.forEach(function(t){
+    if(t.category==='Paint') t.category='Miscellaneous';
+    else if(t.category==='Aeration') t.category='Cultivation';
+    if(typeof t.logField!=='boolean') t.logField=(t.category!=='Maintenance');
   });
 })();
 
@@ -209,6 +231,14 @@ function syncForm(){
  if(erow){ erow.style.display=(FORM.mode==='template')?'':'none'; document.getElementById('tn-equip').textContent=tnEquipLabel(); }
  var enote=document.getElementById('tn-eqnote');
  if(enote){enote.style.display=FORM.eqNote?'':'none';enote.textContent=FORM.eqNote?('Equipment on file: '+FORM.eqNote+' — not in the equipment roster yet.'):'';}
+ /* Same as the equipment row: only a task's own template carries this, not a
+    one-off assignment, edit or request. Styled like the Field Log's own
+    "Take it out of stock" tap-toggle (app-02-fieldlog-sync.js). */
+ var lrow=document.getElementById('tn-logfield-row');
+ if(lrow){ lrow.style.display=(FORM.mode==='template')?'':'none';
+   var lv=document.getElementById('tn-logfield');
+   if(lv){ var lf=FORM.logField!==false; lv.textContent=(lf?'Yes':'No')+' ›'; lv.style.color=lf?'#2f7d3a':'var(--muted)'; }
+ }
  var wrow=document.getElementById('tn-whenrow'), wsel=document.getElementById('tn-when');
  if(wrow&&wsel){ if(asg||edt){ wrow.style.display=''; wsel.innerHTML=asDateOptions(FORM.dueOrd||asTodayOrd()); } else { wrow.style.display='none'; } }
  document.getElementById('tn-schedule').style.display=(req||asg||edt)?'none':'';
@@ -235,8 +265,8 @@ function openEditTask(id){
  syncForm(); go('tasknew');
 }
 function openForm(tpl){
- if(tpl){FORM={id:tpl.id,mode:'template',students:1,name:tpl.name,category:tpl.category,plots:(tpl.plots||[]).slice(),repeat:tpl.repeat,freq:tpl.freq||3,months:(tpl.months||[]).slice(),machine:tpl.machine||'',machines:(tpl.machines||[]).slice(),eqNote:tpl.eqNote||''};}
- else{FORM={id:null,mode:'template',students:1,name:'',category:CATEGORIES[0],plots:[],repeat:'As needed',freq:3,months:[],machines:[],eqNote:''};}
+ if(tpl){FORM={id:tpl.id,mode:'template',students:1,name:tpl.name,category:tpl.category,plots:(tpl.plots||[]).slice(),repeat:tpl.repeat,freq:tpl.freq||3,months:(tpl.months||[]).slice(),machine:tpl.machine||'',machines:(tpl.machines||[]).slice(),eqNote:tpl.eqNote||'',logField:tpl.logField!==false};}
+ else{FORM={id:null,mode:'template',students:1,name:'',category:CATEGORIES[0],plots:[],repeat:'As needed',freq:3,months:[],machines:[],eqNote:'',logField:true};}
  syncForm(); go('tasknew');
 }
 function openReqForm(withStudents){
@@ -295,7 +325,7 @@ function saveForm(){
     refuses this write too -- see canEditTaskList() in firestore.rules. */
  if(!tplCanEdit()){ toast('Only staff can change the task list'); return; }
  var editing=!!FORM.id;
- var t={id:FORM.id||(newId('tpl')),updatedAt:isoLocal(new Date(),true),updatedBy:SESSION.pid||null,name:FORM.name,category:FORM.category,plots:FORM.plots.slice(),repeat:FORM.repeat,freq:FORM.repeat==='Custom'?FORM.freq:null,months:FORM.months.slice(),machine:FORM.machine||null,machines:(FORM.machines||[]).slice(),eqNote:FORM.eqNote||''};
+ var t={id:FORM.id||(newId('tpl')),updatedAt:isoLocal(new Date(),true),updatedBy:SESSION.pid||null,name:FORM.name,category:FORM.category,plots:FORM.plots.slice(),repeat:FORM.repeat,freq:FORM.repeat==='Custom'?FORM.freq:null,months:FORM.months.slice(),machine:FORM.machine||null,machines:(FORM.machines||[]).slice(),eqNote:FORM.eqNote||'',logField:FORM.logField!==false};
  var idx=TEMPLATES.findIndex(function(x){return x.id===t.id;});
  if(idx>=0)TEMPLATES[idx]=t; else TEMPLATES.push(t);
  saveTemplates();
@@ -306,6 +336,7 @@ function saveForm(){
 document.getElementById('tn-name').addEventListener('input',function(e){FORM.name=e.target.value;});
 document.getElementById('tn-students').addEventListener('change',function(e){FORM.students=+e.target.value;});
 document.getElementById('tn-cat').addEventListener('change',function(e){FORM.category=e.target.value;var mrow=document.getElementById('tn-machine-row');if(mrow)mrow.style.display=wantsMachineRow()?'':'none';});
+document.getElementById('tn-logfield-row')&&document.getElementById('tn-logfield-row').addEventListener('click',function(){FORM.logField=(FORM.logField===false);syncForm();});
 document.getElementById('s-tasknew').addEventListener('click',function(e){
 });document.getElementById('tn-machine').addEventListener('change',function(e){FORM.machine=e.target.value;});
 document.getElementById('tn-when')&&document.getElementById('tn-when').addEventListener('change',function(e){FORM.dueOrd=parseInt(e.target.value,10)||FORM.dueOrd;});
@@ -400,8 +431,11 @@ function pickOpen(type,name,list){
 function openPlotPick(){plotPickDone=null;pickOpen(FORM.category,FORM.name,FORM.plots);go('plotpick');}
 function openFlPlotPick(){
  plotPickDone=function(sel){FLFORM.plots=sel.slice();};
- var op=FL_OPS.filter(function(o){return o.id===FLFORM.op;})[0];
- pickOpen(op?op.label:'','',FLFORM.plots);
+ /* FL_CAT_TASKCAT lives in app-02 (loaded before this file), converting the
+    Field Log's category key to the matching Task Board category name so the
+    map's quick-select works the same way it does for a real task. */
+ var tpl=FLFORM.tplId?tplFind(FLFORM.tplId):null;
+ pickOpen(FL_CAT_TASKCAT[FLFORM.category]||'',tpl?tpl.name:'',FLFORM.plots);
  go('plotpick');
 }
 document.getElementById('pp-done').addEventListener('click',function(){if(plotPickDone){var cb=plotPickDone;plotPickDone=null;cb(PICK.slice());back();return;}FORM.plots=PICK.slice();document.getElementById('tn-plots').textContent=plotsLabel(FORM.plots);back();});

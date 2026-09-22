@@ -159,7 +159,7 @@ section('4. a boom spray: the mix sheet is filled in at the rig');
 
 section('5. a trial-dots job');
 {
-  const t = assigned('wr-4', { title: 'Trial Dots', type: 'Paint', plots: [], area: 'All active trials' });
+  const t = assigned('wr-4', { title: 'Trial Dots', type: 'Miscellaneous', plots: [], area: 'All active trials' });
   const server = doc(t);
   t.doneTrials = ['tr1'];
   ok('ticking a study off is allowed', model.isWorkUpdate(server, doc(t), STUDENT), why(server, doc(t)));

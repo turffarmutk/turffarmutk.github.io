@@ -123,7 +123,7 @@ section('2. a job\'s equipment, grouped');
      rot.map(g => g.cat).join(','));
   ok('with all three rotary mowers in it', rot[0] && rot[0].items.length === 3);
 
-  const aer = win.taskEquipNeeded(job('eq-2b', { title: 'Tractor-Mounted', type: 'Aeration' }));
+  const aer = win.taskEquipNeeded(job('eq-2b', { title: 'Tractor-Mounted', type: 'Cultivation' }));
   ok('aerating is a tractor group AND an implement group',
      aer.map(g => g.cat).join(',') === 'tractor,implement', aer.map(g => g.cat).join(','));
 
@@ -141,7 +141,7 @@ section('2. a job\'s equipment, grouped');
 
 section('3. Start opens the page, and Continue waits for every group');
 {
-  const t = job('eq-3', { title: 'Tractor-Mounted', type: 'Aeration', desc: 'Skip plot 7.' });
+  const t = job('eq-3', { title: 'Tractor-Mounted', type: 'Cultivation', desc: 'Skip plot 7.' });
   win.show('taskboard', false);
   win.startTask(t.id);
   ok('Start opens the Start page', active() === 'taskprep', active());

@@ -1907,3 +1907,74 @@ which are not plot lists.
 - Lowering the sheets' z-index. At 60 the Leaflet map drew over the top half of
   every bottom sheet on the work map, including "Mark task complete?". They sit
   at 1200.
+
+### The Task Board's categories and the Field Log's categories are the same 6, plus Maintenance — 2026-09-22
+
+**Decided:** `CATEGORIES` (app-05) dropped from 9 to 7: Paint folded into
+Miscellaneous, Aeration folded into Cultivation. `FL_CAT_TASKCAT` (app-02) maps
+each of the Field Log's 6 categories to exactly one Task Board category —
+Spray, Fertilize, Cultivation, Mow and Irrigation by name, Misc to
+Miscellaneous. Maintenance stays a Task Board category but is the one name
+`FL_CAT_TASKCAT` never mentions, on purpose: it gets its own log on the
+Equipment page, never the Field Log. Every task template also carries its own
+`logField` flag (default `true`, `false` for the four existing Maintenance
+tasks), a per-task override on top of the category rule, set from a checkbox
+on the "Add to the task list" form.
+
+**Why:** the Field Log's manual entry form (below) was rebuilt to pick a real
+task name instead of a fixed list of 16 operations, which meant its 6
+categories needed to line up with the Task Board's. Rather than keep a
+translation table for two diverging lists, the lists themselves were merged.
+Maintenance was deliberately left out at the category level rather than relying
+on `logField` alone, because Dillon said reel grinds, oil changes and the rest
+belong on a separate equipment log, not mixed into field work at all.
+
+**Likely mistakes:**
+- Reading `t.category==='Paint'` or `'Aeration'` anywhere new. Both still exist
+  on templates or tasks saved before this change until somebody edits and
+  re-saves them — the loader in app-05's `TEMPLATES` init folds them to the new
+  names for *display* on the way out of storage, but the stored value only
+  updates when that record is actually saved again.
+- Adding a 7th Field Log category to cover Maintenance "just in case". The
+  Equipment page's own log is where that work belongs; see BACKEND-STEPS.md if
+  that log doesn't exist yet.
+- Assuming `logField:false` is what keeps Maintenance out of the Field Log. The
+  category map does that; `logField` is the separate, finer override for the
+  other 6 categories.
+
+### A Field Log entry now names a real task, a real person, and a real day — 2026-09-22
+
+**Decided:** the "Add manual entry" form on the Field Log (`openFlNew()` /
+`renderFlNew()`, app-02) now asks for Category → Task name (from the matching
+Task Board templates, list-only, no typing) → Person → Date → Plots → Notes,
+instead of a fixed 16-item operation list with the person and time locked to
+"now". `person` (who gets credit) is editable and defaults to whoever is
+signed in; `loggedBy` is always the actual signed-in person and is never
+touched by this form — the two fields already existed and already held the
+same value, they just weren't independent before. `date`/`ord` come from a
+picker that walks back 30 days (weekends included, since fieldwork happens on
+those too) rather than app-05's `asDateOptions()`, which only offers weekdays
+going forward and is built for scheduling, not for saying when something
+already happened. Whether the chemical fields (product, amount, rate) show up
+is now decided by category — Spray or Fertilize, always — instead of a
+per-operation flag, and the "target pest/weed" field is shown for all of Spray
+but left optional, since Spray also covers liquid fertilizer. The equipment
+field, when it shows at all, is now the chosen task's own machine list
+(`tplMachineList()`, app-05) instead of a separate on/off flag, so it now
+appears for any category with machines on file, not just Mow.
+
+**Why:** Dillon asked for the form to look like the Task Board, so an entry
+about work that wasn't done through a task still names a real task, a real
+person and a real day — useful for logging something after the fact, or for
+Bill logging on someone else's behalf.
+
+**Likely mistakes:**
+- Reintroducing `FL_OPS` or a fixed operation dropdown. It's gone; the task
+  name list comes from `flTemplatesFor()`, which reads live templates.
+- Reusing `asDateOptions()` for this field. It silently drops any date more
+  than a day or two old off the list and skips weekends — see `flDateOptions()`
+  in app-02.
+- Treating `person` and `loggedBy` as the same field again. `person` is on
+  `FL_EDITABLE` (and the matching `firestore.rules` list) so it can be
+  corrected later; `loggedBy` deliberately is not, which is what keeps it a
+  reliable audit trail.

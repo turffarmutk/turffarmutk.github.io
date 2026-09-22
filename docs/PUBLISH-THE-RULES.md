@@ -93,7 +93,8 @@ somebody permissions they should not have.
 | Bill, and whoever holds the undergrad-assignment job | Put **any** undergrad on a job; close a job on somebody's behalf |
 | Faculty | Put their **own lab's** grad students, technicians and undergrads on a job |
 | Grad students and technicians | Put themselves on a job; put **their own lab's undergrads** on one; pick up anything from the open pool |
-| Undergrads | Do the work they are given, and mark it done |
+| Undergrads | Do the work they are given — tick plots and trials off, fill in the spray mix, record which equipment they took — and mark it done |
+| Anybody on a job (helpers too) | The same: save their progress on it and finish it. Nothing else about the job |
 | Anybody who is not on the roster, or is switched off | Nothing at all |
 
 ### Undergrads attached to a lab
@@ -403,3 +404,42 @@ yet when you rename, the app stops and tells you so, and lets you go ahead if
 you want to. Other phones would show the new name with the old records still
 attached to the old one — visible in the "in use but not on the list" section on
 both screens, rather than silently wrong — until your phone catches up.
+
+---
+
+## And again on 2026-09-22 — the crew can save their work
+
+**The bug.** Students assigned a job could not check its plots off. They tapped
+a plot, it went green, and a second later it was orange again; the Finish
+button never lit up. It had been like that since the tasks moved into the
+database at the end of August. It never happened to you or Bill, because the
+rules let the two of you change any job.
+
+**Why.** Ticked plots are saved on the job, and the rules only let a student do
+two things to a job: claim it, or mark it done. Ticking a plot was neither, so
+the database refused it and handed its own copy back. Marking it done was
+refused too, because finishing also saves a note and a "already in the Field
+Log" marker, and neither was on the list.
+
+**What changed.** A new permission, `isWorkUpdate()`: **anybody on a job may
+save their progress on it** — ticked plots, ticked trials, the spray mix, and
+which equipment they took — and nothing else about the job. The list of what
+a finish may change (`isCompletion()`) now includes the note, the Field Log
+marker and that same progress.
+
+**Nothing to do in the app.** Publishing the rules is the whole fix. Ticks
+refused before you publish are gone and need tapping again, and any job a
+student tried to finish is still open.
+
+### Do not let anyone take this back out
+
+If a future change — yours, a successor's, or an AI assistant's — removes
+`isWorkUpdate()`, shortens either list, or folds them into the "edit" rule,
+**the crew silently lose the ability to check work off again**, and it will
+look fine to whoever tests it as Bill. Before you publish a rules file, open it
+and search for `isWorkUpdate`. If it is gone, do not publish; ask why.
+
+`npm test` checks this for you: `tools/test-task-work-rules.js` runs the app
+exactly the way a student uses it and fails if the rules would refuse any of
+it.
+

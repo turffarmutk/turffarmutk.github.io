@@ -118,8 +118,31 @@ records move.
 | `assignedBy` | who put the named person on it |
 | **`createdBy`** | **who raised it — stamped at creation, never rewritable** |
 | `status`, `completedBy`, `completedAt`, `closedBy` | state, and the credit |
+| `completedNote`, `_logged` | the note typed at Finish; the guard that stops the job going into the Field Log twice |
+| `donePlots[]`, `doneTrials[]` | progress — the plots, and on a trial-dots job the studies, ticked off so far |
+| `eqUsed` | `{personId: [machine ids]}` — what each person took, from the Start checklist |
+| `tplId` | the job on the task list it was assigned from |
 | `dueAt`, `dueOrd`, `repeat`, `freq`, `months[]` | when |
 | `machine`, `mowDir`, `dblMow`, `dblPass`, `mix` | how — mower, direction, tank |
+
+**Who may change which fields.** An update has to be one of five moves in
+`firestore.rules`, and the narrow ones may touch only their own fields:
+
+| Move | Who | Fields |
+|---|---|---|
+| `isClaim()` | someone taking an unowned job | `assignee`, `status`, `kind`, `origin`, `claimedAt` |
+| `isCompletion()` | anyone on the job, or Bill | `status`, `completedBy`, `completedAt`, `closedBy`, `completedNote`, `_logged`, and the progress fields below |
+| **`isWorkUpdate()`** | **anyone on the job** | **`donePlots`, `doneTrials`, `mix`, their own `eqUsed` entry** |
+| `isAssignment()` | whoever may assign that person | who is on it |
+| `isEdit()` | Bill, the job's creator, faculty over their own lab | anything |
+
+**`isWorkUpdate()` is load-bearing, and it was missing until 2026-09-22.**
+Without it the crew's plot ticks were refused, the database sent its copy back,
+and the plots turned orange again a second after going green — while working
+perfectly for Bill, whose writes pass `isEdit()`. A field the app writes on a
+task while someone *works* or *finishes* a job must be in these lists, or it
+is broken for everybody but Bill. `tools/test-task-work-rules.js` runs the
+app's real writes past them. See `docs/DECISIONS.md`, 2026-09-22.
 
 **`createdBy` was missing and is now stamped.** `taskCan(actor,'edit'|'delete')`
 has always had a branch reading "the person who raised it may change it", and it
@@ -640,6 +663,14 @@ person, for every action** — 3,795 comparisons — through both the app's func
 and a mirror of the rules, and fails if they ever disagree. It also fails if a
 role name, a grant name or a field name appears in one file and not the other,
 and if a new task-creation site forgets `createdBy`.
+
+**What it did not cover, until 2026-09-22:** which *fields* a write changes.
+`test-rules.js` asks "may this person complete this job", and the answer was
+yes — but the database also asks "and does this write only change the fields a
+completion may", and the answer to that was no. `tools/test-task-work-rules.js`
+closes that gap: it runs the app's real code as a student and puts each
+resulting write in front of the field lists, and it checks those lists against
+`firestore.rules` word for word.
 
 **What it cannot do:** run the actual rules file. Google's rules language only
 executes inside the Firebase emulator, which downloads a program from Google's

@@ -245,6 +245,15 @@ run before anything ships, including a set I wrote *before* starting this work
 specifically to prove that changing where records live did not change what the
 app does with them.
 
+**The rules allow something for Bill and refuse it for the crew.** This one
+happened. From late August to 2026-09-22, anybody but Bill assigned a job could
+not check its plots off or finish it: the database refused the write, and the
+phone quietly put the plot back. Every test passed, and so did every check made
+signed in as Bill. The fix is `isWorkUpdate()` in `firestore.rules` — anyone on
+a job may save their progress on it — and `tools/test-task-work-rules.js`,
+which runs the app as a student to prove it stays that way. **That permission
+must never be removed or narrowed**; see `CLAUDE.md`, "The third trap".
+
 **Google lock-in.** Worth saying plainly: once the records are in Firebase,
 getting them out to somewhere else is real work. That is the price of the free
 plan and the no-signal handling. The Export button is also the escape hatch —

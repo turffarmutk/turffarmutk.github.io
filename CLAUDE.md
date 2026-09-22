@@ -236,6 +236,7 @@ get wrong.
 | The five weather day cards in the page | Those `.wxcard` divs are written **unclosed**, and the browser's repair of that is what puts every other screen at the depth the app expects. Tidying them into balanced markup moves 44 screens out of `#app` and the back arrow dies on all of them — silently, because the page still looks right. Fill them from code; never rewrite them. See `docs/DECISIONS.md`. |
 | `storeScan()` / `storeTouch()` | The two-second heartbeat that offers **every** drawer to the shared database. `storeSaveLocal()` is the other half — it writes to the phone and touches no network. Calling `storeScan()` or `storeTouch()` from anywhere that runs when a record *arrives* closes a loop and spends the farm's whole day of database allowance in an afternoon, with nothing on any screen to say why. That is not a worry, it is a thing that happened on 2026-08-31. Arriving records call `storeSaveLocal()`. |
 | The CSS, which stays inside the page | Colour-blind mode works by reading the text of every `<style>` block and rewriting the colours. Move the CSS out to a `.css` file and colour-blind mode stops working **with no error at all** — nothing to see, just wrong colours for the people who need it most. The same rewrite also runs over colours written *for* colour-blind mode (`body.cb …` rules). So any colour picked by hand for it must also be listed in `CB_MAP` (`app-01-shell.js`) as mapping to itself, or it gets shifted a second time. The Task Board's name highlights are the example. |
+| `isWorkUpdate()` and the `isCompletion()` field list in `firestore.rules` | **What lets the crew save their work.** Without them, anybody who is not Bill or the job's creator can tap plots green and watch them turn orange again a second later, and can never finish a job — the database refuses the write and the phone takes the database's copy back. That was live from late August until 2026-09-22 and nobody could tell why. **Never remove either, never narrow the field lists, and never "tidy" them into `isEdit()`.** When the app starts writing a new field on a task while someone works or finishes it, add that field to the lists in the same change. See "The third trap" under The shared database. |
 | Files at the top level | The website serves this folder directly, so these filenames *are* the web address. Nothing the live app needs can move into a subfolder. |
 | `roster-emails.local.json` | The crew's email addresses. Deliberately kept out of the public repo. Never commit it. |
 
@@ -350,6 +351,43 @@ nothing. Both are in `docs/DECISIONS.md` under 2026-08-31.
   it closes a circle. It is the difference between a bad drawer costing 43,000
   reads a day and costing four million. Saving to the phone is what a snapshot
   handler wants; sending is the two-second heartbeat's job, two seconds away.
+
+**THE THIRD TRAP: A FIELD THE CREW WRITES THAT THE RULES DO NOT ALLOW.** This
+one costs nothing on the bill and everything on the farm. On 2026-09-22 Dillon
+reported that nobody he assigned a job to could check its plots off. The tap
+worked. The database refused to store it, because ticked plots live on the task
+(`donePlots`) and the rules only let an undergrad claim or complete a task. The
+database sent its copy back, the phone took it, and the plot went orange again.
+Finishing was refused too, over two fields (`completedNote`, `_logged`) that
+`completeTask()` writes on every finish. It worked for Bill the whole time —
+his edits pass `isEdit()` — which is exactly why it went unnoticed for weeks.
+
+The permission that fixes it is **`isWorkUpdate()`** in the tasks section of
+`firestore.rules`, together with the field list inside **`isCompletion()`**:
+
+- `isWorkUpdate()` — anybody on the job may change `donePlots`, `doneTrials`,
+  `mix` and their own entry in `eqUsed`, and nothing else in the same write.
+- `isCompletion()` — also accepts `completedNote`, `_logged` and those same
+  progress fields, because the last tick and Finish go up in **one** write
+  (the phone sends every two seconds, not on every tap).
+
+The rules for anyone touching these:
+
+- **Never remove them, never narrow the lists, never fold them into
+  `isEdit()`.** Testing as Bill or Dillon will look fine; it is only broken
+  for the crew. If a change seems to call for narrowing them, stop and ask
+  Dillon first.
+- **A new field the app writes on a task while somebody works or finishes a
+  job goes into these lists in the same change** — and into `WORK_FIELDS` /
+  `COMPLETION_FIELDS` in `tools/rules-model.js`, which must match the rules
+  file word for word.
+- **`tools/test-task-work-rules.js` is the guard.** It runs the app's real code
+  as a student — opening a job, ticking plots, finishing with and without a
+  note, filling in a spray mix — and fails if the rules would refuse any of
+  it, or if the mirror and the rules file disagree. It is part of `npm test`.
+  If it fails, the fix is the rules, not the test.
+- **Test the crew's path as the crew.** Signed in as Bill, every task write is
+  allowed, so a refusal like this cannot show up there at all.
 
 There is also a brake, `sdbMaySend()`, in front of every send: a record offered
 more than twelve times in a minute stops going up and the Shared database

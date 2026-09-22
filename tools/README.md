@@ -40,9 +40,26 @@ the Sports Field.
 
 ```
 npm install          # once - turf + jsdom
-npm test             # 111 checks against the live UT-TurfFarm-App.html
+npm test             # every tools/test-*.js file, about 2,400 checks
 npm run zones        # regenerate the alley zones (needs python3 + shapely)
 ```
+
+## The tests that guard the database rules
+
+The database's rules (`firestore.rules`) cannot be run on this machine, so
+they are mirrored in `rules-model.js` and checked from two sides:
+
+- `test-rules.js` — every person against every other person, for every
+  action: may they claim, assign, complete, edit.
+- `test-task-work-rules.js` — may the crew actually **save their work**. It
+  runs the app's real code as a student (open a job, tick plots, finish with
+  a note, fill in a spray mix) and fails if the rules would refuse any of the
+  resulting writes, or if the field lists in `rules-model.js` and
+  `firestore.rules` disagree. Written 2026-09-22, after students could not
+  check off plots for weeks while it all worked fine for Bill.
+
+If `test-task-work-rules.js` fails, **fix the rules, not the test.** Narrowing
+`isWorkUpdate()` or the `isCompletion()` field list is what broke it last time.
 
 ## Cut height and mower
 

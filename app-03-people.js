@@ -1173,6 +1173,18 @@ function tbTaskRow(t,n,isFirst){
  var num=n?'<span style="width:22px;height:22px;border-radius:7px;background:#2f3133;color:#fff;font:800 12px \'Archivo\';display:flex;align-items:center;justify-content:center;flex:none;align-self:flex-start;margin-top:1px">'+n+'</span>':'';
  var note=t.desc?'<div class="rs" style="margin-top:4px;color:#7b828d;line-height:1.4">'+esc(t.desc)+'</div>':'';
  var start=isFirst?'<span class="startbtn tap" data-start="'+t.id+'">Start ›</span>':'';
+ /* The crew's own list shows the note left when the job was assigned, right
+    under the title, and no plot list. Dillon, 2026-09-22: the plot list ran
+    long and the note is what a student actually needs; Start still opens the
+    job with its plots when they get to it. The machine still shows,
+    under the note, because it is what they go and fetch first. Bill keeps the
+    plot/machine line above the note -- he reads the board for where things
+    are. */
+ if(currentRole!=='manager'){
+   var m=(t.machine&&typeof EQUIP!=='undefined')?EQUIP.find(function(e){return e.id===t.machine;}):null;
+   var sub=[m?m.name:'',isFutureTask(t)?'📅 '+dueLabel(t):''].filter(Boolean).join(' · ');
+   return '<div class="row" style="align-items:flex-start">'+num+'<div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div>'+note+(sub?'<div class="rs" style="margin-top:4px">'+esc(sub)+'</div>':'')+'</div>'+start+'</div>';
+ }
  return '<div class="row" style="align-items:flex-start">'+num+'<div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+areaWithDue(t)+'</div>'+note+'</div>'+start+'</div>';
 }
 function tbPoolRow(t){

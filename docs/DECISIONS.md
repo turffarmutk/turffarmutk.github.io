@@ -1778,3 +1778,15 @@ reason to make people wait.
 
 **Don't:** make updates silent at any other moment. The reason the bar exists
 still holds: a reload in the middle of a spray record loses work.
+
+### The crew's task list shows the assign note, not the plot list — 2026-09-22
+
+**Decided:** on the Mine tab, everyone except Bill sees each job's title, then
+the note left when it was assigned, then the machine (if one is named). The
+plot list is not shown there. Bill's own rows still show plots above the note.
+
+**Why:** Dillon asked for it. The plot list ran long and told a student little;
+the note is what they need. Start still opens the job with its plots.
+
+**Likely mistake:** "fixing" the missing plots on the students' list by putting
+`areaWithDue()` back in `tbTaskRow()`. It is missing on purpose.

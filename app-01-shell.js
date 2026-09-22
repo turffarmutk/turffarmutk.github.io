@@ -1147,7 +1147,10 @@ function hwKpis(id,cells){
     +'><div class="n"'+(c.c?' style="color:'+c.c+'"':'')+'>'+c.n+'</div><div class="l">'+c.l+'</div></div>';
  }).join(''));
 }
-function hwOpenTasks(){return typeof TASKS==='undefined'?[]:TASKS.filter(function(t){return t.kind!=='request'&&t.status!=='done';});}
+/* In running order (taskInOrder, app-03), so "next up" on a home card is the
+   job Bill put next -- the guard is for load order, this file runs first. */
+function hwInOrder(list){ return (typeof taskInOrder==='function')?taskInOrder(list):list; }
+function hwOpenTasks(){return typeof TASKS==='undefined'?[]:hwInOrder(TASKS.filter(function(t){return t.kind!=='request'&&t.status!=='done';}));}
 function hwMyTasks(role){var me=hwMe(role);return hwOpenTasks().filter(function(t){return taskIsFor(t,me);});}
 function hwDownCount(){return typeof EQUIP==='undefined'?0:EQUIP.filter(function(e){return e.active&&e.status==='down';}).length;}
 function hwResCount(){return typeof TRIALS==='undefined'?0:trAllLiveRestrictions().length;}
@@ -1268,9 +1271,9 @@ function hwShift(id){
    carries a Start button on the job that is up next instead. */
 function hwMyTaskList(id,role){
  var me=hwMe(role);
- var mine=(typeof TASKS==='undefined'?[]:TASKS.filter(function(t){
+ var mine=(typeof TASKS==='undefined'?[]:hwInOrder(TASKS.filter(function(t){
    return taskIsFor(t,me)&&t.status==='todo'&&t.kind!=='request';
- }));
+ })));
  var show=mine.slice(0,hwRows(hwWid(id)));
  var rows=show.map(function(t,i){
    var right=i===0?'<span class="startbtn tap hw-start" data-start="'+t.id+'" style="padding:8px 13px;font-size:11.5px">Start ›</span>':'';

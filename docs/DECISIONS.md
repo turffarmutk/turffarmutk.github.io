@@ -1849,3 +1849,29 @@ job (or while finishing one) without adding it to these two lists. It will
 work for Bill, whose edits pass `isEdit()`, and silently fail for everybody
 else. Run `node tools/test-task-work-rules.js` — it checks the real code's
 writes against the lists.
+
+### A job's place in the running order is its own `rank` field — 2026-09-22
+
+**Decided:** Bill's ▲▼ arrows set `rank` on the two jobs they swap, and every
+list that shows jobs in order — the Board tab, the crew's Mine tab, the home
+cards and their Start button — sorts through `taskInOrder()` (app-03). A job
+nobody has moved has no `rank` and sorts by when it was made, read from the
+front of its id. The arrows only move a job among the ones on the day being
+shown.
+
+**Why:** Dillon: "when Bill changed the order of the tasks for a student, the
+student's task board did not change." The order used to be nothing but the
+position in each phone's own TASKS array. The arrows swapped two array slots,
+no record changed, nothing reached the database, and every other phone kept
+whatever order the database delivered — even Bill's own reset on reload. The
+arrows also counted jobs on other days, so ▲ could swap with a hidden job and
+seem to do nothing.
+
+**Likely mistakes:**
+- Showing somebody's jobs "in order" straight from `TASKS.filter(...)`. The
+  array order means nothing and differs between phones; wrap it in
+  `taskInOrder()`.
+- Reordering by moving things around in `TASKS`. Change `rank`; that is the
+  only thing that travels.
+- Writing `rank` onto every job to "tidy up". One database write per job from
+  every phone, for an order that already reads the same everywhere.

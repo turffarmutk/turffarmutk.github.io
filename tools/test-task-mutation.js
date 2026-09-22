@@ -67,7 +67,7 @@ function makeLS(store) {
 }
 
 const EX = ['TASKS','FIELDLOG','SESSION','sessionSet','currentRole','newId','atToday','isoLocal',
-            'completeTask','acceptCrewReq','moveTask','submitGradReq','flAddFromTask','parseISO',
+            'completeTask','acceptCrewReq','moveTask','taskInOrder','submitGradReq','flAddFromTask','parseISO',
             'pidOf','nameOf','isMe','taskIsFor','taskCrew','rstFind','renderBoard','me'];
 
 function boot(store) {
@@ -197,22 +197,41 @@ section('6. reordering stays inside one person\'s list');
   const theirs = addTask(b.p, { assignee: 'p19', title: 'ZZ theirs' });
   const mine2 = addTask(b.p, { assignee: 'p18', title: 'ZZ mine 2' });
 
+  /* The order is the jobs' own `rank`, read through taskInOrder() -- NOT the
+     position in this phone's TASKS array. Until 2026-09-22 this test checked
+     the array, which is exactly the bug: Bill's reorder changed his array,
+     changed no record, and so never reached the student's phone. */
+  const order = () => b.p.taskInOrder(b.p.TASKS.filter(x => x.assignee === 'p18' && x.status === 'todo' && x.kind === 'task'))
+                         .map(x => x.title);
   const before = b.p.TASKS.map(x => x.id);
+  const theirsBefore = JSON.stringify(theirs);
+  ok('a new job goes to the end of the list', order().indexOf('ZZ mine 1') < order().indexOf('ZZ mine 2'), order().join(' | '));
   b.p.moveTask(mine2.id, 'up');
-  const mineOrder = b.p.TASKS.filter(x => x.assignee === 'p18' && x.status === 'todo' && x.kind === 'task').map(x => x.title);
+  const mineOrder = order();
 
   ok('the second job moved ahead of the first',
      mineOrder.indexOf('ZZ mine 2') < mineOrder.indexOf('ZZ mine 1'), mineOrder.join(' | '));
-  ok('the other person\'s job is untouched',
-     b.p.TASKS.some(x => x.id === theirs.id && x.assignee === 'p19'));
+  ok('and the move is ON the two jobs, so it travels to other phones',
+     typeof mine1.rank === 'number' && typeof mine2.rank === 'number' && mine2.rank < mine1.rank,
+     mine1.rank + ' / ' + mine2.rank);
+  ok('the other person\'s job is untouched', JSON.stringify(theirs) === theirsBefore);
   ok('nothing was created or lost', b.p.TASKS.length === before.length,
      before.length + ' -> ' + b.p.TASKS.length);
 
+  /* Another phone receives the same records in a different order -- the
+     database hands them out by id -- and must still show the same list. */
+  const shuffled = b.p.TASKS.slice().reverse();
+  const there = b.p.taskInOrder(shuffled.filter(x => x.assignee === 'p18' && x.status === 'todo' && x.kind === 'task'))
+                   .map(x => x.title);
+  ok('a phone holding the jobs in another order shows the same list', there.join('|') === mineOrder.join('|'),
+     there.join(' | '));
+
   /* Moving the first one up again is a no-op, not a crash or a wrap-around. */
-  const first = b.p.TASKS.filter(x => x.assignee === 'p18' && x.status === 'todo' && x.kind === 'task')[0];
-  const snapshot = b.p.TASKS.map(x => x.id).join(',');
+  const firstTitle = order()[0];
+  const first = b.p.TASKS.find(x => x.title === firstTitle);
+  const snapshot = JSON.stringify(b.p.TASKS);
   b.p.moveTask(first.id, 'up');
-  ok('moving the top job up does nothing', b.p.TASKS.map(x => x.id).join(',') === snapshot);
+  ok('moving the top job up does nothing', JSON.stringify(b.p.TASKS) === snapshot);
 }
 
 section('7. a labour request is not a task until it is accepted');

@@ -1438,11 +1438,40 @@ function simpleTaskRow(t){var note=t.desc?'<div class="rs" style="margin-top:4px
 function gradReqRow(t){var done=t.status==='done';var pending=(t.kind==='request'&&!t.assignee);var pill=done?'<span class="pill" style="background:#eaf3ea;color:#2f9e4f;flex:none">✓ Done</span>':(pending?'<span class="pill" style="background:#fff4e0;color:#9a5b00;flex:none">Pending</span>':'<span class="pill" style="background:#489FDF;color:#fff;flex:none">→ '+t.assignee+'</span>');return '<div class="row"><div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+(t.area||'')+'</div></div>'+pill+'</div>';}
 function openGradReq(){var a=document.getElementById('gr-name');if(a)a.value='';var b=document.getElementById('gr-area');if(b)b.value='';var c=document.getElementById('gr-note');if(c)c.value='';go('gradreq');}
 function submitGradReq(){var name=document.getElementById('gr-name').value.trim();if(!name){toast('Enter what you need');return;}var area=document.getElementById('gr-area').value.trim();var note=document.getElementById('gr-note').value.trim();TASKS.push({createdBy:SESSION.pid,id:newId('r'),title:name,area:area||'—',assignee:null,status:'todo',kind:'request',badge:null,type:'Miscellaneous',dueAt:atToday(null),repeat:'None',requestedBy:SESSION.pid,desc:note});toast('Request submitted ✓');back();tbTab='requests';renderBoard();}
+/* ---- the running order of somebody's day ----
+   A job's place in the order is its own `rank` field, and every list that
+   shows jobs in order sorts by it (taskInOrder). Until 2026-09-22 the order
+   was only the position in this phone's TASKS array: Bill's arrows swapped
+   two array slots, no record changed, nothing went to the database, and the
+   student's phone -- which holds its jobs in whatever order the database
+   delivered them -- never moved. Dillon reported it. Now the arrows change
+   `rank` on the two jobs, the heartbeat sends both, and every phone sorts the
+   same way.
+
+   A job nobody has moved has no `rank` and sorts by when it was made, which
+   is written into the front of its id (newId()), so older jobs come first --
+   the order every phone showed before, and the same on all of them. */
+function taskRank(t){
+  if(t&&typeof t.rank==='number'&&isFinite(t.rank)) return t.rank;
+  var m=/^[a-z]+([0-9a-z]{8})/i.exec(String((t&&t.id)||''));
+  var n=m?parseInt(m[1],36):NaN;
+  return isFinite(n)?n:0;
+}
+function taskInOrder(list){
+  return list.slice().sort(function(a,b){
+    var d=taskRank(a)-taskRank(b); if(d) return d;
+    return String(a.id)<String(b.id)?-1:(String(a.id)>String(b.id)?1:0);
+  });
+}
 function moveTask(id,dir){
  var t=TASKS.find(function(x){return x.id===id;}); if(!t)return;
- var grp=TASKS.filter(function(x){return x.assignee&&x.assignee===t.assignee&&x.status==='todo'&&x.kind==='task';});
+ /* The same list the board is showing -- that person, that day -- or an arrow
+    can swap with a job on another day and appear to do nothing at all. */
+ var grp=taskInOrder(TASKS.filter(function(x){return t.assignee&&taskIsFor(x,t.assignee)&&x.status==='todo'&&x.kind==='task'&&taskOnDay(x);}));
  var p=grp.indexOf(t); var sw=dir==='up'?grp[p-1]:grp[p+1]; if(!sw)return;
- var i=TASKS.indexOf(t), j=TASKS.indexOf(sw); TASKS[i]=sw; TASKS[j]=t;
+ var ra=taskRank(t), rb=taskRank(sw);
+ if(ra===rb){ ra=rb+(dir==='up'?1:-1); }   /* same moment: nudge so the swap shows */
+ t.rank=rb; sw.rank=ra;
  renderBoard();
 }
 /* Getting rid of a job, from wherever it was reached. ONE function, because
@@ -1593,7 +1622,7 @@ function renderTasks(){
       himself is still a task, and he should be able to run it off the map the
       way the crew does rather than reading a flat list. */
    var weekView=true;
-   var mineAll=TASKS.filter(function(t){return taskIsFor(t,me)&&t.status==='todo';});
+   var mineAll=taskInOrder(TASKS.filter(function(t){return taskIsFor(t,me)&&t.status==='todo';}));
    var doneMineAll=TASKS.filter(function(t){return taskIsFor(t,me)&&t.status==='done';});
    var totalAll=mineAll.length+doneMineAll.length;
    if(weekView){
@@ -1628,7 +1657,7 @@ function renderTasks(){
    html+='<div class="sec" style="color:#2f3133">'+WEEKDAYS[boardDay]+' · '+asDateLabel(boardDayOrd())
         +(bIn?(' <span style="color:#2f9e4f">· '+bIn+' in</span>'):'')+'</div>';
    people.forEach(function(s){
-     var mine=TASKS.filter(function(t){return taskIsFor(t,s)&&t.status==='todo'&&t.kind==='task'&&taskOnDay(t);});
+     var mine=taskInOrder(TASKS.filter(function(t){return taskIsFor(t,s)&&t.status==='todo'&&t.kind==='task'&&taskOnDay(t);}));
      var slabel=(isMe(s)?nameOf(s)+' (you)':nameOf(s));
      /* Where they are in their day, as the colour of their name: orange
         before they arrive, green while on the clock, red once they have

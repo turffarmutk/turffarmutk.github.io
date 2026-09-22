@@ -237,6 +237,9 @@ get wrong.
 | `storeScan()` / `storeTouch()` | The two-second heartbeat that offers **every** drawer to the shared database. `storeSaveLocal()` is the other half — it writes to the phone and touches no network. Calling `storeScan()` or `storeTouch()` from anywhere that runs when a record *arrives* closes a loop and spends the farm's whole day of database allowance in an afternoon, with nothing on any screen to say why. That is not a worry, it is a thing that happened on 2026-08-31. Arriving records call `storeSaveLocal()`. |
 | The CSS, which stays inside the page | Colour-blind mode works by reading the text of every `<style>` block and rewriting the colours. Move the CSS out to a `.css` file and colour-blind mode stops working **with no error at all** — nothing to see, just wrong colours for the people who need it most. The same rewrite also runs over colours written *for* colour-blind mode (`body.cb …` rules). So any colour picked by hand for it must also be listed in `CB_MAP` (`app-01-shell.js`) as mapping to itself, or it gets shifted a second time. The Task Board's name highlights are the example. |
 | `isWorkUpdate()` and the `isCompletion()` field list in `firestore.rules` | **What lets the crew save their work.** Without them, anybody who is not Bill or the job's creator can tap plots green and watch them turn orange again a second later, and can never finish a job — the database refuses the write and the phone takes the database's copy back. That was live from late August until 2026-09-22 and nobody could tell why. **Never remove either, never narrow the field lists, and never "tidy" them into `isEdit()`.** When the app starts writing a new field on a task while someone works or finishes it, add that field to the lists in the same change. See "The third trap" under The shared database. |
+| `CATEGORIES` in `app-05-tasks-clock.js` | 7 values, not 9, since 2026-09-22: Paint folded into Miscellaneous, Aeration into Cultivation. `FL_CAT_TASKCAT` (`app-02`) maps the Field Log's own 6 categories onto these 1:1 — Maintenance is the one left out, on purpose, because that work gets its own log on the Equipment page. A template saved before this change can still be sitting in Firestore under the old name; `tplFixLegacy()` folds it to the new one everywhere a template enters `TEMPLATES` (initial load **and** `tplsyncOnSnapshot` in `app-02`) — miss either spot and Paint or Aeration silently comes back as its own heading on the Task List or Assign screen, which is exactly what happened the first time this shipped. See "The fifth trap" under The shared database and `docs/DECISIONS.md`. |
+| `flMixItems()` in `app-04-spray-inventory.js` | Decides whether a chemical amount is `mixCompute()`'s `total` (the whole tank, boom-charge buffer included) or its `onTarget` (just the ground, nothing else) — `sprayIsBoom()` decides which. Reading `mixCompute(t).items[i].need`/`.short` directly anywhere gets the **tank** figure always, which overstates what a backpack or granular job actually needs. Both `flSave()` (`app-02`, the manual Field Log entry) and `completeTask()` (`app-04`, finishing an assigned task) go through this and then `mixInvDecrement()` — one call per product, never blocking a save or a completion if a product doesn't match inventory. |
+| Bare class names in the CSS, like `.del` | The page has one stylesheet for the whole app, so a rule written for one screen reaches every element with that class. `.del` is pinned to a 30px square for a little round X button — and the plot popup's Delete button carries the same class, so "Delete" was squeezed into 30px and cut off for months. If a new rule uses a short, ordinary word as a class, scope it (`.plotpop .pp-btn`) or expect it to land somewhere you were not looking. Two other things to know here: `font: 600 12px inherit` is **not valid CSS** — `inherit` cannot be the family inside the `font` shorthand, so the browser throws the whole line away and the element silently draws at the page default; write it longhand. And measure rather than squint: `scrollWidth > clientWidth` on a button is how the clipping above was actually found. |
 | Files at the top level | The website serves this folder directly, so these filenames *are* the web address. Nothing the live app needs can move into a subfolder. |
 | `roster-emails.local.json` | The crew's email addresses. Deliberately kept out of the public repo. Never commit it. |
 
@@ -244,17 +247,17 @@ get wrong.
 
 ## Working inside the app
 
-The app is about 22,000 lines spread over the page and five files beside it.
+The app is about 24,800 lines spread over the page and five files beside it.
 **Work out which file first** — that is most of finding your way around:
 
 | File | Roughly | What is in it |
 |---|---|---|
 | `app-01-shell.js` | 1,900 | Per-person preferences, the phone/roomy shell, notifications, home-screen widgets, theme and colour-blind mode |
-| `app-02-fieldlog-sync.js` | 3,600 | The field log and its corrections; the shared-database drawers, including the roster one; ids and timestamps |
-| `app-03-people.js` | 1,600 | The Roster **screen**, labs, session, sign-in, profile, semesters, and who may change what. It no longer owns who is on the farm — the database does, and `RSTSYNC` in `app-02` is what carries it. |
-| `app-04-spray-inventory.js` | 3,200 | Spray mix calculator, undergrad task-work mode, inventory, equipment |
-| `app-05-tasks-clock.js` | 2,700 | Task templates and list, assign wizard, calendar, time clock, weather, rainfall |
-| `UT-TurfFarm-App.html` | 9,400 | Every screen's markup, all the CSS, and three remaining blocks of code: the map, trials, sign-in and boot |
+| `app-02-fieldlog-sync.js` | 4,000 | The Field Log **screen** — including its manual "Add entry" form, which since 2026-09-22 picks a category and a real task name (`FL_CAT_TASKCAT`) and, for a Spray/Fertilize entry, embeds app-04's mix calculator (`flMixTask()`/`flMixItems()`) rather than a hand-typed amount; the shared-database drawers, including the roster one; ids and timestamps |
+| `app-03-people.js` | 1,700 | The Roster **screen**, labs, session, sign-in, profile, semesters, and who may change what. It no longer owns who is on the farm — the database does, and `RSTSYNC` in `app-02` is what carries it. |
+| `app-04-spray-inventory.js` | 3,800 | The spray mix calculator (`mixCompute()`, `MIX_UNITS`) — used by both a task's own work screen and, since 2026-09-22, the Field Log's manual entry — undergrad task-work mode, inventory, equipment. `completeTask()` here now also takes stock off the shelf for a finished chemical job (`mixInvDecrement()`) — see the table below. |
+| `app-05-tasks-clock.js` | 2,800 | Task templates and list, assign wizard, calendar, time clock, weather, rainfall. `CATEGORIES` is 7 items, not 9 — see the table below before adding an eighth. |
+| `UT-TurfFarm-App.html` | 10,500 | Every screen's markup, all the CSS, and three remaining blocks of code: the map, trials, sign-in and boot |
 
 Within a file, navigate by the `/* ===== SECTION ===== */` headings and by
 function name — **not** by line number, which changes the moment either of you
@@ -314,6 +317,17 @@ Records are moved over one group at a time: tasks, calendar, equipment, field
 log, inventory, map, — since 2026-08-31 — **the roster**, and — since
 2026-09-18 — **alley paint** (what has been mown on the alleys; see
 `docs/DECISIONS.md`).
+
+**The map's records do not travel in the shape the app holds them in, and that
+is load-bearing.** A plot's information goes as `[{k,v}, …]` rather than as
+pairs, and a plot's shape goes as *text*, always written the same way so two
+phones holding one shape cannot disagree about it. `mapWireEncode()` /
+`mapWireDecode()` do it and both must stay safe to run twice. There is also a
+`clear` field, which is **not** the same as a field set to `null`: `null` means
+the farm deliberately took something off, `clear` means a correction has been
+withdrawn and the place goes back to what `farm-geo.js` says. Merging a split
+plot back together is what needs it — see the fourth trap below and
+`docs/DECISIONS.md`, 2026-09-22.
 
 **The roster is not just another drawer.** Every rule in `firestore.rules`
 goes through `rec()`, which reads it, so a mistake there does not break one
@@ -390,6 +404,48 @@ The rules for anyone touching these:
   If it fails, the fix is the rules, not the test.
 - **Test the crew's path as the crew.** Signed in as Bill, every task write is
   allowed, so a refusal like this cannot show up there at all.
+
+**THE FOURTH TRAP: THE PRETEND DATABASE IN THE TESTS ACCEPTS WHAT THE REAL ONE
+REFUSES.** Firestore cannot hold a list placed directly inside another list.
+The map drawer sent a plot's information as a list of pairs and a plot's shape
+as GeoJSON, whose coordinates are lists inside lists inside lists — so from
+2026-08-25 until 2026-09-22 **every map edit was thrown out before it left the
+phone** and nothing reached another device. The alley paint drawer already knew
+this and keeps its track as text; nothing joined the two up. The only sign was
+`· N refused` on the Shared database screen.
+
+Every drawer's test hands writes to a pretend database that recorded whatever
+it was given, so 2,400 checks passed over it for a month. The pretend database
+in `tools/test-sync-settles.js` and `tools/test-mapsync.js` now **refuses a
+list inside a list**, which closes this for every drawer at once. If a new
+drawer needs to send something shaped like that, flatten it the way the paint
+and map drawers do — do not loosen the check. See `docs/DECISIONS.md`,
+2026-09-22.
+
+**THE FIFTH TRAP: FIXING AN ARRIVING RECORD IS ITSELF A WAY TO NEVER STOP
+SENDING.** When Paint and Aeration were folded into Miscellaneous and
+Cultivation, the first version of the fix (`tplFixLegacy()`, `app-05`) ran
+*after* `tplsyncOnSnapshot()` (`app-02`) had already stamped `TPLSYNC.seen`
+with the arriving, still-stale record. That made the correction itself look
+like a local edit — the phone now disagreed with "what the server last said"
+on every single tick, so it tried to push the fix back up forever.
+`tools/test-sync-settles.js` caught it before it shipped a second time.
+
+The fix was to normalize the record **before** stamping `seen`, so the
+correction is folded into what the phone considers "the same as the server
+already said" — it settles quietly, on that one phone, and never sends
+anything. This is *not* the same as self-healing the stale value in
+Firestore: nothing here fixes the server's copy, which stays wrong until
+someone actually edits and re-saves that record. That's deliberate — see
+`docs/DECISIONS.md`, 2026-09-22.
+
+**The rule for any future "fix legacy data on the way in": normalize a
+snapshot's data before it's compared against what the drawer last sent, never
+after.** If you find yourself mutating `have` or `data` inside a
+`*syncOnSnapshot()` handler for any reason other than applying exactly what
+arrived, check whether `seen` gets stamped from the fixed-up copy or the raw
+one — the raw one is the mistake, and it produces no visible symptom in the
+app itself, only a climbing `sent` count nobody's looking at.
 
 There is also a brake, `sdbMaySend()`, in front of every send: a record offered
 more than twelve times in a minute stops going up and the Shared database

@@ -93,28 +93,35 @@ const TASK_SEED=[
 /* Filled in place rather than reassigned: STORE_DEFS, the sync module and a
    dozen closures all hold this one array, and swapping it for a new one would
    leave every one of them pointing at the old contents. */
+/* A template saved before 2026-09-22, when Paint and Aeration were their own
+   categories and logField didn't exist, still needs folding in wherever it
+   enters TEMPLATES -- the initial load below, AND every time one arrives
+   from the shared database (tplsyncOnSnapshot, further down this file's
+   companion in app-02). The category grouping on the task list and the
+   assign screen both keep any category they don't recognise as its own
+   section, on purpose, so an unrecognised value doesn't just disappear --
+   which is exactly why a template still carrying 'Paint' or 'Aeration' kept
+   showing up under a heading that no longer exists anywhere else. Fixing it
+   only where TEMPLATES is first built isn't enough: the live sync re-applies
+   whatever the server is still holding on every snapshot, which is what
+   quietly undid the one-time fix. See docs/DECISIONS.md. */
+function tplFixLegacy(t){
+  if(!t) return t;
+  if(t.category==='Paint') t.category='Miscellaneous';
+  else if(t.category==='Aeration') t.category='Cultivation';
+  if(typeof t.logField!=='boolean') t.logField=(t.category!=='Maintenance');
+  return t;
+}
 var TEMPLATES=[];
 (function(){
   var stored=loadTemplates();
-  if(stored&&stored.length){ stored.forEach(function(t){ if(t) TEMPLATES.push(t); }); }
+  if(stored&&stored.length){ stored.forEach(function(t){ if(t) TEMPLATES.push(tplFixLegacy(t)); }); }
   else{
     TASK_SEED.forEach(function(t){
-      TEMPLATES.push({id:t.id,name:t.name,category:t.category,plots:[],repeat:'As needed',freq:null,months:[],
-                      machines:(t.machines||[]).slice(),machine:'',eqNote:t.eqNote||'',logField:t.logField!==false});
+      TEMPLATES.push(tplFixLegacy({id:t.id,name:t.name,category:t.category,plots:[],repeat:'As needed',freq:null,months:[],
+                      machines:(t.machines||[]).slice(),machine:'',eqNote:t.eqNote||'',logField:t.logField!==false}));
     });
   }
-  /* A phone (or the shared database) can still be holding a template saved
-     before 2026-09-22, when Paint and Aeration were their own categories and
-     logField didn't exist. Fold those in on the way out of storage so a task
-     saved under the old names still shows up under the new ones instead of
-     silently vanishing from every category list -- see docs/DECISIONS.md.
-     The corrected category is only written back to storage the next time
-     that template is actually edited and saved. */
-  TEMPLATES.forEach(function(t){
-    if(t.category==='Paint') t.category='Miscellaneous';
-    else if(t.category==='Aeration') t.category='Cultivation';
-    if(typeof t.logField!=='boolean') t.logField=(t.category!=='Maintenance');
-  });
 })();
 
 /* ---- who may change the task list ----
@@ -430,10 +437,11 @@ function pickOpen(type,name,list){
 }
 function openPlotPick(){plotPickDone=null;pickOpen(FORM.category,FORM.name,FORM.plots);go('plotpick');}
 function openFlPlotPick(){
- plotPickDone=function(sel){FLFORM.plots=sel.slice();};
- /* FL_CAT_TASKCAT lives in app-02 (loaded before this file), converting the
-    Field Log's category key to the matching Task Board category name so the
-    map's quick-select works the same way it does for a real task. */
+ /* FL_CAT_TASKCAT/flStripAlleys live in app-02 (loaded before this file):
+    the category-name conversion so the map's quick-select works the same as
+    a real task, and stripping the merged alley shape back out for a
+    Spray/Fertilize entry if it's what got tapped on the map. */
+ plotPickDone=function(sel){FLFORM.plots=sel.slice();flStripAlleys();};
  var tpl=FLFORM.tplId?tplFind(FLFORM.tplId):null;
  pickOpen(FL_CAT_TASKCAT[FLFORM.category]||'',tpl?tpl.name:'',FLFORM.plots);
  go('plotpick');

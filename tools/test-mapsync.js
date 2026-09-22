@@ -29,11 +29,40 @@ const section = s => console.log('\n' + s);
 
 /* ------------------------------------------------------- the fake db ---- */
 const DELETE = { __delete: true };
-const state = { writes: [], deletes: [], listeners: {}, persistence: 0 };
+const state = { writes: [], deletes: [], listeners: {}, persistence: 0, badData: [] };
+
+/* Firestore cannot hold a list directly inside a list. This drawer sent plot
+   information as a list of pairs and shapes as GeoJSON, whose coordinates are
+   lists inside lists inside lists, so from the day it was built until
+   2026-09-22 nearly every map record was thrown out before it left the phone
+   -- and this file passed the whole time, because the pretend database took
+   anything. It does not any more. */
+function nestedArrayPath(v, path) {
+  if (Array.isArray(v)) {
+    for (let i = 0; i < v.length; i++) {
+      if (Array.isArray(v[i])) return path + '[' + i + ']';
+      const deeper = nestedArrayPath(v[i], path + '[' + i + ']');
+      if (deeper) return deeper;
+    }
+    return null;
+  }
+  if (v && typeof v === 'object') {
+    for (const k of Object.keys(v)) {
+      const deeper = nestedArrayPath(v[k], path ? path + '.' + k : k);
+      if (deeper) return deeper;
+    }
+  }
+  return null;
+}
 function docRef(coll, id) {
   return {
     id: String(id),
-    set(data, opts) { state.writes.push({ coll, id: String(id), data, merge: !!(opts && opts.merge) }); return Promise.resolve(); },
+    set(data, opts) {
+      const bad = nestedArrayPath(data, '');
+      if (bad) state.badData.push({ coll, id: String(id), at: bad });
+      state.writes.push({ coll, id: String(id), data, merge: !!(opts && opts.merge) });
+      return Promise.resolve();
+    },
     update(data) { state.writes.push({ coll, id: String(id), data, update: true }); return Promise.resolve(); },
     delete() { state.deletes.push({ coll, id: String(id) }); return Promise.resolve(); }
   };
@@ -128,6 +157,8 @@ section('2. What is stored is the change, never the finished object');
   ok('only the two touched places have records', Object.keys(recs).sort().join(',') === 'AZ06,B12',
      Object.keys(recs).join(','));
   ok('the plot information rides on its own place', !!recs.B12.plotinfo);
+  ok('and it is still held as pairs on the phone — only the wire is flattened',
+     Array.isArray(recs.B12.plotinfo[0]), JSON.stringify(recs.B12.plotinfo[0]));
   ok('and the mowing setup on its own', recs.AZ06.mgmt && recs.AZ06.mgmt.c === 1.5);
   ok('nothing else about B12 is dragged along',
      Object.keys(recs.B12).sort().join(',') === 'id,plotinfo', Object.keys(recs.B12).join(','));
@@ -145,6 +176,11 @@ ok('a listener is attached', win.MSYNC.live === true);
   const ids = wrote('mapplaces').map(w => w.id).sort();
   ok('both corrections were sent', ids.join(',') === 'AZ06,B12', ids.join(','));
   ok('each says who made it', wrote('mapplaces').every(w => w.data.updatedBy === 'p01'));
+  /* The whole reason the map never reached anybody. */
+  const b12 = wrote('mapplaces').find(w => w.id === 'B12');
+  ok('the plot information travels as objects, not pairs',
+     !!b12 && b12.data.plotinfo[0].k === 'Turfgrass' && b12.data.plotinfo[0].v === 'Bermuda',
+     JSON.stringify(b12 && b12.data.plotinfo));
 
   reset(); win.msyncScan();
   ok('the very next scan sends nothing', wrote('mapplaces').length === 0);
@@ -178,7 +214,7 @@ section('5. A correction from somebody else lands here');
      every record it has ever sent, so the next scan re-offers all of them and
      the echo we are actually looking for gets lost in the noise. C7 is new
      here, which is all this section needs. */
-  emit('mapplaces', [{ type: 'added', id: 'C7', data: { id: 'C7', plotinfo: [['Turfgrass', 'Zoysia']], updatedBy: 'p07' } }], false);
+  emit('mapplaces', [{ type: 'added', id: 'C7', data: { id: 'C7', plotinfo: [{ k: 'Turfgrass', v: 'Zoysia' }], updatedBy: 'p07' } }], false);
   ok('it is applied to this phone', JSON.stringify(INFO()['C7']) === '[["Turfgrass","Zoysia"]]');
   reset(); win.msyncScan();
   ok('and is not sent straight back', wrote('mapplaces').length === 0, JSON.stringify(wrote('mapplaces')));
@@ -265,6 +301,133 @@ section('8. All three are read-outs on one screen');
   ok('who is working where', />Who is working where</.test(html));
   ok('and not one of them can be switched off', !/Turn off|Turn on/.test(html));
 }
+
+/* ------------------------------------------- 9. shapes travel too ------ */
+section('9. A plot\'s shape reaches the other phone');
+{
+  win.PE_STORE.geom = {}; win.PE_STORE.added = []; win.PE_STORE.deleted = []; win.PE_STORE.cleared = {};
+  const poly = { type: 'Polygon', coordinates: [[[-83.9594, 35.9016], [-83.9593, 35.9016], [-83.9593, 35.9017], [-83.9594, 35.9016]]] };
+  win.PE_STORE.geom['B12'] = JSON.parse(JSON.stringify(poly));
+  reset(); win.msyncScan();
+  const w = wrote('mapplaces').find(x => x.id === 'B12');
+  ok('the reshape is sent', !!w);
+  ok('the shape travels as text, because the database cannot hold lists of lists',
+     !!w && typeof w.data.geom === 'string', typeof (w && w.data.geom));
+  ok('and it is the same shape written out', !!w && JSON.parse(w.data.geom).coordinates[0][0][0] === -83.9594);
+
+  reset(); win.msyncScan();
+  ok('the very next scan sends nothing', wrote('mapplaces').length === 0);
+
+  /* The same record handed back, exactly as the database would hand it back. */
+  emit('mapplaces', [{ type: 'modified', id: 'B12', data: JSON.parse(JSON.stringify(w.data)) }], false);
+  reset(); win.msyncScan();
+  ok('and it is not sent back when the database echoes it', wrote('mapplaces').length === 0,
+     JSON.stringify(wrote('mapplaces')));
+}
+{
+  /* Somebody else's new plot, in the shape it travels in. */
+  const g = '{"type":"Polygon","coordinates":[[[-83.96,35.90],[-83.959,35.90],[-83.959,35.901],[-83.96,35.90]]]}';
+  emit('mapplaces', [{ type: 'added', id: 'NEW1', data: { id: 'NEW1', added: { number: 'NEW1', geom: g }, updatedBy: 'p07' } }], false);
+  const got = win.PE_STORE.added.find(a => a.number === 'NEW1');
+  ok('a plot drawn on another phone arrives here', !!got);
+  ok('and arrives as a real shape, not as text', !!got && got.geometry && got.geometry.type === 'Polygon',
+     JSON.stringify(got));
+  reset(); win.msyncScan();
+  ok('and is not sent straight back, even though the other phone wrote 35.90 where '
+     + 'this one writes 35.9', wrote('mapplaces').length === 0, JSON.stringify(wrote('mapplaces')));
+}
+
+/* ----------------------------------- 10. taking a correction back ------ */
+section('10. A correction can be taken back, and it settles');
+{
+  /* Back to a plain B12 first. Section 4 left "the farm removed this plot's
+     information" on it, and section 9 left a reshape; neither is what this
+     section is about. */
+  INFO()['B12'] = JSON.parse(win._mapBase.plotinfo['B12']);
+  win.PE_STORE.geom = {}; win.PE_STORE.added = [];
+  win.PE_STORE.deleted = ['B12']; win.PE_STORE.cleared = {};
+  reset(); win.msyncScan();
+  ok('taking a plot off the map is sent', wrote('mapplaces').some(x => x.id === 'B12' && x.data.removed === true));
+
+  /* Putting it back. Dropping it locally says NOTHING on its own. */
+  win.PE_STORE.deleted = [];
+  reset(); win.msyncScan();
+  ok('just forgetting it locally says nothing at all', wrote('mapplaces').length === 0);
+
+  win.msyncClear('B12', ['removed']);        /* the order mergeBack uses: drop it, then say so */
+  const w = wrote('mapplaces').find(x => x.id === 'B12');
+  ok('msyncClear does say it', !!w && Array.isArray(w.data.clear) && w.data.clear.indexOf('removed') >= 0,
+     JSON.stringify(w && w.data));
+  ok('and it is a flat list of words the database can hold', state.badData.length === 0,
+     JSON.stringify(state.badData));
+
+  reset(); win.msyncScan();
+  ok('and it goes quiet afterwards', wrote('mapplaces').length === 0, JSON.stringify(wrote('mapplaces')));
+
+  /* On the other phone. B12 is a real plot in farm-geo.js, so "clear" means
+     put it back to what the file says. */
+  win.PE_STORE.deleted = ['B12']; win.PE_STORE.cleared = {};
+  emit('mapplaces', [{ type: 'modified', id: 'B12', data: { id: 'B12', clear: ['removed'], updatedBy: 'p07' } }], false);
+  ok('the other phone puts the plot back on the map', win.PE_STORE.deleted.indexOf('B12') < 0);
+  reset(); win.msyncScan();
+  ok('and does not argue about it', wrote('mapplaces').length === 0, JSON.stringify(wrote('mapplaces')));
+}
+{
+  /* Withdrawing plot information restores what farm-geo.js says, which is NOT
+     the same as a field carrying null -- that one means the farm took it off. */
+  const fileSays = win._mapBase.plotinfo['B12'];      /* what farm-geo.js says */
+  INFO()['B12'] = [['Turfgrass', 'Something wrong']];
+  emit('mapplaces', [{ type: 'modified', id: 'B12', data: { id: 'B12', clear: ['plotinfo'], updatedBy: 'p07' } }], false);
+  ok('a withdrawn correction goes back to what the file says',
+     JSON.stringify(INFO()['B12']) === fileSays, JSON.stringify(INFO()['B12']));
+}
+
+/* ------------------------- 11. split, merge back and delete are real --- */
+section('11. Split, merge back and delete are saved and shared');
+{
+  win.PE_STORE.geom = {}; win.PE_STORE.added = []; win.PE_STORE.deleted = []; win.PE_STORE.cleared = {};
+  win.sessionSet('p07');                                   /* Bill */
+  win.confirm = () => true;
+  const target = win.PLOTS_DATA.features.find(f => (f.properties || {}).number && win.PLOT_INFO[(f.properties || {}).number]);
+  const nm = target.properties.number;
+
+  win.doSplit(nm, 2);
+  const kids = win.PE_STORE.added.map(a => a.number).sort();
+  ok('splitting writes the pieces down', kids.join(',') === nm + 'a,' + nm + 'b', kids.join(','));
+  ok('and takes the parent off the map', win.PE_STORE.deleted.indexOf(nm) >= 0);
+  ok('the parent keeps its own details, so merging back can restore them', !!win.PLOT_INFO[nm]);
+  ok('each piece starts with the parent\'s details',
+     JSON.stringify(win.PLOT_INFO[nm + 'a']) === JSON.stringify(win.PLOT_INFO[nm]));
+
+  reset(); win.msyncScan();
+  const ids = wrote('mapplaces').map(w => w.id).sort();
+  ok('the split goes out to the farm', ids.indexOf(nm) >= 0 && ids.indexOf(nm + 'a') >= 0, ids.join(','));
+  ok('nothing sent was a list inside a list', state.badData.length === 0, JSON.stringify(state.badData));
+  reset(); win.msyncScan();
+  ok('and then it goes quiet', wrote('mapplaces').length === 0, JSON.stringify(wrote('mapplaces')));
+
+  reset();
+  win.mergeBack(nm + 'a');
+  ok('merging back drops the pieces', !win.PE_STORE.added.some(a => String(a.number).indexOf(nm) === 0));
+  ok('and puts the parent back on the map', win.PE_STORE.deleted.indexOf(nm) < 0);
+  const cleared = wrote('mapplaces').filter(w => w.data.clear);
+  ok('and TELLS the database, or the split would come straight back', cleared.length >= 2,
+     JSON.stringify(wrote('mapplaces').map(w => w.id)));
+  reset(); win.msyncScan();
+  ok('then it goes quiet', wrote('mapplaces').length === 0, JSON.stringify(wrote('mapplaces')));
+
+  reset();
+  win.deletePlot(nm);
+  ok('the popup Delete is saved on the phone', win.PE_STORE.deleted.indexOf(nm) >= 0);
+  win.msyncScan();
+  ok('and goes out to the farm', wrote('mapplaces').some(w => w.id === nm && w.data.removed === true));
+}
+
+/* ---------------------------------------------- 12. the whole file ----- */
+section('12. Nothing this file sent was a list inside a list');
+ok('not one write the database would have refused', state.badData.length === 0,
+   state.badData.map(b => b.coll + '/' + b.id + ' at ' + b.at).join(', '));
+ok('the popup no longer calls its own edits a demo', !/Demo - edits are session only|Demo \u2014 edits are session only|Demo - session only/.test(appText));
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

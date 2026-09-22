@@ -40,6 +40,7 @@ function ok(name, cond, extra) {
   else { fail++; console.log('  FAIL  ' + name + (extra !== undefined ? '  -> ' + extra : '')); }
 }
 function section(s) { console.log('\n' + s); }
+const near = (a, b) => Math.abs(a - b) < 1e-9;
 
 const noop = () => {};
 const chain = () => new Proxy(function () {}, {
@@ -68,7 +69,8 @@ function makeLS(store) {
 
 const EX = ['TASKS','FIELDLOG','SESSION','sessionSet','currentRole','newId','atToday','isoLocal',
             'completeTask','acceptCrewReq','moveTask','taskInOrder','submitGradReq','flAddFromTask','parseISO',
-            'pidOf','nameOf','isMe','taskIsFor','taskCrew','rstFind','renderBoard','me'];
+            'pidOf','nameOf','isMe','taskIsFor','taskCrew','rstFind','renderBoard','me',
+            'INVENTORY','INVMOVES','invQty','invMovesFor','mixUnit_byUnit'];
 
 function boot(store) {
   const vc = new VirtualConsole();
@@ -160,6 +162,48 @@ section('3. completing writes to the Field Log, once');
   const entry = b.p.FIELDLOG[0];
   ok('the log credits a roster id, not a name', /^p\d\d$/.test(entry.person || entry.byId || ''),
      JSON.stringify({ person: entry.person, byId: entry.byId }));
+}
+
+section('3b. completing a chemical task takes stock off the shelf, once');
+{
+  /* Before this, finishing an assigned task never touched inventory at all --
+     only the Field Log's manual entry did. See docs/DECISIONS.md, 2026-09-22. */
+  const b = boot();
+  b.p.sessionSet('p01');                       /* a technician */
+  const it = b.p.INVENTORY.find(x => x.unit === 'fl oz') || b.p.INVENTORY[0];
+  const ru = (b.p.mixUnit_byUnit(it.unit) || { id: 'floz_m' }).id;
+  const before = b.p.invQty(it);
+  const t = addTask(b.p, {
+    assignee: 'p01', type: 'Spray', title: 'Pesticide - Boom', area: 'Plot 14', plots: ['14'],
+    mix: { nozzle: 'red_ai', area: '1000', charge: '', products: [{ id: it.id, name: it.name, rate: '12', unit: ru }] }
+  });
+  b.p.completeTask(t.id, '');
+
+  ok('stock actually moves for the first time a task closes', near(b.p.invQty(it), before - 12), b.p.invQty(it));
+  ok('as one movement', b.p.invMovesFor(it.id).length === 1, b.p.invMovesFor(it.id).length);
+
+  /* Completing again -- or the same completion arriving on a second phone,
+     which only ever copies fields onto the task, never re-runs completeTask()
+     -- must never decrement twice. _logged is what already stops
+     flAddFromTask()'s own double-write; the stock movement rides the same
+     guard rather than a new flag. */
+  b.p.completeTask(t.id, '');
+  ok('completing again never decrements a second time', b.p.invMovesFor(it.id).length === 1, b.p.invMovesFor(it.id).length);
+}
+
+section('3c. an ordinary task never gets a mix sheet bolted on');
+{
+  /* mixCompute()/mixState() stamp a blank mix sheet onto whatever they're
+     handed -- completeTask() must not go anywhere near them for a task that
+     was never given one, or every Mow/Cultivation/etc. job would pick up an
+     unwanted mix field the moment it's finished. */
+  const b = boot();
+  b.p.sessionSet('p18');
+  const before = b.p.INVMOVES.length;
+  const t = addTask(b.p, { assignee: 'p18', type: 'Mowing', title: 'Rotary Mow', area: 'Plots 1-3' });
+  b.p.completeTask(t.id, '');
+  ok('completing a Mow job never touches inventory', b.p.INVMOVES.length === before, b.p.INVMOVES.length - before);
+  ok('and never stamps a mix sheet onto it', !t.mix, JSON.stringify(t.mix));
 }
 
 section('4. claiming takes the signed-in person');

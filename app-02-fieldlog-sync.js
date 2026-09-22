@@ -2217,6 +2217,23 @@ function tplsyncOnSnapshot(snap){
     var data; try{ data=ch.doc.data(); }catch(e){ return; }
     if(!data||typeof data.name!=='string') return;
     data.id=String(ch.doc.id);
+    /* tplFixLegacy() (app-05) folds a pre-2026-09-22 Paint/Aeration category
+       (and a missing logField) into the current ones. Doing it here, not just
+       at the initial load, is what makes it stick -- without this, a template
+       already sitting in Firestore under its old category would come back
+       down on every sync and silently undo the one-time fix.
+
+       It runs BEFORE `seen` is stamped, on purpose: `seen` is "what we last
+       told the server, so we know whether OUR copy has changed" -- normalizing
+       first means the fix is folded into that baseline too, so a phone that
+       only ever READS a legacy record never thinks it has a local change to
+       push. It settles quietly instead of writing the correction back up.
+       tools/test-sync-settles.js is what catches the difference: pushing the
+       fix back out is exactly the "arriving record starts a send" shape that
+       cost the farm 4.4 million reads in a day. The stale value in Firestore
+       itself only gets fixed for real the next time somebody actually edits
+       and re-saves that template. */
+    tplFixLegacy(data);
     TPLSYNC.seen[data.id]=sdbJson(data);
     delete TPLSYNC.failed[data.id];
     TPLSYNC.down++;
@@ -3465,6 +3482,18 @@ function flTemplatesFor(cat){
   var taskCat=FL_CAT_TASKCAT[cat]; if(!taskCat) return [];
   return tplLive().filter(function(t){return t.category===taskCat && t.logField!==false;});
 }
+/* The merged alley shape (ALLEY_UNIT in app-05) has no usable area figure on
+   file, and even a fixed one would only ever be the WHOLE network — how much
+   of it is actually treated at any moment is a live number tied to an
+   in-progress mowing job, not something a one-time area can capture. So it's
+   kept out of Spray/Fertilize plot selection specifically, not the whole
+   form: mowing or hand-treating the alleys off-task is still loggable
+   everywhere else. See docs/DECISIONS.md. */
+function flStripAlleys(){
+  if(FLFORM.category!=='spray'&&FLFORM.category!=='fert') return;
+  var i=FLFORM.plots.indexOf('ALLEYS');
+  if(i>=0){ FLFORM.plots.splice(i,1); toast('The alley shape can’t be used for a Spray or Fertilize entry — its treated area isn’t something this form can know.'); }
+}
 /* Everyone active on the roster, not just grads/techs (CREW) -- most field
    work is credited to an undergrad, and this is who did the work, not who's
    assigned it. rstActive()/pName() live in app-03, loaded after this file;
@@ -3483,14 +3512,81 @@ function flDateOptions(selOrd){
   if(selOrd&&arr.indexOf(selOrd)<0) arr.push(selOrd);
   return arr.map(function(o){return '<option value="'+o+'"'+(o===selOrd?' selected':'')+'>'+asDateLabel(o)+'</option>';}).join('');
 }
-/* productId / amtNum / amtUnit / takeStock were added 2026-08-25 so a spray can
-   come off the shelf. `product` and `amount` are still here and still hold the
-   same strings they always did - the detail line, the export columns and the
-   correction screen all read them, and none of that had to change. */
-let FLFORM={category:'',tplId:'',plots:[],person:'',dueOrd:0,product:'',productId:null,ai:'',amount:'',
-            amtNum:'',amtUnit:'',takeStock:true,rate:'',target:'',machine:'',notes:''};
-function openFlNew(){FLFORM={category:'',tplId:'',plots:[],person:SESSION.pid,dueOrd:asTodayOrd(),product:'',productId:null,ai:'',
-   amount:'',amtNum:'',amtUnit:'',takeStock:true,rate:'',target:'',machine:'',notes:''};go('flnew');}
+/* `mix` is shaped exactly like a task's own t.mix (app-04's mixState()) —
+   {nozzle, area, charge, products:[{id,name,rate,unit}]} — so the SAME
+   engine that already works out a task's mix sheet (mixCompute(),
+   sprayIsBoom(), mixAreaAuto()) can work out this one too. See
+   flMixTask()/docs/DECISIONS.md, 2026-09-22. `takeStock` still gates
+   whether ANY of it comes off the shelf, same as before. */
+let FLFORM={category:'',tplId:'',plots:[],person:'',dueOrd:0,mix:null,takeStock:true,machine:'',notes:''};
+function flBlankMix(){
+  return {nozzle:(typeof SPRAY_NOZZLES!=='undefined'&&SPRAY_NOZZLES[0])?SPRAY_NOZZLES[0].id:'',
+          area:'',charge:'',products:[{id:null,name:'',rate:'',unit:(typeof MIX_UNITS!=='undefined')?MIX_UNITS[0].id:''}]};
+}
+function openFlNew(){FLFORM={category:'',tplId:'',plots:[],person:SESSION.pid,dueOrd:asTodayOrd(),mix:flBlankMix(),takeStock:true,machine:'',notes:''};go('flnew');}
+/* A stand-in "task" shaped just enough for app-04's mixCompute()/
+   sprayIsBoom() to read — the same functions a real assigned task's mix
+   sheet already uses, so a boom spray logged here behaves exactly like a
+   boom spray worked from the Task Board. title/type/machine are what
+   sprayIsBoom()/sprayIsPrecise() pattern-match on; mix is the SAME object
+   as FLFORM.mix (not a copy), so mixState()'s own bookkeeping mutates it in
+   place and survives between renders. */
+function flMixTask(){
+  var tpl=FLFORM.tplId?tplFind(FLFORM.tplId):null;
+  return {id:null,type:FL_CAT_TASKCAT[FLFORM.category]||'',title:tpl?tpl.name:'',machine:FLFORM.machine||'',
+          plots:FLFORM.plots,mix:FLFORM.mix};
+}
+/* The manual form's version of app-04's mixSummaryFor() — that one only
+   works for a boom job (sprayIsBoom() gate). This works for a backpack or
+   granular entry too, since flMixItems() already picked the right number
+   (onTarget vs total) for whichever kind this is. Active ingredient comes
+   from the matched inventory item's own `ai` field — never typed by hand,
+   since a product name only ever matches one or two of them. */
+function flMixSummary(t){
+  var items=flMixItems(t).filter(function(i){return i.amt!=null&&(i.name||'').trim();});
+  if(!items.length) return null;
+  function nm(i,n){ return i.name||('Product'+(items.length>1?' '+(n+1):'')); }
+  var boom=sprayIsBoom(t), c=mixCompute(t);
+  return {
+    productName:items.map(function(i,n){return nm(i,n);}).join(' + '),
+    ai:items.map(function(i){return i.item&&i.item.ai;}).filter(Boolean).join(' + '),
+    rateText:items.map(function(i){return mixRound(i.rate,2)+' '+i.un.label.replace(/ \/ /,'/');}).join(' · '),
+    amountText:items.map(function(i){return mixQty(i.amt,i.un.unit);}).join(' · ')
+      +(boom?(' in '+mixRound(c.tank,1)+' gal'):'')
+  };
+}
+/* app-04's mixResultsHtml()/mixTankHtml() are the boom job's tank/nozzle/
+   charge picture -- right for a boom pass, meaningless for a backpack or
+   granular job with no tank to fill. This is that same picture without the
+   tank: an editable area (same mx-area id/field mixResultsHtml() uses, so
+   one input listener branch covers both), then what each product needs for
+   just that ground -- flMixItems() already did the onTarget-vs-total math,
+   this only has to lay it out. */
+function flnMixPreciseHtml(t){
+ var m=mixState(t), c=mixCompute(t), items=flMixItems(t);
+ var areaHint=c.areaIsAuto?('from '+c.auto.plots+' plot'+(c.auto.plots===1?'':'s')):'typed in';
+ var out='<div class="list"><div class="fld" style="border-bottom:none"><span class="fl">Area · sq ft <span style="color:var(--muted);font-weight:600">('+areaHint+')</span></span>'
+   +'<input class="inv-in" id="mx-area" inputmode="decimal" value="'+esc(m.area||(c.auto.sqft?mixThou(c.auto.sqft):''))+'" placeholder="'+mixThou(c.auto.sqft||0)+'" style="max-width:120px"></div></div>';
+ if(!c.area) return out+mixNote('Pick the plots for this job (or type an area) and the amount works itself out.');
+ var got=items.filter(function(i){return (i.name||'').trim();});
+ if(!got.length||!c.anyRate) return out+mixNote('Enter a spray rate above to get the amount needed.');
+ var rows='';
+ got.forEach(function(i,n){
+   var label=(i.name||('Product'+(got.length>1?' '+(n+1):'')));
+   rows+=mixRow(label+(i.item?'<span style="color:var(--muted);font-weight:600"> · '+esc(mixInvQty(i.item))+' on hand</span>':''),i.amt!=null?mixQty(i.amt,i.un.unit):'—',true);
+ });
+ out+='<div class="sec">Amount needed</div><div class="list">'+rows+'</div>';
+ var shy=got.filter(function(i){return i.short;});
+ if(shy.length){
+   out+=mixNote('Not enough on hand — '+shy.map(function(i){
+     return esc(i.name)+' needs '+fmt(Math.round(i.need*100)/100)+' '+i.item.unit+', '+mixInvQty(i.item)+' on the shelf';
+   }).join('; ')+'.','bad');
+ }
+ if(c.areaIsAuto&&c.auto.missing){
+   out+=mixNote(c.auto.missing+' of the '+c.auto.plots+' selected plots have no area on file, so they are not in this total. Type the area to override.','warn');
+ }
+ return out;
+}
 function renderFlNew(){
  var body=document.getElementById('fln-body'); if(!body)return;
  var canChem=flCanChem();
@@ -3523,27 +3619,15 @@ function renderFlNew(){
 
  var chemRows='';
  if(isChem&&tpl){
-   var pit=flnProduct();
-   var uOpts=flnUnitChoices().map(function(u){
-     return '<option'+((FLFORM.amtUnit||'')===u?' selected':'')+'>'+esc(u)+'</option>';}).join('');
-   var showPest=(FLFORM.category==='spray');
+   var mt=flMixTask(), mm=mixState(mt), isBoom=sprayIsBoom(mt);
    chemRows=''
-    +'<div class="sec" style="margin:12px 18px 7px">Chemical application record</div><div class="list">'
-    +'<div class="fld" style="position:relative"><span class="fl">Product *</span>'
-    +'<input class="inv-in" id="fln-product" value="'+esc(FLFORM.product)+'" placeholder="e.g. Daconil Weatherstik" autocomplete="off" style="max-width:175px">'
-    +'<div id="fln-prodsug" class="il-sugg" style="display:none;left:auto;right:16px;top:38px"></div></div>'
-    +'<div class="fld"><span class="fl">Active ingredient</span><input class="inv-in" id="fln-ai" value="'+esc(FLFORM.ai)+'" placeholder="e.g. Chlorothalonil" style="max-width:175px"></div>'
-    +'<div class="fld"><span class="fl">Amount used *<div style="font:600 10px \'Public Sans\';color:var(--muted);font-weight:600">total for this job</div></span>'
-    +'<span style="display:flex;align-items:center;gap:6px">'
-    +'<input class="inv-in" id="fln-amtnum" inputmode="decimal" value="'+esc(FLFORM.amtNum)+'" placeholder="12" style="max-width:74px">'
-    +'<select class="inv-sel" id="fln-amtunit" style="max-width:92px">'+uOpts+'</select></span></div>'
-    +'<div class="fld"'+(showPest?'':' style="border-bottom:none"')+'><span class="fl">Rate</span><input class="inv-in" id="fln-rate" value="'+esc(FLFORM.rate)+'" placeholder="e.g. 3.6 fl oz/M" style="max-width:175px"></div>'
-    +(showPest?'<div class="fld" style="border-bottom:none"><span class="fl">Target pest/weed</span><input class="inv-in" id="fln-target" value="'+esc(FLFORM.target)+'" placeholder="e.g. Dollar spot (optional)" style="max-width:175px"></div>':'')
-    +'</div>'
-    +(pit?('<div class="list" style="margin-top:10px"><div class="fld tap" id="fln-takestock" style="border-bottom:none">'
-       +'<span class="fl">Take it out of stock</span>'
-       +'<span class="fv" style="color:'+(FLFORM.takeStock?'#2f7d3a':'var(--muted)')+'">'+(FLFORM.takeStock?'Yes':'No')+'</span></div></div>'):'')
-    +'<div id="fln-stocknote">'+flnStockNoteHTML()+'</div>';
+    +'<div class="sec" style="margin:12px 18px 7px">'+(isBoom?'Products in the tank':'Products')+'</div>'
+    +'<div id="fln-mx-prods">'+mixProductRowsHtml(mixProducts(mm),'flmxp')+'</div>'
+    +'<div class="chiprow" style="padding:0 16px 8px"><span class="fchip tap" id="fln-mx-addprod">+ Add another product</span></div>'
+    +'<div id="mx-out">'+(isBoom?mixResultsHtml(mt):flnMixPreciseHtml(mt))+'</div>'
+    +'<div class="list" style="margin-top:10px"><div class="fld tap" id="fln-takestock" style="border-bottom:none">'
+    +'<span class="fl">Take it out of stock</span>'
+    +'<span class="fv" style="color:'+(FLFORM.takeStock?'#2f7d3a':'var(--muted)')+'">'+(FLFORM.takeStock?'Yes':'No')+'</span></div></div>';
  }
 
  /* Equipment now comes from the machines already on file for the chosen task
@@ -3574,101 +3658,59 @@ function renderFlNew(){
   +chemRows
   +'<div class="sec" style="margin:12px 18px 7px">Notes</div><div class="list"><div class="fld" style="border-bottom:none;align-items:flex-start"><textarea class="inv-in" id="fln-notes" rows="2" placeholder="Optional details…" style="max-width:none;width:100%;flex:1;resize:none">'+esc(FLFORM.notes)+'</textarea></div></div>'
   +'<div style="height:12px"></div>';
+ /* Wired ONCE per (persistent) body element -- mixWireProducts() guards
+    against re-attaching, so this callback has to look FRESH state up on
+    every call rather than close over isChem/tpl from whichever render
+    happened to be the first (which is exactly what app-04's own
+    mixCurrentTask() does for the task-detail screens, for the same reason).
+    getList() returning null just means a keystroke on a product row nobody
+    can see does nothing. */
+ mixWireProducts(body,'flmxp',function(){
+   var nowChem=(FLFORM.category==='spray'||FLFORM.category==='fert');
+   var nowTpl=FLFORM.tplId?tplFind(FLFORM.tplId):null;
+   return (nowChem&&nowTpl)?mixProducts(mixState(flMixTask())):null;
+ },function(){ flnMixRefresh('all'); });
+}
+/* Mirrors app-04's mixRefresh(), but for the field log's own pseudo-task
+   instead of whichever real task the taskboard screens are showing --
+   `.screen.active` scoping is what keeps the two from stepping on each
+   other even though some element ids (mx-area, mx-charge, ...) are shared
+   between mixResultsHtml()'s output and this screen's. */
+function flnMixRefresh(which){
+ var t=flMixTask();
+ if(which==='tank'){
+   var tk=document.querySelector('.screen.active #mx-tank');
+   if(tk){
+     var c=mixCompute(t);
+     tk.innerHTML=mixTankHtml(t,c);
+     var tv=document.querySelector('.screen.active #mx-tankvol'); if(tv) tv.textContent=mixRound(c.tank,1)+' gal';
+     var hn=document.querySelector('.screen.active #mx-chghint'); if(hn) hn.textContent='('+mixChargeHint(c)+')';
+     return;
+   }
+ }
+ var el=document.querySelector('.screen.active #mx-out');
+ if(el){ el.innerHTML=sprayIsBoom(t)?mixResultsHtml(t):flnMixPreciseHtml(t); return; }
+ renderFlNew();     /* the section isn't on screen (category changed) -- a full render is the honest fallback */
+}
+function flnMixProdsRefresh(){
+ var el=document.getElementById('fln-mx-prods'); if(!el) return;
+ el.innerHTML=mixProductRowsHtml(mixProducts(mixState(flMixTask())),'flmxp');
+ flnMixRefresh('all');
 }
 /* ---- the field log's link to the shelf ----
    A spray is already written down here; making the crew write it a second time
    on the inventory screen is how stock numbers rot. So this screen takes it
-   off the shelf - but ONLY when it is certain what came off:
-
-     - the product has to be matched to something in INVENTORY, and
-     - the amount has to convert into that product's own unit.
-
-   Anything less and the entry still saves and stock is simply left alone. The
-   field log's own rule applies here too: NOBODY IS EVER BLOCKED IN A FIELD.
-   Spraying something not on the list is a real thing that happens, and the
-   application record matters more than the stock figure. */
-function flnProduct(){
-  return FLFORM.productId ? (INVENTORY.find(function(x){return x.id===FLFORM.productId;})||null) : null;
-}
-function flnUnitChoices(){
-  var pit=flnProduct();
-  var list=pit?invUnitChoices(pit):['fl oz','gal','qt','pt','L','mL','oz','lb','kg','g'];
-  if(FLFORM.amtUnit && list.indexOf(FLFORM.amtUnit)<0) list=[FLFORM.amtUnit].concat(list);
-  return list;
-}
-/* How much comes off the shelf, in the product's own unit. null = nothing
-   does, and the caller must treat that as "leave it alone", never as zero. */
-function flnStockAmount(){
-  var pit=flnProduct(); if(!pit || !FLFORM.takeStock) return null;
-  var n=parseFloat(FLFORM.amtNum);
-  if(!isFinite(n) || n<=0) return null;
-  return invConvert(n, FLFORM.amtUnit||pit.unit, pit.unit);
-}
-function flnBox(bg,br,col,txt){
-  return '<div style="margin:6px 16px 0;background:'+bg+';border:1px solid '+br
-    +';border-radius:12px;padding:9px 12px;font:600 11px \'Public Sans\';color:'+col+'">'+txt+'</div>';
-}
-function flnStockNoteHTML(){
-  var pit=flnProduct();
-  if(!pit) return flnBox('#eef4ff','#cfe0ff','#2456b8',
-    'Saved as a chemical application record. This product is not matched to anything on the shelf, so stock will not change.');
-  if(!FLFORM.takeStock) return flnBox('#f4f5f6','#e2e5e8','#6b7076',
-    'Saved as a chemical application record. Stock will not change.');
-  var n=parseFloat(FLFORM.amtNum);
-  if(!isFinite(n)||n<=0) return flnBox('#eef4ff','#cfe0ff','#2456b8',
-    'Enter the amount and it will come off '+esc(pit.name)+' automatically.');
-  var conv=invConvert(n, FLFORM.amtUnit||pit.unit, pit.unit);
-  if(conv===null) return flnBox('#fff6e6','#f0d9a8','#8a5a00',
-    esc((FLFORM.amtUnit||''))+' cannot be converted to '+esc(pit.unit)+', so stock will not change. The record still saves.');
-  var after=invQty(pit)-conv;
-  if(after<-1e-9) return flnBox('#fdeceb','#f3c9c4','#c0392b',
-    '\u2212'+fmt(conv)+' '+esc(pit.unit)+' from '+esc(pit.name)+' \u2192 '+fmt(after)+' '+esc(pit.unit)
-    +'. That is below zero, so the count is probably out. It will still be recorded.');
-  return flnBox('#eafaef','#bfe6c9','#2f7d3a',
-    '\u2713 \u2212'+fmt(conv)+' '+esc(pit.unit)+' from '+esc(pit.name)+' \u2192 leaves '+fmt(after)+' '+esc(pit.unit));
-}
-function flnPaintStockNote(){
-  var el=document.getElementById('fln-stocknote');
-  if(el) el.innerHTML=flnStockNoteHTML();
-}
-/* The product typeahead. Matching is what turns a written record into a stock
-   movement, so it is offered rather than demanded - typing straight past it
-   leaves productId null and that is a valid way to save. */
-function flnProdSug(q){
-  var box=document.getElementById('fln-prodsug'); if(!box)return;
-  q=(q||'').trim().toLowerCase();
-  if(q.length<2){ box.style.display='none'; return; }
-  var hits=INVENTORY.filter(function(it){
-    return it.name.toLowerCase().indexOf(q)>=0 || String(it.ai||'').toLowerCase().indexOf(q)>=0;
-  }).slice(0,6);
-  if(!hits.length){ box.style.display='none'; return; }
-  box.innerHTML=hits.map(function(it){
-    return '<div class="s-row" data-flprod="'+it.id+'"><span class="s-nm">'+esc(it.name)+'</span>'
-      +'<span class="s-sub">'+fmt(invQty(it))+' '+esc(it.unit)+' on hand</span></div>';
-  }).join('');
-  box.style.display='block';
-}
-function flnPickProduct(id){
-  var it=INVENTORY.find(function(x){return x.id===id;}); if(!it) return;
-  flReadInputs();
-  FLFORM.productId=it.id;
-  FLFORM.product=it.name;
-  if(!FLFORM.ai && it.ai) FLFORM.ai=it.ai;
-  if(!FLFORM.amtUnit) FLFORM.amtUnit=it.unit;
-  renderFlNew();
-}
-
+   off the shelf via the SAME engine a task's own mix sheet uses (see
+   flMixTask()/flMixItems()/mixInvDecrement() in app-04) - but ONLY when it is
+   certain what came off: the product has to be matched to something in
+   INVENTORY, and the amount has to convert into that product's own unit.
+   Anything less and the entry still saves and stock is simply left alone.
+   NOBODY IS EVER BLOCKED IN A FIELD. Spraying something not on the list is a
+   real thing that happens, and the application record matters more than the
+   stock figure. */
 function flReadInputs(){
  var g=function(id){var e=document.getElementById(id);return e?e.value:undefined;};
  var v;
- if((v=g('fln-product'))!==undefined)FLFORM.product=v.trim();
- if((v=g('fln-ai'))!==undefined)FLFORM.ai=v.trim();
- if((v=g('fln-amtnum'))!==undefined)FLFORM.amtNum=v.trim();
- if((v=g('fln-amtunit'))!==undefined)FLFORM.amtUnit=v.trim();
- /* `amount` stays the readable string everything downstream already reads. */
- FLFORM.amount=FLFORM.amtNum?((FLFORM.amtNum+' '+(FLFORM.amtUnit||'')).trim()):'';
- if((v=g('fln-rate'))!==undefined)FLFORM.rate=v.trim();
- if((v=g('fln-target'))!==undefined)FLFORM.target=v.trim();
  if((v=g('fln-eq'))!==undefined)FLFORM.machine=v;
  if((v=g('fln-when'))!==undefined&&v)FLFORM.dueOrd=parseInt(v,10)||FLFORM.dueOrd;
  if((v=g('fln-notes'))!==undefined)FLFORM.notes=v.trim();
@@ -3681,36 +3723,40 @@ function flnRenderSug(q){
  box.innerHTML=hint+list.map(function(p){return '<div class="s" data-flplot="'+p.id+'"><span>'+esc(p.label)+'</span><span class="c">'+p.n+' logged</span></div>';}).join('');
  box.style.display='block';
 }
+/* data-flmxp<key>="<i>" -- mirrors app-04's own pIdx() for its 'mxp' prefix. */
+function flMxIdx(el,key){ var v=el&&el.getAttribute&&el.getAttribute('data-flmxp'+key); return v==null?null:+v; }
 document.getElementById('s-flnew').addEventListener('click',function(e){
  var cc=e.target.closest('[data-flcat]'); if(cc){
    var k=cc.getAttribute('data-flcat');
    if((k==='spray'||k==='fert')&&!flCanChem()){toast('Spray and Fertilize entries are limited to techs, grads, and Bill');return;}
-   flReadInputs(); FLFORM.category=k; FLFORM.tplId=''; FLFORM.machine=''; renderFlNew(); return;
+   flReadInputs(); FLFORM.category=k; FLFORM.tplId=''; FLFORM.machine=''; flStripAlleys(); renderFlNew(); return;
  }
  var tc=e.target.closest('[data-fltpl]'); if(tc){flReadInputs();FLFORM.tplId=tc.getAttribute('data-fltpl');FLFORM.machine='';renderFlNew();return;}
  var pr=e.target.closest('[data-person]'); if(pr&&pr.closest('#fln-person')){flReadInputs();FLFORM.person=pr.getAttribute('data-person');renderFlNew();return;}
  var mb=e.target.closest('#fln-mapbtn'); if(mb){flReadInputs();openFlPlotPick();return;}
- var pp=e.target.closest('[data-flprod]'); if(pp){flnPickProduct(pp.getAttribute('data-flprod'));return;}
  var ts=e.target.closest('#fln-takestock'); if(ts){flReadInputs();FLFORM.takeStock=!FLFORM.takeStock;renderFlNew();return;}
  var pc=e.target.closest('[data-flplot]'); if(pc){flReadInputs();var p=pc.getAttribute('data-flplot');var i=FLFORM.plots.indexOf(p);if(i>=0)FLFORM.plots.splice(i,1);else FLFORM.plots.push(p);renderFlNew();return;}
+ if(e.target.closest('#fln-mx-addprod')){ mixProducts(mixState(flMixTask())).push(mixBlankProduct()); flnMixProdsRefresh(); return; }
+ var rm=e.target.closest('[data-flmxprm]');
+ if(rm){ var list=mixProducts(mixState(flMixTask())); if(list.length>1){ list.splice(+rm.getAttribute('data-flmxprm'),1); flnMixProdsRefresh(); } return; }
 });
 document.getElementById('s-flnew').addEventListener('input',function(e){
  if(e.target.id==='fln-plotsearch'){flnRenderSug(e.target.value);}
- /* Editing the name after picking BREAKS the match on purpose. Otherwise a
-    typo'd name could still take stock off the product that was picked three
-    keystrokes ago, and the record and the shelf would disagree. */
- else if(e.target.id==='fln-product'){
-   var pit=flnProduct();
-   if(pit && e.target.value.trim()!==pit.name) FLFORM.productId=null;
-   FLFORM.product=e.target.value.trim();
-   flnProdSug(e.target.value); flnPaintStockNote();
+ else if(e.target.id==='mx-noz'){ mixState(flMixTask()).nozzle=e.target.value; flnMixRefresh('all'); }
+ else if(e.target.id==='mx-area'){ mixState(flMixTask()).area=e.target.value; flnMixRefresh('all'); }
+ else if(e.target.id==='mx-charge'){ mixState(flMixTask()).charge=e.target.value; flnMixRefresh('tank'); }
+ else{ var i=flMxIdx(e.target,'rate');
+   if(i!=null){ mixProducts(mixState(flMixTask()))[i].rate=e.target.value; flnMixRefresh('all'); }
  }
- else if(e.target.id==='fln-amtnum'){ flReadInputs(); flnPaintStockNote(); }
 });
 document.getElementById('s-flnew').addEventListener('change',function(e){
  if(e.target.id==='fln-when'){FLFORM.dueOrd=parseInt(e.target.value,10)||FLFORM.dueOrd;return;}
  if(e.target.id==='fln-eq'){FLFORM.machine=e.target.value;return;}
- if(e.target.id==='fln-amtunit'){ flReadInputs(); flnPaintStockNote(); return; }
+ if(e.target.id==='mx-noz'){ mixState(flMixTask()).nozzle=e.target.value; flnMixRefresh('all'); return; }
+ if(e.target.id==='mx-area'){ mixState(flMixTask()).area=e.target.value; flnMixRefresh('all'); return; }
+ if(e.target.id==='mx-charge'){ mixState(flMixTask()).charge=e.target.value; flnMixRefresh('tank'); return; }
+ var i=flMxIdx(e.target,'unit');
+ if(i!=null){ mixProducts(mixState(flMixTask()))[i].unit=e.target.value; flnMixRefresh('all'); }
 });
 function flSave(){
  flReadInputs();
@@ -3722,15 +3768,25 @@ function flSave(){
  if(isChem&&!flCanChem()){toast('Not permitted to log chemical applications');return;}
  if(!FLFORM.person){toast('Pick who did this');return;}
  if(!FLFORM.plots.length){toast('Pick at least one plot / area');return;}
- if(isChem&&(!FLFORM.product||!FLFORM.amount)){toast('Product and amount are required');return;}
+ var mixTask=isChem?flMixTask():null;
+ /* Unlike openDoneSheet() (which refuses to let a task COMPLETE with a
+    product that doesn't resolve to inventory), this form keeps the field
+    log's own, older rule: NOBODY IS EVER BLOCKED IN A FIELD. Spraying
+    something not on the list is a real thing that happens — it just means
+    that row doesn't move stock. Only an entirely blank chemical record is
+    refused. */
+ if(isChem&&!mixProducts(mixState(mixTask)).some(function(p){return (p.name||'').trim();})){
+   toast('Add at least one product'); return;
+ }
+ var summary=isChem?flMixSummary(mixTask):null;
  /* the record stores the ids; the detail line keeps the readable names */
  var loggedBy=SESSION.pid;             /* always the real signed-in person -- see docs/DECISIONS.md */
  var personId=FLFORM.person;           /* who gets credit -- editable, defaults to loggedBy */
  var eq=(typeof EQUIP!=='undefined'?EQUIP:[]).find(function(e){return e.id===FLFORM.machine;});
  var equipmentStr=eq?eq.name:'';
- var title=(isChem&&FLFORM.product)?FLFORM.product:tpl.name;
+ var title=(summary&&summary.productName)?summary.productName:tpl.name;
  var bits=[];
- if(isChem){ if(FLFORM.ai)bits.push(FLFORM.ai); if(FLFORM.rate)bits.push(FLFORM.rate); if(FLFORM.amount)bits.push(FLFORM.amount+' used'); if(cat==='spray'&&FLFORM.target)bits.push('target: '+FLFORM.target); }
+ if(summary){ if(summary.ai)bits.push(summary.ai); if(summary.rateText)bits.push(summary.rateText); if(summary.amountText)bits.push(summary.amountText+' used'); }
  if(equipmentStr)bits.push(equipmentStr);
  bits.push(nameOf(personId)||meName());
  var detail=bits.join(' · ');
@@ -3740,33 +3796,29 @@ function flSave(){
  var ord=asOrd(d);
  var time=nowTime();
  FLFORM.plots.forEach(function(p){
-   FIELDLOG.push({plot:p,type:cat,title:title,detail:detail,date:date,ord:ord,op:tpl.name,product:FLFORM.product||null,ai:FLFORM.ai||null,amount:FLFORM.amount||null,rate:FLFORM.rate||null,target:FLFORM.target||null,equipment:equipmentStr||null,notes:FLFORM.notes||'',person:personId,loggedBy:loggedBy,time:time,source:'manual'});
+   FIELDLOG.push({plot:p,type:cat,title:title,detail:detail,date:date,ord:ord,op:tpl.name,product:summary?summary.productName:null,ai:summary?(summary.ai||null):null,amount:summary?summary.amountText:null,rate:summary?(summary.rateText||null):null,target:null,equipment:equipmentStr||null,notes:FLFORM.notes||'',person:personId,loggedBy:loggedBy,time:time,source:'manual'});
  });
  flCommit();                                    /* stamps the ids we need below */
 
- /* ONE movement per save, not one per plot.
-    Spraying three plots writes three entries - that is how the field log has
-    always worked - but the person mixed ONE tank. Taking the amount off three
-    times would drain the shelf at triple speed and nobody would spot it for
-    weeks. The box says "total for this job" for the same reason. The movement
-    hangs off the FIRST entry's id, which is what a later correction looks for.
-
-    Nothing here can stop the save: the entry is already committed above. If
-    the product is unmatched or the unit will not convert, flnStockAmount()
-    returns null and the shelf is simply left alone. */
+ /* ONE movement per PRODUCT per save, not one per plot — extending the
+    field log's existing "one movement per save" rule (spraying three plots
+    is three entries, but one tank) to cover a tank with more than one
+    product in it. The movement hangs off the FIRST entry's id, same as
+    before. Nothing here can stop the save: the entries are already
+    committed above, and mixInvDecrement() skips anything unmatched or
+    unconvertible rather than guessing. */
  var _msg=isChem?'Logged ✓ · chemical record saved':'Operation logged ✓';
- try{
-   var _take=flnStockAmount(), _pit=flnProduct();
-   if(_take!==null && _take>0 && _pit){
+ if(isChem&&FLFORM.takeStock){
+   try{
      var _made=FIELDLOG.slice(-FLFORM.plots.length);
-     var _warn=invNegWarn(_pit,-_take);          /* BEFORE the movement lands */
-     invMove(_pit.id, -_take, 'out',
-       {ref:(_made[0]&&_made[0].id)||null, note:'Field log · '+tpl.name});
-     flCommit();                                 /* the ref may have stamped an id */
-     _msg+=' · '+fmt(_take)+' '+_pit.unit+' off the shelf';
-     if(_warn) _msg=_warn;
-   }
- }catch(e){}
+     var _res=mixInvDecrement(flMixItems(mixTask),(_made[0]&&_made[0].id)||null,'Field log · '+tpl.name);
+     if(_res.moved.length){
+       flCommit();                               /* the ref may have stamped an id */
+       _msg+=' · '+_res.moved.map(function(m){return fmt(m.qty)+' '+m.unit;}).join(', ')+' off the shelf';
+       if(_res.warn) _msg=_res.warn;
+     }
+   }catch(e){}
+ }
  toast(_msg);
  flState={type:'all',plots:[]};
  back(); flRender();

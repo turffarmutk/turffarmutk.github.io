@@ -42,10 +42,40 @@ const ok = (n, c, x) => { c ? (pass++, console.log('  PASS  ' + n)) : (fail++, c
 const section = s => console.log('\n' + s);
 
 /* ------------------------------------------------------- the fake db ---- */
-const state = { writes: [], deletes: [], listeners: {} };
+const state = { writes: [], deletes: [], listeners: {}, badData: [] };
+
+/* THE PRETEND DATABASE USED TO ACCEPT WHAT THE REAL ONE REFUSES, and that hole
+   cost the farm the whole map feature for a month. Firestore cannot hold a
+   list directly inside a list. A plot's information is a list of pairs and a
+   shape's coordinates are lists inside lists inside lists, so every map record
+   was thrown out before it left the phone -- while this file, and every other
+   drawer's test, sailed straight past. Now a drawer that offers one fails the
+   checks here, for every drawer at once. See docs/DECISIONS.md, 2026-09-22. */
+function nestedArrayPath(v, path) {
+  if (Array.isArray(v)) {
+    for (let i = 0; i < v.length; i++) {
+      if (Array.isArray(v[i])) return path + '[' + i + ']';
+      const deeper = nestedArrayPath(v[i], path + '[' + i + ']');
+      if (deeper) return deeper;
+    }
+    return null;
+  }
+  if (v && typeof v === 'object') {
+    for (const k of Object.keys(v)) {
+      const deeper = nestedArrayPath(v[k], path ? path + '.' + k : k);
+      if (deeper) return deeper;
+    }
+  }
+  return null;
+}
 function docRef(coll, id) {
   return { id: String(id),
-    set(data) { state.writes.push({ coll, id: String(id), data }); return Promise.resolve(); },
+    set(data) {
+      const bad = nestedArrayPath(data, '');
+      if (bad) state.badData.push({ coll, id: String(id), at: bad });
+      state.writes.push({ coll, id: String(id), data });
+      return Promise.resolve();
+    },
     delete() { state.deletes.push({ coll, id: String(id) }); return Promise.resolve(); } };
 }
 const fakeDb = {
@@ -174,7 +204,16 @@ const DRAWERS = [
   /* One record per task rather than a list, so `local` lists the tasks held. */
   { name: 'alley paint',        coll: 'paint',      push: 'psyncPush', local: () => Object.keys(win.paintLoad()).map(id => ({ id })),
     sample: { id: 'zz1', open: true,
-              strokes: { 'p07-a1': { who: P, at: 1758200000000, how: 'hand', w: 6, pts: '35.901600,-83.959400;35.901610,-83.959380' } } } }
+              strokes: { 'p07-a1': { who: P, at: 1758200000000, how: 'hand', w: 6, pts: '35.901600,-83.959400;35.901610,-83.959380' } } } },
+  /* The map was excused from this file until 2026-09-22, and it was the drawer
+     that turned out to be broken. One record per PLACE, so `local` lists the
+     places this phone has corrections for. The sample deliberately carries the
+     two fields that used to be refused -- plot information and a shape. */
+  { name: 'map corrections',    coll: 'mapplaces',  push: 'msyncScan', local: () => Object.keys(win.mapPlaceRecords()).map(id => ({ id })),
+    sample: { id: 'ZZ1',
+              plotinfo: [{ k: 'Turfgrass', v: 'Zoysia' }, { k: 'Area (sq ft)', v: '450' }],
+              mgmt: { m: 'John Deere 2653', c: 0.75, h: 4 },
+              geom: '{"type":"Polygon","coordinates":[[[-83.9594,35.9016],[-83.9593,35.9016],[-83.9593,35.9017],[-83.9594,35.9016]]]}' } }
 ];
 
 /* Every drawer has to be attached and to have heard from the server before it
@@ -188,10 +227,11 @@ reset();
 section('1. Every drawer is here');
 {
   const listened = Object.keys(state.listeners).filter(k => (state.listeners[k] || []).length);
-  /* Four collections are checked by their own harnesses instead: the crew
-     claims and the map are in test-mapsync.js, service history is write-once
-     so it can never argue, and lifted restrictions ride with the studies. */
-  const elsewhere = ['crew', 'mapplaces', 'eqmaint', 'triallifts', 'farmsettings'];
+  /* Three collections are checked by their own harnesses instead: the crew
+     claims are in test-mapsync.js, service history is write-once so it can
+     never argue, and lifted restrictions ride with the studies. The map used
+     to be excused here too, and being excused is how it stayed broken. */
+  const elsewhere = ['crew', 'eqmaint', 'triallifts', 'farmsettings'];
   const missing = listened.filter(c => elsewhere.indexOf(c) < 0 && !DRAWERS.some(d => d.coll === c));
   ok('no drawer the app listens to has been left out of the table below',
      missing.length === 0, missing.join(','));
@@ -407,6 +447,48 @@ section('7. A blown allowance is explained, not spelled out in code words');
     const d = win.sdbDetails();
     ok('and the copy-details text carries it', d.indexOf(rep) >= 0);
     try { win.localStorage.removeItem(win.SDBNET_PAUSE_KEY); } catch (e) {}
+  }
+
+  section('9c. A legacy template category is fixed for display, never pushed back');
+  {
+    /* Dillon, 2026-09-22: "Trial Dots" kept showing under Paint and
+       "Tractor-Mounted" under Aerate after the category merge shipped -- the
+       one-time load fix was getting silently undone by the live sync handing
+       the still-stale category back down. tplFixLegacy() (app-05) is called
+       from tplsyncOnSnapshot() now, BEFORE `seen` is stamped, so the
+       correction never looks like a local edit that needs pushing back out. */
+    reset();
+    emit('templates', [{ type: 'added', id: 'zzpaint',
+      data: { id: 'zzpaint', name: 'ZZ legacy paint', category: 'Paint', removed: false } }], false);
+    const t = win.TEMPLATES.find(x => x.id === 'zzpaint');
+    ok('a template arriving with the old Paint category is found', !!t);
+    ok('and shows up under Miscellaneous, not Paint', t && t.category === 'Miscellaneous', t && t.category);
+    reset();
+    win.tplPush();
+    const w = state.writes.filter(x => x.coll === 'templates' && x.id === 'zzpaint');
+    ok('the correction is never sent back to the server', w.length === 0, JSON.stringify(w));
+
+    /* Same check for Aeration -> Cultivation, and confirms the merge doesn't
+       clobber a field the server actually did send. */
+    reset();
+    emit('templates', [{ type: 'added', id: 'zzaerate',
+      data: { id: 'zzaerate', name: 'ZZ legacy aerate', category: 'Aeration', logField: true, removed: false } }], false);
+    const t2 = win.TEMPLATES.find(x => x.id === 'zzaerate');
+    ok('an old Aeration template becomes Cultivation', t2 && t2.category === 'Cultivation', t2 && t2.category);
+    ok('a logField the server actually sent is left alone', t2 && t2.logField === true, t2 && t2.logField);
+    reset();
+    win.tplPush();
+    const w2 = state.writes.filter(x => x.coll === 'templates' && x.id === 'zzaerate');
+    ok('and this one settles too', w2.length === 0, JSON.stringify(w2));
+  }
+
+  /* Last, because it judges every write this whole file has made. */
+  section('10. Nothing anybody sent was a list inside a list');
+  {
+    const bad = state.badData;
+    ok('no drawer offered the database something it cannot hold',
+       bad.length === 0,
+       bad.map(b => b.coll + '/' + b.id + ' at ' + b.at).join(', '));
   }
 
   console.log('\n' + pass + ' passed, ' + fail + ' failed');

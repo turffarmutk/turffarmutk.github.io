@@ -1931,16 +1931,51 @@ belong on a separate equipment log, not mixed into field work at all.
 
 **Likely mistakes:**
 - Reading `t.category==='Paint'` or `'Aeration'` anywhere new. Both still exist
-  on templates or tasks saved before this change until somebody edits and
-  re-saves them — the loader in app-05's `TEMPLATES` init folds them to the new
-  names for *display* on the way out of storage, but the stored value only
-  updates when that record is actually saved again.
+  in Firestore on templates saved before this change until somebody edits and
+  re-saves them — `tplFixLegacy()` (app-05) folds them to the new names for
+  *display*, called both when `TEMPLATES` is first built and every time a
+  template arrives from the shared database (`tplsyncOnSnapshot`, app-02),
+  but the value stored on the server only updates when that record is
+  actually edited and saved again.
 - Adding a 7th Field Log category to cover Maintenance "just in case". The
   Equipment page's own log is where that work belongs; see BACKEND-STEPS.md if
   that log doesn't exist yet.
 - Assuming `logField:false` is what keeps Maintenance out of the Field Log. The
   category map does that; `logField` is the separate, finer override for the
   other 6 categories.
+
+### Fixing a template's category on the way in must never look like a local edit — 2026-09-22
+
+**Decided:** the first version of `tplFixLegacy()` ran *after* `TPLSYNC.seen`
+was stamped with the arriving record's json, so a legacy Paint/Aeration
+template (or one missing `logField`) always looked, to `tplPush()`, like it
+had just been changed locally — and got pushed straight back to the server on
+the next 2-second tick. Moving `tplFixLegacy(data)` to run *before*
+`TPLSYNC.seen[data.id]=sdbJson(data)` fixed it: the correction is folded into
+what the phone considers "the same as the server already said," so it never
+looks like a local change and nothing gets sent.
+
+**Why:** Dillon reported "Trial Dots" still showing under Paint and
+"Tractor-Mounted" still showing under Aerate after the category merge shipped
+— the display fix only ran once, at load, and the live sync was re-applying
+the server's still-stale category on every snapshot, silently undoing it.
+Fixing that exposed a second bug in the fix itself: `tools/test-sync-settles.js`
+caught it immediately — a phone that only ever *reads* a legacy record must
+never start *sending* because of it. That's the exact shape of mistake behind
+the 4.4-million-read day.
+
+**Likely mistakes:**
+- "Fixing" data on the way in by mutating it *after* it's been compared
+  against what the server last said, anywhere in this app, not just here.
+  Normalize first, then stamp `seen` from the normalized copy — never the
+  other way around.
+- Treating this as self-healing the server's copy. It isn't, and deliberately
+  isn't — see the entry above. Each phone corrects its own display, forever,
+  cheaply; nothing pushes the fix to Firestore itself.
+- Trusting a fix like this because it "looks right" in the browser without
+  running `node tools/test-sync-settles.js`. The bug this entry describes
+  produced no visible symptom at all until that test was run — the app looked
+  completely correct while quietly queuing a write every two seconds.
 
 ### A Field Log entry now names a real task, a real person, and a real day — 2026-09-22
 
@@ -1978,3 +2013,143 @@ Bill logging on someone else's behalf.
   `FL_EDITABLE` (and the matching `firestore.rules` list) so it can be
   corrected later; `loggedBy` deliberately is not, which is what keeps it a
   reliable audit trail.
+
+### The Field Log's chemical entry uses the real spray mix calculator, and finishing a task actually takes stock off the shelf — 2026-09-22
+
+**Decided:** the manual entry's Product/Amount/Rate boxes are gone. In their
+place, a Spray or Fertilize entry gets the same calculator app-04 already
+built for working an assigned boom-spray task — `mixCompute()`, `MIX_UNITS`,
+`mixProductRowsHtml()`/`mixWireProducts()` (called with the field log's own
+`'flmxp'` prefix and its own `fln-`/`mx-out`-wrapped markup, not
+`mixSectionHtml()`'s own `td-body`/`tw-brief` markup verbatim, since some of
+its ids like `mx-charge` aren't scoped to a container and two screens holding
+one each would collide). `flMixTask()` builds a stand-in task object from the
+form's own state — `{type, title, machine, plots, mix}` — good enough for
+`sprayIsBoom()`/`mixCompute()` to read exactly as they would a real task's own
+`t.mix`.
+
+Which of `mixCompute()`'s two numbers is used — `onTarget` (rate × the ground
+alone) or `total` (rate × the whole tank, boom-charge buffer included) — is
+decided by `sprayIsBoom()`, the same function a real task's mix sheet already
+answers to (`flMixItems()`, app-04). A boom job gets the full tank/nozzle/
+charge picture and `total`; a backpack or granular job skips straight to
+`onTarget` with no tank section at all, since there's no tank to overfill.
+This is not a new rule — `mixCompute()` always computed both numbers — it is
+simply the first place that reads `onTarget` for anything.
+
+Finishing an assigned task with a filled-in mix sheet now also takes stock off
+the shelf (`completeTask()`, app-04) — before this, only the Field Log's
+manual entry ever touched inventory; a boom task's whole worked-out mix sheet
+was discarded the moment the job closed. The decrement is gated on
+`flAddFromTask()`'s own return value — the same `_logged` guard that already
+stops a re-tap or a second phone's sync from double-logging the Field Log
+entry — so it can never double-fire, and it only runs from `completeTask()`'s
+two button-tap call sites, never from the task-arrival sync handler (which
+only ever copies fields onto the task and calls `storeSaveLocal()`). It is
+**not** wired into `twHandIn()`/`flAddPartFromTask()` (a helper handing in
+their own share while the job stays open for others) — the tank was filled
+once for the whole job, so decrementing on every helper's individual hand-in
+would count it more than once.
+
+**Why:** Dillon asked for the manual entry to have the same calculator the
+task flow already uses, and for both paths to actually decrement inventory —
+today only one of the two ever did.
+
+**Likely mistakes:**
+- Reading `mixCompute(t).items[i].need`/`.short` for anything other than a
+  boom job. Both are always figured against `total` (the tank), which is
+  wrong for a backpack or granular amount — use `flMixItems()`, which already
+  picks the right one.
+- Wiring the stock decrement into `twHandIn()`/`flAddPartFromTask()`, or into
+  the task-arrival sync handler (`tsyncOnSnapshot`). Either one turns a single
+  real completion into more than one stock movement.
+- Letting an unmatched product or a plot with no area on file block a save or
+  a completion. Neither does today — `mixInvDecrement()` silently skips
+  anything it can't resolve, matching the Field Log's older rule: NOBODY IS
+  EVER BLOCKED IN A FIELD.
+- Letting the merged alley shape (`ALLEY_UNIT`) into a Spray/Fertilize plot
+  list. Its area is 0 in `PLOT_INFO` today (a `'Alleys'`/`'ALLEYS'` key-case
+  mismatch), and even fixed, how much of it is actually treated is a live
+  number tied to an in-progress mowing job — not something a one-time area
+  figure can capture. `flStripAlleys()` keeps it out of a chemical entry
+  specifically; it's still fine to pick for Mow, Cultivation, Irrigation or
+  Misc, where no amount is being calculated from it.
+
+### The database cannot hold a list inside a list, and the map had been doing it for a month — 2026-09-22
+
+**Decided:** map records are re-shaped on the way out. A plot's information
+travels as `[{k:"Turfgrass", v:"Zoysia"}, …]` instead of `[["Turfgrass",
+"Zoysia"], …]`, and a plot's shape travels as text instead of as GeoJSON.
+Split, Merge back and the Delete button on the plot popup now save to
+`PE_STORE` and share like every other map edit, and a new `clear` field lets a
+correction be taken back.
+
+**Why:** Firestore refuses a list placed directly inside another list. A plot's
+information is a list of pairs, and a shape's coordinates are lists inside
+lists inside lists. So from the day the map drawer was built (2026-08-25) until
+today, almost every map record was thrown out by the Firebase code *before it
+left the phone*. Reshaping a plot, correcting an area, adding a plot — none of
+it ever reached another device or another account. A record carrying any
+refused field is refused whole, so a cut-height change on a plot whose
+turfgrass had also been edited went down with it, which is why it looked like
+nothing shared at all.
+
+The app already knew this. The alley paint drawer, written a month later, keeps
+its GPS tracks as `"lat,lng;lat,lng;…"` with the comment *"the database cannot
+hold a list of lists"* right above it. The map drawer never got the same
+treatment and nothing joined the two up.
+
+**Nothing on any screen said so.** The only sign was `· N refused` on the
+Shared database screen. Dillon reported it as "map edits are not shared",
+which is exactly what it looked like from a field.
+
+**Why no test caught it.** Every drawer's test hands writes to a pretend
+database that records whatever it is given. It accepted lists of lists happily;
+the real one does not. That is the same shape of hole as the one CLAUDE.md
+describes for the console — the checks pass straight over it. The pretend
+database in `tools/test-sync-settles.js` and `tools/test-mapsync.js` now
+refuses a list inside a list, which closes it for **every** drawer at once, not
+just this one.
+
+**Things that look wrong and are not:**
+
+- **Plot information is pairs on the phone and objects on the wire.** The order
+  of those pairs is meaning — `farm-geo.js` says so and the popup prints them
+  in order — so it cannot become a plain `{label: value}` object. A list of
+  objects keeps the order and the database accepts it.
+- **A shape travels as text and `mapWireGeom()` re-writes text it is handed.**
+  That is not a wasted round trip. Two phones holding the same shape can write
+  it differently — `35.90` and `35.9` are the same corner — and compared as
+  text they are not equal, so each phone would read the other's as a change and
+  send its own back forever. Everything goes through the parsed form and comes
+  out written the same way. `tools/test-mapsync.js` section 9 is that case.
+- **`clear` and a field set to `null` mean opposite things and must stay
+  separate words.** `null` means *the file has this and the farm has
+  deliberately taken it off*. `clear` means *forget the farm's correction and
+  go back to what the file says*. Merging a split plot back needs the second
+  one; without it, dropping the split locally says nothing to the database and
+  the split comes straight back within two seconds.
+- **The withdrawal is kept on the phone (`PE_STORE.cleared`) and travels on the
+  ordinary two-second heartbeat**, not as a one-off write. A part stays on that
+  list only while there is genuinely nothing local for it, so the moment
+  somebody corrects that part again the correction is what travels and the
+  withdrawal drops off by itself. That is what makes the two unable to argue.
+- **Splitting marks the parent removed but leaves its plot information alone.**
+  Wiping it would send `plotinfo: null` — "the farm took this off" — and Merge
+  back would hand you a plot that had forgotten the turfgrass somebody typed in
+  last spring.
+- **A split child inherits the parent's stated area rather than one worked out
+  from the polygon.** `farm-geo.js` says in its own header that the CAFS shapes
+  are a drawn grid, not a survey, and every spray rate reads the area typed in
+  on the plot information form. A made-up number going quietly out to the whole
+  farm is worse than an obviously-wrong inherited one, so the toast says to set
+  the real areas.
+- **Split offers 2 or 3 pieces and no more.** `CHILD_RE` only recognises the
+  suffixes a, b and c; a fourth piece would be a plot the app could never merge
+  back.
+
+**Don't:** don't send a list inside a list from any drawer — the settle test
+now fails the build for it. Don't fold `clear` into the `null` case. Don't
+narrow `mapWireGeom()` into a plain `JSON.stringify`, which is the loop above.
+The `mapplaces` rules did **not** change and did not need republishing: that
+block checks the record's id and who wrote it, not its fields.

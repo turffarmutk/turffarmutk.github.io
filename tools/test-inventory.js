@@ -78,7 +78,8 @@ const EX = ['INVENTORY','INVMOVES','invQty','invMove','invMovesFor','invSums','i
             'STORE_DEFS','INV_WHY','renderInvList','renderLowStock',
             'invConvert','invParseAmount','invAmountIn','invUnitChoices','invMovesForRef',
             'invRefTotal','invReconcileFromLog','FLFORM','FIELDLOG','flSave','flEdit',
-            'flnStockAmount','flnProduct','flById',
+            'flById','flMixItems','mixInvDecrement','flMixTask','mixUnit_byUnit','flStripAlleys',
+            'sprayIsBoom',
             'INVSYNC','invsyncOnMoves','invsyncOnItems','invsyncWanted','invsyncSetWanted',
             'invMoveDoc','invItemDoc','invsyncSummary','invMoveById'];
 
@@ -291,11 +292,12 @@ section('11. logging a spray takes it off the shelf');
   const b = boot();
   b.p.sessionSet('p01');                       /* a technician — may log chemicals */
   const it = b.p.INVENTORY.find(x => x.unit === 'fl oz') || b.p.INVENTORY[0];
+  const ru = (b.p.mixUnit_byUnit(it.unit) || { id: 'floz_m' }).id;
   const before = b.p.invQty(it), logged = b.p.FIELDLOG.length;
 
   Object.assign(b.p.FLFORM, {
-    category: 'spray', tplId: 'tpl10', person: 'p01', plots: ['14'], product: it.name, productId: it.id,
-    amtNum: '12', amtUnit: it.unit, takeStock: true
+    category: 'spray', tplId: 'tpl10', person: 'p01', plots: ['14'], takeStock: true,
+    mix: { nozzle: 'red_ai', area: '1000', charge: '', products: [{ id: it.id, name: it.name, rate: '12', unit: ru }] }
   });
   b.p.flSave();
 
@@ -316,11 +318,12 @@ section('12. three plots, one tank — the shelf is charged ONCE');
   const b = boot();
   b.p.sessionSet('p01');
   const it = b.p.INVENTORY.find(x => x.unit === 'fl oz') || b.p.INVENTORY[0];
+  const ru = (b.p.mixUnit_byUnit(it.unit) || { id: 'floz_m' }).id;
   const before = b.p.invQty(it), logged = b.p.FIELDLOG.length;
 
   Object.assign(b.p.FLFORM, {
-    category: 'spray', tplId: 'tpl10', person: 'p01', plots: ['14', '15', '16'], product: it.name, productId: it.id,
-    amtNum: '10', amtUnit: it.unit, takeStock: true
+    category: 'spray', tplId: 'tpl10', person: 'p01', plots: ['14', '15', '16'], takeStock: true,
+    mix: { nozzle: 'red_ai', area: '1000', charge: '', products: [{ id: it.id, name: it.name, rate: '10', unit: ru }] }
   });
   b.p.flSave();
 
@@ -340,8 +343,8 @@ section('13. when it cannot be sure, it logs anyway and leaves stock alone');
      blocked in a field. */
   let logged = b.p.FIELDLOG.length;
   Object.assign(b.p.FLFORM, {
-    category: 'spray', tplId: 'tpl10', person: 'p01', plots: ['14'], product: 'Something not on the list',
-    productId: null, amtNum: '8', amtUnit: 'fl oz', takeStock: true
+    category: 'spray', tplId: 'tpl10', person: 'p01', plots: ['14'], takeStock: true,
+    mix: { nozzle: 'red_ai', area: '1000', charge: '', products: [{ id: null, name: 'Something not on the list', rate: '8', unit: 'floz_m' }] }
   });
   b.p.flSave();
   ok('an unmatched product still logs', b.p.FIELDLOG.length === logged + 1);
@@ -353,8 +356,8 @@ section('13. when it cannot be sure, it logs anyway and leaves stock alone');
     logged = b.p.FIELDLOG.length;
     const before = b.p.invQty(bagged);
     Object.assign(b.p.FLFORM, {
-      category: 'spray', tplId: 'tpl10', person: 'p01', plots: ['14'], product: bagged.name, productId: bagged.id,
-      amtNum: '3', amtUnit: 'fl oz', takeStock: true
+      category: 'spray', tplId: 'tpl10', person: 'p01', plots: ['14'], takeStock: true,
+      mix: { nozzle: 'red_ai', area: '1000', charge: '', products: [{ id: bagged.id, name: bagged.name, rate: '3', unit: 'floz_m' }] }
     });
     b.p.flSave();
     ok('an unconvertible unit still logs', b.p.FIELDLOG.length === logged + 1);
@@ -363,10 +366,11 @@ section('13. when it cannot be sure, it logs anyway and leaves stock alone');
 
   /* And the tick turns it off outright. */
   const it2 = b.p.INVENTORY.find(x => x.unit === 'fl oz') || b.p.INVENTORY[1];
+  const ru2 = (b.p.mixUnit_byUnit(it2.unit) || { id: 'floz_m' }).id;
   const was = b.p.invQty(it2);
   Object.assign(b.p.FLFORM, {
-    category: 'spray', tplId: 'tpl10', person: 'p01', plots: ['14'], product: it2.name, productId: it2.id,
-    amtNum: '5', amtUnit: it2.unit, takeStock: false
+    category: 'spray', tplId: 'tpl10', person: 'p01', plots: ['14'], takeStock: false,
+    mix: { nozzle: 'red_ai', area: '1000', charge: '', products: [{ id: it2.id, name: it2.name, rate: '5', unit: ru2 }] }
   });
   b.p.flSave();
   ok('the tick turned off means the shelf is untouched', near(b.p.invQty(it2), was), b.p.invQty(it2));
@@ -377,11 +381,12 @@ section('14. editing the amount corrects the shelf, without a second entry');
   const b = boot();
   b.p.sessionSet('p01');
   const it = b.p.INVENTORY.find(x => x.unit === 'fl oz') || b.p.INVENTORY[0];
+  const ru = (b.p.mixUnit_byUnit(it.unit) || { id: 'floz_m' }).id;
   const before = b.p.invQty(it);
 
   Object.assign(b.p.FLFORM, {
-    category: 'spray', tplId: 'tpl10', person: 'p01', plots: ['14'], product: it.name, productId: it.id,
-    amtNum: '20', amtUnit: it.unit, takeStock: true
+    category: 'spray', tplId: 'tpl10', person: 'p01', plots: ['14'], takeStock: true,
+    mix: { nozzle: 'red_ai', area: '1000', charge: '', products: [{ id: it.id, name: it.name, rate: '20', unit: ru }] }
   });
   b.p.flSave();
   const orig = b.p.FIELDLOG[b.p.FIELDLOG.length - 1];
@@ -437,7 +442,7 @@ section('15. the edit screen really does call the reconciler');
   ok('flxSave exists', i > 0);
   ok('and reconciles stock after editing', src.indexOf('invReconcileFromLog') >= 0);
   const j = SRC.indexOf('function flSave()');
-  ok('flSave asks how much to take off', SRC.slice(j, j + 3000).indexOf('flnStockAmount') >= 0);
+  ok('flSave asks how much to take off', SRC.slice(j, j + 3000).indexOf('mixInvDecrement') >= 0);
 }
 
 /* A Firestore snapshot, near enough. fromCache:true keeps the handler from
@@ -571,6 +576,55 @@ section('21. nothing anywhere deletes a movement');
   ok('and the only thing that writes to it is invMove()',
      (CODE.match(/INVMOVES\.push/g) || []).length <= 2,
      (CODE.match(/INVMOVES\.push/g) || []).length);
+}
+
+section('22. boom vs. backpack/granular use different math for the same job');
+{
+  /* mixCompute() already works out both onTarget (just the ground) and total
+     (the whole tank, boom-charge buffer included) for every product -- this
+     confirms flMixItems() actually picks the right one, the same way
+     sprayIsBoom() already decides it for a real task's mix sheet. */
+  const b = boot();
+  b.p.sessionSet('p01');
+  const it = b.p.INVENTORY.find(x => x.unit === 'fl oz') || b.p.INVENTORY[0];
+  const ru = (b.p.mixUnit_byUnit(it.unit) || { id: 'floz_m' }).id;
+
+  /* A tank big enough to push the boom's base volume over the farm's 25-gal
+     charge threshold, so a boom run here mixes MORE than the ground alone
+     needs -- same as a real boom task's mix sheet would. */
+  Object.assign(b.p.FLFORM, {
+    category: 'spray', tplId: 'tpl10', person: 'p01',   /* Pesticide - Boom */
+    mix: { nozzle: 'red_ai', area: '30000', charge: '', products: [{ id: it.id, name: it.name, rate: '1', unit: ru }] }
+  });
+  const boomItems = b.p.flMixItems(b.p.flMixTask());
+  ok('a boom job is recognized as one', b.p.sprayIsBoom(b.p.flMixTask()));
+  ok('and its amount includes the boom-charge buffer', boomItems[0].amt > 30.0001, boomItems[0].amt);
+
+  /* Same rate, same area, same product -- a backpack job for it instead. */
+  Object.assign(b.p.FLFORM, {
+    category: 'spray', tplId: 'tpl11', person: 'p01',   /* Pesticide - Backpack */
+    mix: { nozzle: 'red_ai', area: '30000', charge: '', products: [{ id: it.id, name: it.name, rate: '1', unit: ru }] }
+  });
+  const packItems = b.p.flMixItems(b.p.flMixTask());
+  ok('a backpack job is not', !b.p.sprayIsBoom(b.p.flMixTask()));
+  ok('and its amount is exactly what the ground needs, no buffer', near(packItems[0].amt, 30), packItems[0].amt);
+}
+
+section('23. the alley shape is excluded from Spray/Fertilize, nowhere else');
+{
+  /* The merged alley shape has no usable area on file, and even a fixed
+     figure would only ever be the WHOLE network -- how much of it is
+     actually treated is a live number this form cannot know. See
+     docs/DECISIONS.md. */
+  const b = boot();
+  b.p.sessionSet('p01');
+  Object.assign(b.p.FLFORM, { category: 'mow', plots: ['ALLEYS'] });
+  b.p.flStripAlleys();
+  ok('the alley shape is fine under Mow', b.p.FLFORM.plots.indexOf('ALLEYS') >= 0, JSON.stringify(b.p.FLFORM.plots));
+
+  b.p.FLFORM.category = 'spray';
+  b.p.flStripAlleys();
+  ok('but is stripped out the moment the category is chemical', b.p.FLFORM.plots.indexOf('ALLEYS') < 0, JSON.stringify(b.p.FLFORM.plots));
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

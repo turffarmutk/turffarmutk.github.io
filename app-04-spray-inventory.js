@@ -505,6 +505,42 @@ function mixCompute(t){
           water:any?Math.max(0,tank-prodGal):null};
 }
 
+/* mixCompute()'s per-product `need`/`short` are always figured against the
+   TANK (`total` — rate x tank area, including the boom-charge buffer): right
+   for a boom pass, wrong for anything else, where there is no tank to
+   overfill. This picks whichever of mixCompute()'s two numbers actually
+   applies — `total` for a boom job, `onTarget` (just the ground, no
+   dilution) for a backpack or granular one — the same way sprayIsBoom()
+   already decides it for a real task's own mix sheet. Shared by the Field
+   Log's manual entry (app-02) and task completion (below) so both take the
+   same amount off the shelf that the calculator actually showed. */
+function flMixItems(t){
+  var c=mixCompute(t), boom=sprayIsBoom(t);
+  return c.items.map(function(i){
+    var amt=boom?i.total:i.onTarget;
+    var need=(i.item&&amt!=null)?mixToInvQty(amt,i.un.unit,i.item.unit):null;
+    return {name:i.name,un:i.un,rate:i.rate,item:i.item,amt:amt,
+            need:need,short:(need!=null&&i.item)?(need>invQty(i.item)+1e-9):false};
+  });
+}
+/* Takes stock off the shelf for a computed mix — one invMove() per product
+   that resolved to a real inventory item and has an amount, using the same
+   `need` figure flMixItems() already worked out (already converted to that
+   item's own unit). Shared by the manual Field Log entry and task
+   completion so "never blocks, never guesses" only has to be written once.
+   Returns what moved (for a toast) and the lowest-stock warning, if any. */
+function mixInvDecrement(items,refId,noteText){
+  var moved=[],warn='';
+  (items||[]).forEach(function(i){
+    if(!i.item||i.amt==null||i.amt<=0||i.need==null) return;
+    var w=invNegWarn(i.item,-i.need);
+    invMove(i.item.id,-i.need,'out',{ref:refId||null,note:noteText||''});
+    moved.push({name:i.item.name,qty:i.need,unit:i.item.unit});
+    if(w) warn=w;
+  });
+  return {moved:moved,warn:warn};
+}
+
 /* One-line summary that rides onto the Field Log when the task is completed. */
 function mixSummaryFor(t){
   if(!sprayIsBoom(t)) return null;
@@ -890,6 +926,19 @@ function completeTask(id,note){ var t=TASKS.find(function(x){return x.id===id;})
     Bill clears a job an undergrad finished. The log credits the worker and
     keeps the closer beside it, so neither is guessed at later. */
  t.completedBy=t.assignee||SESSION.pid; t.closedBy=SESSION.pid; t.completedAt=isoLocal(new Date()); t.completedNote=note||''; var _flg=flAddFromTask(t); closeDoneSheet();
+ /* Stock only comes off the shelf on a REAL completion (`_flg` — the same
+    guard flAddFromTask() itself uses against a re-tap or a second phone
+    syncing the same finish), and never from twHandIn()/flAddPartFromTask()
+    — the tank was filled once for the whole job, so decrementing on every
+    helper's own hand-in would count it more than once. See
+    docs/DECISIONS.md. */
+ /* mixCompute()/mixState() stamp a blank mix sheet onto whatever task object
+    they're handed, so this only ever looks at one that already has a
+    NAMED product on it — an ordinary Mow/Cultivation/etc. task never gets a
+    mix field bolted onto it just because it was finished. */
+ if(_flg&&t.mix&&mixProducts(t.mix).some(function(p){return (p.name||'').trim();})){
+   try{ mixInvDecrement(flMixItems(t),t.id,'Field log · '+t.title); }catch(e){}
+ }
  if(t.partial) toast('Your part is in ✓ · '+(t.leftPlots||[]).length+' left for Bill to hand out');
  else toast(_flg?'Complete ✓ · logged to Field Log':'Marked complete ✓');
  renderBoard(); back(); }

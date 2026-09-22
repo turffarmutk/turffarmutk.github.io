@@ -340,9 +340,28 @@ B12, AZ06, CAFS9. A place nobody has touched has no document at all.
 | Field | Was | Holds |
 |---|---|---|
 | `places` | `ut_places_v1` | what a named place IS |
-| `plotinfo` | `ut_plot_info_v1` | turfgrass, cultivar, area, rootzone |
+| `plotinfo` | `ut_plot_info_v1` | turfgrass, cultivar, area, rootzone — as `[{k,v}, …]` |
 | `mgmt` | `ut_mgmt_data_v1` | mower, cut height, irrigation heads |
-| `geom` / `added` / `removed` | `ut_plot_shapes_v1` | polygon, a place drawn, a place taken off |
+| `geom` / `added` / `removed` | `ut_plot_shapes_v1` | polygon **as text**, a place drawn, a place taken off |
+| `clear` | — | parts of this place the farm has taken back |
+
+**Two fields do not travel in the shape the app holds them in, and that is not
+tidiness — it is the difference between the map working and not.** The database
+refuses a list placed directly inside another list. Plot information is a list
+of pairs and a shape's coordinates are lists inside lists inside lists, so from
+2026-08-25 until 2026-09-22 nearly every map record was thrown out before it
+left the phone and no map edit reached anybody. Plot information therefore
+travels as a list of `{k, v}` objects — which keeps the order, and the order is
+meaning — and a shape travels as text, always written the same way so that two
+phones holding one shape cannot disagree about it. See `docs/DECISIONS.md`,
+2026-09-22.
+
+**`clear` is the opposite of a field set to `null`.** `null` means the file has
+this and the farm has deliberately taken it off. `clear` lists parts of the
+place whose correction has been **withdrawn** — go back to what `farm-geo.js`
+says. Merging a split plot back together is what needs it: dropping the split
+on one phone says nothing to the database, so without `clear` the split would
+come straight back.
 
 **Still overrides, never whole objects.** Storing the finished object would
 shadow `farm-geo.js` forever: the next time the file gains a plot or a corrected

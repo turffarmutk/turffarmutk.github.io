@@ -653,7 +653,7 @@ body{background:#0f1011;display:flex;align-items:center;justify-content:center;f
 .plotpop .pp-resdot{display:inline-block;color:#fff;background:#c0392b;border-radius:3px;font:800 9px 'Public Sans';padding:2px 4px;margin-right:5px;letter-spacing:.3px;vertical-align:1px}
 .leaflet-container .leaflet-popup-content{font:13px/1.5 -apple-system,BlinkMacSystemFont,sans-serif;margin:9px 12px}
 .mapchips span{cursor:pointer}.mapchips span.soon{opacity:.5;cursor:default;font-style:italic}
-.plotpop{font:13px/1.45 -apple-system,BlinkMacSystemFont,sans-serif;min-width:170px}.plotpop .pp-title{font-weight:800;font-size:15px;color:#1f2328;margin-bottom:6px;border-bottom:2px solid #ff8200;padding-bottom:4px}.plotpop .pp-tbl{border-collapse:collapse;width:100%}.plotpop .pp-tbl td{padding:3px 0;vertical-align:top}.plotpop .pp-k{color:#8a8f98;font-size:11px;text-transform:uppercase;letter-spacing:.3px;padding-right:12px;white-space:nowrap}.plotpop .pp-v{color:#1f2328;text-align:right;font-weight:600}.plotpop .pp-note{color:#8a8f98;font-size:12px;padding:2px 0}.plotpop .pp-mgmt-h{margin-top:8px;padding-top:6px;border-top:1px solid #eef0f2;font:800 10px 'Public Sans';text-transform:uppercase;letter-spacing:.5px;color:#ff8200}.plotpop .pp-in{width:100%;font:13px inherit;padding:3px 5px;border:1px solid #d9d9d9;border-radius:5px}.plotpop .pp-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.plotpop .pp-btn{font:600 12px inherit;padding:5px 9px;border-radius:6px;border:1px solid #e6e8eb;background:#f1f2f4;color:#333;cursor:pointer}.plotpop .pp-btn.save{background:#2f7d3a;color:#fff;border-color:#2f7d3a}.plotpop .pp-btn.del{background:#fdeceb;color:#c0392b;border-color:#f3c1c1}.plotpop .pp-demo{margin-top:6px;font-size:10px;color:#b26a00}
+.plotpop{font:13px/1.45 -apple-system,BlinkMacSystemFont,sans-serif;min-width:212px}.plotpop .pp-title{font-weight:800;font-size:15px;color:#1f2328;margin-bottom:6px;border-bottom:2px solid #ff8200;padding-bottom:4px}.plotpop .pp-tbl{border-collapse:collapse;width:100%}.plotpop .pp-tbl td{padding:3px 0;vertical-align:top}.plotpop .pp-k{color:#8a8f98;font-size:11px;text-transform:uppercase;letter-spacing:.3px;padding-right:12px;white-space:nowrap}.plotpop .pp-v{color:#1f2328;text-align:right;font-weight:600}.plotpop .pp-note{color:#8a8f98;font-size:12px;padding:2px 0}.plotpop .pp-mgmt-h{margin-top:8px;padding-top:6px;border-top:1px solid #eef0f2;font:800 10px 'Public Sans';text-transform:uppercase;letter-spacing:.5px;color:#ff8200}.plotpop .pp-in{width:100%;font:13px inherit;padding:3px 5px;border:1px solid #d9d9d9;border-radius:5px}.plotpop .pp-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.plotpop .pp-btn{font-weight:600;font-size:12px;font-family:inherit;padding:5px 9px;border-radius:6px;border:1px solid #e6e8eb;background:#f1f2f4;color:#333;cursor:pointer;white-space:nowrap;flex:0 0 auto;width:auto;height:auto}.plotpop .pp-btn.save{background:#2f7d3a;color:#fff;border-color:#2f7d3a}.plotpop .pp-btn.del{background:#fdeceb;color:#c0392b;border-color:#f3c1c1}.plotpop .pp-demo{margin-top:6px;font-size:10px;color:#b26a00}
 </style></head>
 <style id="tb-relax">
 /* Relaxed spacing — app-wide (scoped to .screen to win over .field/.calm bases) */
@@ -2006,7 +2006,7 @@ function editPlot(name){ if(!_pop)return; var o=infoObj(name);
   if(lb==='Type'){ var cur=o[lb]||''; var opts=TYPE_OPTS.map(function(t){return '<option'+(t===cur?' selected':'')+'>'+(t||'-')+'</option>';}).join('');
    h+='<tr><td class="pp-k">'+lb+'</td><td class="pp-v"><select id="'+id+'" class="pp-in">'+opts+'</select></td></tr>'; }
   else { var v=(o[lb]||'').replace(/"/g,'&quot;'); h+='<tr><td class="pp-k">'+lb+'</td><td class="pp-v"><input id="'+id+'" class="pp-in" value="'+v+'"/></td></tr>'; } });
- h+='</table><div class="pp-actions"><button class="pp-btn save" data-pp="savePlot" data-ppn="'+esc(name)+'">Save</button><button class="pp-btn" data-pp="cancelEdit" data-ppn="'+esc(name)+'">Cancel</button></div><div class="pp-demo">Demo - session only</div></div>';
+ h+='</table><div class="pp-actions"><button class="pp-btn save" data-pp="savePlot" data-ppn="'+esc(name)+'">Save</button><button class="pp-btn" data-pp="cancelEdit" data-ppn="'+esc(name)+'">Cancel</button></div></div>';
  _pop.setContent(h); }
 function savePlot(name){ if(!mapCan(SESSION.pid,'info')){ toast('Undergrads cannot change plot information'); return; } var arr=[]; EDIT_FIELDS.forEach(function(lb){ var el=document.getElementById(efId(lb)); if(!el)return; var v=(el.value||'').trim(); if(v&&v!=='-'&&v.toUpperCase()!=='NA') arr.push([lb,v]); }); PLOT_INFO[name]=arr; if(_pop)_pop.setContent(plotPopupHtml({number:name})); }
 function cancelEdit(name){ if(_pop)_pop.setContent(plotPopupHtml({number:name})); }
@@ -2082,7 +2082,7 @@ function editMowing(name){
    +'<div class="pp-note" id="mg_eff"></div>'
    +'<div class="pp-actions"><button class="pp-btn save" data-pp="saveMowing" data-ppn="'+esc(name)+'">Save</button>'
    +'<button class="pp-btn" data-pp="cancelEdit" data-ppn="'+esc(name)+'">Cancel</button></div>'
-   +'<div class="pp-demo">Demo — edits are session only</div></div>';
+   +'</div>';
   _pop.setContent(h);
   /* remember what we started from so we can tell a real change from a re-save */
   _mgStart={c:(o.c===''?null:+o.c),m:cur};
@@ -2189,28 +2189,94 @@ function logMowingChange(name,before,after){
   });
   try{ flCommit(); }catch(e){}
 }
-function askSplit(name){ if(!_pop)return; _pop.setContent('<div class="plotpop"><div class="pp-title">Split '+name+'</div><div class="pp-note">Into how many pieces?</div><div class="pp-actions"><button class="pp-btn" data-pp="doSplit" data-ppn="'+esc(name)+'" data-ppa="2">2</button><button class="pp-btn" data-pp="doSplit" data-ppn="'+esc(name)+'" data-ppa="3">3</button><button class="pp-btn" data-pp="cancelEdit" data-ppn="'+esc(name)+'">Cancel</button></div><div class="pp-demo">Equal-ish split for demo; use the splitter tool for precise cuts</div></div>'); }
+function askSplit(name){ if(!_pop)return; _pop.setContent('<div class="plotpop"><div class="pp-title">Split '+name+'</div><div class="pp-note">Into how many pieces?</div><div class="pp-actions"><button class="pp-btn" data-pp="doSplit" data-ppn="'+esc(name)+'" data-ppa="2">2</button><button class="pp-btn" data-pp="doSplit" data-ppn="'+esc(name)+'" data-ppa="3">3</button><button class="pp-btn" data-pp="cancelEdit" data-ppn="'+esc(name)+'">Cancel</button></div><div class="pp-demo">Equal-ish pieces. Each starts with this plot\'s details \u2014 set the real areas after.</div></div>'); }
 function interX(a,b){ try{return turf.intersect(turf.featureCollection([a,b]));}catch(e){try{return turf.intersect(a,b);}catch(e2){return null;}} }
 function aFt(f){ try{return turf.area(f)*10.7639;}catch(e){return 0;} }
 function sliceLine(poly,A,B){ var dx=B[0]-A[0],dy=B[1]-A[1],L=Math.hypot(dx,dy)||1e-9,ux=dx/L,uy=dy/L,E=0.03; var a2=[A[0]-ux*E,A[1]-uy*E],b2=[B[0]+ux*E,B[1]+uy*E],nx=-uy,ny=ux,O=0.03;
  var left=turf.polygon([[a2,b2,[b2[0]+nx*O,b2[1]+ny*O],[a2[0]+nx*O,a2[1]+ny*O],a2]]); var right=turf.polygon([[a2,[a2[0]-nx*O,a2[1]-ny*O],[b2[0]-nx*O,b2[1]-ny*O],b2,a2]]);
  var out=[],l=interX(poly,left),r=interX(poly,right); if(l&&aFt(l)>0.2)out.push(l); if(r&&aFt(r)>0.2)out.push(r); return out.length?out:[poly]; }
-function doSplit(name,n){ var idx=PLOTS_DATA.features.findIndex(function(f){return (f.properties||{}).number===name;}); if(idx<0)return; var f=PLOTS_DATA.features[idx];
+/* ---- SPLIT, MERGE BACK AND DELETE -----------------------------------------
+   Until 2026-09-22 these three changed the map on screen and nothing else. Not
+   saved on the phone, not shared, gone on reload — and the popup admitted it in
+   small print nobody reads. They now go through PE_STORE, the same store the
+   shape editor writes, which is what the map drawer reads. So a plot split
+   standing in a field is on everybody's phone a couple of seconds later.
+
+   THE PARENT KEEPS ITS OWN CORRECTIONS. Splitting marks the parent as taken
+   off the map; it does NOT wipe the turfgrass or the cut height somebody typed
+   in last spring. That is what lets Merge back hand you a plot that still
+   remembers them.
+
+   AREAS ARE NOT WORKED OUT FROM THE POLYGON, on purpose. farm-geo.js says in
+   its own header that the CAFS shapes are a drawn grid, not a survey, and
+   every spray rate reads the area TYPED IN on the plot information form. A
+   child therefore inherits the parent's stated area and somebody has to
+   correct it — so the toast says so rather than letting a made-up number go
+   quietly out to the whole farm. */
+function doSplit(name,n){
+ if(!mapCan(SESSION.pid,'shape')){ toast('Undergrads cannot change the map'); return; }
+ var idx=PLOTS_DATA.features.findIndex(function(f){return (f.properties||{}).number===name;}); if(idx<0)return; var f=PLOTS_DATA.features[idx];
  var bb=turf.bbox(f), W=bb[0],S=bb[1],E=bb[2],N=bb[3]; var vert=(E-W)>=(N-S); var pieces=[f];
  for(var k=1;k<n;k++){ var t=k/n; var A,B; if(vert){A=[W+(E-W)*t,S-0.0003];B=[W+(E-W)*t,N+0.0003];}else{A=[W-0.0003,S+(N-S)*t];B=[E+0.0003,S+(N-S)*t];}
   var np=[]; pieces.forEach(function(pc){ sliceLine(pc,A,B).forEach(function(x){np.push(x);}); }); pieces=np; }
  pieces.sort(function(a,b){var ca=turf.centroid(a).geometry.coordinates,cb=turf.centroid(b).geometry.coordinates; return vert?ca[0]-cb[0]:cb[1]-ca[1];});
- var letters='abcdefgh'; var subs=pieces.map(function(p,i){ var nf=JSON.parse(JSON.stringify(p)); nf.properties={number:name+letters[i]}; return nf; });
- PLOTS_DATA.features.splice(idx,1); subs.forEach(function(x){PLOTS_DATA.features.push(x);});
- subs.forEach(function(x){ if(PLOT_INFO[name]) PLOT_INFO[x.properties.number]=JSON.parse(JSON.stringify(PLOT_INFO[name])); }); if(PLOT_INFO[name])delete PLOT_INFO[name];
- _appmap.closePopup(); refreshLayers(); }
-function mergeBack(name){ var m=(name||'').match(CHILD_RE); if(!m)return; var base=m[1];
- var sibs=PLOTS_DATA.features.filter(function(f){var nn=(f.properties||{}).number; var mm=nn&&nn.match(CHILD_RE); return mm&&mm[1]===base;}); if(!sibs.length)return;
- var u=null; sibs.forEach(function(sf){u=uni2(u,sf);}); if(!u)u=sibs[0]; u=JSON.parse(JSON.stringify(u)); u.properties={number:base};
- PLOTS_DATA.features=PLOTS_DATA.features.filter(function(f){var nn=(f.properties||{}).number; var mm=nn&&nn.match(CHILD_RE); return !(mm&&mm[1]===base);}); PLOTS_DATA.features.push(u);
- var ci=sibs.map(function(sf){return (sf.properties||{}).number;}).find(function(cn){return PLOT_INFO[cn];}); if(ci)PLOT_INFO[base]=JSON.parse(JSON.stringify(PLOT_INFO[ci]));
- sibs.forEach(function(sf){ delete PLOT_INFO[(sf.properties||{}).number]; }); _appmap.closePopup(); refreshLayers(); }
-function deletePlot(name){ if(!confirm('Delete '+name+'? (demo - not saved)'))return; PLOTS_DATA.features=PLOTS_DATA.features.filter(function(f){return (f.properties||{}).number!==name;}); delete PLOT_INFO[name]; _appmap.closePopup(); refreshLayers(); }
+ /* CHILD_RE only recognises a, b and c, which is why Split offers 2 or 3 and
+    nothing wider — a fourth piece would be a plot the app could never merge. */
+ var letters='abc'; var subs=pieces.slice(0,letters.length).map(function(p,i){ var nf=JSON.parse(JSON.stringify(p)); nf.properties={number:name+letters[i]}; return nf; });
+ if(!subs.length) return;
+ if(!confirm('Split '+name+' into '+subs.length+'? Everybody on the farm will see this.')) return;
+ subs.forEach(function(x){
+   var cn=x.properties.number;
+   peRemovePlace(cn);                                    /* a re-split replaces, never stacks */
+   PE_STORE.added.push({number:cn,geometry:x.geometry});
+   var di=PE_STORE.deleted.indexOf(cn); if(di>=0) PE_STORE.deleted.splice(di,1);
+   if(PLOT_INFO[name]) PLOT_INFO[cn]=JSON.parse(JSON.stringify(PLOT_INFO[name]));
+   if(typeof MGMT_DATA!=='undefined'&&MGMT_DATA[name]) MGMT_DATA[cn]=JSON.parse(JSON.stringify(MGMT_DATA[name]));
+ });
+ if(PE_STORE.deleted.indexOf(name)<0) PE_STORE.deleted.push(name);
+ peSave(); peRedraw();
+ try{ _appmap.closePopup(); }catch(e){}
+ toast(name+' split into '+subs.length+' — set each area on the new plots');
+}
+function mergeBack(name){
+ if(!mapCan(SESSION.pid,'shape')){ toast('Undergrads cannot change the map'); return; }
+ var m=(name||'').match(CHILD_RE); if(!m)return; var base=m[1];
+ /* The pieces are whatever was ADDED under this parent's name — by this phone
+    or by somebody else's, since the drawer has already brought theirs across. */
+ var kids=[];
+ (PE_STORE.added||[]).forEach(function(a){
+   if(!a||!a.number) return;
+   var mm=String(a.number).match(CHILD_RE);
+   if(mm&&mm[1]===base&&kids.indexOf(String(a.number))<0) kids.push(String(a.number));
+ });
+ if(!kids.length){ toast('Nothing to put back together'); return; }
+ if(!confirm('Put '+base+' back together? Everybody on the farm will see this.')) return;
+ kids.forEach(function(cn){
+   peRemovePlace(cn);
+   var di=PE_STORE.deleted.indexOf(cn); if(di>=0) PE_STORE.deleted.splice(di,1);
+   delete PLOT_INFO[cn];
+   if(typeof MGMT_DATA!=='undefined') delete MGMT_DATA[cn];
+ });
+ var pi=PE_STORE.deleted.indexOf(base); if(pi>=0) PE_STORE.deleted.splice(pi,1);
+ peSave(); peRedraw();
+ /* Forgetting the split on this phone says NOTHING to the database — the old
+    records are still up there and would come back down within two seconds. */
+ try{ if(typeof msyncClear==='function'){
+   msyncClear(base,['removed']);
+   kids.forEach(function(cn){ msyncClear(cn,['added','geom','plotinfo','mgmt']); });
+ } }catch(e){}
+ try{ _appmap.closePopup(); }catch(e){}
+ toast(base+' put back together');
+}
+function deletePlot(name){
+ if(!mapCan(SESSION.pid,'shape')){ toast('Undergrads cannot change the map'); return; }
+ if(name==='LH') return;
+ if(!confirm('Take '+name+' off the map? Everybody on the farm will see this.'))return;
+ peRemovePlace(name);
+ peSave(); peRedraw();
+ try{ _appmap.closePopup(); }catch(e){}
+ toast(name+' taken off the map');
+}
 function refreshLayers(){ [_plots,_parents,_children,_labels,_parentLabels,_childLabels,_mower,_cutLabels,_childCutLabels].forEach(function(Lx){ if(Lx&&_appmap.hasLayer(Lx))_appmap.removeLayer(Lx); }); buildLayers(); if(_plotsOn){ _plots.addTo(_appmap); if(_parents)_parents.addTo(_appmap); } if(_mowerOn&&_mower){ _mower.addTo(_appmap); } updateView(); }
 function plotPopupHtml(p){var name=p.number||"\u2014";
  if(p.type==='dump'){
@@ -2240,7 +2306,7 @@ function plotPopupHtml(p){var name=p.number||"\u2014";
    } else fh+='<div class="pp-note">No equipment assigned here yet</div>';
    return fh+'</div>';
  }
- var info=PLOT_INFO[name];var h='<div class="plotpop"><div class="pp-title">'+name+'</div>';if(info&&info.length){h+='<table class="pp-tbl">';for(var i=0;i<info.length;i++){h+='<tr><td class="pp-k">'+info[i][0]+'</td><td class="pp-v">'+info[i][1]+'</td></tr>';}h+='</table>';}else if(SUBDIV.indexOf(name)>=0){h+='<div class="pp-note">Details pending \u2014 plot to be subdivided</div>';}else if(p.type==='border'){h+='<div class="pp-note">Surround'+(p.width_ft?(' \u00b7 '+p.width_ft+' ft'):'')+(p.around?(' around '+p.around.join(', ')):'')+'</div>';}else{h+='<div class="pp-note">No details yet</div>';}h+=mgmtPopHtml(name);try{h+=trPopHtml(name);}catch(e){}if(canEdit()&&name!=='LH'){var isChild=CHILD_RE.test(name);h+='<div class="pp-actions"><button class="pp-btn" data-pp="editPlot" data-ppn="'+esc(name)+'">Edit</button>'+(isNonTurf(name,p)?'':'<button class="pp-btn" data-pp="editMowing" data-ppn="'+esc(name)+'">Mowing</button>')+'<button class="pp-btn" data-pp="askSplit" data-ppn="'+esc(name)+'">Split</button>'+(isChild?'<button class="pp-btn" data-pp="mergeBack" data-ppn="'+esc(name)+'">Merge back</button>':'')+'<button class="pp-btn del" data-pp="deletePlot" data-ppn="'+esc(name)+'">Delete</button></div><div class="pp-demo">Demo - edits are session only</div>';}return h+'</div>';}
+ var info=PLOT_INFO[name];var h='<div class="plotpop"><div class="pp-title">'+name+'</div>';if(info&&info.length){h+='<table class="pp-tbl">';for(var i=0;i<info.length;i++){h+='<tr><td class="pp-k">'+info[i][0]+'</td><td class="pp-v">'+info[i][1]+'</td></tr>';}h+='</table>';}else if(SUBDIV.indexOf(name)>=0){h+='<div class="pp-note">Details pending \u2014 plot to be subdivided</div>';}else if(p.type==='border'){h+='<div class="pp-note">Surround'+(p.width_ft?(' \u00b7 '+p.width_ft+' ft'):'')+(p.around?(' around '+p.around.join(', ')):'')+'</div>';}else{h+='<div class="pp-note">No details yet</div>';}h+=mgmtPopHtml(name);try{h+=trPopHtml(name);}catch(e){}if(canEdit()&&name!=='LH'){var isChild=CHILD_RE.test(name);h+='<div class="pp-actions"><button class="pp-btn" data-pp="editPlot" data-ppn="'+esc(name)+'">Edit</button>'+(isNonTurf(name,p)?'':'<button class="pp-btn" data-pp="editMowing" data-ppn="'+esc(name)+'">Mowing</button>')+'<button class="pp-btn" data-pp="askSplit" data-ppn="'+esc(name)+'">Split</button>'+(isChild?'<button class="pp-btn" data-pp="mergeBack" data-ppn="'+esc(name)+'">Merge back</button>':'')+'<button class="pp-btn del" data-pp="deletePlot" data-ppn="'+esc(name)+'">Delete</button></div><div class="pp-demo">Changes here go out to the whole farm</div>';}return h+'</div>';}
 
 /* ---- Map thematic layers: management data (mower / cut height / irrigation) ---- */
 var MOWER_CFG=[
@@ -7396,20 +7462,41 @@ function _farmViewBounds(){
    the piece that swaps out for a table write.
    ============================================================ */
 var PE_KEY='ut_plot_shapes_v1';
-function peBlank(){ return {geom:{},added:[],deleted:[]}; }
+/* `cleared` is corrections the farm has TAKEN BACK — {placeName:[parts]} —
+   and it is here rather than beside the map drawer because it is saved and
+   reset with everything else the shape editor owns. See msyncClear(). */
+function peBlank(){ return {geom:{},added:[],deleted:[],cleared:{}}; }
 function peLoad(){
   try{ var s=JSON.parse(localStorage.getItem(PE_KEY)||'null'); if(!s)return peBlank();
-    s.geom=s.geom||{}; s.added=s.added||[]; s.deleted=s.deleted||[]; return s;
+    s.geom=s.geom||{}; s.added=s.added||[]; s.deleted=s.deleted||[]; s.cleared=s.cleared||{}; return s;
   }catch(e){ return peBlank(); }
 }
 var PE_STORE=peLoad();
 /* __base is the pristine copy of the shapes in this file — kept in memory only,
    never written, so storage holds just the diff. */
 function peSave(){
-  try{ localStorage.setItem(PE_KEY,JSON.stringify({geom:PE_STORE.geom,added:PE_STORE.added,deleted:PE_STORE.deleted})); }catch(e){}
+  try{ localStorage.setItem(PE_KEY,JSON.stringify({geom:PE_STORE.geom,added:PE_STORE.added,deleted:PE_STORE.deleted,cleared:PE_STORE.cleared})); }catch(e){}
+}
+/* Write down that a part of a place has been put back to what the file says. */
+function peClearMark(id,parts){
+  id=String(id);
+  PE_STORE.cleared=PE_STORE.cleared||{};
+  var was=PE_STORE.cleared[id]||[];
+  parts.forEach(function(p){ if(was.indexOf(p)<0) was.push(String(p)); });
+  PE_STORE.cleared[id]=was.sort();
+  peSave();
+}
+/* Take a place off the map — the store half, shared by the editor's Delete
+   mode and the Delete button in the plot popup so the two cannot drift. */
+function peRemovePlace(number){
+  var ai=-1; PE_STORE.added.forEach(function(a,i){ if(a&&a.number===number)ai=i; });
+  if(ai>=0) PE_STORE.added.splice(ai,1);
+  else if(PE_STORE.deleted.indexOf(number)<0) PE_STORE.deleted.push(number);
+  delete PE_STORE.geom[number];
 }
 function peCanEdit(){ return mapCan(SESSION.pid,'shape'); }
 function peDirty(){ return Object.keys(PE_STORE.geom).length>0||PE_STORE.added.length>0||PE_STORE.deleted.length>0
+  ||Object.keys(PE_STORE.cleared||{}).length>0
   ||(typeof DUMP_NOTES!=='undefined'&&Object.keys(DUMP_NOTES).length>0); }
 /* Layer the saved overrides over the shapes baked into the file. */
 function peApply(){
@@ -7551,7 +7638,7 @@ function peExportJson(){
      arrives on the other machine as an anonymous brown polygon. */
   return JSON.stringify({
     exported:new Date().toISOString().slice(0,10),
-    geom:PE_STORE.geom, added:PE_STORE.added, deleted:PE_STORE.deleted,
+    geom:PE_STORE.geom, added:PE_STORE.added, deleted:PE_STORE.deleted, cleared:PE_STORE.cleared,
     dumpNotes:(typeof DUMP_NOTES!=='undefined')?DUMP_NOTES:{}
   },null,1);
 }
@@ -7576,7 +7663,7 @@ function peImport(){
       try{ s=JSON.parse(txt); }catch(e){ toast('That is not valid JSON'); return false; }
       if(!s||typeof s!=='object'||(!s.geom&&!s.added&&!s.deleted)){ toast('No shape edits found in that'); return false; }
       var base=PE_STORE.__base;
-      PE_STORE={geom:s.geom||{},added:s.added||[],deleted:s.deleted||[],__base:base};
+      PE_STORE={geom:s.geom||{},added:s.added||[],deleted:s.deleted||[],cleared:s.cleared||{},__base:base};
       if(s.dumpNotes&&typeof DUMP_NOTES!=='undefined'){
         DUMP_NOTES=s.dumpNotes;
         try{ localStorage.setItem(DUMP_KEY,JSON.stringify(DUMP_NOTES)); }catch(e){}
@@ -7651,10 +7738,7 @@ function peSyncChrome(){
 function peTryDelete(number){
   if(!PE_ON||PE_MODE!=='delete'||!number||number==='LH') return false;
   if(!confirm('Remove '+number+' from the map?')) return true;
-  var ai=-1; PE_STORE.added.forEach(function(a,i){ if(a.number===number)ai=i; });
-  if(ai>=0) PE_STORE.added.splice(ai,1);
-  else if(PE_STORE.deleted.indexOf(number)<0) PE_STORE.deleted.push(number);
-  delete PE_STORE.geom[number];
+  peRemovePlace(number);
   peSave(); peRedraw();
   toast(number+' removed');
   return true;
@@ -8389,51 +8473,178 @@ function mapPlaceRecords(){
     (PE_STORE.deleted||[]).forEach(function(k){ touch(k).removed=true; });
   }catch(e){}
 
+  /* Corrections this device has TAKEN BACK — see msyncClear(). A part stays on
+     the list only while there is genuinely nothing local for it. The moment
+     somebody corrects that part of the place again, the correction itself is
+     what travels and the withdrawal drops off on its own, so these two can
+     never end up arguing with each other. */
+  try{
+    var cl=PE_STORE.cleared||{};
+    Object.keys(cl).forEach(function(id){
+      var want=cl[id]; if(!Array.isArray(want)||!want.length) return;
+      var have=out[String(id)]||{};
+      var parts=want.filter(function(p){ return !(p in have); });
+      if(parts.length) touch(id).clear=parts.slice().sort();
+    });
+  }catch(e){}
+
   return out;
 }
 
-/* A record is plain data or it does not go. */
+/* ---- what actually travels ------------------------------------------------
+   THE DATABASE CANNOT HOLD A LIST INSIDE A LIST. The alley paint drawer says
+   the same thing over its `pts` field and keeps its track as text for exactly
+   this reason. This drawer did not, and it cost the farm the whole feature:
+   from the day it was built until 2026-09-22, every record carrying a plot's
+   information or a plot's shape was thrown out by the Firebase code before it
+   left the phone. A plot's information is a list of pairs and a shape's
+   coordinates are lists inside lists inside lists, so almost nothing got
+   through. The one sign was a small `· N refused` on the Shared database
+   screen, which is not where anybody looks. See docs/DECISIONS.md.
+
+   So two things are re-shaped on the way out and put back on the way in:
+
+     plotinfo  [["Turfgrass","Zoysia"], …] -> [{k:"Turfgrass",v:"Zoysia"}, …]
+               A list of OBJECTS is fine — only a list directly inside a list
+               is not. The order survives, which matters: farm-geo.js says
+               those pairs are ordered and the popup prints them in order.
+     geom      a GeoJSON shape              -> the same shape written as text
+               Polygons and multi-polygons nest to different depths, so text
+               is the honest answer rather than a shape-by-shape unpacking.
+
+   BOTH FUNCTIONS MUST BE SAFE TO RUN TWICE, and that is not tidiness. The
+   record this phone built and the record the database hands back are compared
+   in this same travelling form, and if those two ever disagree the drawer
+   writes at the server forever — the 4.4 million read day. Handing an
+   already-travelling record to mapWireEncode() must change nothing.
+   --------------------------------------------------------------------------- */
+function mapWirePairs(v){
+  if(!Array.isArray(v)) return v;
+  return v.map(function(p){
+    if(!Array.isArray(p)) return p;                       /* already travelling */
+    return {k:String(p[0]==null?'':p[0]), v:String(p[1]==null?'':p[1])};
+  });
+}
+function mapPlainPairs(v){
+  if(!Array.isArray(v)) return v;
+  return v.map(function(p){
+    if(p&&typeof p==='object'&&!Array.isArray(p)) return [String(p.k==null?'':p.k),String(p.v==null?'':p.v)];
+    return p;
+  });
+}
+/* A shape written out as text, and ALWAYS written the same way — that last
+   part is not tidiness, it is the difference between this drawer settling and
+   this drawer spending the farm's day. Two phones can hold the same shape and
+   write it differently: 35.90 and 35.9 are the same corner, and {type,
+   coordinates} and {coordinates, type} are the same shape. Compared as text
+   they are not, so each phone would read the other's as a change and send its
+   own back, forever. Everything therefore goes through the parsed form and
+   comes out with its fields in the same order, whichever phone drew it. */
+function mapWireGeom(g){
+  if(g===null||g===undefined) return g;
+  var o=g;
+  if(typeof o==='string'){ try{ o=JSON.parse(o); }catch(e){ return null; } }
+  try{ return JSON.stringify((typeof _sdbSort==='function')?_sdbSort(o):o); }catch(e){ return null; }
+}
+function mapPlainGeom(g){
+  if(typeof g!=='string') return g;
+  try{ return JSON.parse(g); }catch(e){ return null; }
+}
+function mapWireEncode(rec){
+  var o; try{ o=JSON.parse(JSON.stringify(rec||{})); }catch(e){ return null; }
+  if(!o||typeof o!=='object') return null;
+  if(o.plotinfo!==null&&o.plotinfo!==undefined) o.plotinfo=mapWirePairs(o.plotinfo);
+  if(o.geom!==null&&o.geom!==undefined) o.geom=mapWireGeom(o.geom);
+  if(o.added&&typeof o.added==='object'){
+    if('geometry' in o.added){ o.added.geom=mapWireGeom(o.added.geometry); delete o.added.geometry; }
+    else if('geom' in o.added){ o.added.geom=mapWireGeom(o.added.geom); }
+  }
+  return o;
+}
+function mapWireDecode(rec){
+  var o; try{ o=JSON.parse(JSON.stringify(rec||{})); }catch(e){ return null; }
+  if(!o||typeof o!=='object') return null;
+  if(o.plotinfo!==null&&o.plotinfo!==undefined) o.plotinfo=mapPlainPairs(o.plotinfo);
+  if(o.geom!==null&&o.geom!==undefined) o.geom=mapPlainGeom(o.geom);
+  if(o.added&&typeof o.added==='object'&&'geom' in o.added){
+    o.added.geometry=mapPlainGeom(o.added.geom); delete o.added.geom;
+  }
+  return o;
+}
+
+/* A record is plain data, in the travelling shape, or it does not go. */
 function mapPlaceDoc(rec){
-  var out; try{ out=JSON.parse(JSON.stringify(rec||{})); }catch(e){ return null; }
+  var out=mapWireEncode(rec);
   if(!out||!out.id) return null;
   out.id=String(out.id);
   out.updatedBy=SESSION.pid||null;
   out.updatedAt=new Date().toISOString();
   return out;
 }
-/* What is compared. updatedAt and updatedBy are stamped on every write, so
-   they must be left out of the comparison or every scan would look changed. */
+/* What is compared, and it is the TRAVELLING shape on both sides — see the
+   warning above. updatedAt and updatedBy are stamped on every write, so they
+   must be left out of the comparison or every scan would look changed. */
 function mapPlaceJson(rec){
-  var d; try{ d=JSON.parse(JSON.stringify(rec||{})); }catch(e){ return null; }
+  var d=mapWireEncode(rec);
   if(!d) return null;
   delete d.updatedAt; delete d.updatedBy;
   return sdbJson(d);
 }
 
 /* Lay an arriving record over what this device has. Mirrors mapApply(): a
-   field carrying null means the file has it and the farm has removed it. */
-function mapPlaceApply(rec){
-  if(!rec||!rec.id) return false;
+   field carrying null means the file has it and the farm has removed it.
+
+   `clear` is the opposite of that and the two must never be confused. A part
+   named in `clear` is a correction the farm has TAKEN BACK — put that part of
+   the place back to whatever farm-geo.js says, which is what _mapBase has held
+   since boot. Merging a split plot back together is the reason it exists: with
+   no way to say "this place is itself again", the database would hand the
+   split straight back two seconds later. */
+function mapPlaceApply(wire){
+  if(!wire||!wire.id) return false;
+  var rec=mapWireDecode(wire); if(!rec) return false;
   var id=String(rec.id), changed=false;
 
+  var clear={};
+  if(Array.isArray(rec.clear)) rec.clear.forEach(function(k){ clear[String(k)]=true; });
+
   MAP_DEFS.forEach(function(d){
-    if(!(d.name in rec)) return;
     var o=d.get(); if(!o||typeof o!=='object') return;
+    if(clear[d.name]){
+      var base=(_mapBase[d.name]||{})[id];
+      if(base===undefined){ if(id in o){ delete o[id]; changed=true; } }
+      else {
+        var was=null; try{ was=JSON.stringify(o[id]); }catch(e){}
+        if(was!==base){ try{ o[id]=JSON.parse(base); changed=true; }catch(e){} }
+      }
+      return;
+    }
+    if(!(d.name in rec)) return;
     var v=rec[d.name];
     if(v===null){ if(id in o){ delete o[id]; changed=true; } }
     else { try{ if(sdbJson(o[id])!==sdbJson(v)){ o[id]=v; changed=true; } }catch(e){ o[id]=v; changed=true; } }
   });
 
   try{
-    if('geom' in rec){
+    if(clear.geom){
+      if(PE_STORE.geom[id]){ delete PE_STORE.geom[id]; changed=true; }
+    } else if('geom' in rec){
       if(rec.geom===null){ if(PE_STORE.geom[id]){ delete PE_STORE.geom[id]; changed=true; } }
       else if(sdbJson(PE_STORE.geom[id])!==sdbJson(rec.geom)){ PE_STORE.geom[id]=rec.geom; changed=true; }
     }
-    if(rec.added){
+
+    if(clear.added){
+      var ai=-1; PE_STORE.added.forEach(function(a,i){ if(a&&a.number===id) ai=i; });
+      if(ai>=0){ PE_STORE.added.splice(ai,1); changed=true; }
+    } else if(rec.added){
       var have=PE_STORE.added.some(function(a){ return a&&a.number===id; });
       if(!have){ PE_STORE.added.push(rec.added); changed=true; }
     }
-    if(rec.removed===true){
+
+    if(clear.removed){
+      var di=PE_STORE.deleted.indexOf(id);
+      if(di>=0){ PE_STORE.deleted.splice(di,1); changed=true; }
+    } else if(rec.removed===true){
       if(PE_STORE.deleted.indexOf(id)<0){ PE_STORE.deleted.push(id); changed=true; }
     }
   }catch(e){}
@@ -8532,6 +8743,28 @@ function msyncScan(){
     try{ db.collection(MSYNC_COLL).doc(id).set(doc).catch(function(e){ msyncFail(id,e); }); }
     catch(e){ msyncFail(id,e); }
   });
+}
+
+/* Take a correction back — put a place at what farm-geo.js says.
+
+   WHY DROPPING IT LOCALLY IS NOT ENOUGH. The scan sends what this device has
+   CHANGED, and a place with nothing changed about it produces no record at
+   all. So quietly forgetting a correction says nothing to the database, the
+   old record is still sitting up there, and it comes straight back down on the
+   next snapshot. Merging a split plot back together would undo itself within
+   two seconds.
+
+   So the withdrawal is written down on the phone (peClearMark) and travels as
+   an ordinary record, on the ordinary two-second heartbeat, which is what
+   makes it settle like every other drawer. The send here is only so the other
+   phone sees it now rather than in two seconds — the same thing the alley
+   paint does after a stroke, and allowed for the same reason: this is somebody
+   pressing a button, not a record arriving. */
+function msyncClear(id,parts){
+  if(!id||!Array.isArray(parts)||!parts.length) return false;
+  try{ peClearMark(id,parts); }catch(e){ return false; }
+  try{ msyncScan(); }catch(e){}
+  return true;
 }
 
 function msyncTick(){

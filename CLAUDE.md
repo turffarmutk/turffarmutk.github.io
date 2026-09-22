@@ -85,7 +85,7 @@ show up." Never edit `sw.js` by hand; this command writes it.
 npm test
 ```
 
-40 sets of automated checks, about 2,400 in total, in a minute or so. They
+41 sets of automated checks, about 2,400 in total, in a minute or so. They
 run several at a time (`tools/run-tests.js`); `npm run test:serial` runs them
 one after another instead, which is slower but easier to read when two of them
 disagree.

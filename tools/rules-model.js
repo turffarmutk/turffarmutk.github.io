@@ -206,9 +206,10 @@ function creditsWorker(before, after, mePid) {
 }
 
 /*
- * The equipment picks on a task. Mirrors isEquipPick() and eqPickOk() in
- * firestore.rules: which keys of the whole record changed, and inside eqUsed,
- * whose entry changed. Firestore compares values deeply, so this does too.
+ * Working a job, and finishing one. Mirrors isWorkUpdate(), eqPickOk() and
+ * the field list of isCompletion() in firestore.rules: which keys of the
+ * whole record changed, and inside eqUsed, whose entry changed. Firestore
+ * compares values deeply, so this does too.
  */
 function changedKeys(before, after) {
   const keys = new Set(Object.keys(before || {}).concat(Object.keys(after || {})));
@@ -219,11 +220,23 @@ function eqPickOk(before, after, mePid) {
   const inner = changedKeys((before && before.eqUsed) || {}, (after && after.eqUsed) || {});
   return inner.every(k => k === mePid);
 }
-function isEquipPick(before, after, mePid) {
-  const onTask = mePid !== '' && (before.assignee === mePid || (before.helpers || []).indexOf(mePid) >= 0);
-  return changedKeys(before, after).every(k => k === 'eqUsed' || k === 'updatedAt')
-    && onTask && eqPickOk(before, after, mePid);
+const WORK_FIELDS = ['donePlots', 'doneTrials', 'mix', 'eqUsed', 'updatedAt'];
+const COMPLETION_FIELDS = ['status', 'completedBy', 'completedAt', 'closedBy', 'completedNote', '_logged',
+                           'done', 'units', 'updatedAt', 'donePlots', 'doneTrials', 'mix', 'eqUsed'];
+function onTaskM(t, pid) {
+  return pid !== '' && (t.assignee === pid || (t.helpers || []).indexOf(pid) >= 0);
+}
+function isWorkUpdate(before, after, mePid) {
+  return changedKeys(before, after).every(k => WORK_FIELDS.indexOf(k) >= 0)
+    && onTaskM(before, mePid) && eqPickOk(before, after, mePid);
+}
+/* The field half of isCompletion(); who may complete and who is credited are
+   rulesCan(...,'complete') and creditsWorker() above. */
+function completionFieldsOk(before, after, mePid) {
+  return changedKeys(before, after).every(k => COMPLETION_FIELDS.indexOf(k) >= 0)
+    && eqPickOk(before, after, mePid);
 }
 
 module.exports = { rosterDoc, Rules, rulesCan, creditsWorker, keepsRoster, ROSTER_V, rosterCanWriteIn,
-                   eqPickOk, isEquipPick };
+                   eqPickOk, isWorkUpdate, completionFieldsOk, changedKeys,
+                   WORK_FIELDS, COMPLETION_FIELDS };

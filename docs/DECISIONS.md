@@ -1826,3 +1826,26 @@ otherwise a guess from its type, made when it is read and never written back.
 - Removing `'eqUsed'` from `isCompletion()` in `firestore.rules`. A phone
   offline at Continue sends the pick and the finish in one write, and without
   it the finish is refused too.
+
+### Anyone on a job may save their progress on it — 2026-09-22
+
+**Decided:** `firestore.rules` has a fifth way to change a task,
+`isWorkUpdate()`: anybody on the job may change `donePlots`, `doneTrials`,
+`mix` and their own entry in `eqUsed`, and nothing else in the same write.
+`isCompletion()` also accepts those, plus `completedNote` and `_logged`.
+
+**Why:** Dillon, 2026-09-22: "after I assign a task to someone they are not
+able to click off the plots." The tap worked; the database refused to store
+it, because an undergrad is not a job's creator and no rule allowed a tick.
+The database handed its copy back and the plot went orange again a second
+after going green. The finish was refused as well: `completeTask()` writes
+`completedNote` and `_logged`, neither of which was on the completion list.
+Both had been true since tasks moved into the database at the end of August.
+Nothing caught it because no test put what the app REALLY writes in front of
+the rules; `tools/test-task-work-rules.js` does now.
+
+**Likely mistake:** adding a new field the app writes while someone works a
+job (or while finishing one) without adding it to these two lists. It will
+work for Bill, whose edits pass `isEdit()`, and silently fail for everybody
+else. Run `node tools/test-task-work-rules.js` — it checks the real code's
+writes against the lists.

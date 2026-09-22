@@ -219,20 +219,19 @@ section('5. coming back, sharing, and going without');
 
 section('6. the database rule');
 {
-  ok('the rules file has the new move', /function isEquipPick\(\)/.test(RULES) && /function eqPickOk\(\)/.test(RULES));
-  ok('and allows it on update', /isCompletion\(\) \|\| isEquipPick\(\)/.test(RULES));
-  ok('a completion may carry the picks', /'done', 'units', 'updatedAt', 'eqUsed'\]\)\s*&& eqPickOk\(\)/.test(RULES));
+  ok('the rules file has the move', /function isWorkUpdate\(\)/.test(RULES) && /function eqPickOk\(\)/.test(RULES));
+  ok('and allows it on update', /isCompletion\(\) \|\| isWorkUpdate\(\)/.test(RULES));
 
   const before = { id: 't', assignee: 'p18', helpers: ['p19'], status: 'todo', eqUsed: { p19: ['e3'] } };
   const mine = Object.assign({}, before, { eqUsed: { p19: ['e3'], p18: ['e4'] } });
-  ok('a student records their own pick', model.isEquipPick(before, mine, 'p18'));
-  ok('a helper records theirs', model.isEquipPick(before, Object.assign({}, before, { eqUsed: { p19: ['e5'] } }), 'p19'));
+  ok('a student records their own pick', model.isWorkUpdate(before, mine, 'p18'));
+  ok('a helper records theirs', model.isWorkUpdate(before, Object.assign({}, before, { eqUsed: { p19: ['e5'] } }), 'p19'));
   ok('nobody changes another person\'s pick',
-     !model.isEquipPick(before, Object.assign({}, before, { eqUsed: { p19: ['e5'] } }), 'p18'));
+     !model.isWorkUpdate(before, Object.assign({}, before, { eqUsed: { p19: ['e5'] } }), 'p18'));
   ok('somebody not on the job cannot record one',
-     !model.isEquipPick(before, Object.assign({}, before, { eqUsed: { p19: ['e3'], p20: ['e4'] } }), 'p20'));
+     !model.isWorkUpdate(before, Object.assign({}, before, { eqUsed: { p19: ['e3'], p20: ['e4'] } }), 'p20'));
   ok('and a pick cannot smuggle in another change',
-     !model.isEquipPick(before, Object.assign({}, mine, { title: 'something else' }), 'p18'));
+     !model.isWorkUpdate(before, Object.assign({}, mine, { title: 'something else' }), 'p18'));
   ok('a completion carrying only my own picks passes the pick check',
      model.eqPickOk(before, Object.assign({}, mine, { status: 'done' }), 'p18'));
 }

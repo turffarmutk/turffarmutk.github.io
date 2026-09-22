@@ -361,11 +361,17 @@ service cloud.firestore {
       }
 
       /* --- completion: credit goes to the WORKER, not to whoever closed
-             it. completedBy must be somebody who was actually on the job,
+             it. completedNote and _logged were missing from this list until
+             2026-09-22, so a finish from anybody but Bill or the job's
+             creator was refused: completeTask() writes both on every
+             finish (_logged is the guard that stops a job going into the
+             Field Log twice). tools/test-task-work-rules.js now runs the
+             real finish past this list. completedBy must be somebody who was actually on the job,
              or the person pressing the button. --- */
       function isCompletion() {
         return changed().hasOnly(['status', 'completedBy', 'completedAt', 'closedBy',
-                                  'done', 'units', 'updatedAt', 'eqUsed'])
+                                  'completedNote', '_logged', 'done', 'units', 'updatedAt',
+                                  'donePlots', 'doneTrials', 'mix', 'eqUsed'])
           && eqPickOk()
           && canComplete(resource.data)
           && str(request.resource.data.get('completedBy', '')) != ''
@@ -373,21 +379,33 @@ service cloud.firestore {
               || str(request.resource.data.get('completedBy', '')) == me());
       }
 
-      /* --- equipment: what I took, from the Start checklist ---
-             Anybody on the job records the machines THEY took, and only
-             theirs: eqUsed is keyed by person, and eqPickOk() refuses a
-             write that touches anybody else's entry. Nothing else on the
-             job may change in the same write. App: the tp-go handler in
-             app-04-spray-inventory.js. Dillon, 2026-09-22. */
-      function isEquipPick() {
-        return changed().hasOnly(['eqUsed', 'updatedAt'])
+      /* --- working the job: what the person out there changes as they go
+             donePlots   the plots ticked off on the work map
+             doneTrials  the studies ticked off on a trial-dots job
+             mix         the tank on a spray, filled in at the rig
+             eqUsed      the machines they took, from the Start checklist
+             Anybody on the job, and nothing else about the job.
+
+             Before 2026-09-22 there was no such move, and it was a real
+             bug: an undergrad is not the job's creator, so a plot tick
+             matched none of the other four moves and was refused. The
+             database then handed its copy back, the phone took it, and the
+             plot went back to orange a second after it went green. Nobody
+             assigned a job could ever check it off. Dillon reported it.
+
+             eqUsed is keyed by person and eqPickOk() refuses a write that
+             touches anybody else's entry. App: the work map's onTap in
+             renderTaskWork() and the tp-go handler, app-04. --- */
+      function isWorkUpdate() {
+        return changed().hasOnly(['donePlots', 'doneTrials', 'mix', 'eqUsed', 'updatedAt'])
           && onTask(resource.data, me())
           && eqPickOk();
       }
 
-      /* Also allowed inside a completion, because a phone that was offline
-         when the student pressed Continue sends both changes in one write
-         when it comes back. Without this, the finish would be refused too. */
+      /* The same fields are allowed inside a completion (above), because the
+         last plot ticked and Finish pressed a second later go up as ONE
+         write -- the phone sends every two seconds, not on every tap. A phone
+         that was offline sends everything at once too. */
       function eqPickOk() {
         return !changed().hasAny(['eqUsed'])
           || request.resource.data.get('eqUsed', {})
@@ -434,7 +452,7 @@ service cloud.firestore {
       allow update: if actor()
         && request.resource.data.id == resource.data.id
         && str(request.resource.data.get('createdBy', '')) == str(resource.data.get('createdBy', ''))
-        && (isClaim() || isCompletion() || isEquipPick() || isAssignment() || isEdit());
+        && (isClaim() || isCompletion() || isWorkUpdate() || isAssignment() || isEdit());
 
       allow delete: if actor() && canEdit(resource.data);
 

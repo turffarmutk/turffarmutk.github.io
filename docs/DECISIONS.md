@@ -1790,3 +1790,39 @@ the note is what they need. Start still opens the job with its plots.
 
 **Likely mistake:** "fixing" the missing plots on the students' list by putting
 `areaWithDue()` back in `tbTaskRow()`. It is missing on purpose.
+
+### Start opens an equipment checklist, and "in use" is read from the tasks — 2026-09-22
+
+**Decided:** pressing Start shows one page first: the note from whoever
+assigned the job, anything closed on the ground, and a tile for each piece of
+equipment the job needs, grouped by category. The student taps the machine
+they took in each group; Continue stays grey until every group is answered.
+"Not taking one" is a tile of its own, so a group can be answered when every
+machine in it is down or out. A job with nothing to show skips the page.
+
+The pick is written onto the TASK (`eqUsed`, keyed by person), and the
+Equipment screen works out "In use · Garrett · Rotary - Plots" from any open
+task that names the machine (`eqHolder()`). Finishing or deleting the task
+hands the machine back. Nothing on the machine record changes.
+
+**Why:** Dillon wants to know which rotary mower went out with which student.
+Undergraduates may not write machine records, and a machine marked "out" on
+its own record stays out forever if the phone that took it dies. The task
+already has to be right, so it is the one record.
+
+A job's equipment is the job's `machines[]` on the task list, now edited from
+the task form's "Equipment needed" row. Several machines in one category mean
+"any one of these"; machines in different categories mean "all of these" —
+the categories carry that, so nobody has to spell it out.
+
+A machine's category is `cat` if somebody picked one on its edit screen,
+otherwise a guess from its type, made when it is read and never written back.
+
+**Likely mistakes:**
+- Setting `status:'in_use'` / `holder` on the machine at Start. See above;
+  and the database refuses it from an undergraduate anyway.
+- Writing the guessed category onto every machine to "tidy up". That is one
+  database write per machine from every phone, for a value nobody chose.
+- Removing `'eqUsed'` from `isCompletion()` in `firestore.rules`. A phone
+  offline at Continue sends the pick and the finish in one write, and without
+  it the finish is refused too.

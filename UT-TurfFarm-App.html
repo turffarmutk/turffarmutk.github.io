@@ -786,6 +786,23 @@ select.tn-input{-webkit-appearance:none;appearance:none;text-align-last:right;di
 .plot .wck{position:absolute;top:2px;right:4px;color:#fff;font-size:14px;font-weight:900;display:none;text-shadow:0 1px 2px rgba(0,0,0,.5)}
 .plot.wdone .wck{display:block}
 .startbtn{background:var(--acc);color:#fff;font:800 12px 'Public Sans';padding:10px 15px;border-radius:10px;flex:none;align-self:center}
+/* Equipment tiles -- the Start checklist and the task list's equipment picker.
+   The top box is where a machine's photo goes; without one it shows the
+   category's initial at the same size, so adding photos moves nothing. */
+.eqgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(138px,1fr));gap:9px;margin:0 12px}
+.eqt{position:relative;background:var(--card);border:1.5px solid var(--line);border-radius:13px;overflow:hidden;padding-bottom:9px;min-width:0}
+.eqt-ph{height:82px;background:#eef0f2 center/cover no-repeat;margin-bottom:7px}
+.eqt-noph{display:flex;align-items:center;justify-content:center;font:800 30px 'Archivo';color:#b9bec5}
+.eqt-nm{font:800 12.5px 'Public Sans';color:var(--ink);padding:0 10px;line-height:1.25;overflow-wrap:anywhere}
+.eqt-sub{font:600 10.5px 'Public Sans';color:var(--muted);padding:3px 10px 0;line-height:1.3}
+.eqt-ck{position:absolute;top:7px;right:7px;width:24px;height:24px;border-radius:12px;background:var(--acc);color:#fff;font:800 13px 'Public Sans';display:none;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.eqt-on{border-color:var(--acc);background:#fff6ec}
+.eqt-on .eqt-ck{display:flex}
+.eqt-busy .eqt-sub{color:#9a5b00}
+.eqt-down{opacity:.45}
+.eqt-none{border-style:dashed;display:flex;align-items:center;justify-content:center;min-height:118px;padding:9px;text-align:center;font:700 12px 'Public Sans';color:var(--muted)}
+.eqt-none.eqt-on{color:#9a5b00}
+.tp-go.off{background:#c9ccd1}
 .startbtn:active{opacity:.7}
 /* ---- locate control ----
    Finding yourself is not a map layer, it is what you do TO the map, so it gets
@@ -1657,6 +1674,7 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
               <div class="fld" id="tn-machine-row" style="display:none"><span class="fl">Machine</span><select id="tn-machine" class="inv-sel" style="max-width:180px"></select></div>
               <div id="tn-eqnote" style="display:none;padding:2px 16px 8px;font:600 11px 'Public Sans';color:#b26a00"></div>
               <div class="fld tap" id="tn-plots-row"><span class="fl">Plot / area</span><span class="fv" id="tn-plots">Tap to choose ›</span></div>
+              <div class="fld tap" id="tn-equip-row" style="display:none"><span class="fl">Equipment needed</span><span class="fv" id="tn-equip">None ›</span></div>
               <div class="fld" id="tn-whenrow" style="display:none"><span class="fl">When</span><select id="tn-when" class="inv-sel" style="max-width:180px"></select></div>
               <div class="fld" id="tn-students-row" style="border-bottom:none;display:none"><span class="fl">Students needed</span><select id="tn-students" class="inv-sel" style="max-width:120px"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
             </div>
@@ -1676,6 +1694,22 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
             <div id="tn-delwrap" style="display:none;margin:18px 16px 0"><div class="tap" id="tn-del" style="border:1px solid #e6c6c2;border-radius:12px;padding:13px;text-align:center;font:800 13px 'Archivo';color:#c0392b;background:#fdf3f2">Delete task</div><div style="font:600 11px 'Public Sans';color:var(--muted);line-height:1.45;margin:7px 2px 0;text-align:center">It stops showing when anybody assigns work. You can put it back from the bottom of the task list.</div></div>
             <div style="height:16px"></div>
             </div>
+          </div>
+<div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab on"><span class="te">📋</span>Tasks</div><div class="tab"><span class="te">🗺️</span>Map</div><div class="tab"><span class="te">📦</span>Inventory</div><div class="tab"><span class="te">•••</span>More</div></div>
+</section>
+<section class="screen" id="s-taskprep">
+<div class="app field">
+            <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" id="tp-title" style="flex:1">Before you start</div></div>
+            <div id="tp-body" style="flex:1;min-height:0;overflow:auto;padding-bottom:12px"></div>
+            <div class="actionbar"><div class="action tap tp-go" id="tp-go">Continue ›</div></div>
+          </div>
+<div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab on"><span class="te">📋</span>Tasks</div><div class="tab"><span class="te">🗺️</span>Map</div><div class="tab"><span class="te">📦</span>Inventory</div><div class="tab"><span class="te">•••</span>More</div></div>
+</section>
+<section class="screen" id="s-eqpick">
+<div class="app field">
+            <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Equipment needed</div></div>
+            <div id="ep-body" style="flex:1;min-height:0;overflow:auto;padding-bottom:12px"></div>
+            <div class="actionbar"><div class="action tap" id="ep-done">Done</div></div>
           </div>
 <div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab on"><span class="te">📋</span>Tasks</div><div class="tab"><span class="te">🗺️</span>Map</div><div class="tab"><span class="te">📦</span>Inventory</div><div class="tab"><span class="te">•••</span>More</div></div>
 </section>

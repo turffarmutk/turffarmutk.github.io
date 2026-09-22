@@ -159,7 +159,7 @@ function navChosen(role){
 function navSetChosen(arr){ prefsSet('nav',arr.slice()); }
 const SCREEN_DEST={
  'home-manager':'home-manager','home-undergrad':'home-undergrad','home-grad':'home-grad','home-faculty':'home-faculty','home-tech':'home-tech',
- 'taskboard':'taskboard','taskdetail':'taskboard','tasknew':'taskboard','taskwork':'taskboard','gradreq':'taskboard','templates':'taskboard','assign':'taskboard','plotpick':'taskboard',
+ 'taskboard':'taskboard','taskdetail':'taskboard','tasknew':'taskboard','taskwork':'taskboard','taskprep':'taskboard','eqpick':'taskboard','gradreq':'taskboard','templates':'taskboard','assign':'taskboard','plotpick':'taskboard',
  'map':'map','indoor':'map',
  'inventory':'inventory','itemdetail':'inventory','invlog':'inventory','additem':'inventory','lowstock':'inventory',
  'trial':'trial','trialdetail':'trial','trialedit':'trial','trialres':'trial',
@@ -766,14 +766,20 @@ function hwFill(id,html,scope){
  if(scope){ el.setAttribute('data-open','page:'+scope); el.removeAttribute('data-go'); el.classList.add('tap'); }
 }
 
+/* A machine is "in use" when a student ticked it on the Start checklist, and
+   that is worked out from the tasks by eqStatusOf() in app-04. The guard is
+   for load order: this file runs first, and a widget painted before app-04 is
+   read falls back to the machine's own status rather than throwing. */
+function hwEqStatus(e){ return (typeof eqStatusOf==='function')?eqStatusOf(e):e.status; }
+function hwEqWho(e){ var h=(typeof eqHolder==='function')?eqHolder(e.id):null; return h?(nameOf(h.pid)||h.pid):(e.holder||''); }
 function hwMgrEquip(){
  if(typeof EQUIP==='undefined')return;
  var live=EQUIP.filter(function(e){return e.active;});
  var down=live.filter(function(e){return e.status==='down';});
- var use=live.filter(function(e){return e.status==='in_use';});
+ var use=live.filter(function(e){return hwEqStatus(e)==='in_use';});
  var list=down.concat(use),show=list.slice(0,hwRows('equip'));
- var rows=show.map(function(e,i){var s=eqStat(e.status);
-   return hwRow(hwName(e.name,e.type+(e.holder?' · '+e.holder:'')),hwPill(s.lbl,s.bg,s.fg),i===show.length-1,'equip:'+e.id);
+ var rows=show.map(function(e,i){var s=eqStat(hwEqStatus(e));
+   return hwRow(hwName(e.name,e.type+(hwEqStatus(e)==='in_use'?' · '+hwEqWho(e):'')),hwPill(s.lbl,s.bg,s.fg),i===show.length-1,'equip:'+e.id);
  }).join('');
  hwFill('hw-m-equip',hwHead('Equipment','All equipment')
   +hwSub(down.length+' down · '+use.length+' in use · '+(live.length-down.length-use.length)+' available')
@@ -992,11 +998,11 @@ function hwEquipCard(id,mode){
  if(typeof EQUIP==='undefined')return;
  var live=EQUIP.filter(function(e){return e.active;});
  var down=live.filter(function(e){return e.status==='down';});
- var use=live.filter(function(e){return e.status==='in_use';});
+ var use=live.filter(function(e){return hwEqStatus(e)==='in_use';});
  var flag=live.filter(function(e){return e.flagged&&e.status!=='down';});
  var list=down.concat(flag,use),show=list.slice(0,hwRows(hwWid(id)));
- var rows=show.map(function(e,i){var s=eqStat(e.status);
-   return hwRow(hwName(e.name,e.type+(e.holder?' · '+e.holder:'')),
+ var rows=show.map(function(e,i){var s=eqStat(hwEqStatus(e));
+   return hwRow(hwName(e.name,e.type+(hwEqStatus(e)==='in_use'?' · '+hwEqWho(e):'')),
      e.flagged&&e.status!=='down'?hwPill('Flagged','#fdf0dd','#9a5b00'):hwPill(s.lbl,s.bg,s.fg),i===show.length-1,'equip:'+e.id);
  }).join('');
  var foot={report:'Spot a problem? Report it and Bill gets a repair task straight away.',
@@ -1278,8 +1284,8 @@ function hwMyTaskList(id,role){
   +(rows||hwEmpty('Nothing assigned to you right now.'))+hwMore(mine.length-show.length),
   'taskboard/board=mine');
 }
-/* Start goes straight into the job — map view when the work is plot-based,
-   otherwise the task detail. stopPropagation keeps the card's own tap-through
+/* Start goes through startTask() — the notes and equipment checklist first
+   when there are any, then the map or the task detail. stopPropagation keeps the card's own tap-through
    to the board from firing underneath it. */
 ['s-home-undergrad','s-home-tech'].forEach(function(sid){
  var scr=document.getElementById(sid); if(!scr)return;
@@ -1289,8 +1295,7 @@ function hwMyTaskList(id,role){
   var tid=st.getAttribute('data-start');
   var t=(typeof TASKS==='undefined')?null:TASKS.find(function(x){return x.id===tid;});
   if(!t)return;
-  if(typeof worksOnMap==='function'&&worksOnMap(t.type,t.title)&&typeof openTaskWork==='function')openTaskWork(tid);
-  else if(typeof openTask==='function')openTask(tid);
+  if(typeof startTask==='function')startTask(tid);
  },true);
 });
 /* Faculty banner — the single thing most worth their attention, from live data. */
@@ -1849,7 +1854,7 @@ function show(id,push){ const el=document.getElementById('s-'+id); if(!el)return
      longer promote you by being opened. The attribute stays as a label, used
      below to pick which home layout to paint. */
   if(id==='profile')fillProfile(); if(id==='profedit')renderProfEdit(); if(id==='roster')rstRender(); if(id==='rosteredit')rstEditRender(); if(id==='adminxfer')axfRender(); if(id==='spraysettings')sprRender(); if(id==='farmsettings')fstRender(); if(id==='bugreport')bugRender(); if(id==='bugsettings')bgsRender(); if(id==='sharedb')sdbRender(); if(id==='admin')admRender(); if(id==='flfix')flxRender(); if(id==='mowersettings')mwsRender(); if(id==='labsettings')lbsRender(); if(id==='semsettings')smsRender(); if(id==='roles')authRenderAccount();
-  if(id==='login')authRenderLogin(); if(id==='notifications'){setSeen(Date.now());setTimeout(updateBellBadges,0);} if(id==='home-manager')renderHomeNotif(); if(id==='weather')wxEnter(); if(id==='map')mapEnter(); if(id==='taskboard')boardEnter(); if(id==='templates')renderTemplates(); if(id==='assign')assignEnter(); if(id==='plotpick')renderPlotPick(); if(id==='taskwork')renderTaskWork(); if(id==='inventory')invEnter(); if(id==='lowstock')renderLowStock(); if(id==='additem')renderAddItem(); if(id==='invlog')renderInvLog(); if(id==='itemdetail')0; if(id==='equipment')equipEnter(); if(id==='eqreport')renderEqReport(); if(id==='eqmaint')renderEqMaint(); if(id==='eqedit')renderEqEdit(); if(id==='eqsched')renderEqSched(); if(id==='calendar')calEnter(); if(id==='caladd')renderCalAdd(); if(id==='timeclock')tcEnter(); if(id==='tcperson')tcRenderPerson(); if(id==='fieldlog')fieldlogEnter(); if(id==='flexport')renderFlExport(); if(id==='flnew')renderFlNew(); if(id==='fldetail')renderFlDetail(); if(id==='more')moreEnter(); if(id==='trial')trialsEnter(); if(id==='trialdetail')trRenderDetail(); if(id==='trialedit')trRenderEdit(); if(id==='trialres')trRenderRes(); if(id==='trialpin')trRenderPin(); if(id==='navsettings')renderPrefsHub(); if(id==='notifsettings')renderNotifSettings(); if(id==='powersettings')renderPowerSettings(); if(id==='navtabs')renderNavSettings(); if(id==='homescreen')renderHomeSettings(); if(id==='theme')renderTheme(); if(id.indexOf('home-')===0)hwApply(r||currentRole); renderTabs();
+  if(id==='login')authRenderLogin(); if(id==='notifications'){setSeen(Date.now());setTimeout(updateBellBadges,0);} if(id==='home-manager')renderHomeNotif(); if(id==='weather')wxEnter(); if(id==='map')mapEnter(); if(id==='taskboard')boardEnter(); if(id==='templates')renderTemplates(); if(id==='assign')assignEnter(); if(id==='plotpick')renderPlotPick(); if(id==='taskwork')renderTaskWork(); if(id==='taskprep')renderTaskPrep(); if(id==='eqpick')renderEqPick(); if(id==='inventory')invEnter(); if(id==='lowstock')renderLowStock(); if(id==='additem')renderAddItem(); if(id==='invlog')renderInvLog(); if(id==='itemdetail')0; if(id==='equipment')equipEnter(); if(id==='eqreport')renderEqReport(); if(id==='eqmaint')renderEqMaint(); if(id==='eqedit')renderEqEdit(); if(id==='eqsched')renderEqSched(); if(id==='calendar')calEnter(); if(id==='caladd')renderCalAdd(); if(id==='timeclock')tcEnter(); if(id==='tcperson')tcRenderPerson(); if(id==='fieldlog')fieldlogEnter(); if(id==='flexport')renderFlExport(); if(id==='flnew')renderFlNew(); if(id==='fldetail')renderFlDetail(); if(id==='more')moreEnter(); if(id==='trial')trialsEnter(); if(id==='trialdetail')trRenderDetail(); if(id==='trialedit')trRenderEdit(); if(id==='trialres')trRenderRes(); if(id==='trialpin')trRenderPin(); if(id==='navsettings')renderPrefsHub(); if(id==='notifsettings')renderNotifSettings(); if(id==='powersettings')renderPowerSettings(); if(id==='navtabs')renderNavSettings(); if(id==='homescreen')renderHomeSettings(); if(id==='theme')renderTheme(); if(id.indexOf('home-')===0)hwApply(r||currentRole); renderTabs();
   try{csApply(el,id);}catch(e){}
   try{updateBellBadges();}catch(e){}
   try{syncBack(el);}catch(e){}

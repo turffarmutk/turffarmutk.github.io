@@ -205,4 +205,25 @@ function creditsWorker(before, after, mePid) {
   return onIt || credited === me;
 }
 
-module.exports = { rosterDoc, Rules, rulesCan, creditsWorker, keepsRoster, ROSTER_V, rosterCanWriteIn };
+/*
+ * The equipment picks on a task. Mirrors isEquipPick() and eqPickOk() in
+ * firestore.rules: which keys of the whole record changed, and inside eqUsed,
+ * whose entry changed. Firestore compares values deeply, so this does too.
+ */
+function changedKeys(before, after) {
+  const keys = new Set(Object.keys(before || {}).concat(Object.keys(after || {})));
+  return Array.from(keys).filter(k => JSON.stringify((before || {})[k]) !== JSON.stringify((after || {})[k]));
+}
+function eqPickOk(before, after, mePid) {
+  if (changedKeys(before, after).indexOf('eqUsed') < 0) return true;
+  const inner = changedKeys((before && before.eqUsed) || {}, (after && after.eqUsed) || {});
+  return inner.every(k => k === mePid);
+}
+function isEquipPick(before, after, mePid) {
+  const onTask = mePid !== '' && (before.assignee === mePid || (before.helpers || []).indexOf(mePid) >= 0);
+  return changedKeys(before, after).every(k => k === 'eqUsed' || k === 'updatedAt')
+    && onTask && eqPickOk(before, after, mePid);
+}
+
+module.exports = { rosterDoc, Rules, rulesCan, creditsWorker, keepsRoster, ROSTER_V, rosterCanWriteIn,
+                   eqPickOk, isEquipPick };

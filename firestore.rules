@@ -365,11 +365,33 @@ service cloud.firestore {
              or the person pressing the button. --- */
       function isCompletion() {
         return changed().hasOnly(['status', 'completedBy', 'completedAt', 'closedBy',
-                                  'done', 'units', 'updatedAt'])
+                                  'done', 'units', 'updatedAt', 'eqUsed'])
+          && eqPickOk()
           && canComplete(resource.data)
           && str(request.resource.data.get('completedBy', '')) != ''
           && (onTask(resource.data, str(request.resource.data.get('completedBy', '')))
               || str(request.resource.data.get('completedBy', '')) == me());
+      }
+
+      /* --- equipment: what I took, from the Start checklist ---
+             Anybody on the job records the machines THEY took, and only
+             theirs: eqUsed is keyed by person, and eqPickOk() refuses a
+             write that touches anybody else's entry. Nothing else on the
+             job may change in the same write. App: the tp-go handler in
+             app-04-spray-inventory.js. Dillon, 2026-09-22. */
+      function isEquipPick() {
+        return changed().hasOnly(['eqUsed', 'updatedAt'])
+          && onTask(resource.data, me())
+          && eqPickOk();
+      }
+
+      /* Also allowed inside a completion, because a phone that was offline
+         when the student pressed Continue sends both changes in one write
+         when it comes back. Without this, the finish would be refused too. */
+      function eqPickOk() {
+        return !changed().hasAny(['eqUsed'])
+          || request.resource.data.get('eqUsed', {})
+               .diff(resource.data.get('eqUsed', {})).affectedKeys().hasOnly([me()]);
       }
 
       /* --- assignment: the person on the job changes --- */
@@ -405,14 +427,14 @@ service cloud.firestore {
         && (str(request.resource.data.get('assignee', '')) == ''
             || canAssignTo(str(request.resource.data.get('assignee', ''))));
 
-      /* An update is one of four moves. Each is checked against the branch
+      /* An update is one of five moves. Each is checked against the branch
          of taskCan() that governs it, and the narrow moves may only touch
          the fields that move actually changes — so "I am claiming this"
          cannot quietly also rewrite the job. */
       allow update: if actor()
         && request.resource.data.id == resource.data.id
         && str(request.resource.data.get('createdBy', '')) == str(resource.data.get('createdBy', ''))
-        && (isClaim() || isCompletion() || isAssignment() || isEdit());
+        && (isClaim() || isCompletion() || isEquipPick() || isAssignment() || isEdit());
 
       allow delete: if actor() && canEdit(resource.data);
 

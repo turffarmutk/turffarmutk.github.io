@@ -903,7 +903,7 @@ document.getElementById('s-taskboard').addEventListener('click',function(e){
  var mv=e.target.closest('[data-move]'); if(mv){e.stopPropagation();moveTask(mv.getAttribute('data-id'),mv.getAttribute('data-move'));return;}
  var claim=e.target.closest('[data-claim]');
  if(claim){e.stopPropagation();var t=TASKS.find(function(x){return x.id===claim.getAttribute('data-claim');});if(t){t.assignee=SESSION.pid;toast('Claimed ✓');renderTasks();}return;}
- var st=e.target.closest('[data-start]'); if(st){var sid=st.getAttribute('data-start');var stt=TASKS.find(function(x){return x.id===sid;});if(stt&&worksOnMap(stt.type,stt.title))openTaskWork(sid);else openTask(sid);return;}
+ var st=e.target.closest('[data-start]'); if(st){startTask(st.getAttribute('data-start'));return;}
  /* SESSION.pid is a roster id, not a function. Calling it threw a TypeError
     out of this handler, so tapping any of your own to-do tasks on the board
     did nothing at all — the row swallowed the tap and never opened. */
@@ -930,12 +930,144 @@ document.getElementById('td-body').addEventListener('click',function(e){var p=e.
 document.getElementById('td-edit').addEventListener('click',function(){if(tdCur)openEditTask(tdCur);});
 /* ---- Undergrad task work mode (check plots off) ---- */
 var workTaskId=null;
-function openTaskWork(id){var t=TASKS.find(function(x){return x.id===id;});if(!t)return;if(!t.donePlots)t.donePlots=[];workTaskId=id;
+function openTaskWork(id,notesRead){var t=TASKS.find(function(x){return x.id===id;});if(!t)return;if(!t.donePlots)t.donePlots=[];workTaskId=id;
  /* Notes first when there are any — otherwise straight to the map. A boom
     spray always opens on the brief: the tank has to be mixed before anyone
-    drives anywhere, and the mix sheet lives there. */
- twBrief=!!(t.desc&&t.desc.trim())||(typeof sprayIsBoom==='function'&&sprayIsBoom(t));
+    drives anywhere, and the mix sheet lives there. notesRead is set when the
+    Start page has just shown them, so they are not shown twice running. */
+ twBrief=(!notesRead&&!!(t.desc&&t.desc.trim()))||(typeof sprayIsBoom==='function'&&sprayIsBoom(t));
  go('taskwork');}
+
+/* ===================== START: NOTES AND EQUIPMENT CHECKLIST =====================
+   What Start does, since 2026-09-22 (Dillon): before the map or the task
+   page, one page with the note Bill left when he assigned it, anything closed
+   on the ground, and a tile for each piece of equipment the job needs, grouped
+   by category. The student taps the machine they actually took in each group,
+   and Continue stays grey until every group has an answer.
+
+   The point is the record. "Rotary - Plots" lists three mowers; tapping one
+   says WHICH, and it lands on the task (eqUsed) where the Equipment screen
+   reads it -- see eqHolder(). A job with no note, no restrictions and no
+   equipment skips the page entirely, which is what Start did before.
+
+   Where the equipment list comes from: the job on the task list (TEMPLATES),
+   whose machines[] is edited from the task form's "Equipment needed" row. If
+   Bill pinned one machine when assigning (t.machine), that machine is the
+   only one offered in its category -- he made that choice on purpose. */
+function taskTemplateOf(t){
+  if(!t||typeof TEMPLATES==='undefined') return null;
+  if(t.tplId){ var a=TEMPLATES.find(function(x){return x.id===t.tplId;}); if(a) return a; }
+  return TEMPLATES.find(function(x){return x.name===t.title&&x.category===t.type;})||null;
+}
+function taskEquipNeeded(t){
+  var tpl=taskTemplateOf(t);
+  var ids=((tpl&&tpl.machines)||[]).slice();
+  if(t.machine&&ids.indexOf(t.machine)<0) ids.push(t.machine);
+  var list=ids.map(function(id){return EQUIP.find(function(e){return e.id===id;});})
+              .filter(function(m){return m&&m.active!==false;});
+  var groups=eqGroupByCat(list);
+  if(t.machine){
+    var pin=EQUIP.find(function(e){return e.id===t.machine;});
+    if(pin) groups.forEach(function(g){ if(g.cat===eqCatOf(pin)) g.items=[pin]; });
+  }
+  return groups;
+}
+function taskPrepWanted(t){
+  if(t.desc&&t.desc.trim()) return true;
+  if(taskEquipNeeded(t).length) return true;
+  return worksOnMap(t.type,t.title)&&twRestrictionLines(t).length>0;
+}
+var TP=null;   /* {id, pick:{cat: machine id | 'none'}} while the Start page is open */
+function startTask(id){
+  var t=TASKS.find(function(x){return x.id===id;}); if(!t) return;
+  if(!taskPrepWanted(t)){ taskGoOn(t,false); return; }
+  /* Coming back to a job already started: last time's picks are ticked
+     already, so it is one tap through -- or a tap to swap a machine. */
+  var mine=(t.eqUsed&&t.eqUsed[SESSION.pid])||[], pick={};
+  taskEquipNeeded(t).forEach(function(g){
+    g.items.forEach(function(m){ if(mine.indexOf(m.id)>=0) pick[g.cat]=m.id; });
+  });
+  TP={id:id,pick:pick};
+  go('taskprep');
+}
+function taskGoOn(t,notesRead){
+  if(worksOnMap(t.type,t.title)) openTaskWork(t.id,notesRead); else openTask(t.id);
+  /* Back from the job goes to the board, not to this page again. */
+  stack=stack.filter(function(x){return x!=='taskprep';});
+}
+function taskPrepMissing(t){
+  return taskEquipNeeded(t).filter(function(g){return !TP.pick[g.cat];}).length;
+}
+function renderTaskPrep(){
+  var el=document.getElementById('tp-body'); if(!el) return;
+  var t=TP&&TASKS.find(function(x){return x.id===TP.id;});
+  if(!t){ el.innerHTML='<div class="sec" style="text-align:center;margin-top:26px">This job is no longer on the board.</div>'; return; }
+  document.getElementById('tp-title').textContent=t.title;
+  var h='';
+  if(t.desc&&t.desc.trim()){
+    var by=t.createdBy?nameOf(t.createdBy):'';
+    h+='<div class="sec">Notes'+(by?' from '+esc(by):'')+'</div><div class="list"><div class="row"><div class="rt" style="font-weight:700;line-height:1.5;white-space:pre-wrap">'+esc(t.desc)+'</div></div></div>';
+  }
+  var res=worksOnMap(t.type,t.title)?twRestrictionLines(t):[];
+  if(res.length){
+    h+='<div class="sec">Closed on this job</div><div class="list">';
+    res.forEach(function(r){
+      h+='<div class="row" style="align-items:flex-start"><span class="tr-resic" style="background:'+r.c+'">'+esc(r.ab)+'</span>'
+       +'<div style="flex:1"><div class="rt">'+esc(r.plot)+' · '+esc(r.label)+'</div><div class="rs">'+esc(r.extent)+' · through '+trFmt(r.end)+'</div>'
+       +(r.note?'<div class="rs" style="margin-top:3px">'+esc(r.note)+'</div>':'')+'</div></div>';
+    });
+    h+='</div>';
+  }
+  var groups=taskEquipNeeded(t);
+  if(groups.length){
+    h+='<div class="sec" style="color:#2f3133;margin-top:16px">Equipment — tap what you are taking</div>';
+    groups.forEach(function(g){
+      h+='<div class="sec">'+esc(g.label)+(g.items.length>1?' · pick one':'')+'</div><div class="eqgrid">';
+      g.items.forEach(function(m){
+        var hd=eqHolder(m.id), mineHd=hd&&hd.pid===SESSION.pid&&hd.task.id===t.id;
+        var state=TP.pick[g.cat]===m.id?'on':(m.status==='down'?'down':((hd&&!mineHd)?'busy':'off'));
+        var sub=m.status==='down'?'Out of service':((hd&&!mineHd)?'With '+(nameOf(hd.pid)||hd.pid):(m.location||''));
+        h+=eqTileHtml(m,state,sub,'data-tpeq="'+esc(m.id)+'" data-tpcat="'+g.cat+'"');
+      });
+      /* A way through when every machine in a group is down or taken, or the
+         job genuinely goes without one today. It is a tap of its own, so it
+         is a decision somebody made rather than a group they skipped. */
+      h+='<div class="eqt eqt-none tap'+(TP.pick[g.cat]==='none'?' eqt-on':'')+'" data-tpeq="none" data-tpcat="'+g.cat+'">Not taking one</div>';
+      h+='</div>';
+    });
+  }
+  el.innerHTML=h;
+  var left=taskPrepMissing(t), go_=document.getElementById('tp-go');
+  go_.classList.toggle('off',left>0);
+  go_.textContent=left>0?(left===groups.length?'Tap your equipment to continue':left+' more to tap'):'Continue ›';
+}
+document.getElementById('tp-body').addEventListener('click',function(e){
+  var tl=e.target.closest('[data-tpeq]'); if(!tl||!TP) return;
+  var id=tl.getAttribute('data-tpeq'), cat=tl.getAttribute('data-tpcat');
+  if(id!=='none'){
+    var m=EQUIP.find(function(x){return x.id===id;}); if(!m) return;
+    if(m.status==='down'){ toast(m.name+' is out of service'); return; }
+    var hd=eqHolder(id);
+    if(hd&&!(hd.pid===SESSION.pid&&hd.task.id===TP.id)&&TP.pick[cat]!==id){
+      if(!confirm(m.name+' is down as with '+(nameOf(hd.pid)||hd.pid)+' on “'+hd.task.title+'”.\n\nTake it anyway?')) return;
+    }
+  }
+  TP.pick[cat]=(TP.pick[cat]===id)?undefined:id;
+  if(TP.pick[cat]===undefined) delete TP.pick[cat];
+  renderTaskPrep();
+});
+document.getElementById('tp-go').addEventListener('click',function(){
+  var t=TP&&TASKS.find(function(x){return x.id===TP.id;}); if(!t) return;
+  if(taskPrepMissing(t)){ toast('Tap one in each group first'); return; }
+  /* Only this person's own entry is touched -- a job shared by two students
+     keeps the other one's mower, and the database refuses a write that
+     changes anybody else's (see eqPickOk() in firestore.rules). */
+  var ids=Object.keys(TP.pick).map(function(k){return TP.pick[k];}).filter(function(v){return v&&v!=='none';});
+  var had=(t.eqUsed&&t.eqUsed[SESSION.pid])||null;
+  if(ids.length){ t.eqUsed=t.eqUsed||{}; t.eqUsed[SESSION.pid]=ids; }
+  else if(had){ delete t.eqUsed[SESSION.pid]; }
+  taskGoOn(t,true);
+});
 /* Plots a task covers -- the ground THIS assignment is on, which is not the
    same question the plot picker asks.
 
@@ -983,9 +1115,12 @@ function renderTaskBrief(t){
    +'<div style="flex:1"><div class="rt">'+esc(t.title)+'</div>'
    +'<div class="rs">'+esc(t.area||'—')+(dueLabel(t)?(' · '+esc(dueLabel(t))):'')+'</div></div>'
    +'</div></div>';
-  var mach=(t.machine&&typeof EQUIP!=='undefined')?EQUIP.filter(function(e){return e.id===t.machine;})[0]:null;
-  if(mach) h+='<div class="sec">Equipment</div><div class="list"><div class="row"><div style="flex:1">'
-   +'<div class="rt">'+esc(mach.name)+'</div><div class="rs">'+esc(mach.location||'')+'</div></div></div></div>';
+  /* What this person ticked on the Start page, or Bill's pinned machine for
+     a job started before that page existed. */
+  var took=(t.eqUsed&&t.eqUsed[SESSION.pid])||(t.machine?[t.machine]:[]);
+  var machs=(typeof EQUIP!=='undefined')?took.map(function(id){return EQUIP.find(function(e){return e.id===id;});}).filter(Boolean):[];
+  if(machs.length) h+='<div class="sec">Equipment</div><div class="list">'+machs.map(function(mach){return '<div class="row"><div style="flex:1">'
+   +'<div class="rt">'+esc(mach.name)+'</div><div class="rs">'+esc(eqCatLabel(eqCatOf(mach)))+(mach.location?' · '+esc(mach.location):'')+'</div></div></div>';}).join('')+'</div>';
   if(t.desc) h+='<div class="sec">Notes</div><div class="list"><div class="row"><div class="rt" style="font-weight:700;line-height:1.5;white-space:pre-wrap">'+esc(t.desc)+'</div></div></div>';
   var res=twRestrictionLines(t);
   if(res.length){
@@ -2948,6 +3083,95 @@ function eqStat(s){
  return {lbl:'Available',dot:'#2f9e4f',bg:'#eafaef',fg:'#2f7d3a'};
 }
 function eqTypeLabel(t){return (t&&(''+t).trim())||'Other';}
+/* ---- categories ----
+   What the Start checklist groups by: one row of tiles per category, and the
+   student taps the one machine they took from each. Dillon, 2026-09-22.
+
+   A machine's category is its own `cat` field once somebody has picked one on
+   the edit screen. Until then it is GUESSED from the free-text type, at the
+   moment it is read -- never written back. Writing the guess onto all sixty
+   machines would be sixty database writes from every phone that opened the
+   app, for a value nobody chose. The list itself stays in the code: adding a
+   category is rare, and every screen that groups by it would need a look. */
+var EQCATS=[['mower','Mowers'],['sprayer','Sprayers'],['spreader','Spreaders'],['tractor','Tractors'],
+            ['implement','Implements'],['cart','Carts & utility'],['trailer','Trailers'],
+            ['tool','Tools'],['painter','Painters'],['shop','Shop'],['other','Other']];
+/* Order matters: an aerifier is "Pedestrian Trafficker (Aerfier)" and a
+   fraise mower says "Mower", so implements are tested before mowers. */
+function eqCatGuess(type){
+  var s=String(type||'').toLowerCase();
+  if(/aer[a-z]*f|fraise|bleck|blec|sod cut|seeder|traf+icker(?!.*mower)|roller/.test(s)) return 'implement';
+  if(/spreader|top ?dress/.test(s)) return 'spreader';
+  if(/spray/.test(s)) return 'sprayer';
+  if(/paint/.test(s)) return 'painter';
+  if(/grind/.test(s)) return 'shop';
+  if(/mower|reel|rotary/.test(s)) return 'mower';
+  if(/tractor/.test(s)) return 'tractor';
+  if(/trailer/.test(s)) return 'trailer';
+  if(/cart|utility|gator|mule|loader|forklift|truck/.test(s)) return 'cart';
+  if(/weed|edger|blower|brush|broom|shovel|rake|tool|generator/.test(s)) return 'tool';
+  return 'other';
+}
+function eqCatOf(m){
+  var c=m&&m.cat;
+  if(c&&EQCATS.some(function(x){return x[0]===c;})) return c;
+  return eqCatGuess(m&&m.type);
+}
+function eqCatLabel(c){ var x=EQCATS.find(function(y){return y[0]===c;}); return x?x[1]:'Other'; }
+/* Machines grouped by category, in EQCATS order, empty groups dropped. */
+function eqGroupByCat(list){
+  return EQCATS.map(function(c){
+    return {cat:c[0],label:c[1],items:list.filter(function(m){return eqCatOf(m)===c[0];})};
+  }).filter(function(g){return g.items.length;});
+}
+/* ---- who has it ----
+   Worked out from the tasks, not stored on the machine. A student ticking a
+   mower on the Start checklist writes it onto THEIR TASK (eqUsed, keyed by
+   person), and the mower is "with them" for as long as that task is open.
+   Finishing or deleting the task hands it back with nothing else to do.
+
+   Why not set status/holder on the machine instead: undergraduates may not
+   change machine records (canEditMachine() in firestore.rules), and two
+   records that must agree -- the task and the machine -- are two records that
+   can disagree, e.g. a phone that dies mid-job leaving a mower "out" forever.
+   The task already has to be right; this reads it. */
+function eqHolder(id){
+  var list=(typeof TASKS!=='undefined')?TASKS:[];
+  for(var i=0;i<list.length;i++){
+    var t=list[i]; if(!t||t.status!=='todo'||!t.eqUsed) continue;
+    for(var pid in t.eqUsed){
+      if((t.eqUsed[pid]||[]).indexOf(id)>=0) return {pid:pid,task:t};
+    }
+  }
+  return null;
+}
+/* The status every screen shows. Down wins; then a checklist pick; then the
+   old hand-set in_use, which nothing writes today but an old record might. */
+function eqStatusOf(m){
+  if(!m) return 'available';
+  if(m.status==='down') return 'down';
+  if(eqHolder(m.id)||m.status==='in_use') return 'in_use';
+  return 'available';
+}
+function eqHolderText(m){
+  var h=eqHolder(m.id);
+  if(h) return (nameOf(h.pid)||h.pid)+' · '+(h.task.title||'');
+  return (m.holder?(nameOf(m.holder)||m.holder):'—')+(m.task?' · '+m.task:'');
+}
+/* One equipment tile. Built so a photo drops straight in: when the machine
+   has one (the Equipment screen's "Tap to add a photo") it fills the top of
+   the tile; until then the tile shows the category's initial instead, the
+   same size, so nothing moves the day photos arrive.
+   state: 'on' picked by me · 'off' free · 'busy' with somebody else · 'down'. */
+function eqTileHtml(m,state,sub,attrs){
+  var ph=m.photo
+    ? '<div class="eqt-ph" style="background-image:url(\''+esc(m.photo)+'\')"></div>'
+    : '<div class="eqt-ph eqt-noph">'+esc(eqCatLabel(eqCatOf(m)).charAt(0))+'</div>';
+  return '<div class="eqt eqt-'+state+(state==='down'?'':' tap')+'" '+(attrs||'')+'>'
+    +ph+'<div class="eqt-nm">'+esc(m.name)+'</div>'
+    +(sub?'<div class="eqt-sub">'+esc(sub)+'</div>':'')
+    +'<span class="eqt-ck">✓</span></div>';
+}
 function eqActive(id){var m=EQUIP.find(function(x){return x.id===id;});return m&&m.active;}
 /* ---- shell / tabs ---- */
 function eqSyncSearch(){var s=document.getElementById('eq-search');if(s)s.style.display=(eqTab==='home')?'block':'none';}
@@ -2959,8 +3183,8 @@ function equipEnter(){
 function renderEquip(){ if(eqTab==='status')renderEquipStatus(); else if(eqTab==='maint')renderEquipMaint(); else renderEquipHome(); eqSyncActionbar(); }
 function eqSyncActionbar(){var ab=document.getElementById('eq-actionbar');if(ab)ab.style.display=(eqTab==='maint'&&eqCanMaint())?'':'none';}
 function equipRow(m){
- var st=eqStat(m.status);
- var sub = m.status==='in_use' ? (esc(m.holder||'—')+(m.task?' · '+esc(m.task):'')) : (m.status==='down' ? (m.notes?esc(m.notes):'Out of service') : (m.notes?esc(m.notes):'Ready'));
+ var ms=eqStatusOf(m), st=eqStat(ms);
+ var sub = ms==='in_use' ? esc(eqHolderText(m)) : (ms==='down' ? (m.notes?esc(m.notes):'Out of service') : (m.notes?esc(m.notes):'Ready'));
  var flag = (m.flagged&&m.status!=='down') ? '<span class="pill" style="background:#fef1dc;color:#9a5b00;margin-right:4px">⚠ Issue</span>' : '';
  return '<div class="row tap" data-eq="'+m.id+'"><span class="dot" style="background:'+st.dot+'"></span><div style="flex:1;min-width:0"><div class="rt" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(m.name)+'</div><div class="rs">'+eqTypeLabel(m.type)+' · '+sub+'</div></div>'+flag+'<span class="pill" style="background:'+st.bg+';color:'+st.fg+'">'+st.lbl+'</span></div>';
 }
@@ -2982,7 +3206,9 @@ function renderEquipHome(){
  }
  var q=(eqSearch||'').trim().toLowerCase();
  var list=EQUIP.filter(function(m){return m.active && (!q || m.name.toLowerCase().indexOf(q)>=0 || eqTypeLabel(m.type).toLowerCase().indexOf(q)>=0 || (m.make&&m.make.toLowerCase().indexOf(q)>=0) || (m.model&&m.model.toLowerCase().indexOf(q)>=0));});
- var rl = list.length ? '<div class="list">'+list.map(equipRowPlain).join('')+'</div>' : '<div class="sec" style="text-align:center;margin-top:20px">No machines match</div>';
+ /* Grouped by category, the same groups the Start checklist uses, so a
+    machine filed under the wrong one is easy to spot here and fix. */
+ var rl = list.length ? eqGroupByCat(list).map(function(g){return '<div class="sec" style="margin:12px 18px 6px">'+esc(g.label)+' · '+g.items.length+'</div><div class="list">'+g.items.map(equipRowPlain).join('')+'</div>';}).join('') : '<div class="sec" style="text-align:center;margin-top:20px">No machines match</div>';
  body.innerHTML=mh+'<div class="invhead">All equipment · '+list.length+'</div>'+rl;
 }
 function renderEquipStatus(){
@@ -2990,7 +3216,7 @@ function renderEquipStatus(){
  var list=EQUIP.filter(function(m){return m.active;});
  var html='';
  [['down','Down'],['in_use','In use'],['available','Available']].forEach(function(g){
-   var grp=list.filter(function(m){return m.status===g[0];});
+   var grp=list.filter(function(m){return eqStatusOf(m)===g[0];});
    if(!grp.length)return;
    html+='<div class="invhead">'+g[1]+' · '+grp.length+'</div><div class="list">'+grp.map(equipRow).join('')+'</div>';
  });
@@ -3042,7 +3268,7 @@ function openMachine(id){
  var m=EQUIP.find(function(x){return x.id===id;}); if(!m)return;
  window.eqCur=id;
  var can=eqCanEdit();
- var st=eqStat(m.status);
+ var st=eqStat(eqStatusOf(m));
  var photo = m.photo
    ? '<div style="position:relative">'
      +'<div'+(can?' class="tap" data-eqphoto="1"':'')+' style="height:150px;background:#000;background-image:url(\''+esc(m.photo)+'\');background-size:cover;background-position:center"></div>'
@@ -3062,7 +3288,7 @@ function openMachine(id){
  if(m.oilFilter)rows+=fldRowI('Oil filter', esc(m.oilFilter));
  var jobTypes=[]; (typeof TASKS!=='undefined'?TASKS:[]).forEach(function(tk){ if(tk.machine===id&&tk.type&&tk.type!=='Equipment repair'&&jobTypes.indexOf(tk.type)<0)jobTypes.push(tk.type); });
  rows+=fldRowI('Runs jobs', jobTypes.length?jobTypes.map(esc).join(', '):'— (assign this machine on a task)');
- if(m.status==='in_use')rows+=fldRowI('Checked out to', esc(m.holder||'—')+(m.task?' · '+esc(m.task):''));
+ if(eqStatusOf(m)==='in_use')rows+=fldRowI('Checked out to', esc(eqHolderText(m)));
  rows+=fldRowI('Notes', m.notes?esc(m.notes):'—', true);
  var manualRow = m.manualUrl ? '<div class="list"><a class="row" href="'+esc(m.manualUrl)+'" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><span class="dot" style="background:#2456b8"></span><div style="flex:1;min-width:0"><div class="rt">📖 Owner&#39;s / maintenance manual</div><div class="rs" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(m.manualUrl)+'</div></div><span style="color:#c9ccd1;font-size:16px">↗</span></a></div>' : '';
  var probs=EQPROBLEMS.filter(function(p){return p.eq===id&&p.status==='open';});
@@ -3266,7 +3492,9 @@ function renderEqEdit(){
  document.getElementById('eqe-body').innerHTML=
    '<div class="sec" style="margin:12px 18px 7px">Machine</div><div class="list">'
   +'<div class="fld"><span class="fl">Name *</span><input class="inv-in" id="eqe-name" placeholder="e.g. Toro 3" style="max-width:170px"></div>'
+  +'<div class="fld"><span class="fl">Category</span><select class="inv-sel" id="eqe-cat" style="max-width:185px"><option value="" id="eqe-cat-auto">Automatic</option>'+EQCATS.map(function(c){return '<option value="'+c[0]+'">'+esc(c[1])+'</option>';}).join('')+'</select></div>'
   +'<div class="fld" style="border-bottom:none"><span class="fl">Type</span><input class="inv-in" id="eqe-type" placeholder="e.g. Fairway Reel Mower" style="max-width:185px"></div></div>'
+  +'<div style="margin:6px 18px 0;font:600 11px \'Public Sans\';color:var(--muted);line-height:1.45">Category is the group this shows under on the Start checklist. Hand tools (shovels, rakes, a paint gun) can be added here too — only the name is needed.</div>'
   +'<div class="sec" style="margin:14px 18px 7px">Specs</div><div class="list">'
   +eqeInput('Make','eqe-make','e.g. Toro')
   +eqeInput('Model','eqe-model','e.g. Greensmaster 3150')
@@ -3285,13 +3513,19 @@ function renderEqEdit(){
   +'<div class="sec" style="margin:14px 18px 7px">Notes</div><div class="list"><div class="fld" style="border-bottom:none"><span class="fl">Notes</span><input class="inv-in" id="eqe-notes" placeholder="—" style="max-width:160px"></div></div>';
  if(ed){
    var g=function(x){return document.getElementById('eqe-'+x);};
-   g('name').value=ed.name; g('type').value=ed.type;
+   g('name').value=ed.name; g('type').value=ed.type; g('cat').value=ed.cat||'';
    g('reels').value=(ed.reels==null?'':ed.reels); g('cassettes').value=(ed.cassettes==null?'':ed.cassettes);
    g('make').value=ed.make||''; g('model').value=ed.model||''; g('year').value=ed.year||'';
    g('fuel').value=ed.fuel||''; g('hours').value=(ed.hours==null?'':ed.hours); g('location').value=ed.location||'';
    g('oiltype').value=ed.oilType||''; g('oilfilter').value=ed.oilFilter||'';
    g('manual').value=ed.manualUrl||''; g('photo').value=ed.photo||''; g('notes').value=ed.notes||'';
  }
+ /* "Automatic" means "go by the type", and says which group that is, so the
+    choice is never a mystery. Left on Automatic, nothing is stored and the
+    machine follows its type if that is ever corrected. */
+ var ty=document.getElementById('eqe-type');
+ var autoLbl=function(){var o=document.getElementById('eqe-cat-auto');if(o)o.textContent='Automatic — '+eqCatLabel(eqCatGuess(ty.value));};
+ autoLbl(); ty.addEventListener('input',autoLbl);
 }
 document.getElementById('s-eqedit').addEventListener('click',function(e){
  var c=e.target.closest('.eqjob'); if(!c)return;
@@ -3305,8 +3539,9 @@ document.getElementById('eqe-save').addEventListener('click',function(){
  var hrs=g('hours').value.trim()===''?null:(parseInt(g('hours').value)||0);
  var rl=g('reels').value.trim(); rl=(rl===''?null:(isNaN(+rl)?rl:+rl));
  var cs=g('cassettes').value.trim(); cs=(cs===''?null:(isNaN(+cs)?cs:+cs));
- var vals={name:nm,type:g('type').value.trim(),make:g('make').value.trim(),model:g('model').value.trim(),year:yr,fuel:g('fuel').value.trim(),hours:hrs,reels:rl,cassettes:cs,location:g('location').value.trim(),oilType:g('oiltype').value.trim(),oilFilter:g('oilfilter').value.trim(),manualUrl:g('manual').value.trim(),photo:g('photo').value.trim()||null,notes:g('notes').value.trim()};
+ var vals={name:nm,cat:g('cat').value||null,type:g('type').value.trim(),make:g('make').value.trim(),model:g('model').value.trim(),year:yr,fuel:g('fuel').value.trim(),hours:hrs,reels:rl,cassettes:cs,location:g('location').value.trim(),oilType:g('oiltype').value.trim(),oilFilter:g('oilfilter').value.trim(),manualUrl:g('manual').value.trim(),photo:g('photo').value.trim()||null,notes:g('notes').value.trim()};
  var ed=window.eqEditId?EQUIP.find(function(x){return x.id===window.eqEditId;}):null;
+ if(vals.cat==null&&(!ed||!('cat' in ed))) delete vals.cat;   /* no empty field on records that never had one */
  if(ed){Object.keys(vals).forEach(function(k){ed[k]=vals[k];});toast('Saved changes ✓');window.eqEditId=null;stack=stack.filter(function(x){return x!=='eqedit';});openMachine(ed.id);return;}
  var id=newId('e');
  EQUIP.push(Object.assign({id:id,status:'available',holder:null,task:null,flagged:false,active:true,jobs:[]},vals));

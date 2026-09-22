@@ -203,6 +203,10 @@ function syncForm(){
  var selfRow=document.getElementById('tn-selfrow');
  if(selfRow)selfRow.style.display=(asg&&FORM.scope==='self')?'':'none';
  var mrow=document.getElementById('tn-machine-row'); if(mrow)mrow.style.display=wantsMachineRow()?'':'none';
+ /* Equipment belongs to the JOB on the task list, so the row is only on that
+    form -- not on a request or an assignment, which take it from the job. */
+ var erow=document.getElementById('tn-equip-row');
+ if(erow){ erow.style.display=(FORM.mode==='template')?'':'none'; document.getElementById('tn-equip').textContent=tnEquipLabel(); }
  var enote=document.getElementById('tn-eqnote');
  if(enote){enote.style.display=FORM.eqNote?'':'none';enote.textContent=FORM.eqNote?('Equipment on file: '+FORM.eqNote+' — not in the equipment roster yet.'):'';}
  var wrow=document.getElementById('tn-whenrow'), wsel=document.getElementById('tn-when');
@@ -309,6 +313,40 @@ document.getElementById('tn-repeat').addEventListener('change',function(e){FORM.
 document.getElementById('tn-freq').addEventListener('click',function(e){var c=e.target.closest('[data-freq]');if(!c)return;FORM.freq=+c.getAttribute('data-freq');syncForm();});
 document.getElementById('tn-months').addEventListener('click',function(e){var c=e.target.closest('[data-month]');if(!c)return;var m=c.getAttribute('data-month');var i=FORM.months.indexOf(m);if(i>=0)FORM.months.splice(i,1);else FORM.months.push(m);syncForm();});
 document.getElementById('tn-plots-row').addEventListener('click',function(){openPlotPick();});
+/* ---- Equipment needed: the list behind the Start checklist ----
+   Every active machine as a tile, grouped by category; tap to add it to this
+   job, tap again to take it off. Picking two rotary mowers means "either of
+   these", picking a tractor and an aerifier means "both" -- the categories
+   make that distinction, which is why nobody has to spell it out here. */
+function tnEquipLabel(){
+  var ms=(FORM.machines||[]).map(function(id){return EQUIP.find(function(e){return e.id===id;});}).filter(Boolean);
+  if(!ms.length) return 'None ›';
+  if(ms.length<=2) return ms.map(function(m){return m.name;}).join(', ')+' ›';
+  return ms.length+' items ›';
+}
+document.getElementById('tn-equip-row').addEventListener('click',function(){ go('eqpick'); });
+function renderEqPick(){
+  var el=document.getElementById('ep-body'); if(!el) return;
+  var sel=FORM.machines||[];
+  var h='<div style="margin:12px 18px 4px;font:600 11.5px \'Public Sans\';color:var(--muted);line-height:1.45">Tap everything this job could use. Several in one group means “any one of these” — the student taps the one they took when they press Start.</div>';
+  eqGroupByCat(EQUIP.filter(function(m){return m.active!==false;})).forEach(function(g){
+    var n=g.items.filter(function(m){return sel.indexOf(m.id)>=0;}).length;
+    h+='<div class="sec">'+esc(g.label)+(n?' · '+n+' picked':'')+'</div><div class="eqgrid">'
+      +g.items.map(function(m){return eqTileHtml(m,sel.indexOf(m.id)>=0?'on':'off',m.location||'','data-epeq="'+esc(m.id)+'"');}).join('')
+      +'</div>';
+  });
+  el.innerHTML=h;
+}
+document.getElementById('ep-body').addEventListener('click',function(e){
+  var tl=e.target.closest('[data-epeq]'); if(!tl) return;
+  var id=tl.getAttribute('data-epeq');
+  FORM.machines=(FORM.machines||[]).slice();
+  var i=FORM.machines.indexOf(id); if(i>=0) FORM.machines.splice(i,1); else FORM.machines.push(id);
+  /* The default machine has to be one of the job's own. */
+  if(FORM.machine&&FORM.machines.indexOf(FORM.machine)<0) FORM.machine='';
+  var sc=document.getElementById('ep-body').scrollTop; renderEqPick(); document.getElementById('ep-body').scrollTop=sc;
+});
+document.getElementById('ep-done').addEventListener('click',function(){ syncForm(); back(); });
 document.getElementById('tn-target').addEventListener('click',function(e){var p=e.target.closest('[data-person]');if(!p)return;FORM.target=p.getAttribute('data-person');document.querySelectorAll('#tn-target .ppill').forEach(function(x){x.classList.remove('on');});p.classList.add('on');});
 document.getElementById('tn-save').addEventListener('click',saveForm);
 document.getElementById('tn-del').addEventListener('click',function(){
@@ -791,6 +829,9 @@ function pushAssign(o){
  var dueOrd=o.dueOrd||asTodayOrd();
  var base={createdBy:SESSION.pid,id:newId('t'),title:o.title,area:o.area,plots:o.plots,badge:o.badge||null,type:o.type,dueAt:isoFromOrd(dueOrd),dueOrd:dueOrd,repeat:o.repeat||'None',status:'todo',desc:o.note||''};
  if(o.mow&&o.mow.machine) base.machine=o.mow.machine;
+ /* Which job on the task list this came from, so Start can find the job's
+    equipment even if the task is later renamed -- see taskTemplateOf(). */
+ if(o.tplId) base.tplId=o.tplId;
  /* Whatever Bill wrote into the tank rides out on the job. The nozzle and the
     area are left for the field — the nozzle is whatever is on the rig that
     morning, and the area fills itself in from the plots. */
@@ -803,7 +844,7 @@ function pushAssign(o){
  else { base.kind='task'; base.assignee=(asPerson===OPEN?null:(asPerson===SELF?SESSION.pid:asPerson)); }
  TASKS.push(base);
 }
-function commitTpl(id,note,plots,dueOrd,mow){var t=TEMPLATES.find(function(x){return x.id===id;});if(!t)return;var pl=(plots&&plots.length?plots:(t.plots||[])).slice();pushAssign({title:t.name,area:jobIsTrialDots(t.category,t.name)?'All active trials':(pl.length?areaLabel(pl):'—'),plots:pl,type:t.category,repeat:t.repeat,badge:(t.repeat&&t.repeat!=='None')?{t:'↻ '+asRepeatLabel(t),bg:'#eef1f4',fg:'#7b828d'}:null,note:note,dueOrd:dueOrd,mow:mow});}
+function commitTpl(id,note,plots,dueOrd,mow){var t=TEMPLATES.find(function(x){return x.id===id;});if(!t)return;var pl=(plots&&plots.length?plots:(t.plots||[])).slice();pushAssign({tplId:t.id,title:t.name,area:jobIsTrialDots(t.category,t.name)?'All active trials':(pl.length?areaLabel(pl):'—'),plots:pl,type:t.category,repeat:t.repeat,badge:(t.repeat&&t.repeat!=='None')?{t:'↻ '+asRepeatLabel(t),bg:'#eef1f4',fg:'#7b828d'}:null,note:note,dueOrd:dueOrd,mow:mow});}
 function commitTask(id,note,plots,dueOrd,mow){var t=TASKS.find(function(x){return x.id===id;});if(!t)return;var pl=(plots&&plots.length?plots:parsePlots(t)).slice();pushAssign({title:t.title,area:pl.length?areaLabel(pl):t.area,plots:pl,type:t.type,repeat:'None',badge:null,note:note||t.desc||'',dueOrd:dueOrd,mow:mow});}
 function commitEv(id,note,plots,dueOrd,mow){var e=EVENTS.find(function(x){return x.id===id;});if(!e)return;var pl=(plots&&plots.length?plots:parsePlots({area:e.title})).slice();pushAssign({title:e.title,area:pl.length?areaLabel(pl):(e.sub||'Spray'),plots:pl,type:'Spray',repeat:'None',badge:{t:'From calendar',bg:'#e7f1fb',fg:'#1f6fb0'},note:note||e.sub||'',dueOrd:dueOrd,mow:mow});}
 function saveAssignments(){

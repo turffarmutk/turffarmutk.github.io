@@ -551,12 +551,12 @@ function taskPaintSummary(t){
   if(!p||!(p.cans>0||p.item||p.color)) return null;
   var it=p.item?INVENTORY.find(function(x){return x.id===p.item;}):null;
   var m=paintTypeMeta(p.type), word=(m&&m.word)||'can';
-  /* The product still on the shelf wins over the colour stored on the job:
-     if Bill corrects a paint's colour on the Inventory screen, a job finished
+  /* The product still on the shelf wins over the color stored on the job:
+     if Bill corrects a paint's color on the Inventory screen, a job finished
      last week should read the corrected one rather than keep the old word. */
   var name=it?paintFullName(it):(p.color?(p.color+' paint'):'Marking paint');
   /* A liquid job carries no count, on purpose — see PAINT_TYPES. It still has
-     a colour worth writing down, so it says what it can. */
+     a color worth writing down, so it says what it can. */
   var text=(p.cans>0)?(p.cans+' '+word+(p.cans===1?'':'s'))
                      :((m?m.label:'Paint')+' · amount not recorded');
   return {name:name, text:text};
@@ -940,7 +940,7 @@ function nowTime(){var d=new Date(),h=d.getHours(),m=d.getMinutes();return (h%12
    in. The student who did the job is the one who knows what went, so the
    finish sheet asks them, and the answer comes off the shelf.
 
-   THE SHEET ASKS THREE THINGS: the TYPE (spray or liquid), the COLOUR, and
+   THE SHEET ASKS THREE THINGS: the TYPE (spray or liquid), the COLOR, and
    HOW MANY CANS.
 
    WHOLE CANS ONLY, and a dropdown rather than a typed box on purpose: half a
@@ -950,11 +950,11 @@ function nowTime(){var d=new Date(),h=d.getHours(),m=d.getMinutes();return (h%12
 
    THE PAINT ITSELF IS NOT NAMED HERE, and that is the point. It is whatever
    products sit in the Paint · Cans (or Paint · Liquid) category of the
-   inventory, which Bill adds on the Inventory screen -- one item per colour,
+   inventory, which Bill adds on the Inventory screen -- one item per color,
    each with its own count, so the Inventory screen can say you are out of
-   blue while there is still orange. The COLOUR dropdown on this sheet IS the
+   blue while there is still orange. The COLOR dropdown on this sheet IS the
    product list, labelled by each product's own `color` field (set on the Add
-   item form). A new colour in 2030 is one item added on a phone; this file
+   item form). A new color in 2030 is one item added on a phone; this file
    never needs touching for it.
 
    None set up yet and the job still finishes -- it says plainly that nothing
@@ -965,7 +965,7 @@ var PAINT_MAX_CANS=12;      /* where the dropdown stops — Dillon, 2026-09-23 *
    `count` is what a student is asked for. Liquid has none yet ON PURPOSE:
    nobody has decided whether a liquid job is measured in whole jugs or in
    gallons, and guessing would put a wrong number on the farm's records every
-   time. Until Dillon says, picking Liquid records the type and the colour,
+   time. Until Dillon says, picking Liquid records the type and the color,
    asks for no amount, and takes nothing off the shelf -- and says so on the
    sheet. Give it a `count` of 'container' the day that question is answered
    and the rest of this works unchanged. */
@@ -986,16 +986,16 @@ function taskPaintType(t){
 }
 function taskAsksPaint(t){ return !!taskPaintType(t); }
 /* Every paint of one kind, and what to call each one on the sheet. A product
-   with no colour set falls back to its name, so an item added before the
-   colour box existed still works and still comes off the shelf. */
+   with no color set falls back to its name, so an item added before the
+   color box existed still works and still comes off the shelf. */
 function paintItems(type){
   var m=paintTypeMeta(type); if(!m) return [];
   try{ return INVENTORY.filter(function(it){ return it&&it.cat===m.cat; }); }catch(e){ return []; }
 }
 function paintColorOf(it){ return ((it&&it.color)||'').trim(); }
 function paintLabel(it){ return paintColorOf(it)||((it&&it.name)||'Paint'); }
-/* Name and colour together, for the Field Log and the task's own screen. The
-   colour is left off when the product's name already says it, so a paint Bill
+/* Name and color together, for the Field Log and the task's own screen. The
+   color is left off when the product's name already says it, so a paint Bill
    named "Blue Marking Paint" does not read as "Blue Marking Paint · Blue". */
 function paintFullName(it){
   var n=(it&&it.name)||'Paint', c=paintColorOf(it);
@@ -1010,7 +1010,7 @@ function paintFullName(it){
 function paintCanAmount(it,cans){ return (+cans||0)*(+(it&&it.csize)||1); }
 
 /* What the sheet's paint answers are right now. Kept here rather than read
-   back off the dropdowns, because changing the type rebuilds the colour list
+   back off the dropdowns, because changing the type rebuilds the color list
    underneath -- reading the DOM would lose the answer mid-rebuild. */
 var DSPAINT=null;    /* {type, item, cans} while the finish sheet is open */
 function donePaintStart(t){
@@ -1031,7 +1031,7 @@ function donePaintAutoItem(){
 function donePaintRead(t){
   if(!taskAsksPaint(t)||!DSPAINT) return {ok:true,val:null};
   var m=paintTypeMeta(DSPAINT.type), list=paintItems(DSPAINT.type);
-  if(list.length&&!DSPAINT.item) return {ok:false,why:'Pick the colour you used'};
+  if(list.length&&!DSPAINT.item) return {ok:false,why:'Pick the color you used'};
   var val={type:DSPAINT.type};
   var it=DSPAINT.item?INVENTORY.find(function(x){return x.id===DSPAINT.item;}):null;
   if(it){ val.item=it.id; if(paintColorOf(it)) val.color=paintColorOf(it); }
@@ -1053,7 +1053,7 @@ function donePaintHtml(t){
        return '<option value="'+p.k+'"'+(p.k===DSPAINT.type?' selected':'')+'>'+esc(p.label)+'</option>';
      }).join('')+'</select>';
   if(list.length){
-    h+='<select class="ds-sel" id="ds-paint-color"><option value="">Which colour?</option>'
+    h+='<select class="ds-sel" id="ds-paint-color"><option value="">Which color?</option>'
       +list.map(function(it){
          return '<option value="'+esc(it.id)+'"'+(it.id===DSPAINT.item?' selected':'')+'>'
            +esc(paintLabel(it))+' · '+esc(fmt(invQty(it))+' '+it.unit)+' on hand</option>';
@@ -1072,11 +1072,11 @@ function donePaintHintHtml(m,list){
   if(!list.length)
     return 'No '+esc((m&&m.label||'paint').toLowerCase())+' paint is set up on the Inventory screen yet, so nothing comes off the shelf. What you pick here still goes on the job and the Field Log.';
   if(!m||!m.count)
-    return 'Liquid paint is not counted in the app yet, so nothing comes off the shelf — tell Bill how much you used. The colour still goes on the job and the Field Log.';
+    return 'Liquid paint is not counted in the app yet, so nothing comes off the shelf — tell Bill how much you used. The color still goes on the job and the Field Log.';
   return 'Whole '+esc(m.word)+'s only — round to the nearest '+esc(m.word)+'.';
 }
 /* A change of TYPE rebuilds the block, because it is a different shelf with
-   different colours on it. A change of colour or count only moves the button,
+   different colors on it. A change of color or count only moves the button,
    so the sheet does not jump under somebody's thumb. */
 function donePaintChange(el){
   if(!DSPAINT||!el||!el.id) return;
@@ -2124,8 +2124,8 @@ var CAT=[
  {k:'misc',      label:'Miscellaneous',         res:null}
 ];
 function catMeta(k){return CAT.find(function(c){return c.k===k;})||{k:k,label:k,emoji:'📦',res:null};}
-/* The two categories that carry a colour. A paint is added once PER COLOUR so
-   each colour keeps its own count — see the paint block over openDoneSheet(). */
+/* The two categories that carry a color. A paint is added once PER COLOR so
+   each color keeps its own count — see the paint block over openDoneSheet(). */
 function invIsPaintCat(k){ return k==='paint_can'||k==='paint_liq'; }
 var INVENTORY=[
  /* Built by tools/build-inventory.py from
@@ -3014,8 +3014,8 @@ function renderInvAlert(){
 function invRow(it){
  var low=isLow(it);
  var pill=low?'<span class="pill lowpill">Low</span>':'';
- /* A paint is stocked one item PER COLOUR, so three rows can all be called
-    "Marking Paint" and the list is useless without the colour on it. */
+ /* A paint is stocked one item PER COLOR, so three rows can all be called
+    "Marking Paint" and the list is useless without the color on it. */
  return '<div class="row tap" data-item="'+it.id+'"><div class="invamt"'+(low?' style="color:#e8341f"':'')+'>'+amtStr(it)+'</div><div style="flex:1;min-width:0;display:flex;align-items:center;gap:8px"><div class="rt" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(invIsPaintCat(it.cat)?paintFullName(it):it.name)+'</div>'+pill+'</div></div>';
 }
 function renderInvList(){
@@ -3046,8 +3046,8 @@ function openItem(id){
  var stat=isLow(it)?'<span class="pill lowpill">Low</span>':'';
  var rows='';
  rows+=fldRowI('Category', cm.label);
- /* The colour a paint is, which is what the Trial Dots finish sheet calls it. */
- if(invIsPaintCat(it.cat))rows+=fldRowI('Colour', esc(it.color||'—'));
+ /* The color a paint is, which is what the Trial Dots finish sheet calls it. */
+ if(invIsPaintCat(it.cat))rows+=fldRowI('Color', esc(it.color||'—'));
  if(it.ai)rows+=fldRowI('Active ingredient', it.ai);
  if(cm.res&&it.moa)rows+=fldRowI(cm.res+' group', it.moa);
  rows+=fldRowI('Formulation', it.form);
@@ -3297,11 +3297,11 @@ function renderAddItem(){
    '<div class="sec" style="margin:12px 18px 7px">Product</div><div class="list">'
   +'<div class="fld"><span class="fl">Brand name *</span><input class="inv-in" id="ai-name" placeholder="e.g. Daconil" style="max-width:160px"></div>'
   +'<div class="fld"><span class="fl">Category *</span><select class="inv-sel" id="ai-cat">'+catOpts('fungicide')+'</select></div>'
-  /* Paint only. One item per colour is the point: the Trial Dots finish sheet
-     lists these as its colour picker, and each colour keeps its own count, so
+  /* Paint only. One item per color is the point: the Trial Dots finish sheet
+     lists these as its color picker, and each color keeps its own count, so
      the Inventory screen can say you are out of blue while there is still
-     orange. Hidden for everything else — a fungicide has no colour. */
-  +'<div class="fld" id="ai-colorrow"><span class="fl">Colour *</span><input class="inv-in" id="ai-color" placeholder="e.g. Blue" style="max-width:120px"></div>'
+     orange. Hidden for everything else — a fungicide has no color. */
+  +'<div class="fld" id="ai-colorrow"><span class="fl">Color *</span><input class="inv-in" id="ai-color" placeholder="e.g. Blue" style="max-width:120px"></div>'
   +'<div class="fld"><span class="fl">Active ingredient</span><input class="inv-in" id="ai-ai" placeholder="—" style="max-width:160px"></div>'
   +'<div class="fld"><span class="fl" id="ai-reslbl">FRAC group</span><input class="inv-in" id="ai-moa" placeholder="—" style="max-width:110px"></div>'
   +'<div class="fld" style="border-bottom:none"><span class="fl">Formulation</span><select class="inv-sel" id="ai-form">'+forms.map(function(f){return '<option'+(f==='SC'?' selected':'')+'>'+f+'</option>';}).join('')+'</select></div>'
@@ -3329,11 +3329,11 @@ document.getElementById('ai-save').addEventListener('click',function(){
  var g=function(x){return document.getElementById('ai-'+x);};
  var name=g('name').value.trim(); if(!name){toast('Enter a brand name');return;}
  var csize=parseFloat(g('csize').value)||1, qty=parseFloat(g('qty').value)||0, thr=parseFloat(g('thr').value)||0;
- /* A paint with no colour on it would be an unlabelled line in the Trial Dots
-    colour picker, which is worse than no line at all. Everything else may
+ /* A paint with no color on it would be an unlabelled line in the Trial Dots
+    color picker, which is worse than no line at all. Everything else may
     leave it blank, because the box is not even shown to them. */
  var color=invIsPaintCat(g('cat').value)?g('color').value.trim():'';
- if(invIsPaintCat(g('cat').value)&&!color){toast('Give the paint a colour');return;}
+ if(invIsPaintCat(g('cat').value)&&!color){toast('Give the paint a color');return;}
  var ed=window.aiEdit?INVENTORY.find(function(x){return x.id===window.aiEdit;}):null;
  if(ed){
    ed.name=name; ed.ai=g('ai').value.trim()||null; ed.moa=g('moa').value.trim()||null; ed.cat=g('cat').value; ed.form=g('form').value; ed.color=color||null; ed.loc=g('loc').value.trim()||'—'; ed.ctype=g('ctype').value; ed.csize=csize; ed.unit=g('unit').value.trim()||'unit'; ed.thr=thr;

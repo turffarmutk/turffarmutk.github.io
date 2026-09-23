@@ -509,8 +509,8 @@ function crewHeartbeat(taskId, on) {
   }, CREW_BEAT_MS);
 }
 
-/* Colour per person so the map reads at a glance. Stable by name, not by
-   join order, so Maria is the same colour on everyone's screen. */
+/* Color per person so the map reads at a glance. Stable by name, not by
+   join order, so Maria is the same color on everyone's screen. */
 var CREW_COLORS = ['#489FDF', '#9b59b6', '#e67e22', '#16a085', '#c0392b', '#2c3e50'];
 function crewColor(who) {
   var h = 0, s = who || '';

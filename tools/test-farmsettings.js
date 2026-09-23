@@ -231,7 +231,7 @@ section('4. THE ONE THAT MATTERS — a phone on the defaults never seeds');
   ok('an incoming list replaces the list', w.eval("FARM_LABS.length") === 2, String(w.eval("FARM_LABS.length")));
   ok('the derived roster dropdown was rebuilt with it',
      w.eval("RST_LABS.indexOf('Alpha')") >= 0, w.eval("JSON.stringify(RST_LABS)"));
-  ok('and so was the trials colour map', w.eval("!!TR_LABS['Alpha']"));
+  ok('and so was the trials color map', w.eval("!!TR_LABS['Alpha']"));
   ok('a lab marked not-a-PI stays out of trials', w.eval("!TR_LABS['Beta']"));
 
   /* junk on the way in is refused rather than applied */

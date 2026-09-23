@@ -1817,7 +1817,7 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
     function col(id){return '<div id="'+id+'" class="tp-col" style="position:relative;z-index:2;height:'+(TP_ITEMH*5)+'px;width:66px;overflow-y:scroll;scroll-snap-type:y mandatory;text-align:center;-webkit-overflow-scrolling:touch"></div>';}
     el.innerHTML='<style>#tc-tp .tp-col::-webkit-scrollbar{display:none}#tc-tp .tp-col{scrollbar-width:none}'
       /* Every row used to render identically, so nothing told you which value the
-         band had captured. Distance from the centre now drives size + colour. */
+         band had captured. Distance from the centre now drives size + color. */
       +'#tc-tp .tp-i{font-family:\'Archivo\';font-weight:700;font-size:19px;color:#aab2bb;opacity:.55;cursor:pointer;transition:font-size .12s,color .12s,opacity .12s}'
       +'#tc-tp .tp-i.near{font-size:21px;color:#6c7681;opacity:.85}'
       +'#tc-tp .tp-i.on{font-size:27px;font-weight:800;color:var(--acc);opacity:1}'
@@ -1908,7 +1908,7 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
             span:sh?(t12(sh.start)+' – '+t12(sh.end)):'',
             scheduledToday:!!sh};
   };
-  /* The task board colours each name by where that person is in their day,
+  /* The task board colors each name by where that person is in their day,
      and whether they are on the clock is only known in here. 'on' while a
      punch is open, 'off' once they have clocked out today (the time is their
      last clock-out), null if they have not punched today at all. Today only:

@@ -52,7 +52,7 @@ let man = null;
     ok('it opens the app', man.start_url === './UT-TurfFarm-App.html', man.start_url);
     ok('its scope covers the folder', man.scope === './', man.scope);
     ok('it installs standalone, without browser chrome', man.display === 'standalone', man.display);
-    ok('the splash colour matches the app', man.background_color === '#2f3133' && man.theme_color === '#2f3133');
+    ok('the splash color matches the app', man.background_color === '#2f3133' && man.theme_color === '#2f3133');
   }
 }
 
@@ -82,7 +82,7 @@ if (man) {
 section('3. the page asks to be installed');
 {
   ok('it links the manifest', /<link[^>]+rel="manifest"[^>]+href="manifest\.webmanifest"/.test(HTML));
-  ok('it names a theme colour', /<meta[^>]+name="theme-color"[^>]+content="#2f3133"/.test(HTML));
+  ok('it names a theme color', /<meta[^>]+name="theme-color"[^>]+content="#2f3133"/.test(HTML));
   ok('it sets the viewport', /<meta[^>]+name="viewport"/.test(HTML));
   /* iOS ignores the manifest for these two and wants its own tags. */
   ok('iOS gets its touch icon', /rel="apple-touch-icon"/.test(HTML));

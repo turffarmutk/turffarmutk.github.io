@@ -628,11 +628,11 @@ section('23. the alley shape is excluded from Spray/Fertilize, nowhere else');
   ok('but is stripped out the moment the category is chemical', b.p.FLFORM.plots.indexOf('ALLEYS') < 0, JSON.stringify(b.p.FLFORM.plots));
 }
 
-/* Dillon, 2026-09-23: a paint is added once PER COLOUR, so each colour keeps
-   its own count and the Trial Dots finish sheet can list them as its colour
-   picker. The colour therefore has to survive the form that writes it — and
-   it must not turn up on a fungicide, which has no colour. */
-section('24. a paint carries a colour, and only a paint does');
+/* Dillon, 2026-09-23: a paint is added once PER COLOR, so each color keeps
+   its own count and the Trial Dots finish sheet can list them as its color
+   picker. The color therefore has to survive the form that writes it — and
+   it must not turn up on a fungicide, which has no color. */
+section('24. a paint carries a color, and only a paint does');
 {
   const b = boot();
   b.p.sessionSet('p07', { quiet: true });
@@ -642,13 +642,13 @@ section('24. a paint carries a colour, and only a paint does');
 
   b.win.aiEdit = null;
   b.p.renderAddItem();
-  ok('a fungicide is not asked for a colour', !shown(), g('cat').value);
+  ok('a fungicide is not asked for a color', !shown(), g('cat').value);
 
   g('cat').value = 'paint_can';
   g('cat').dispatchEvent(new b.win.Event('change', { bubbles: true }));
   ok('a paint is', shown());
 
-  /* Saving without one would put an unlabelled line in the colour picker,
+  /* Saving without one would put an unlabelled line in the color picker,
      which is worse than no line at all. */
   const before = b.p.INVENTORY.length;
   g('name').value = 'Marking Paint';
@@ -659,36 +659,36 @@ section('24. a paint carries a colour, and only a paint does');
   g('color').value = 'Blue';
   d.getElementById('ai-save').click();
   const made = b.p.INVENTORY[b.p.INVENTORY.length - 1];
-  ok('with a colour it saves', b.p.INVENTORY.length === before + 1 && made.name === 'Marking Paint');
-  ok('and the colour is on the product', made.color === 'Blue', made.color);
-  ok('the finish sheet would call it by its colour', b.p.paintLabel(made) === 'Blue', b.p.paintLabel(made));
+  ok('with a color it saves', b.p.INVENTORY.length === before + 1 && made.name === 'Marking Paint');
+  ok('and the color is on the product', made.color === 'Blue', made.color);
+  ok('the finish sheet would call it by its color', b.p.paintLabel(made) === 'Blue', b.p.paintLabel(made));
   ok('and the Field Log by both', b.p.paintFullName(made) === 'Marking Paint · Blue', b.p.paintFullName(made));
   ok('it is on the spray shelf, not the liquid one',
      b.p.paintItems('spray').some(x => x.id === made.id) && !b.p.paintItems('liquid').some(x => x.id === made.id));
 
-  /* A product Bill already named after its colour must not read twice. */
+  /* A product Bill already named after its color must not read twice. */
   made.name = 'Blue Marking Paint';
-  ok('a name that already says the colour is left alone',
+  ok('a name that already says the color is left alone',
      b.p.paintFullName(made) === 'Blue Marking Paint', b.p.paintFullName(made));
 
-  ok('the colour goes up to the other phones with the rest of the product',
+  ok('the color goes up to the other phones with the rest of the product',
      JSON.parse(JSON.stringify(b.p.invItemDoc(made))).color === 'Blue');
   ok('and the two paint categories are the only ones that carry one',
      b.p.invIsPaintCat('paint_can') && b.p.invIsPaintCat('paint_liq')
      && !b.p.invIsPaintCat('fungicide') && !b.p.invIsPaintCat('seed'));
 
   /* Three paints all called "Marking Paint" is a useless list without the
-     colour on the row, and a search for "blue" must find the blue one even
+     color on the row, and a search for "blue" must find the blue one even
      though the word is not in its name. */
   made.name = 'Marking Paint';
   const listed = () => { b.p.renderInvList(); return b.doc.getElementById('inv-body').textContent; };
   b.win.__set('invFilter', 'paint_can'); b.win.__set('invSearch', '');
-  ok('the list row says which colour it is', listed().indexOf('Marking Paint \u00b7 Blue') >= 0,
+  ok('the list row says which color it is', listed().indexOf('Marking Paint \u00b7 Blue') >= 0,
      listed().slice(0, 120));
   b.win.__set('invSearch', 'blue');
-  ok('and searching a colour finds it', listed().indexOf('Blue') >= 0, listed().slice(0, 120));
+  ok('and searching a color finds it', listed().indexOf('Blue') >= 0, listed().slice(0, 120));
   b.win.__set('invSearch', 'orange');
-  ok('and a colour nothing matches comes back empty', /No products match/.test(listed()), listed().slice(0, 80));
+  ok('and a color nothing matches comes back empty', /No products match/.test(listed()), listed().slice(0, 80));
   b.win.__set('invSearch', '');
 }
 

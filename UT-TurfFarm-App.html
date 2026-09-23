@@ -413,7 +413,7 @@
   .screen > .tabs .tab .te{opacity:.75}
   /* The active tab used to be var(--acc) — orange on the UT Orange banner, i.e.
      invisible. Full-strength ink on a chip is what the rail does for the same
-     reason, and it survives all five banner colours. */
+     reason, and it survives all five banner colors. */
   .screen > .tabs .tab.on{color:var(--banner-ink);background:var(--banner-chip)}
   .screen > .tabs .tab.on .te{opacity:1}
   .field .card,.field .list{border:none;box-shadow:0 4px 14px rgba(0,0,0,.09)}
@@ -429,7 +429,7 @@
   .field .hubic{font-size:28px}
   .field .seg span{padding:10px}
   .field .action{padding:17px;font-size:16px}
-  /* NOTE: these two are inert for the same reason the colour rules were — .tabs
+  /* NOTE: these two are inert for the same reason the color rules were — .tabs
      is not inside .field. Left as-is deliberately: switching them on enlarges
      the bar (icons 19->23px, labels 9.5->10.5px), which is a look change rather
      than a theming fix. Rescope to `.screen > .tabs` to enable. */
@@ -509,22 +509,22 @@
   body.cb .dot.cb-tr{border-radius:0;clip-path:polygon(50% 0%,100% 100%,0% 100%)} /* scheduled event */
   body.cb .plot.restrict{border-style:dashed;border-width:3px}
   body.cb .pill{border:1px solid currentColor}
-  /* ---- task board: each name coloured by where that person is in their day ----
+  /* ---- task board: each name colored by where that person is in their day ----
      orange = scheduled, not here yet · green = on the clock · red = clocked out or
      shift over. tbPersonState() in app-03-people.js decides which. Only the text
-     changes colour -- no box or background behind the name. Dillon tried a
-     highlighted bar on 2026-09-18 and asked for plain coloured names back. */
+     changes color -- no box or background behind the name. Dillon tried a
+     highlighted bar on 2026-09-18 and asked for plain colored names back. */
   .tbp-sched{color:#b26a00!important}
   .tbp-on{color:#2f9e4f!important}
   .tbp-off{color:#c0392b!important}
   .tbp-sub{font:800 10px 'Public Sans';letter-spacing:.3px;margin-top:2px;text-transform:none;display:flex;align-items:center;gap:6px}
   .tbp-dot{display:none;width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
-  /* Colour-blind palette: the standard remap would turn red and orange into two
-     near-identical oranges, which is the one pair these colours exist to tell
+  /* Color-blind palette: the standard remap would turn red and orange into two
+     near-identical oranges, which is the one pair these colors exist to tell
      apart. So these three are set by hand -- amber, blue, vermillion, the
-     Okabe-Ito colours -- and a small dot appears with a shape of its own:
-     diamond, circle, square. Every colour here is also listed in CB_MAP as
-     mapping to itself, or the colour-blind copy of this stylesheet would shift
+     Okabe-Ito colors -- and a small dot appears with a shape of its own:
+     diamond, circle, square. Every color here is also listed in CB_MAP as
+     mapping to itself, or the color-blind copy of this stylesheet would shift
      them a second time. */
   body.cb .tbp-sched{color:#8c6d00!important}
   body.cb .tbp-on{color:#0072b2!important}
@@ -955,7 +955,7 @@ html[data-size="tablet"] .screen > .app.field > .hdr{
 /* Home is the one screen whose header scrolls with the content (everywhere
    else it's a flex:none row above an inner scroller). When it scrolls off,
    the strip above the rail would flash the app's light background, so paint
-   that band in the banner colour and the seam never shows. */
+   that band in the banner color and the seam never shows. */
 html[data-size="tablet"] #app{
   background:linear-gradient(var(--banner,#2f3133) 0 var(--hdrh,64px),#e9ebe7 var(--hdrh,64px))}
 
@@ -1018,7 +1018,7 @@ html[data-size="tablet"] #rail{
   transition:background .12s,color .12s}
 #rail .rl-item:hover{background:rgba(255,255,255,.11);color:#fff}
 #rail .rl-item.on{background:rgba(255,255,255,.17);color:#fff}
-/* Active gets an accent edge as well as a lighter chip — colour alone is a weak
+/* Active gets an accent edge as well as a lighter chip — color alone is a weak
    signal on the darker banner themes. */
 #rail .rl-item.on::before{content:'';position:absolute;left:-8px;top:6px;bottom:6px;
   width:3px;border-radius:0 3px 3px 0;background:var(--acc,#ff8200)}
@@ -1059,7 +1059,7 @@ html[data-size="tablet"] #rail .rl-label{overflow:hidden;text-overflow:ellipsis;
    shut so the shell can't be dragged off its own left edge. */
 html[data-size="tablet"] .screen[id^="s-home-"]{overflow-y:auto;overflow-x:hidden}
 
-/* #app paints a banner-coloured band across its top so the strip above the
+/* #app paints a banner-colored band across its top so the strip above the
    rail matches while a header is scrolled away — but .screen is absolute,
    inset:0 and opaque, so it covers that band and the corner flashed light
    instead. Paint the corner on top of .screen and under the header (z-index 6),
@@ -1164,7 +1164,7 @@ html[data-size="tablet"] #tb-days .chip,html[data-size="tablet"] #as-days .chip{
    right on a phone, where a third of the width is a thumb-sized square, and
    absurd on a monitor, where the same rule produces three ~180px slabs. Above
    phone the swatch gets a fixed size and the grid auto-fills from the left, so
-   adding a colour lengthens the row instead of shrinking every tile. */
+   adding a color lengthens the row instead of shrinking every tile. */
 html[data-size="tablet"] .thgrid{
   grid-template-columns:repeat(auto-fill,76px);justify-content:start;
   gap:12px 14px;padding:14px 18px}
@@ -1188,7 +1188,7 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
   html[data-size="tablet"] .screen[id^="s-home-"] > .app.field > [data-w]:hover{
     filter:none;outline:2px solid rgba(0,0,0,.07);outline-offset:-2px}
   /* Role cards sit on the dark chooser, where a grey wash reads as "greyed
-     out" rather than "picked". Orange is the only colour on that screen that
+     out" rather than "picked". Orange is the only color on that screen that
      means live, so the hover borrows it. */
   .rolecard:hover{background:#fff5eb;box-shadow:0 4px 14px rgba(0,0,0,.18),inset 0 0 0 2px var(--acc)}
 }
@@ -2323,8 +2323,8 @@ var MOWER_CFG=[
  ['Toro Greensmaster Flex 200','Walk-Mow (Toro)','#00746F']
 ];
 
-/* ---- mowers: the machines, their legend colour, and who they cut ---------
-   MOWER_CFG is [machine, label, colour]. MGMT_DATA stores the *machine*
+/* ---- mowers: the machines, their legend color, and who they cut ---------
+   MOWER_CFG is [machine, label, color]. MGMT_DATA stores the *machine*
    string on each plot, so renaming a machine here has to carry the plots
    with it or 43 plots quietly turn grey. mowersRename does that. */
 var MOWERS_KEY='ut_mowers_v1';
@@ -3178,7 +3178,7 @@ function mwsRender(){
     var fields = edit
       ? '<div class="fld" style="margin-top:8px"><span class="fl">Shows as</span><input class="inv-in" data-mw-label="'+i+'" value="'+esc(m[1])+'" style="max-width:190px"></div>'
        +'<div class="fld"><span class="fl">Machine on the plot record</span><input class="inv-in" data-mw-machine="'+i+'" value="'+esc(m[0])+'" style="max-width:230px"></div>'
-       +'<div class="fld" style="border-bottom:none"><span class="fl">Map colour</span><input type="color" data-mw-color="'+i+'" value="'+esc(m[2])+'" style="width:44px;height:26px;border:1px solid var(--line);border-radius:6px;background:none;padding:0"></div>'
+       +'<div class="fld" style="border-bottom:none"><span class="fl">Map color</span><input type="color" data-mw-color="'+i+'" value="'+esc(m[2])+'" style="width:44px;height:26px;border:1px solid var(--line);border-radius:6px;background:none;padding:0"></div>'
       : '';
     return '<div class="row" style="display:block'+(last&&!edit?';border-bottom:none':'')+'">'+head+fields+'</div>';
   }).join('');
@@ -3189,7 +3189,7 @@ function mwsRender(){
       ? '<div style="padding:11px 15px;border-top:1px solid var(--line)">'
         +'<div class="fld"><span class="fl">Shows as</span><input class="inv-in" id="mw-n-label" placeholder="Rough Mower" style="max-width:190px"></div>'
         +'<div class="fld"><span class="fl">Machine</span><input class="inv-in" id="mw-n-machine" placeholder="John Deere 1600" style="max-width:230px"></div>'
-        +'<div class="fld" style="border-bottom:none"><span class="fl">Map colour</span><input type="color" id="mw-n-color" value="#4a7fb5" style="width:44px;height:26px;border:1px solid var(--line);border-radius:6px;background:none;padding:0"></div>'
+        +'<div class="fld" style="border-bottom:none"><span class="fl">Map color</span><input type="color" id="mw-n-color" value="#4a7fb5" style="width:44px;height:26px;border:1px solid var(--line);border-radius:6px;background:none;padding:0"></div>'
         +'<div style="display:flex;gap:8px;margin-top:10px">'
         +'<div class="action tap" data-mw="addsave" style="flex:1">Add this machine</div>'
         +'<div class="action tap" data-mw="addcancel" style="flex:none;background:#e7e9e6;color:#2f3133;padding:0 16px">Cancel</div></div></div>'
@@ -3204,7 +3204,7 @@ function mwsRender(){
   if(un.length){
     drift='<div class="sec">On plots but not on the list</div>'
      +'<div style="font:600 11.5px \'Public Sans\';color:var(--muted);line-height:1.5;margin:0 20px 8px">'
-     +'These plots draw grey on the mower layer and show the raw name. Add the machine to give it a colour.</div>'
+     +'These plots draw grey on the mower layer and show the raw name. Add the machine to give it a color.</div>'
      +'<div class="list">'+un.map(function(u,i){
         return '<div class="row'+(edit?' tap':'')+'"'+(edit?(' data-mw-adopt="'+esc(u.name)+'"'):'')+(i===un.length-1?' style="border-bottom:none"':'')+'>'
           +'<div style="flex:1;min-width:0"><div class="rt">'+esc(u.name)+'</div>'
@@ -3215,7 +3215,7 @@ function mwsRender(){
 
   body.innerHTML=
      '<div style="margin:14px 16px 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px">'
-    +'<div style="font:800 13px \'Archivo\';color:var(--ink)">The machines and their colours</div>'
+    +'<div style="font:800 13px \'Archivo\';color:var(--ink)">The machines and their colors</div>'
     +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:3px;line-height:1.45">'
     +'Every plot records the machine that cuts it. The name below is what a plot record has to match, so renaming one here '
     +'moves its plots with it.</div>'
@@ -3251,7 +3251,7 @@ document.getElementById('s-mowersettings').addEventListener('change',function(e)
   var cl=t.closest('[data-mw-color]');
   if(cl){ i=+cl.getAttribute('data-mw-color'); m=MOWER_CFG[i]; if(!m) return;
     if(!LAB_HEX.test(cl.value||'')) return;
-    m[2]=cl.value; mowersScan(); mapRepaintMowers(); mwsRender(); toast(m[1]+' recoloured ✓'); }
+    m[2]=cl.value; mowersScan(); mapRepaintMowers(); mwsRender(); toast(m[1]+' recolored ✓'); }
 });
 
 document.getElementById('s-mowersettings').addEventListener('click',function(e){
@@ -3270,7 +3270,7 @@ document.getElementById('s-mowersettings').addEventListener('click',function(e){
     var name=ad.getAttribute('data-mw-adopt');
     MOWER_CFG.push([name,name,'#4a7fb5']);
     mowersScan(); mapRepaintMowers(); mwsRender();
-    toast(name+' added — give it a colour and a shorter name');
+    toast(name+' added — give it a color and a shorter name');
     return;
   }
   var a=e.target.closest('[data-mw]'); if(!a) return;
@@ -3297,7 +3297,7 @@ document.getElementById('s-mowersettings').addEventListener('click',function(e){
   }
 });
 
-/* The mower layer draws from MOWER_CFG, so a colour or a rename has to reach
+/* The mower layer draws from MOWER_CFG, so a color or a rename has to reach
    the map. Quiet no-op when the map has never been opened. */
 function mapRepaintMowers(){
   try{ jobBlocksInvalidate(); }catch(e){}
@@ -3321,7 +3321,7 @@ function lbsRender(){
     var fields = edit
       ? '<div class="fld" style="margin-top:8px"><span class="fl">Name</span><input class="inv-in" data-lb-name="'+i+'" value="'+esc(l.name)+'" style="max-width:180px"></div>'
        +'<div class="fld"><span class="fl">Badge</span><input class="inv-in" data-lb-ab="'+i+'" value="'+esc(l.ab||'')+'" maxlength="3" style="max-width:60px"></div>'
-       +'<div class="fld"><span class="fl">Colour</span><input type="color" data-lb-color="'+i+'" value="'+esc(l.color)+'" style="width:44px;height:26px;border:1px solid var(--line);border-radius:6px;background:none;padding:0"></div>'
+       +'<div class="fld"><span class="fl">Color</span><input type="color" data-lb-color="'+i+'" value="'+esc(l.color)+'" style="width:44px;height:26px;border:1px solid var(--line);border-radius:6px;background:none;padding:0"></div>'
        +'<div class="fld" style="border-bottom:none"><span class="fl">Runs trials</span><span class="tgl'+(l.pi?' on':'')+'" data-lb-pi="'+i+'"></span></div>'
       : '';
     return '<div class="row" style="display:block'+(last&&!edit?';border-bottom:none':'')+'">'+head+fields+'</div>';
@@ -3332,7 +3332,7 @@ function lbsRender(){
     add = lbAdding
       ? '<div style="padding:11px 15px;border-top:1px solid var(--line)">'
         +'<div class="fld"><span class="fl">Name</span><input class="inv-in" id="lb-n-name" placeholder="Surname" style="max-width:180px"></div>'
-        +'<div class="fld" style="border-bottom:none"><span class="fl">Colour</span><input type="color" id="lb-n-color" value="#4a7fb5" style="width:44px;height:26px;border:1px solid var(--line);border-radius:6px;background:none;padding:0"></div>'
+        +'<div class="fld" style="border-bottom:none"><span class="fl">Color</span><input type="color" id="lb-n-color" value="#4a7fb5" style="width:44px;height:26px;border:1px solid var(--line);border-radius:6px;background:none;padding:0"></div>'
         +'<div style="display:flex;gap:8px;margin-top:10px">'
         +'<div class="action tap" data-lb="addsave" style="flex:1">Add this lab</div>'
         +'<div class="action tap" data-lb="addcancel" style="flex:none;background:#e7e9e6;color:#2f3133;padding:0 16px">Cancel</div></div></div>'
@@ -3345,7 +3345,7 @@ function lbsRender(){
   if(un.length){
     drift='<div class="sec">In use but not on the list</div>'
      +'<div style="font:600 11.5px \'Public Sans\';color:var(--muted);line-height:1.5;margin:0 20px 8px">'
-     +'People or studies already name these. Until a lab is on the list it has no colour and cannot be filtered for.</div>'
+     +'People or studies already name these. Until a lab is on the list it has no color and cannot be filtered for.</div>'
      +'<div class="list">'+un.map(function(u,i){
         var bits=[]; if(u.people) bits.push(u.people+' on the roster'); if(u.trials) bits.push(u.trials+' stud'+(u.trials===1?'y':'ies'));
         return '<div class="row'+(edit?' tap':'')+'"'+(edit?(' data-lb-adopt="'+esc(u.name)+'"'):'')+(i===un.length-1?' style="border-bottom:none"':'')+'>'
@@ -3358,8 +3358,8 @@ function lbsRender(){
      '<div style="margin:14px 16px 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px">'
     +'<div style="font:800 13px \'Archivo\';color:var(--ink)">One list, read everywhere</div>'
     +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:3px;line-height:1.45">'
-    +'The roster, the calendar filter and the trials colours all read this list. '
-    +'A lab that runs studies gets a trials colour and a legend badge; the farm crew does not.</div>'
+    +'The roster, the calendar filter and the trials colors all read this list. '
+    +'A lab that runs studies gets a trials color and a legend badge; the farm crew does not.</div>'
     +(edit?'':'<div style="font:800 11.5px \'Public Sans\';color:#8a929c;margin-top:7px">Read-only for your role</div>')
     +'</div>'
     +'<div class="list" style="margin-top:12px">'+rows+add+'</div>'
@@ -3448,7 +3448,7 @@ document.getElementById('s-labsettings').addEventListener('change',function(e){
   var cl=t.closest('[data-lb-color]');
   if(cl){ i=+cl.getAttribute('data-lb-color'); l=FARM_LABS[i]; if(!l) return;
     if(!LAB_HEX.test(cl.value||'')) return;
-    l.color=cl.value; labsRebuild(); labsScan(); lbsRender(); toast(l.name+' recoloured ✓'); }
+    l.color=cl.value; labsRebuild(); labsScan(); lbsRender(); toast(l.name+' recolored ✓'); }
 });
 
 document.getElementById('s-labsettings').addEventListener('click',function(e){
@@ -3475,7 +3475,7 @@ document.getElementById('s-labsettings').addEventListener('click',function(e){
     var nm2=ad.getAttribute('data-lb-adopt');
     FARM_LABS.push({name:nm2,color:'#4a7fb5',ab:nm2.slice(0,2),pi:true});
     labsRebuild(); labsScan(); lbsRender();
-    toast(nm2+' added — give it a colour');
+    toast(nm2+' added — give it a color');
     return;
   }
   var a=e.target.closest('[data-lb]'); if(!a) return;
@@ -3512,7 +3512,7 @@ function mowerLegendHtml(){
   return s;
 }
 function mgmtPopHtml(name){ var d=MGMT_DATA[name]; if(!d) return ''; var r=''; if(d.m)r+='<tr><td class="pp-k">Mower</td><td class="pp-v">'+d.m+'</td></tr>'; if(d.c!=null)r+='<tr><td class="pp-k">Cut height</td><td class="pp-v">'+d.c+' in</td></tr>'; if(d.h!=null)r+='<tr><td class="pp-k">Irrigation heads</td><td class="pp-v">'+d.h+'</td></tr>'; return r?('<div class="pp-mgmt-h">Management</div><table class="pp-tbl">'+r+'</table>'):''; }
-/* Lab colours only mean something when the studies are on the map, so the
+/* Lab colors only mean something when the studies are on the map, so the
    swatch row rides with the Trials chip rather than sitting there by default. */
 var TR_LAB_AB=labAbMap();
 function trialsLegendHtml(){
@@ -3532,7 +3532,7 @@ function mapLegend(which){
   el.style.marginBottom=el.innerHTML?'9px':'0';
 }
 /* Restrictions carry their own four-letter badge on the ground, so they need no
-   legend row — only mower colours and lab colours do. */
+   legend row — only mower colors and lab colors do. */
 function mapLegendAuto(){ mapLegend(_mowerOn?'mower':(_trialsOn?'trials':'default')); }
 
 var _appmap=null,_plots=null,_alleys=null,_labels=null,_labelsOn=true,_plotsOn=true,_pop=null;
@@ -5906,7 +5906,7 @@ function crewTask(taskId) {
    Measured on 2026-08-30: a holder five minutes fast locked a zone
    permanently, and a day fast locked it for a day. On the alleys job, where
    every piece of ground is a zone, that is the whole job dead on every other
-   phone -- zones highlighted in the holder's colour, taps refused, and the
+   phone -- zones highlighted in the holder's color, taps refused, and the
    finish button refusing with them, so nobody could move on to the next task.
 
    So a timestamp we cannot trust is not used for arithmetic. Anything dated
@@ -6023,8 +6023,8 @@ function crewHeartbeat(taskId, on) {
   }, crewBeatMs());
 }
 
-/* Colour per person so the map reads at a glance. Stable by name, not by
-   join order, so Maria is the same colour on everyone's screen. */
+/* Color per person so the map reads at a glance. Stable by name, not by
+   join order, so Maria is the same color on everyone's screen. */
 var CREW_COLORS = ['#489FDF', '#9b59b6', '#e67e22', '#16a085', '#c0392b', '#2c3e50'];
 function crewColor(who) {
   var h = 0, s = who || '';
@@ -7181,7 +7181,7 @@ function jobMapDraw(st,o){
   (o.sel||[]).forEach(function(n){sset[n]=1;});
   var jb=null;
   /* A trial-dots job shows where the studies are instead of a target list:
-     every active trial's footprint and pin, coloured by lab, over grey plots. */
+     every active trial's footprint and pin, colored by lab, over grey plots. */
   if(o.trials){
     var trDone={}; (o.doneTrials||[]).forEach(function(id){trDone[id]=1;});
     jobActiveTrials().forEach(function(t){
@@ -7237,7 +7237,7 @@ function jobMapDraw(st,o){
       else if(taken)    style={color:crewColor(claim.who),weight:2.4,dashArray:'7 5',
                                fillColor:crewColor(claim.who),fillOpacity:.26};
       else if(mine)     style={color:'#ff8200',weight:2.6,fillColor:'#ffb266',fillOpacity:.5};
-      /* Gravel is not green. Colouring it like turf on a spray map invites
+      /* Gravel is not green. Coloring it like turf on a spray map invites
          someone to treat it as turf. */
       else if(jobZoneIsGravel(zid)) style={color:'#7b6a58',weight:1.8,fillColor:'#b9ada0',fillOpacity:.42};
       else              style={color:'#2f9e4f',weight:1.6,fillColor:'#3cbf5a',fillOpacity:.32};

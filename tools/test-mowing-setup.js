@@ -159,7 +159,7 @@ ok('selectable on the fairway job', fairway.indexOf(P) >= 0, fairway.length + ' 
 ok('gone from the rotary job', rotary.indexOf(P) < 0, rotary.length + ' rotary plots');
 ok('the live fairway task picks it up without being touched',
    win.taskPlots(win.TASKS.find(t => t.id === 't1')).indexOf(P) >= 0);
-ok('the map colours it as fairway now', win.mowerColor(P) === '#D55E00', win.mowerColor(P));
+ok('the map colors it as fairway now', win.mowerColor(P) === '#D55E00', win.mowerColor(P));
 ok('the cut-height label follows', win.plotCut(P) === 0.5, String(win.plotCut(P)));
 
 section('The change is on the record');

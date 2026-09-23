@@ -197,7 +197,7 @@ section('5b. the cans of paint a trial-dots job used');
   ok('the spray/liquid type is filled in from the job', type && type.value === 'spray', type && type.value);
   ok('and the student can still change it', type && [...type.options].map(o => o.value).join(',') === 'spray,liquid');
   const col = win.document.getElementById('ds-paint-color');
-  ok('the colour picker names the colour, not the product', col && col.options[1].textContent.indexOf('Blue') === 0,
+  ok('the color picker names the color, not the product', col && col.options[1].textContent.indexOf('Blue') === 0,
      col && col.options[1].textContent);
   ok('one paint on the shelf is picked for them', col && col.value === 'ipaint', col && col.value);
 
@@ -213,7 +213,7 @@ section('5b. the cans of paint a trial-dots job used');
 
   const finished = doc(t);
   ok('the job is done', t.status === 'done');
-  ok('the cans, the colour and the type are all on the job',
+  ok('the cans, the color and the type are all on the job',
      t.paintUsed && t.paintUsed.cans === 3 && t.paintUsed.item === 'ipaint'
      && t.paintUsed.color === 'Blue' && t.paintUsed.type === 'spray', JSON.stringify(t.paintUsed));
   ok('THE DATABASE ACCEPTS THE FINISH WITH THE PAINT ON IT',
@@ -223,7 +223,7 @@ section('5b. the cans of paint a trial-dots job used');
      win.INVMOVES.some(m => m.item === 'ipaint' && m.delta === -3 && m.ref === t.id && m.who === STUDENT));
 
   const entry = win.__w.FIELDLOG.filter(e => e.taskId === t.id)[0];
-  ok('the Field Log says what went out, in what colour, and how much',
+  ok('the Field Log says what went out, in what color, and how much',
      entry && entry.product === 'Field Marking Paint · Blue' && entry.amount === '3 cans',
      entry && entry.product + ' / ' + entry.amount);
 }
@@ -245,13 +245,13 @@ section('5c. a paint measured in ounces, not in cans');
   win.renderTaskWork();
   win.document.getElementById('tw-complete').click();
   const pick = win.document.getElementById('ds-paint-color');
-  ok('with two colours on the shelf, nothing is chosen for them', pick && pick.value === '', pick && pick.value);
-  ok('and both colours are offered by name',
+  ok('with two colors on the shelf, nothing is chosen for them', pick && pick.value === '', pick && pick.value);
+  ok('and both colors are offered by name',
      pick && [...pick.options].slice(1).map(o => o.textContent.split(' \u00b7 ')[0]).join(',') === 'Blue,Orange',
      pick && [...pick.options].map(o => o.textContent).join('|'));
   const btn = win.document.getElementById('donesheet').querySelector('.ds-confirm');
   btn.click();
-  ok('and it will not close until they pick one', t.status === 'todo' && /colour/i.test(btn.textContent), btn.textContent);
+  ok('and it will not close until they pick one', t.status === 'todo' && /color/i.test(btn.textContent), btn.textContent);
   pick.value = 'ipaint2';
   pick.dispatchEvent(new win.Event('change', { bubbles: true }));
   const cans = win.document.getElementById('ds-paint-cans');
@@ -260,7 +260,7 @@ section('5c. a paint measured in ounces, not in cans');
   btn.click();
   ok('two 17 oz cans take 34 oz off the shelf, not 2', win.invQty(oz) === before - 34,
      before + ' -> ' + win.invQty(oz));
-  ok('and the colour picked is the one recorded', t.paintUsed && t.paintUsed.color === 'Orange',
+  ok('and the color picked is the one recorded', t.paintUsed && t.paintUsed.color === 'Orange',
      JSON.stringify(t.paintUsed));
 }
 
@@ -287,7 +287,7 @@ section('5c2. switching the type to liquid');
   type.dispatchEvent(new win.Event('change', { bubbles: true }));
 
   const col = win.document.getElementById('ds-paint-color');
-  ok('the colour list swaps to the liquid shelf', col && col.value === 'ipaint3', col && col.value);
+  ok('the color list swaps to the liquid shelf', col && col.value === 'ipaint3', col && col.value);
   ok('and no amount is asked for', !win.document.getElementById('ds-paint-cans'));
   ok('the sheet says why, rather than going quiet',
      /not counted in the app yet/i.test(win.document.querySelector('#ds-extra .ds-hint').textContent),
@@ -297,7 +297,7 @@ section('5c2. switching the type to liquid');
   ok('the job can still be finished', btn.textContent.indexOf('Confirm') === 0, btn.textContent);
   btn.click();
   ok('and it is', t.status === 'done', t.status);
-  ok('the colour and type are recorded with no count',
+  ok('the color and type are recorded with no count',
      t.paintUsed && t.paintUsed.type === 'liquid' && t.paintUsed.color === 'White' && !t.paintUsed.cans,
      JSON.stringify(t.paintUsed));
   ok('NOTHING was guessed off the liquid shelf', win.invQty(liq) === before, before + ' -> ' + win.invQty(liq));

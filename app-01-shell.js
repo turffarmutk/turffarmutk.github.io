@@ -2,14 +2,14 @@
    THE SHELL — what the app looks like before it holds any farm data.
 
    Per-person preferences, the adaptive shell (phone / roomy layout), the
-   notification list, the home-screen widgets, and the theme: banner colour,
-   text size, and colour-blind mode.
+   notification list, the home-screen widgets, and the theme: banner color,
+   text size, and color-blind mode.
 
-   ONE THING TO KNOW. Colour-blind mode works by reading the text of every
-   <style> block in the page and rewriting the colours it finds (see cbCss()).
+   ONE THING TO KNOW. Color-blind mode works by reading the text of every
+   <style> block in the page and rewriting the colors it finds (see cbCss()).
    That is why the app's CSS has to stay written inside UT-TurfFarm-App.html.
-   Move the CSS out to a .css file and colour-blind mode stops working with no
-   error at all -- nothing to see, just wrong colours for the people who need
+   Move the CSS out to a .css file and color-blind mode stops working with no
+   error at all -- nothing to see, just wrong colors for the people who need
    it most.
    ------------------------------------------------------------
    PART OF UT-TurfFarm-App.html. This file used to be part of one 10,800-line
@@ -1189,7 +1189,7 @@ function hwMgrCal(id){
  });
  var vis=(typeof eventsOnDate==='function'?eventsOnDate(CAL_TODAY_DT):[]).filter(function(e){return e.type==='event';});
  /* Shift time sits on the right where the status pill used to; status is carried
-    by its colour, with the words moved under the name. */
+    by its color, with the words moved under the name. */
  var rows=working.map(function(p,i){
    var st=p.noshow?{t:'No-show',c:'#c0392b'}:(p.on?{t:'On the clock',c:'#2f7d3a'}:{t:'Expected',c:'var(--muted)'});
    return hwRow(hwName(p.name,'<span style="color:'+st.c+'">'+st.t+'</span>'),
@@ -1221,7 +1221,7 @@ function hwMgrClock(id){
    they should be on — so the first task in their list is the one to show. */
 function hwOnTask(id){
  var open=hwOpenTasks().filter(function(t){return t.assignee;});
- /* Per-person avatar colours, keyed by roster id. */
+ /* Per-person avatar colors, keyed by roster id. */
  var C={p18:'#489FDF',p20:'#00746F',p21:'#ff8200',p22:'#98a0aa',p05:'#58595b'};
  /* Walking TASKS in order means the first hit per person is their rank-1 job,
     and the people come out ordered by whose top job leads the board. */
@@ -1533,8 +1533,8 @@ var CB_MAP={
  '#eef4ff':'#e8f4fc','#cfe0ff':'#bfe0f5','#ffcf9e':'#f5dca8',
  '#517c96':'#56849e','#22a5c4':'#56b4e9','#0f8a78':'#009e73','#b07d3e':'#a07c2e',
  '#d17a00':'#e69f00','#7c5cbf':'#cc79a7','#3cbf5a':'#3fbfae','#d55e00':'#d55e00',
- /* Already colour-blind safe, and chosen by hand for the task board's name
-    colours (see .tbp-* in the page), so they must come through unchanged. */
+ /* Already color-blind safe, and chosen by hand for the task board's name
+    colors (see .tbp-* in the page), so they must come through unchanged. */
  '#e69f00':'#e69f00','#0072b2':'#0072b2','#8c6d00':'#8c6d00',
  '#fbf3d9':'#fbf3d9','#e8f4fc':'#e8f4fc','#fdf0e6':'#fdf0e6'
 };
@@ -1593,12 +1593,12 @@ function applyBanner(){
  st.setProperty('--banner-chip',b.dark?'rgba(255,255,255,.16)':'rgba(0,0,0,.06)');
  st.setProperty('--banner-chipline',b.dark?'rgba(255,255,255,.26)':'rgba(0,0,0,.13)');
 }
-/* ---- colour conversion ----------------------------------------------------------
-   CB_MAP hand-tunes the colours that carry meaning app-wide. Everything else — one-off
-   category colours, map layer fills, chart tints — runs through cbShift(), which rotates
-   hue onto the blue/yellow axis that red-green colour blindness can still separate,
+/* ---- color conversion ----------------------------------------------------------
+   CB_MAP hand-tunes the colors that carry meaning app-wide. Everything else — one-off
+   category colors, map layer fills, chart tints — runs through cbShift(), which rotates
+   hue onto the blue/yellow axis that red-green color blindness can still separate,
    keeping saturation and lightness so light tints stay light. Between them, every
-   colour in the app is converted, with nothing left to maintain by hand.            */
+   color in the app is converted, with nothing left to maintain by hand.            */
 function cbHueMap(h){
  if(h>=330)h-=360;                       // treat magenta-reds as negative so reds group
  if(h<20)  return 18+(h+30)*0.24;        // reds        -> warm orange
@@ -1627,7 +1627,7 @@ function cbColor(hex){
  if(_cbCache[hex])return _cbCache[hex];
  return (_cbCache[hex]=cbShift(hex));
 }
-/* Rewrite every colour in a blob of CSS/style text: 6-digit hex, 3-digit hex, and the
+/* Rewrite every color in a blob of CSS/style text: 6-digit hex, 3-digit hex, and the
    rgb()/rgba() forms the stylesheet uses for shadows and tints. */
 function cbText(t){
  return t.replace(/#[0-9a-fA-F]{6}\b/g,function(m){return cbColor(m);})
@@ -1641,8 +1641,8 @@ function cbText(t){
        '('+parseInt(v.slice(1,3),16)+','+parseInt(v.slice(3,5),16)+','+parseInt(v.slice(5,7),16));
    });
 }
-/* Colours that live in the stylesheet (calendar pills, plot chips, status classes)
-   can't be reached by walking elements. So clone every <style> block with the colours
+/* Colors that live in the stylesheet (calendar pills, plot chips, status classes)
+   can't be reached by walking elements. So clone every <style> block with the colors
    remapped and append the clone as the document's LAST stylesheet — identical
    selectors, so source order makes the clone win. Removing it undoes everything. */
 var CB_CSS_ID='cb-css';

@@ -34,15 +34,15 @@ var RST_SHORT={'Farm Manager':'MGR','Faculty':'PI','Graduate Student':'GRAD','Te
 var RST_ORDER={'Farm Manager':0,'Faculty':1,'Graduate Student':2,'Technician':3,'Undergraduate Student':4};
 /* ---- labs: one list, four consumers ------------------------------------
    The farm's labs used to be written out four times — RST_LABS for the roster
-   dropdown, CAL_LABS for the calendar filter, TR_LABS for the trials colours
+   dropdown, CAL_LABS for the calendar filter, TR_LABS for the trials colors
    and TR_LAB_AB for its legend badges. They had already drifted: Stier was on
-   the roster list and on nobody else's, so a Stier trial had no colour and a
+   the roster list and on nobody else's, so a Stier trial had no color and a
    Stier event could not be filtered for.
 
    All four are now derived from FARM_LABS. Adding a lab is one row on the
    Labs screen instead of four edits in three parts of this file.
 
-   `pi` marks a research group: those get a trials colour and a legend badge.
+   `pi` marks a research group: those get a trials color and a legend badge.
    Bill is the farm crew rather than a lab, so he appears on the roster and
    calendar lists but not in trials. */
 var FARM_LABS=[
@@ -377,7 +377,7 @@ function sessionPerson(){ return SESSION.pid?rstFind(SESSION.pid):null; }
    the roster updates their card immediately — the same guarantee the old
    RST_LOGIN wiring gave, now for everybody.
 
-   Colour and hire date have no roster column yet. Until they do they come from
+   Color and hire date have no roster column yet. Until they do they come from
    the per-role defaults, which is what they always were. */
 function meCard(p){
   p=p||sessionPerson();
@@ -1557,7 +1557,7 @@ function tbBoardRow(t,n,first,last){
  var del='<span class="del tap" data-del="'+t.id+'" title="Delete">🗑</span>';
  return '<div class="row">'+num+'<div class="tap" data-task="'+t.id+'" style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+areaWithDue(t)+'</div></div><span style="display:flex;flex-direction:column;gap:4px;flex:none">'+up+dn+'</span>'+del+'</div>';
 }
-/* Where somebody is in their day, for the colour of their name on the Board
+/* Where somebody is in their day, for the color of their name on the Board
    tab. Dillon, 2026-09-18:
      sched (orange)  scheduled, and not here yet
      on    (green)   on the clock right now
@@ -1568,9 +1568,9 @@ function tbBoardRow(t,n,first,last){
    (still expected) until the shift's end, then goes red.
    Punches exist only for today, so any other day on the chips is orange or
    nothing. Returns null for nobody-expected-and-nobody-came: plain grey.
-   The colour-blind palette swaps these three for amber, blue and vermillion
+   The color-blind palette swaps these three for amber, blue and vermillion
    and gives each dot its own shape; the words under the name say it outright
-   either way. That CSS sits with the colour-blind rules in the page. */
+   either way. That CSS sits with the color-blind rules in the page. */
 function tbPersonState(pid,d){
   var sh=schedShiftOn(pid,d);
   var span=sh?(schedFmt(sh.start)+'–'+schedFmt(sh.end)):'';
@@ -1586,9 +1586,9 @@ function tbPersonState(pid,d){
   }
   return {k:'sched',txt:'Scheduled '+span};
 }
-/* The colours move on their own -- a shift ends, somebody on another phone
+/* The colors move on their own -- a shift ends, somebody on another phone
    clocks in -- and the board is otherwise only drawn when you open it. Once a
-   minute, if the Board tab is showing today and any name's colour would now
+   minute, if the Board tab is showing today and any name's color would now
    be different, draw it again. Comparing first means a board nobody is
    changing is left alone, so it does not jump under a thumb mid-scroll. */
 var _tbStateSig='';
@@ -1668,7 +1668,7 @@ function renderTasks(){
    people.forEach(function(s){
      var mine=taskInOrder(TASKS.filter(function(t){return taskIsFor(t,s)&&t.status==='todo'&&t.kind==='task'&&taskOnDay(t);}));
      var slabel=(isMe(s)?nameOf(s)+' (you)':nameOf(s));
-     /* Where they are in their day, as the colour of their name: orange
+     /* Where they are in their day, as the color of their name: orange
         before they arrive, green while on the clock, red once they have
         clocked out or the shift is over. See tbPersonState(). Plain grey
         means they are not down for this day and have not punched. */

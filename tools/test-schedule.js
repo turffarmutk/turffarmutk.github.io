@@ -198,7 +198,7 @@ section('3. the day board asks one question, and gets one answer');
      p.schedSortForDay(['p21', 'p18'], thu).join(','));
 }
 
-section('3b. the task board colours each name by where they are in their day');
+section('3b. the task board colors each name by where they are in their day');
 {
   /* A fresh app, so the punches below cannot leak into section 5's check
      that the clock starts empty. Dillon, 2026-09-18: orange before they
@@ -230,12 +230,12 @@ section('3b. the task board colours each name by where they are in their day');
   w.eval("tcApplyRemote([{id:'pu-tb2',pid:'p21',date:'" + iso + "',in:'12:30',out:null}]);");
   ok('back from lunch is green again', (q.tbPersonState('p21', today) || {}).k === 'on');
 
-  /* The colour-blind copy of the stylesheet runs every colour through CB_MAP.
+  /* The color-blind copy of the stylesheet runs every color through CB_MAP.
      These have to come out unchanged or the hand-picked palette is lost. */
   ['#e69f00', '#0072b2', '#8c6d00', '#fbf3d9', '#e8f4fc', '#fdf0e6', '#d55e00'].forEach(h => {
-    ok('colour-blind palette keeps ' + h, q.CB_MAP && q.CB_MAP[h] === h);
+    ok('color-blind palette keeps ' + h, q.CB_MAP && q.CB_MAP[h] === h);
   });
-  ok('the colour-blind board colours exist', /body\.cb \.tbp-sched\{/.test(HTML) &&
+  ok('the color-blind board colors exist', /body\.cb \.tbp-sched\{/.test(HTML) &&
      /body\.cb \.tbp-on\{/.test(HTML) && /body\.cb \.tbp-off\{/.test(HTML));
   ok('no errors in the second boot', c.errs.length === 0, c.errs[0]);
 }

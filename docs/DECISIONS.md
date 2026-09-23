@@ -331,16 +331,16 @@ because it "never finds anything": that is what it looks like when it is working
 **Decision:** all of the app's CSS stays written in `<style>` blocks inside
 `UT-TurfFarm-App.html`. It was deliberately left there when the JavaScript was
 split out into files.
-**Why:** colour-blind mode (`cbCss()`) works by walking every `<style>` block,
-reading its text, rewriting each colour, and appending the result as a last
+**Why:** color-blind mode (`cbCss()`) works by walking every `<style>` block,
+reading its text, rewriting each color, and appending the result as a last
 stylesheet. A stylesheet loaded from a separate `.css` file has no text to read
-this way. Moving the CSS out would therefore switch colour-blind mode off for
+this way. Moving the CSS out would therefore switch color-blind mode off for
 the entire app — **with no error, nothing in the console, and nothing on screen
 to notice** — for the people who need it most.
 **Don't:** "tidy" the CSS into `app.css`. If it ever has to move, `cbCss()` has
 to be rewritten to read `document.styleSheets` and its `cssRules` first, and
-somebody has to check colour-blind mode by eye afterwards, because no test
-watches colour.
+somebody has to check color-blind mode by eye afterwards, because no test
+watches color.
 
 ### Sharing has no switch, and no way to turn it off — 2026-08-26
 **Decision:** the ten per-phone sharing switches were deleted. Every drawer
@@ -688,7 +688,7 @@ pin this behaviour — keep them green.
 
 ### Trial dots ask what paint went, and it comes off the shelf — 2026-09-23
 **Decision:** finishing a **Trial Dots** job now asks three things on the
-confirm sheet — the **type** (spray or liquid), the **colour**, and **how many
+confirm sheet — the **type** (spray or liquid), the **color**, and **how many
 cans**, a dropdown of whole cans 1 to 12 with no "None". The answer is stored
 on the task as `paintUsed` ({type, color, item, cans}), written into the Field
 Log's own product and amount columns, and taken off the inventory through
@@ -697,10 +697,10 @@ own unit, the same sum the restock screen does.
 
 The paint itself is **not named anywhere in the code**: it is whatever products
 sit in the **Paint · Cans** (or **Paint · Liquid**) category of the inventory.
-A paint is added **once per colour**, each with its own count, and each carries
+A paint is added **once per color**, each with its own count, and each carries
 a **`color`** set on the Add item form — a box that only appears for those two
-categories, and is required there. The sheet's colour dropdown **is** that
-product list, labelled by colour. So "we now stock pink" is one item added on
+categories, and is required there. The sheet's color dropdown **is** that
+product list, labelled by color. So "we now stock pink" is one item added on
 a phone, and the Inventory screen can say you are out of blue while there is
 still orange.
 
@@ -708,7 +708,7 @@ The **type** is filled in from the job (`taskPaintType()` — Trial Dots means
 spray) but is **shown and changeable**, so a job set up wrong can be put right
 in the field instead of emptying the wrong shelf. **Liquid is deliberately not
 counted yet:** nobody has decided whether a liquid job is measured in whole
-jugs or in gallons, so picking Liquid records the type and the colour, asks for
+jugs or in gallons, so picking Liquid records the type and the color, asks for
 no amount, takes nothing off the shelf, and says so on the sheet. Give
 `PAINT_TYPES`' liquid row a `count` the day that is answered and the rest works
 unchanged. With no paint set up at all the job **still finishes** — what was
@@ -723,9 +723,9 @@ invites "1.5" and stray zeros — Dillon asked for it to round them to whole
 cans, and a list does that by construction. No "None" because Dillon wants a
 real answer from every job (Dillon, 2026-09-23); 12 because that is past a big
 day of dots without being a long spin on a phone. Reading the product off the
-inventory rather than naming it here is the succession rule: a new colour or
-brand in 2030 must not need this file edited. One item per colour rather than
-one paint with a colour picked per job, because "how much blue is left" is a
+inventory rather than naming it here is the succession rule: a new color or
+brand in 2030 must not need this file edited. One item per color rather than
+one paint with a color picked per job, because "how much blue is left" is a
 question the farm actually asks and a single lumped count cannot answer it.
 The type is written in code rather than put on the task form — Dillon's call,
 2026-09-23 — only because Trial Dots is the farm's one painted job today.
@@ -995,14 +995,14 @@ explicit answer, not a default.
 
 
 ### One labs list, four consumers — 2026-08-15
-**Decision:** `FARM_LABS` (name, colour, badge, `pi`) is the source. `RST_LABS`,
+**Decision:** `FARM_LABS` (name, color, badge, `pi`) is the source. `RST_LABS`,
 `CAL_LABS`, `TR_LABS` and `TR_LAB_AB` are all derived from it by `labsRebuild()`
 and rebuilt together. `pi:false` marks the farm crew — on the roster and calendar
 lists, absent from trials. Renaming a lab migrates `PEOPLE[].lab` and
 `TRIALS[].lab`.
 **Why:** the four lists were written out separately and had already drifted —
 **Stier** was on the roster list and on none of the others, so a Stier study had
-no colour and a Stier event could not be filtered for. Stier is now a PI lab on
+no color and a Stier event could not be filtered for. Stier is now a PI lab on
 all four; flip its `pi` toggle if that's wrong. Derivation makes the drift
 structurally impossible rather than a thing to remember.
 **Don't:** hardcode a fifth lab list. If something needs labs, derive it in
@@ -1151,10 +1151,10 @@ its screen name off `CS_LOCKED`; to release them all, delete the block and the
 `csApply()` line in `show()`. This is a courtesy, not security: the database
 rules are unchanged.
 
-### A name on the Task Board is coloured by where that person is in their day — 2026-09-18
-**Decision:** on the Board tab each name's text is coloured (`tbPersonState()`
+### A name on the Task Board is colored by where that person is in their day — 2026-09-18
+**Decision:** on the Board tab each name's text is colored (`tbPersonState()`
 in `app-03-people.js`). Only the text: the same day a highlighted bar with a
-background was tried, and Dillon asked for plain coloured names back, as the
+background was tried, and Dillon asked for plain colored names back, as the
 schedule's green name used to be. **Orange** means scheduled and not clocked in yet.
 **Green** means on the clock now. **Red** means clocked out today, or the shift
 has ended. A person with no shift and no punch stays plain grey. Clocking in
@@ -1166,17 +1166,17 @@ green again. Any day other than today can only be orange or grey, because
 nobody has clocked in on it yet. Dillon asked for all of this, including that
 unscheduled people stay grey until they clock in.
 **Why:** Bill can see who has actually turned up, not only who said they would.
-With the colour-blind palette on, the usual colour swap would turn red and
+With the color-blind palette on, the usual color swap would turn red and
 orange into two nearly identical oranges, and those are exactly the two
-colours this feature needs people to tell apart. So colour-blind mode uses
-three hand-picked colours instead: amber, blue and vermillion. Each dot also
+colors this feature needs people to tell apart. So color-blind mode uses
+three hand-picked colors instead: amber, blue and vermillion. Each dot also
 gets its own shape (diamond, circle, square), and the words under every name
-say what the colour means.
-**Don't:** remove the identity entries at the bottom of `CB_MAP` (colours that
+say what the color means.
+**Don't:** remove the identity entries at the bottom of `CB_MAP` (colors that
 map to themselves, like `'#0072b2':'#0072b2'`). They look pointless. But the
-colour-blind copy of the stylesheet sends *every* colour through `CB_MAP`,
+color-blind copy of the stylesheet sends *every* color through `CB_MAP`,
 including the hand-picked ones, and without those entries it would shift them
-a second time. Also don't read the board's colours from `currentRole` or from
+a second time. Also don't read the board's colors from `currentRole` or from
 the phone's own punches only: `window.tcBoardState()` reads the shared time
 clock, so a clock-in on someone else's phone reaches Bill's board.
 

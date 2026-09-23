@@ -2,15 +2,15 @@
  * Harness for the farm reference lists — mowers and labs.
  *
  * These are the lists the rest of the app reads: which machines exist and
- * what colour they draw, which labs exist and which of them run trials. They
+ * what color they draw, which labs exist and which of them run trials. They
  * were constants, written out more than once, and had already drifted apart.
  *
  * What it pins:
  *   1. One source     — the roster list, the calendar filter, the trials
- *                       colours and the legend badges all derive from
+ *                       colors and the legend badges all derive from
  *                       FARM_LABS and cannot disagree.
  *   2. Migration      — renaming a mower or a lab carries the records that
- *                       name it, or plots turn grey and studies lose colour.
+ *                       name it, or plots turn grey and studies lose color.
  *   3. Drift surfaced — a name in use but not on the list is reported, not
  *                       hidden.
  *   4. Validation     — a bad list, including one from a hand-edited backup,
@@ -107,7 +107,7 @@ section('1. four lists, one source');
   ok('the roster list is every lab', L.rst.length === names.length, L.rst.join(','));
   ok('and it is sorted, as it always was', JSON.stringify(L.rst) === JSON.stringify(names.slice().sort()), L.rst.join(','));
   ok('the calendar filter is every lab', JSON.stringify(L.cal) === JSON.stringify(names), L.cal.join(','));
-  ok('the trials colours are the research groups only', JSON.stringify(Object.keys(L.tr)) === JSON.stringify(pis), Object.keys(L.tr).join(','));
+  ok('the trials colors are the research groups only', JSON.stringify(Object.keys(L.tr)) === JSON.stringify(pis), Object.keys(L.tr).join(','));
   ok('Bill is not a research group', !('Bill' in L.tr));
   ok('every trials lab has a badge', Object.keys(L.tr).every(n => L.ab[n]), JSON.stringify(L.ab));
 
@@ -159,13 +159,13 @@ section('4. a bad lab list never replaces a good one');
   const n = b.p.FARM_LABS.length;
   ok('an empty list is refused', b.p.labsApply([]) === false && b.p.FARM_LABS.length === n);
   ok('a nameless lab is refused', b.p.labsApply([{ name: '', color: '#123456' }]) === false);
-  ok('a lab with no colour is refused', b.p.labsApply([{ name: 'X' }]) === false);
-  ok('a colour that is not a colour is refused', b.p.labsApply([{ name: 'X', color: 'red' }]) === false);
+  ok('a lab with no color is refused', b.p.labsApply([{ name: 'X' }]) === false);
+  ok('a color that is not a color is refused', b.p.labsApply([{ name: 'X', color: 'red' }]) === false);
   ok('a duplicate name is refused', b.p.labsApply([{ name: 'X', color: '#111111' }, { name: 'X', color: '#222222' }]) === false);
   ok('not a list at all is refused', b.p.labsApply('Brosnan') === false && b.p.FARM_LABS.length === n);
   ok('but a good list applies', b.p.labsApply([{ name: 'Solo', color: '#123456', pi: true }]) === true && b.p.FARM_LABS.length === 1);
 
-  const hostile = boot({ ut_labs_v1: JSON.stringify([{ name: 'Bad', color: 'not-a-colour' }]) });
+  const hostile = boot({ ut_labs_v1: JSON.stringify([{ name: 'Bad', color: 'not-a-color' }]) });
   ok('a hand-edited backup cannot break the lists', hostile.p.FARM_LABS.length > 1,
      String(hostile.p.FARM_LABS.length));
   const junk = boot({ ut_labs_v1: '{oh dear' });
@@ -221,7 +221,7 @@ section('7. the map reads the edited machines');
   b.p.MOWER_CFG[idx][1] = 'Tee Mower';
   b.p.MOWER_CFG[idx][2] = '#123456';
   ok('renaming the machine changes what the plot reads', b.p.mowerLabel(plot) === 'Tee Mower', b.p.mowerLabel(plot));
-  ok('and recolouring changes what it draws', b.p.mowerColor(plot) === '#123456', b.p.mowerColor(plot));
+  ok('and recoloring changes what it draws', b.p.mowerColor(plot) === '#123456', b.p.mowerColor(plot));
 
   /* Removing a machine leaves the plot naming something nobody lists. */
   const machine = b.p.MOWER_CFG[idx][0];
@@ -238,7 +238,7 @@ section('8. a bad mower list never replaces a good one');
   ok('an empty list is refused', b.p.mowersApply([]) === false && b.p.MOWER_CFG.length === n);
   ok('a short row is refused', b.p.mowersApply([['a', 'b']]) === false);
   ok('a blank machine is refused', b.p.mowersApply([['', 'b', '#111111']]) === false);
-  ok('a bad colour is refused', b.p.mowersApply([['a', 'b', 'blue']]) === false);
+  ok('a bad color is refused', b.p.mowersApply([['a', 'b', 'blue']]) === false);
   ok('but a good list applies', b.p.mowersApply([['a', 'b', '#111111']]) === true && b.p.MOWER_CFG.length === 1);
 
   const hostile = boot({ ut_mowers_v1: JSON.stringify([['x', 'y', 'chartreuse']]) });
@@ -286,7 +286,7 @@ section('9. the screens');
   ok('the derived lists followed', b.win.__lists().cal.indexOf('Renamed') >= 0 && b.win.__lists().cal.indexOf(was) < 0);
   ok('and it was written', JSON.parse(b.store['ut_labs_v1']).some(l => l.name === 'Renamed'));
 
-  /* A duplicate name has to be refused, or two labs share a colour slot. */
+  /* A duplicate name has to be refused, or two labs share a color slot. */
   const dup = b.doc.querySelector('[data-lb-name="2"]');
   const kept = b.p.FARM_LABS[2].name;
   dup.value = 'Renamed';

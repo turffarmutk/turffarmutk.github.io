@@ -241,7 +241,7 @@ So the database allows changes here, narrowly:
 Both drawers share on their own — there is nothing to switch on. **More → Admin
 → Shared database** shows a line per drawer saying whether it is working, and
 the schedule is the one where you will actually see the change: it drives the
-coloured names on the day board (orange scheduled, green clocked in, red
+colored names on the day board (orange scheduled, green clocked in, red
 clocked out — see `docs/DECISIONS.md`, 2026-09-18).
 
 ---

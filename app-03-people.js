@@ -1439,7 +1439,30 @@ function crewPill(c,on){return '<span class="ppill'+(on?' on':'')+'" data-person
 function isCrew(n){var id=pidOf(n);return !!id&&CREW.some(function(c){return c.pid===id;});}
 function isUndergrad(n){var id=pidOf(n);return !!id&&STUDENTS.indexOf(id)>=0;}
 function receivedRow(t){return '<div class="row"><div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+(t.area&&t.area!=='—'?t.area+' · ':'')+'from Bill</div></div><span class="pill tap" data-accept="'+t.id+'" style="background:#2f9e4f;color:#fff;flex:none">Accept ✓</span></div>';}
-function billSentRow(t){var done=t.status==='done';var pending=(t.kind==='request');var pill=done?'<span class="pill" style="background:#eaf3ea;color:#2f9e4f;flex:none">✓ Done</span>':(pending?'<span class="pill" style="background:#fff4e0;color:#9a5b00;flex:none">Pending</span>':'<span class="pill" style="background:#489FDF;color:#fff;flex:none">Accepted</span>');return '<div class="row"><div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">→ '+(t.target||'')+'</div></div>'+pill+'</div>';}
+/* THE BIN ON A REQUEST YOU RAISED - Dillon, 2026-09-23.
+   Bill can take back a job he asked a grad or a technician for, and a grad
+   or a technician can take back one they asked Bill for. Until now a request
+   was permanent the moment it was sent: there was no way to cancel one, so
+   work nobody wanted any more sat on somebody's screen until they did it or
+   Bill went round the board and deleted it by hand.
+
+   Nothing about WHO may do this is new. taskCan(...,'delete') has always said
+   "the person who raised it", and firestore.rules says the same thing in
+   canEdit(). This is the button that was missing, not the permission.
+
+   Two things it will not draw:
+     - on a finished job. That is the farm's record of work that actually
+       happened, and a request is the only place on the board somebody could
+       have quietly removed one.
+     - when taskCan() says no. A request filed before the app started
+       stamping createdBy has nobody the database recognises as its author,
+       so the bin would be a button that does nothing. Better absent. */
+function reqDelBtn(t){
+  if(!t||t.status==='done') return '';
+  if(!taskCan(SESSION.pid,'delete',t)) return '';
+  return '<span class="del tap" data-reqdel="'+t.id+'" title="Cancel this request">🗑</span>';
+}
+function billSentRow(t){var done=t.status==='done';var pending=(t.kind==='request');var pill=done?'<span class="pill" style="background:#eaf3ea;color:#2f9e4f;flex:none">✓ Done</span>':(pending?'<span class="pill" style="background:#fff4e0;color:#9a5b00;flex:none">Pending</span>':'<span class="pill" style="background:#489FDF;color:#fff;flex:none">Accepted</span>');return '<div class="row"><div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">→ '+(t.target||'')+'</div></div>'+pill+reqDelBtn(t)+'</div>';}
 function acceptCrewReq(id){var t=TASKS.find(function(x){return x.id===id;});if(!t)return;t.kind='task';t.assignee=pidOf(t.target);t.status='todo';toast('Accepted ✓');renderBoard();}
 function numBadge(n){return '<span style="width:22px;height:22px;border-radius:7px;background:#2f3133;color:#fff;font:800 12px \'Archivo\';display:flex;align-items:center;justify-content:center;flex:none;align-self:flex-start;margin-top:1px">'+n+'</span>';}
 function roRow(lead,title,sub){return '<div class="row" style="align-items:flex-start">'+(lead||'')+'<div style="flex:1;min-width:0"><div class="rt">'+title+'</div><div class="rs">'+sub+'</div></div></div>';}
@@ -1471,7 +1494,7 @@ function renderBoard(){
 }
 function boardEnter(){ tbTab=(currentRole==='manager'||currentRole==='faculty')?'board':'mine'; boardDay=boardDefaultDay(); renderBoard(); }
 function simpleTaskRow(t){var note=t.desc?'<div class="rs" style="margin-top:4px;color:#7b828d;line-height:1.4">'+esc(t.desc)+'</div>':'';return '<div class="row tap" data-task="'+t.id+'" style="align-items:flex-start"><div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+areaWithDue(t)+'</div>'+note+'</div><span style="color:#c2c7cd;font-size:17px;flex:none;align-self:center">›</span></div>';}
-function gradReqRow(t){var done=t.status==='done';var pending=(t.kind==='request'&&!t.assignee);var pill=done?'<span class="pill" style="background:#eaf3ea;color:#2f9e4f;flex:none">✓ Done</span>':(pending?'<span class="pill" style="background:#fff4e0;color:#9a5b00;flex:none">Pending</span>':'<span class="pill" style="background:#489FDF;color:#fff;flex:none">→ '+t.assignee+'</span>');return '<div class="row"><div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+(t.area||'')+'</div></div>'+pill+'</div>';}
+function gradReqRow(t){var done=t.status==='done';var pending=(t.kind==='request'&&!t.assignee);var pill=done?'<span class="pill" style="background:#eaf3ea;color:#2f9e4f;flex:none">✓ Done</span>':(pending?'<span class="pill" style="background:#fff4e0;color:#9a5b00;flex:none">Pending</span>':'<span class="pill" style="background:#489FDF;color:#fff;flex:none">→ '+t.assignee+'</span>');return '<div class="row"><div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+(t.area||'')+'</div></div>'+pill+reqDelBtn(t)+'</div>';}
 function openGradReq(){var a=document.getElementById('gr-name');if(a)a.value='';var b=document.getElementById('gr-area');if(b)b.value='';var c=document.getElementById('gr-note');if(c)c.value='';go('gradreq');}
 function submitGradReq(){var name=document.getElementById('gr-name').value.trim();if(!name){toast('Enter what you need');return;}var area=document.getElementById('gr-area').value.trim();var note=document.getElementById('gr-note').value.trim();TASKS.push({createdBy:SESSION.pid,id:newId('r'),title:name,area:area||'—',assignee:null,status:'todo',kind:'request',badge:null,type:'Miscellaneous',dueAt:atToday(null),repeat:'None',requestedBy:SESSION.pid,desc:note});toast('Request submitted ✓');back();tbTab='requests';renderBoard();}
 /* ---- the running order of somebody's day ----

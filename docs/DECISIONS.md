@@ -1133,6 +1133,32 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### A request can be taken back — 2026-09-23
+**Decision:** the Requests tab draws a bin on a request **you** raised, and
+tapping it asks before it removes the job everywhere. Bill gets it on his
+"Sent to grad / tech" list, and grad students and technicians get it on their
+"Sent to Bill" list. `reqDelBtn()` in `app-03-people.js` decides whether it is
+drawn; the `data-reqdel` handler in `app-04-spray-inventory.js` asks and then
+calls the existing `deleteTask()`.
+**Why:** Dillon asked for it. Until now a request was permanent the moment it
+was sent — the board's own bin only draws on Bill's Board tab, and a request
+sitting on nobody's day is never on that tab — so work nobody wanted any more
+sat on somebody's screen until they did it. **No permission changed and
+`firestore.rules` was not touched.** `taskCan(...,'delete')` and the rules
+file's `canEdit()` have both said "the person who raised it" since
+2026-08-31; the button is what was missing, not the right. That is also why
+the rules do not need publishing for this.
+**Don't:** three things. (1) Don't draw the bin on a **finished** request —
+that is the farm's record of work that actually happened, and this tab is the
+one screen it could have been quietly deleted from. (2) Don't draw it without
+asking `taskCan()` first: a request raised before the app stamped `createdBy`
+has no author the database recognises, so the bin would be a button that does
+nothing and says nothing. (3) Don't fold `data-reqdel` into the board's
+`data-del` handler to save a few lines — that one deletes with no question
+asked, which is fine for Bill removing a job off his own board and wrong for
+a request somebody else may already be out doing. `tools/test-task-permissions.js`
+section 8c holds all three.
+
 ### The graduate students are on the Task Board, and keep weekly hours — 2026-09-23
 **Decision:** two changes made together, because neither is worth much alone.
 (1) The Board tab lists the graduate students beside the undergraduates.

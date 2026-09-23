@@ -1180,6 +1180,26 @@ document.getElementById('s-taskboard').addEventListener('click',function(e){
     goes through deleteTask(), which checks who is asking and sends the removal
     to the shared copy itself -- see the note over that function. */
  var dl=e.target.closest('[data-del]'); if(dl){e.stopPropagation();var did=dl.getAttribute('data-del');var dt=TASKS.find(function(x){return x.id===did;});if(dt){var dn=dt.title;if(deleteTask(did)){toast('Deleted “'+dn+'”');renderBoard();}else toast('You cannot delete this task');}return;}
+ /* Cancelling a request you raised. Its own handler rather than the bin
+    above, because this one ASKS first — the same reason the task sheet's
+    Delete asks. A request that has been picked up is somebody's job now, so
+    taking it back takes it off their list, and the wording says which of the
+    two is happening. deleteTask() still has the final say on who may. */
+ var rq=e.target.closest('[data-reqdel]');
+ if(rq){
+   e.stopPropagation();
+   var rqid=rq.getAttribute('data-reqdel');
+   var rqt=TASKS.find(function(x){return x.id===rqid;}); if(!rqt)return;
+   var taken=(rqt.kind!=='request'||!!rqt.assignee);
+   if(!confirm('Cancel “'+rqt.title+'”?\n\n'
+     +(taken?'Somebody has already picked this up, so it comes off their list too.'
+            :'It disappears from the other person’s list of requests.')
+     +' There is no undo.')) return;
+   var rqn=rqt.title;
+   if(deleteTask(rqid)){ toast('Cancelled “'+rqn+'”'); renderBoard(); }
+   else toast('You cannot cancel this request');
+   return;
+ }
  var rs=e.target.closest('[data-rest]'); if(rs){e.stopPropagation();openRestSheet(rs.getAttribute('data-rest'));return;}
  var rd=e.target.closest('[data-restdrop]'); if(rd){e.stopPropagation();dropRest(rd.getAttribute('data-restdrop'));return;}
  var mv=e.target.closest('[data-move]'); if(mv){e.stopPropagation();moveTask(mv.getAttribute('data-id'),mv.getAttribute('data-move'));return;}

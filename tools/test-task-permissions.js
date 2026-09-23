@@ -174,6 +174,69 @@ section('8b. a lab-assigned undergrad answers to their lab');
   ok('Bill can, because he holds the job',                   can('p07', 'assign', to('p20')));
 }
 
+/* CANCELLING A REQUEST YOU RAISED - Dillon, 2026-09-23.
+
+   Bill asks a grad or a technician for help; a grad or a technician asks Bill
+   for an undergrad. Either of them can now take that request back, from the
+   bin on the row. taskCan() already said they could -- the button was what was
+   missing -- so what this section guards is that the BUTTON and the RULE keep
+   giving the same answer.
+
+   The thing to get wrong here is drawing a bin that does nothing. reqDelBtn()
+   is the only thing deciding whether it appears, and deleteTask() is the only
+   thing deciding whether the removal happens; if those two ever disagree,
+   somebody taps a bin and watches the row stay put with no explanation. So
+   every case below checks them together.
+
+   The finished-job case is the one that is not about permission at all: a
+   completed request is the farm's record of work that actually happened, and
+   the Requests tab is the one screen where it could have been quietly
+   deleted. No bin there, on purpose. */
+section('8c. taking back a request you raised');
+{
+  const bin = (me, t) => { win.SESSION.pid = me; return win.reqDelBtn(t) !== ''; };
+  const req = (by, extra) => Object.assign(
+    { id: 'rq1', title: 'Mow the alleys', kind: 'request', status: 'todo',
+      assignee: null, createdBy: by, requestedBy: by }, extra || {});
+
+  ok('Bill gets a bin on the request he sent a grad',  bin('p07', req('p07', { origin: 'manager', target: 'p09' })));
+  ok('a grad gets one on the request she sent Bill',   bin('p09', req('p09')));
+  ok('so does a technician',                           bin('p02', req('p02')));
+  ok('and the rule agrees in all three cases',
+     can('p07', 'delete', req('p07')) && can('p09', 'delete', req('p09')) && can('p02', 'delete', req('p02')));
+
+  ok('no bin on somebody ELSE\'s request',             !bin('p02', req('p09')));
+  ok('and the rule refuses that one too',              !can('p02', 'delete', req('p09')));
+
+  ok('no bin on a FINISHED job -- that is the record', !bin('p09', req('p09', { status: 'done' })));
+  ok('even for Bill, who may delete anything else',    !bin('p07', req('p09', { status: 'done' })));
+
+  /* Still cancellable once Bill has handed it to an undergrad: the point of
+     cancelling is usually that the work is no longer wanted, and the app asks
+     first and says the job comes off that person's list. */
+  ok('still there once an undergrad is on it',
+     bin('p09', req('p09', { kind: 'task', assignee: 'p18' })));
+
+  /* A request raised before the app started stamping createdBy has no author
+     the database recognises, so a bin on it would be refused on the way up. */
+  ok('no bin on a request with no author on record',
+     !bin('p09', { id: 'rq0', title: 'Old one', kind: 'request', status: 'todo', assignee: null, requestedBy: 'p09' }));
+
+  ok('a deactivated person gets no bin on their own old request', (function () {
+    const p = win.rstFind('p09'); p.active = false;
+    const b = bin('p09', req('p09')); p.active = true; return !b;
+  })());
+
+  /* The two rows that draw it, so a future tidy-up of either cannot drop it. */
+  win.SESSION.pid = 'p09';
+  ok('the "Sent to Bill" row carries the bin',
+     win.gradReqRow(req('p09')).indexOf('data-reqdel="rq1"') >= 0);
+  win.SESSION.pid = 'p07';
+  ok('and so does Bill\'s "Sent to grad / tech" row',
+     win.billSentRow(req('p07', { origin: 'manager', target: 'p09' })).indexOf('data-reqdel="rq1"') >= 0);
+  win.SESSION.pid = null;
+}
+
 section('9. the whole grid, so nothing is allowed by accident');
 {
   /* Every actor against every target. Anything true that is not in this list

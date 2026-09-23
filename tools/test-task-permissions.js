@@ -44,7 +44,14 @@ Object.defineProperty(win, 'localStorage', {
   value: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); },
            removeItem: k => { delete store[k]; }, clear: () => { store = {}; } }, configurable: true });
 win.navigator.geolocation = { watchPosition: () => 1, clearWatch: noop, getCurrentPosition: noop };
-try { win.eval(appSource(win.document)); }
+/* TASKS, currentRole and tbTab are `let`, so they are global lexical bindings
+   and never appear on `window`. Section 8d needs to set them to draw the board
+   the way a faculty member sees it, so the app is handed two accessors that
+   evaluate in its own scope -- the same shim tools/test-task-mutation.js uses
+   and for the same reason. */
+try { win.eval(appSource(win.document)
+        + '\n;window.__get=function(k){return eval(k);};'
+        + '\n;window.__set=function(k,v){eval(k+"=v");};'); }
 catch (e) { console.log('app script threw: ' + e.message); fail++; }
 
 const can = (a, act, t) => win.taskCan(a, act, t);
@@ -227,6 +234,25 @@ section('8c. taking back a request you raised');
     const b = bin('p09', req('p09')); p.active = true; return !b;
   })());
 
+  /* FACULTY - Dillon, 2026-09-23: "anyone" means anyone. They raise requests
+     through the same form and the same fields, so the same bin applies. Their
+     tab used to be a single read-only list of the whole farm's open requests
+     with no row of their own on it at all, which is why they were the one role
+     left out when the bin first shipped. */
+  ok('faculty get a bin on the request THEY raised',   bin('p16', req('p16')));
+  ok('and the rule agrees',                            can('p16', 'delete', req('p16')));
+  ok('but not on another lab\'s request',              !bin('p16', req('p12')));
+  ok('nor on a finished one of their own',             !bin('p16', req('p16', { status: 'done' })));
+
+  /* Faculty CAN delete work sitting on their own lab's people -- a separate
+     clause in taskCan() that predates all of this. Worth pinning: it is the
+     one case where the bin appears on something they did not raise, and it is
+     deliberate, not a leak. */
+  ok('faculty may still remove work on their own lab member',
+     can('p16', 'delete', req('p09', { kind: 'task', assignee: 'p09' })));
+  ok('but not on another lab\'s',
+     !can('p16', 'delete', req('p12', { kind: 'task', assignee: 'p12' })));
+
   /* The two rows that draw it, so a future tidy-up of either cannot drop it. */
   win.SESSION.pid = 'p09';
   ok('the "Sent to Bill" row carries the bin',
@@ -234,6 +260,65 @@ section('8c. taking back a request you raised');
   win.SESSION.pid = 'p07';
   ok('and so does Bill\'s "Sent to grad / tech" row',
      win.billSentRow(req('p07', { origin: 'manager', target: 'p09' })).indexOf('data-reqdel="rq1"') >= 0);
+  win.SESSION.pid = null;
+}
+
+/* THE FACULTY REQUESTS TAB, AS IT IS ACTUALLY DRAWN.
+   The section above proves the button is allowed; this proves it is on the
+   screen. They are different failures: faculty had the right to cancel all
+   along, and still could not, because the tab never drew a row of their own
+   for the bin to sit on. A permission nobody can reach is not a permission. */
+section('8d. the faculty Requests tab lists their own requests');
+{
+  const mine  = { id: 'fq1', title: 'Two students on the alleys', kind: 'request', status: 'todo',
+                  assignee: null, origin: 'crew', createdBy: 'p16', requestedBy: 'p16', students: 2 };
+  const hers  = { id: 'fq2', title: 'Somebody else asked for this', kind: 'request', status: 'todo',
+                  assignee: null, origin: 'crew', createdBy: 'p09', requestedBy: 'p09', students: 3 };
+  const fromBill = { id: 'fq3', title: 'Bill asked a grad', kind: 'request', status: 'todo',
+                     assignee: null, origin: 'manager', target: 'p09', createdBy: 'p07', requestedBy: 'p07' };
+  const TASKS = win.__get('TASKS');
+  const keep = TASKS.slice();
+  TASKS.length = 0;
+  TASKS.push(mine, hers, fromBill);
+
+  const draw = (pid, role) => {
+    win.SESSION.pid = pid; win.__set('currentRole', role); win.__set('tbTab', 'requests');
+    win.renderBoard();
+    const b = win.document.getElementById('tb-body');
+    return { html: b.innerHTML,
+             secs: [...b.querySelectorAll('.sec')].map(e => e.textContent.trim()) };
+  };
+
+  const fac = draw('p16', 'faculty');
+  ok('their own requests get a section of their own',
+     fac.secs.some(t => /Sent to Bill/.test(t)), fac.secs.join(' | '));
+  ok('with a bin on the one they raised',        fac.html.indexOf('data-reqdel="fq1"') >= 0);
+  ok('the farm\'s open queue is still there',     fac.secs.some(t => /open requests/i.test(t)));
+  ok('somebody else\'s request is in it',         fac.html.indexOf('Somebody else asked') >= 0);
+  ok('and carries no bin',                        fac.html.indexOf('data-reqdel="fq2"') < 0);
+  ok('their own is not listed twice',
+     fac.html.split('Two students on the alleys').length - 1 === 1);
+  /* Bill's request form only offers grads and technicians, so this section
+     would be permanently empty for faculty and is left out rather than drawn. */
+  ok('no empty "From Bill" section for faculty', !fac.secs.some(t => /From Bill/.test(t)));
+  /* The raw roster id used to be printed here -- "p09 · needs 3". */
+  ok('the asker is named, not printed as an id',
+     fac.html.indexOf('Rose') >= 0 && !/>p09/.test(fac.html));
+
+  const grad = draw('p09', 'grad');
+  ok('a grad student still gets the "From Bill" section',
+     grad.secs.some(t => /From Bill/.test(t)), grad.secs.join(' | '));
+  ok('and can still accept from it',              grad.html.indexOf('data-accept="fq3"') >= 0);
+  ok('with a bin on what they raised',            grad.html.indexOf('data-reqdel="fq2"') >= 0);
+  ok('and none on what Bill sent them',           grad.html.indexOf('data-reqdel="fq3"') < 0);
+
+  const bill = draw('p07', 'manager');
+  ok('Bill\'s two sections are unchanged',
+     bill.secs.some(t => /From crew/.test(t)) && bill.secs.some(t => /Sent to grad/.test(t)),
+     bill.secs.join(' | '));
+  ok('with a bin on the one he sent',             bill.html.indexOf('data-reqdel="fq3"') >= 0);
+
+  TASKS.length = 0; keep.forEach(t => TASKS.push(t));
   win.SESSION.pid = null;
 }
 

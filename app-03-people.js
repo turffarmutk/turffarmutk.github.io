@@ -1462,7 +1462,7 @@ function reqDelBtn(t){
   if(!taskCan(SESSION.pid,'delete',t)) return '';
   return '<span class="del tap" data-reqdel="'+t.id+'" title="Cancel this request">🗑</span>';
 }
-function billSentRow(t){var done=t.status==='done';var pending=(t.kind==='request');var pill=done?'<span class="pill" style="background:#eaf3ea;color:#2f9e4f;flex:none">✓ Done</span>':(pending?'<span class="pill" style="background:#fff4e0;color:#9a5b00;flex:none">Pending</span>':'<span class="pill" style="background:#489FDF;color:#fff;flex:none">Accepted</span>');return '<div class="row"><div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">→ '+(t.target||'')+'</div></div>'+pill+reqDelBtn(t)+'</div>';}
+function billSentRow(t){var done=t.status==='done';var pending=(t.kind==='request');var pill=done?'<span class="pill" style="background:#eaf3ea;color:#2f9e4f;flex:none">✓ Done</span>':(pending?'<span class="pill" style="background:#fff4e0;color:#9a5b00;flex:none">Pending</span>':'<span class="pill" style="background:#489FDF;color:#fff;flex:none">Accepted</span>');return '<div class="row"><div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">→ '+esc(nameOf(t.target)||t.target||'')+'</div></div>'+pill+reqDelBtn(t)+'</div>';}
 function acceptCrewReq(id){var t=TASKS.find(function(x){return x.id===id;});if(!t)return;t.kind='task';t.assignee=pidOf(t.target);t.status='todo';toast('Accepted ✓');renderBoard();}
 function numBadge(n){return '<span style="width:22px;height:22px;border-radius:7px;background:#2f3133;color:#fff;font:800 12px \'Archivo\';display:flex;align-items:center;justify-content:center;flex:none;align-self:flex-start;margin-top:1px">'+n+'</span>';}
 function roRow(lead,title,sub){return '<div class="row" style="align-items:flex-start">'+(lead||'')+'<div style="flex:1;min-width:0"><div class="rt">'+title+'</div><div class="rs">'+sub+'</div></div></div>';}
@@ -1494,7 +1494,7 @@ function renderBoard(){
 }
 function boardEnter(){ tbTab=(currentRole==='manager'||currentRole==='faculty')?'board':'mine'; boardDay=boardDefaultDay(); renderBoard(); }
 function simpleTaskRow(t){var note=t.desc?'<div class="rs" style="margin-top:4px;color:#7b828d;line-height:1.4">'+esc(t.desc)+'</div>':'';return '<div class="row tap" data-task="'+t.id+'" style="align-items:flex-start"><div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+areaWithDue(t)+'</div>'+note+'</div><span style="color:#c2c7cd;font-size:17px;flex:none;align-self:center">›</span></div>';}
-function gradReqRow(t){var done=t.status==='done';var pending=(t.kind==='request'&&!t.assignee);var pill=done?'<span class="pill" style="background:#eaf3ea;color:#2f9e4f;flex:none">✓ Done</span>':(pending?'<span class="pill" style="background:#fff4e0;color:#9a5b00;flex:none">Pending</span>':'<span class="pill" style="background:#489FDF;color:#fff;flex:none">→ '+t.assignee+'</span>');return '<div class="row"><div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+(t.area||'')+'</div></div>'+pill+reqDelBtn(t)+'</div>';}
+function gradReqRow(t){var done=t.status==='done';var pending=(t.kind==='request'&&!t.assignee);var pill=done?'<span class="pill" style="background:#eaf3ea;color:#2f9e4f;flex:none">✓ Done</span>':(pending?'<span class="pill" style="background:#fff4e0;color:#9a5b00;flex:none">Pending</span>':'<span class="pill" style="background:#489FDF;color:#fff;flex:none">→ '+esc(nameOf(t.assignee)||t.assignee||'')+'</span>');return '<div class="row"><div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+(t.area||'')+'</div></div>'+pill+reqDelBtn(t)+'</div>';}
 function openGradReq(){var a=document.getElementById('gr-name');if(a)a.value='';var b=document.getElementById('gr-area');if(b)b.value='';var c=document.getElementById('gr-note');if(c)c.value='';go('gradreq');}
 function submitGradReq(){var name=document.getElementById('gr-name').value.trim();if(!name){toast('Enter what you need');return;}var area=document.getElementById('gr-area').value.trim();var note=document.getElementById('gr-note').value.trim();TASKS.push({createdBy:SESSION.pid,id:newId('r'),title:name,area:area||'—',assignee:null,status:'todo',kind:'request',badge:null,type:'Miscellaneous',dueAt:atToday(null),repeat:'None',requestedBy:SESSION.pid,desc:note});toast('Request submitted ✓');back();tbTab='requests';renderBoard();}
 /* ---- the running order of somebody's day ----
@@ -1843,21 +1843,44 @@ function renderTasks(){
      html+='<div class="sec">Sent to grad / tech</div>';
      html+= sentCrew.length? '<div class="list">'+sentCrew.map(billSentRow).join('')+'</div>'
           : '<div class="sec" style="text-align:center;margin:8px 0;color:#9aa0a6">None sent</div>';
-   } else if(currentRole==='faculty'){
-     var freqs=TASKS.filter(function(t){return t.kind==='request'&&!t.assignee&&t.origin!=='manager';});
-     html+= freqs.length? '<div class="sec">Open requests to Bill</div><div class="list">'+freqs.map(function(t){var needs=(t.students&&t.students>1)?' · needs '+t.students:'';return roRow('',t.title,t.requestedBy+needs);}).join('')+'</div>'
-          : '<div class="sec" style="text-align:center;margin-top:26px">No open requests</div>';
    } else {
-     /* Both of these used to match on a display name — `target===meName()` and
+     /* EVERYBODY WHO IS NOT BILL SEES THE SAME THING FIRST: what THEY asked
+        for, one row each, with a bin to take it back (reqDelBtn()).
+
+        Faculty used to be the exception and it was the wrong way round. Their
+        tab was a single read-only list of the whole farm's open requests, so
+        the one thing a faculty member could NOT find on this screen was the
+        request they had made themselves -- and with no row of their own there
+        was nowhere to put a bin. Dillon, 2026-09-23: anyone who raises a
+        request can cancel it, so everyone needs their own list. Faculty keep
+        the farm-wide list as well, below their own.
+
+        Both filters used to match on a display name -- `target===meName()` and
         a startsWith on the "Name · Role" string. Ids compare exactly. */
      var received=TASKS.filter(function(t){return t.kind==='request'&&t.origin==='manager'&&isMe(t.target);});
      var sent=TASKS.filter(function(t){return isMe(t.requestedBy);});
-     html+='<div class="sec">From Bill — accept to add to your list</div>';
-     html+= received.length? '<div class="list">'+received.map(receivedRow).join('')+'</div>'
-          : '<div class="sec" style="text-align:center;margin:8px 0 6px;color:#9aa0a6">Nothing from Bill</div>';
+     /* Bill's own request form only offers grads and technicians (CREW), so a
+        faculty member can never have anything in here. Left out for them
+        rather than drawn permanently empty. */
+     if(currentRole!=='faculty'){
+       html+='<div class="sec">From Bill — accept to add to your list</div>';
+       html+= received.length? '<div class="list">'+received.map(receivedRow).join('')+'</div>'
+            : '<div class="sec" style="text-align:center;margin:8px 0 6px;color:#9aa0a6">Nothing from Bill</div>';
+     }
      html+='<div class="sec">Sent to Bill</div>';
      html+= sent.length? '<div class="list">'+sent.map(gradReqRow).join('')+'</div>'
           : '<div class="sec" style="text-align:center;margin:8px 0;color:#9aa0a6">No requests sent</div>';
+     /* Faculty only, and read-only on purpose: this is the farm's open queue,
+        which they watch rather than act on -- only Bill hands undergrads out.
+        Their own are taken out of it because they are listed above, with the
+        bin; leaving them in both places would offer two different answers
+        about the same request on one screen. */
+     if(currentRole==='faculty'){
+       var freqs=TASKS.filter(function(t){return t.kind==='request'&&!t.assignee&&t.origin!=='manager'&&!isMe(t.requestedBy);});
+       html+='<div class="sec">Everyone else’s open requests</div>';
+       html+= freqs.length? '<div class="list">'+freqs.map(function(t){var needs=(t.students&&t.students>1)?' · needs '+t.students:'';return roRow('',esc(t.title),esc(reqByLabel(t.requestedBy)+needs));}).join('')+'</div>'
+            : '<div class="sec" style="text-align:center;margin:8px 0;color:#9aa0a6">No open requests</div>';
+     }
    }
  }
  if(daysbar){daysbar.innerHTML=showDays?boardDayChips():'';daysbar.style.display=showDays?'':'none';}

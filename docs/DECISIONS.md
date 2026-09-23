@@ -1135,11 +1135,22 @@ always offer the bake-in after map editing.
 
 ### A request can be taken back — 2026-09-23
 **Decision:** the Requests tab draws a bin on a request **you** raised, and
-tapping it asks before it removes the job everywhere. Bill gets it on his
-"Sent to grad / tech" list, and grad students and technicians get it on their
-"Sent to Bill" list. `reqDelBtn()` in `app-03-people.js` decides whether it is
-drawn; the `data-reqdel` handler in `app-04-spray-inventory.js` asks and then
-calls the existing `deleteTask()`.
+tapping it asks before it removes the job everywhere. **Everyone who can raise
+a request can cancel one** — Bill on his "Sent to grad / tech" list, and grad
+students, technicians **and faculty** on their "Sent to Bill" list.
+`reqDelBtn()` in `app-03-people.js` decides whether it is drawn; the
+`data-reqdel` handler in `app-04-spray-inventory.js` asks and then calls the
+existing `deleteTask()`.
+
+Faculty needed a second change to get there. Their Requests tab was a single
+read-only list of the whole farm's open requests with no row of their own on
+it, so there was nowhere to put a bin. They now get the same "Sent to Bill"
+section everybody else has, with the farm-wide list kept below it and their
+own requests taken out of it — one request, one row, one answer. The
+farm-wide list stays read-only: watching the queue is not the same as handing
+undergraduates out, which is still only Bill. There is no "From Bill" section
+for faculty because `openCrewReq()` only offers `CREW` — grads and
+technicians — so it could never hold anything.
 **Why:** Dillon asked for it. Until now a request was permanent the moment it
 was sent — the board's own bin only draws on Bill's Board tab, and a request
 sitting on nobody's day is never on that tab — so work nobody wanted any more
@@ -1157,7 +1168,14 @@ nothing and says nothing. (3) Don't fold `data-reqdel` into the board's
 `data-del` handler to save a few lines — that one deletes with no question
 asked, which is fine for Bill removing a job off his own board and wrong for
 a request somebody else may already be out doing. `tools/test-task-permissions.js`
-section 8c holds all three.
+section 8c holds all three, and 8d holds the tab as it is actually drawn for
+each role — a permission nobody can reach on screen is not a permission, which
+is the whole reason faculty were left out of the first version.
+
+While these rows were open, two of them were printing a raw roster id where a
+person's name belongs — "→ p09" on Bill's sent list and on an assigned
+request, and "p09 · needs 3" as the asker on the faculty list. Fixed with
+`nameOf()` / `reqByLabel()` in the same change.
 
 ### The graduate students are on the Task Board, and keep weekly hours — 2026-09-23
 **Decision:** two changes made together, because neither is worth much alone.

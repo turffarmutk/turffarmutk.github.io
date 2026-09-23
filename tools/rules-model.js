@@ -223,7 +223,7 @@ function eqPickOk(before, after, mePid) {
 const WORK_FIELDS = ['donePlots', 'doneTrials', 'mix', 'eqUsed', 'updatedAt'];
 const COMPLETION_FIELDS = ['status', 'completedBy', 'completedAt', 'closedBy', 'completedNote', '_logged',
                            'done', 'units', 'updatedAt', 'donePlots', 'doneTrials', 'mix', 'eqUsed',
-                           'partial', 'leftPlots'];
+                           'partial', 'leftPlots', 'paintUsed'];
 function onTaskM(t, pid) {
   return pid !== '' && (t.assignee === pid || (t.helpers || []).indexOf(pid) >= 0);
 }

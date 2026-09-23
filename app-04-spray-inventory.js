@@ -541,6 +541,18 @@ function mixInvDecrement(items,refId,noteText){
   return {moved:moved,warn:warn};
 }
 
+/* The paint a trial-dots job used, for the Field Log and the task detail
+   screen. It fills the same product/amount columns a spray's mix does, so a
+   line on the log reads the same way whatever was applied. Null when the job
+   never carried an answer — an old job finished before this existed, or any
+   other kind of task. */
+function taskPaintSummary(t){
+  var p=t&&t.paintUsed;
+  if(!p||!(p.cans>0)) return null;
+  var it=p.item?INVENTORY.find(function(x){return x.id===p.item;}):null;
+  return {name:it?it.name:'Marking paint', text:p.cans+' can'+(p.cans===1?'':'s')};
+}
+
 /* One-line summary that rides onto the Field Log when the task is completed. */
 function mixSummaryFor(t){
   if(!sprayIsBoom(t)) return null;
@@ -843,7 +855,10 @@ function openTask(id){
  var rows='';
  rows+=fldRow('Task type',t.type);
  rows+=fldRow('Plot / area',t.area);
- if(t.status==='done'){ rows+=fldRow('Completed by',nameOf(t.completedBy)); rows+=fldRow('Time',fmtTime(t.completedAt)||t.completedAt); }
+ if(t.status==='done'){ rows+=fldRow('Completed by',nameOf(t.completedBy)); rows+=fldRow('Time',fmtTime(t.completedAt)||t.completedAt);
+   /* What went out of the paint cage on a trial-dots job. Bill reads this when
+      the Inventory count looks wrong and he wants to know where it went. */
+   var pnSum=taskPaintSummary(t); if(pnSum) rows+=fldRow('Paint used',esc(pnSum.text+' · '+pnSum.name)); }
  else if(isReq){ rows+=fldRow('Requested by',reqByLabel(t.requestedBy)); rows+=fldRow('Students needed',t.students||1); }
  else { rows+=fldRow('Assigned to',taskCrewLabel(t)); rows+=fldRow('When',(isFutureTask(t)?'📅 ':'')+(dueLabel(t)||'Today')); }
  /* Who put this job on the list. It was never shown before, and its absence
@@ -909,8 +924,91 @@ function plotsSummary(a){
 function progressCard(done,total){var pct=total?Math.round(done/total*100):0;return '<div class="progcard"><div class="progtop"><span class="progn">'+done+' of '+total+' done</span><span class="progpct">'+pct+'%</span></div><div class="progbar"><div class="progfill" style="width:'+pct+'%"></div></div></div>';}
 function parsePlots(t){if(t.plots&&t.plots.length)return t.plots.slice();var m=(t.area||'').match(/Plots?\s+(.+)/i);if(!m)return [];var out=[];m[1].split(',').forEach(function(part){part=part.trim();var r=part.match(/^(\d+)\s*[–-]\s*(\d+)$/);if(r){for(var i=+r[1];i<=+r[2];i++)out.push(''+i);}else if(/^(\d+)$/.test(part))out.push(part);else if(/^gh/i.test(part))out.push('GH');});return out;}
 function nowTime(){var d=new Date(),h=d.getHours(),m=d.getMinutes();return (h%12||12)+':'+(m<10?'0'+m:m)+(h<12?'a':'p');}
+/* ---- paint on a trial-dots job ------------------------------------------
+   Dillon, 2026-09-23. The dots are sprayed out of cans, and until now those
+   cans left the shelf with nothing recording it -- so the Paint · Cans count
+   on the Inventory screen was only ever right on the day somebody typed it
+   in. The student who did the job is the one who knows how many cans went, so
+   the finish sheet asks them, and the answer comes off the shelf.
+
+   WHOLE CANS ONLY, and a dropdown rather than a typed box on purpose: half a
+   can is not something anybody can measure standing in a field, and a number
+   box on a phone invites "1.5" and stray zeros. Picking from a list rounds the
+   answer for them, which is what Dillon asked for.
+
+   THE PAINT ITSELF IS NOT NAMED HERE, and that is the point. It is whatever
+   products sit in the Paint · Cans category of the inventory, which Bill adds
+   on the Inventory screen -- so a new colour, a new brand or a second paint
+   never needs this file edited again. One product and it is used without
+   asking; more than one and the student says which. None set up yet and the
+   job still finishes -- it says plainly that nothing came off the shelf,
+   because refusing to let somebody close a job over paperwork is the mistake
+   that cost the farm three weeks in September. */
+var PAINT_MAX_CANS=12;      /* where the dropdown stops — Dillon, 2026-09-23 */
+function paintCanItems(){
+  try{ return INVENTORY.filter(function(it){ return it&&it.cat==='paint_can'; }); }catch(e){ return []; }
+}
+function taskAsksPaint(t){
+  return !!t && typeof jobIsTrialDots==='function' && jobIsTrialDots(t.type,t.title);
+}
+/* A can is a CONTAINER; the shelf is counted in the product's own unit. This
+   is the same sum the restock screen does (containers x container size), so a
+   paint set up as 1 'can' takes 2 off for two cans, and one set up as a 17 oz
+   can takes 34 oz off. Getting this wrong by using the can count directly
+   would take 2 oz off a 17 oz can. */
+function paintCanAmount(it,cans){ return (+cans||0)*(+(it&&it.csize)||1); }
+/* What the finish sheet's paint dropdowns say right now. ok:false means the
+   job wants an answer and has not got one -- `why` is what to put on the
+   button. */
+function donePaintRead(t){
+  if(!taskAsksPaint(t)) return {ok:true,val:null};
+  var isel=document.getElementById('ds-paint-item'), csel=document.getElementById('ds-paint-cans');
+  if(isel&&!isel.value) return {ok:false,why:'Pick which paint you used'};
+  var cans=csel?parseInt(csel.value,10):NaN;
+  if(!(cans>0)) return {ok:false,why:'Pick how many cans you used'};
+  var items=paintCanItems(), id=isel?isel.value:((items[0]&&items[0].id)||'');
+  var val={cans:cans};
+  /* No id when nothing is set up under Paint · Cans yet. The count is still
+     recorded on the job; there is simply no shelf to take it off. */
+  if(id) val.item=id;
+  return {ok:true,val:val};
+}
+function donePaintHtml(t){
+  if(!taskAsksPaint(t)) return '';
+  var items=paintCanItems(), h='<div class="ds-lbl">Paint used</div>';
+  if(items.length>1){
+    h+='<select class="ds-sel" id="ds-paint-item"><option value="">Which paint?</option>'
+      +items.map(function(it){
+         return '<option value="'+esc(it.id)+'">'+esc(it.name)+' · '+esc(fmt(invQty(it))+' '+it.unit)+' on hand</option>';
+       }).join('')+'</select>';
+  }
+  h+='<select class="ds-sel" id="ds-paint-cans"><option value="">How many cans?</option>';
+  for(var n=1;n<=PAINT_MAX_CANS;n++) h+='<option value="'+n+'">'+n+' can'+(n===1?'':'s')+'</option>';
+  h+='</select>';
+  h+='<div class="ds-hint">'+(items.length
+      ? (items.length===1?(esc(items[0].name)+' · '+esc(fmt(invQty(items[0]))+' '+items[0].unit)+' on hand. '):'')
+        +'Whole cans only — round to the nearest can.'
+      : 'No paint is set up under Paint · Cans on the Inventory screen yet, so nothing comes off the shelf. The number still goes on the job and the Field Log.')
+   +'</div>';
+  return h;
+}
+/* Only the button is redrawn when a dropdown changes. Rebuilding the block
+   would throw away the choice that was just made. */
+function donePaintPaint(){
+  if(!doneSheet) return;
+  var b=doneSheet.querySelector('.ds-confirm'); if(!b) return;
+  var r=donePaintRead(TASKS.find(function(x){return x.id===doneTaskId;}));
+  b.classList.toggle('ds-off',!r.ok);
+  b.textContent=r.ok?'Confirm ✓':r.why;
+}
 var doneSheet=null, doneTaskId=null;
-function ensureDoneSheet(){ if(doneSheet)return; doneSheet=document.createElement('div'); doneSheet.id='donesheet'; doneSheet.innerHTML='<div class="ds-back"></div><div class="ds-card"><div class="ds-title">Mark task complete?</div><div class="ds-sub" id="ds-sub"></div><div class="ds-btns"><div class="ds-cancel tap">Cancel</div><div class="ds-confirm tap">Confirm ✓</div></div></div>'; app.appendChild(doneSheet); doneSheet.querySelector('.ds-back').addEventListener('click',closeDoneSheet); doneSheet.querySelector('.ds-cancel').addEventListener('click',closeDoneSheet); doneSheet.querySelector('.ds-confirm').addEventListener('click',function(){completeTask(doneTaskId);}); }
+function ensureDoneSheet(){ if(doneSheet)return; doneSheet=document.createElement('div'); doneSheet.id='donesheet'; doneSheet.innerHTML='<div class="ds-back"></div><div class="ds-card"><div class="ds-title">Mark task complete?</div><div class="ds-sub" id="ds-sub"></div><div id="ds-extra"></div><div class="ds-btns"><div class="ds-cancel tap">Cancel</div><div class="ds-confirm tap">Confirm ✓</div></div></div>'; app.appendChild(doneSheet); doneSheet.querySelector('.ds-back').addEventListener('click',closeDoneSheet); doneSheet.querySelector('.ds-cancel').addEventListener('click',closeDoneSheet);
+ doneSheet.addEventListener('change',function(e){ if(e.target&&/^ds-paint-/.test(e.target.id||'')) donePaintPaint(); });
+ doneSheet.querySelector('.ds-confirm').addEventListener('click',function(){
+   var r=donePaintRead(TASKS.find(function(x){return x.id===doneTaskId;}));
+   if(!r.ok){ toast(r.why); return; }
+   completeTask(doneTaskId,'',r.val);
+ }); }
 function openDoneSheet(id){ var t=TASKS.find(function(x){return x.id===id;});
  /* Whatever the sheet says went in the tank ends up in the Field Log and in the
     spray record, so a name that is not a product on the farm cannot be signed
@@ -919,12 +1017,25 @@ function openDoneSheet(id){ var t=TASKS.find(function(x){return x.id===id;});
    var bad=mixProducts(t.mix).filter(function(p){ return (p.name||'').trim()&&!mixProdItem(p); });
    if(bad.length){ toast('Pick “'+bad[0].name+'” from inventory first'); return; }
  }
- ensureDoneSheet(); doneTaskId=id; doneSheet.querySelector('#ds-sub').textContent=t?t.title:''; doneSheet.classList.add('show'); }
+ ensureDoneSheet(); doneTaskId=id; doneSheet.querySelector('#ds-sub').textContent=t?t.title:'';
+ /* A trial-dots job asks how much paint went before it will close. Everything
+    else gets an empty block and the sheet it always had. */
+ doneSheet.querySelector('#ds-extra').innerHTML=donePaintHtml(t);
+ donePaintPaint();
+ doneSheet.classList.add('show'); }
 function closeDoneSheet(){ if(doneSheet)doneSheet.classList.remove('show'); }
-function completeTask(id,note){ var t=TASKS.find(function(x){return x.id===id;}); if(!t)return; t.status='done';
+function completeTask(id,note,paint){ var t=TASKS.find(function(x){return x.id===id;}); if(!t)return; t.status='done';
  /* Who did the work and who closed the job are not always the same person —
     Bill clears a job an undergrad finished. The log credits the worker and
     keeps the closer beside it, so neither is guessed at later. */
+ /* The cans go onto the job BEFORE the Field Log is written, because the log
+    entry reads them straight off it (taskPaintSummary, used by
+    flAddFromTask). `paintUsed` is a field an undergrad writes as they finish,
+    so it is in isCompletion() in firestore.rules and in COMPLETION_FIELDS in
+    tools/rules-model.js — leave it out of either and a student finishing a
+    trial-dots job is refused by the database with nothing on screen to say
+    why. See "The third trap" in CLAUDE.md. */
+ if(paint&&paint.cans>0) t.paintUsed=paint;
  t.completedBy=t.assignee||SESSION.pid; t.closedBy=SESSION.pid; t.completedAt=isoLocal(new Date()); t.completedNote=note||''; var _flg=flAddFromTask(t); closeDoneSheet();
  /* Stock only comes off the shelf on a REAL completion (`_flg` — the same
     guard flAddFromTask() itself uses against a re-tap or a second phone
@@ -939,8 +1050,23 @@ function completeTask(id,note){ var t=TASKS.find(function(x){return x.id===id;})
  if(_flg&&t.mix&&mixProducts(t.mix).some(function(p){return (p.name||'').trim();})){
    try{ mixInvDecrement(flMixItems(t),t.id,'Field log · '+t.title); }catch(e){}
  }
+ /* Trial-dots paint, on the same terms as the tank above: only on a REAL
+    completion, through the one write point, and never blocking the finish —
+    a paint that is not set up in inventory just leaves the shelf alone. */
+ var _pn='';
+ if(_flg&&t.paintUsed&&t.paintUsed.cans>0){
+   _pn=' · '+t.paintUsed.cans+' can'+(t.paintUsed.cans===1?'':'s')+' of paint';
+   try{
+     var _pit=t.paintUsed.item?INVENTORY.find(function(x){return x.id===t.paintUsed.item;}):null;
+     if(_pit){
+       mixInvDecrement([{item:_pit,amt:t.paintUsed.cans,need:paintCanAmount(_pit,t.paintUsed.cans)}],
+                       t.id,'Paint · '+t.title);
+       _pn+=' off the shelf';
+     }
+   }catch(e){}
+ }
  if(t.partial) toast('Your part is in ✓ · '+(t.leftPlots||[]).length+' left for Bill to hand out');
- else toast(_flg?'Complete ✓ · logged to Field Log':'Marked complete ✓');
+ else toast(_flg?('Complete ✓ · logged to Field Log'+_pn):'Marked complete ✓');
  renderBoard(); back(); }
 document.getElementById('tb-seg').addEventListener('click',function(e){var sp=e.target.closest('span[data-tab]');if(!sp)return;tbTab=sp.getAttribute('data-tab');renderTasks();});
 document.getElementById('s-taskboard').addEventListener('click',function(e){

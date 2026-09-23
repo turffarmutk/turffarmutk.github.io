@@ -686,6 +686,42 @@ pin this behaviour — keep them green.
 
 ## Field data & farm constants
 
+### Trial dots ask how many cans of paint, and it comes off the shelf — 2026-09-23
+**Decision:** finishing a **Trial Dots** job now asks, on the confirm sheet,
+how much paint went — a **dropdown of whole cans, 1 to 12, with no "None"**.
+The answer is stored on the task as `paintUsed` ({cans, item}), written into
+the Field Log's own product and amount columns, and taken off the inventory
+through `mixInvDecrement()`. The paint itself is **not named anywhere in the
+code**: it is whatever products sit in the **Paint · Cans** category of the
+inventory, which Bill adds on the Inventory screen. One product there and it
+is used without asking; more than one and the student picks which; none at all
+and the job **still finishes** — the count is kept, and the sheet says plainly
+that nothing came off the shelf. The amount subtracted is `cans × csize` in the
+product's own unit, the same sum the restock screen does.
+**Why:** the cans were leaving the paint cage with nothing recording it, so the
+count on the Inventory screen was only ever right on the day somebody typed it
+in. The student who did the job is the only person who knows the number, and
+the finish sheet is the one moment they are already stopped and answering a
+question. A dropdown rather than a typed box because half a can is not
+something anybody can measure standing in a field, and a number box on a phone
+invites "1.5" and stray zeros — Dillon asked for it to round them to whole
+cans, and a list does that by construction. No "None" because Dillon wants a
+real answer from every job (Dillon, 2026-09-23); 12 because that is past a big
+day of dots without being a long spin on a phone. Reading the product off the
+inventory rather than naming it here is the succession rule: a new colour or
+brand in 2030 must not need this file edited.
+**Don't:** don't take `cans` off the shelf directly. A paint set up as a 17 oz
+can would then lose 2 oz instead of 34 — `paintCanAmount()` exists for this.
+Don't drop `paintUsed` from `isCompletion()` in `firestore.rules` or from
+`COMPLETION_FIELDS` in `tools/rules-model.js`: an undergrad writes it as they
+finish, so leaving it out means the database refuses the whole finish and the
+job will not close, with nothing on screen to say why — the same shape of bug
+`donePlots` caused for three weeks in September. And **the rules have to be
+published before the app is pushed** (`docs/PUBLISH-THE-RULES.md`), because
+until they are, the new field is exactly what gets refused. Don't make the
+question block a finish when no paint is set up either: stranding somebody on a
+finished job over paperwork is worse than a missing number.
+
 ### Any plot may be picked; the machine's ground is a button — 2026-08-30
 **Decision:** the plot maps (the assign wizard and Choose plots) offer **every
 plot on the farm**, whatever the job is — `jobPickTargets()`. The ground the

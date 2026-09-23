@@ -3095,6 +3095,10 @@ function flAddFromTask(t){
  /* A boom spray that was mixed on its task sheet writes the real numbers into
     the record rather than leaving the application blank. */
  var mx=(typeof mixSummaryFor==='function')?mixSummaryFor(t):null;
+ /* Trial dots: the cans the student picked on the finish sheet fill the same
+    product and amount columns, so "what went out and how much" reads the same
+    way on the log whether it came out of a tank or a spray can. */
+ var pnt=(typeof taskPaintSummary==='function')?taskPaintSummary(t):null;
  /* Carry the whole job over, not just a one-line summary. The detail page reads
     these straight off the task that produced the entry, so the log record and
     the work order never drift apart. */
@@ -3105,7 +3109,7 @@ function flAddFromTask(t){
    taskId:t.id,op:t.type||'Field practice',person:byId,loggedBy:SESSION.pid,time:at,
    equipment:flEqName(t.machine),area:(t.area&&t.area!=='—')?t.area:null,
    dueAt:t.dueAt||null,due:dueLabel(t)||null,repeat:(t.repeat&&t.repeat!=='None')?t.repeat:null,
-   product:mx?mx.productName:null,rate:mx?mx.rateText:null,amount:mx?mx.productText:null,
+   product:mx?mx.productName:(pnt?pnt.name:null),rate:mx?mx.rateText:null,amount:mx?mx.productText:(pnt?pnt.text:null),
    closedBy:(t.closedBy&&t.closedBy!==by)?t.closedBy:null,
    notes:[t.desc||'',mx?('Mix: '+mx.line):'',(alleyNote&&p===ALLEY_UNIT)?alleyNote:'',
           t.partial?('Part of the job: '+plots.length+' done, '+(t.leftPlots||[]).length+' handed back'+(t.completedNote?(' — '+t.completedNote):'')):''].filter(Boolean).join('\n')

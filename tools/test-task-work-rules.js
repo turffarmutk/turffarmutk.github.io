@@ -165,6 +165,133 @@ section('5. a trial-dots job');
   ok('ticking a study off is allowed', model.isWorkUpdate(server, doc(t), STUDENT), why(server, doc(t)));
 }
 
+/* Dillon, 2026-09-23: the cans of paint the dots were sprayed out of come off
+   the inventory when the job is finished. Two halves have to hold at once --
+   the database must accept the new field, and the shelf must actually move --
+   and the first of those is the one that cannot be seen on a phone. */
+section('5b. the cans of paint a trial-dots job used');
+{
+  win.sessionSet(STUDENT, { quiet: true });
+  /* A paint set up the way Bill would on the Inventory screen. It is pushed in
+     here rather than shipped in the app on purpose: the app must read whatever
+     is in the Paint · Cans category, not a product named in the source. */
+  win.INVENTORY.push({ id: 'ipaint', name: 'Field Marking Paint', ai: null, cat: 'paint_can',
+                       form: 'other', loc: 'Barn', ctype: 'can', csize: 1, unit: 'can', qty: 10, thr: 2 });
+  const paint = win.INVENTORY.find(x => x.id === 'ipaint');
+  const before = win.invQty(paint);
+
+  const t = assigned('wr-4b', { title: 'Trial Dots', type: 'Miscellaneous', plots: [], area: 'All active trials' });
+  const server = doc(t);
+  win.openTaskWork(t.id);
+  win.__w.setBrief(false);
+  win.renderTaskWork();
+  win.document.getElementById('tw-complete').click();
+
+  const sheet = win.document.getElementById('donesheet');
+  const cans = win.document.getElementById('ds-paint-cans');
+  ok('finishing asks how much paint went', sheet && sheet.classList.contains('show') && !!cans);
+  ok('and the only answers offered are whole cans',
+     cans && [...cans.options].slice(1).every(o => /^\d+ cans?$/.test(o.textContent) && String(+o.value) === o.value),
+     cans && [...cans.options].map(o => o.textContent).join('|'));
+  ok('one paint in inventory is not a question worth asking', !win.document.getElementById('ds-paint-item'));
+
+  const btn = sheet.querySelector('.ds-confirm');
+  btn.click();
+  ok('confirming without an answer does not close the job', t.status === 'todo', t.status);
+  ok('and the button says what is missing', /how many cans/i.test(btn.textContent), btn.textContent);
+
+  cans.value = '3';
+  cans.dispatchEvent(new win.Event('change', { bubbles: true }));
+  ok('picking a number lights the button up', btn.textContent.indexOf('Confirm') === 0, btn.textContent);
+  btn.click();
+
+  const finished = doc(t);
+  ok('the job is done', t.status === 'done');
+  ok('the cans are on the job', t.paintUsed && t.paintUsed.cans === 3 && t.paintUsed.item === 'ipaint',
+     JSON.stringify(t.paintUsed));
+  ok('THE DATABASE ACCEPTS THE FINISH WITH THE PAINT ON IT',
+     model.completionFieldsOk(server, finished, STUDENT), why(server, finished));
+  ok('three cans came off the shelf', win.invQty(paint) === before - 3, before + ' -> ' + win.invQty(paint));
+  ok('and the movement says which job took them',
+     win.INVMOVES.some(m => m.item === 'ipaint' && m.delta === -3 && m.ref === t.id && m.who === STUDENT));
+
+  const entry = win.__w.FIELDLOG.filter(e => e.taskId === t.id)[0];
+  ok('the Field Log says what went out and how much',
+     entry && entry.product === 'Field Marking Paint' && entry.amount === '3 cans',
+     entry && entry.product + ' / ' + entry.amount);
+}
+
+section('5c. a paint measured in ounces, not in cans');
+{
+  win.sessionSet(STUDENT, { quiet: true });
+  /* A 17 oz can counted in ounces. Two cans must take 34 oz off, not 2 --
+     using the can count straight would empty a shelf eight times too slowly
+     and make the Inventory screen quietly wrong. */
+  win.INVENTORY.push({ id: 'ipaint2', name: 'Upside-Down Marker', ai: null, cat: 'paint_can',
+                       form: 'other', loc: 'Barn', ctype: 'can', csize: 17, unit: 'oz', qty: 170, thr: 0 });
+  const oz = win.INVENTORY.find(x => x.id === 'ipaint2');
+  const before = win.invQty(oz);
+
+  const t = assigned('wr-4c', { title: 'Trial Dots', type: 'Miscellaneous', plots: [], area: 'All active trials' });
+  win.openTaskWork(t.id);
+  win.__w.setBrief(false);
+  win.renderTaskWork();
+  win.document.getElementById('tw-complete').click();
+  const pick = win.document.getElementById('ds-paint-item');
+  ok('with two paints on the shelf, the student says which', !!pick, 'no product dropdown');
+  const btn = win.document.getElementById('donesheet').querySelector('.ds-confirm');
+  btn.click();
+  ok('and it will not close until they do', t.status === 'todo' && /which paint/i.test(btn.textContent), btn.textContent);
+  pick.value = 'ipaint2';
+  pick.dispatchEvent(new win.Event('change', { bubbles: true }));
+  const cans = win.document.getElementById('ds-paint-cans');
+  cans.value = '2';
+  cans.dispatchEvent(new win.Event('change', { bubbles: true }));
+  btn.click();
+  ok('two 17 oz cans take 34 oz off the shelf, not 2', win.invQty(oz) === before - 34,
+     before + ' -> ' + win.invQty(oz));
+}
+
+section('5d. trial dots still finishes when no paint is set up at all');
+{
+  /* The farm may not have added a paint yet. A student must never be stranded
+     on a finished job over that -- the count still gets recorded, there is
+     simply no shelf to take it off. */
+  win.sessionSet(STUDENT, { quiet: true });
+  const keep = win.INVENTORY.filter(it => it.cat === 'paint_can');
+  keep.forEach(it => win.INVENTORY.splice(win.INVENTORY.indexOf(it), 1));
+
+  const t = assigned('wr-4d', { title: 'Trial Dots', type: 'Miscellaneous', plots: [], area: 'All active trials' });
+  const server = doc(t);
+  win.openTaskWork(t.id);
+  win.__w.setBrief(false);
+  win.renderTaskWork();
+  win.document.getElementById('tw-complete').click();
+  const cans = win.document.getElementById('ds-paint-cans');
+  ok('it still asks', !!cans);
+  cans.value = '1';
+  cans.dispatchEvent(new win.Event('change', { bubbles: true }));
+  win.document.getElementById('donesheet').querySelector('.ds-confirm').click();
+  ok('the job closes', t.status === 'done', t.status);
+  ok('the count is kept even with nothing to subtract it from',
+     t.paintUsed && t.paintUsed.cans === 1 && !t.paintUsed.item, JSON.stringify(t.paintUsed));
+  ok('and the database still accepts it', model.completionFieldsOk(server, doc(t), STUDENT), why(server, doc(t)));
+
+  keep.forEach(it => win.INVENTORY.push(it));
+}
+
+section('5e. an ordinary job is not asked about paint');
+{
+  win.sessionSet(STUDENT, { quiet: true });
+  const t = assigned('wr-4e');
+  win.openDoneSheet(t.id);
+  ok('a mowing job gets the sheet it always had', !win.document.getElementById('ds-paint-cans'));
+  const btn = win.document.getElementById('donesheet').querySelector('.ds-confirm');
+  ok('and its Confirm button is not greyed out', btn.textContent.indexOf('Confirm') === 0, btn.textContent);
+  btn.click();
+  ok('one tap finishes it', t.status === 'done', t.status);
+}
+
 section('6. what working a job still may NOT do');
 {
   const t = assigned('wr-5');

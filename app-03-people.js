@@ -1775,11 +1775,13 @@ function renderTasks(){
    var bIn=people.filter(function(s){return schedShiftOn(s,bDate);}).length;
    /* Part-finished jobs waiting for Bill to hand out the rest -- at the top,
       whatever day is showing, because they are waiting on him right now.
-      See PART-FINISHED JOBS in app-04. */
+      Dillon, 2026-09-23: no heading of its own any more. It is a job that
+      needs a person, so it reads as one job row above the crew, and tapping
+      it opens the same who-and-when picker as anything else. See
+      PART-FINISHED JOBS in app-04. */
    if(currentRole==='manager'){
      var lefts=tbLeftovers();
-     if(lefts.length) html+='<div class="sec" style="color:#9a5b00">Left over — needs someone · '+lefts.length+'</div>'
-                          +'<div class="list">'+lefts.map(tbLeftRow).join('')+'</div>';
+     if(lefts.length) html+='<div class="list">'+lefts.map(tbLeftRow).join('')+'</div>';
    }
    html+='<div class="sec" style="color:#2f3133">'+WEEKDAYS[boardDay]+' · '+asDateLabel(boardDayOrd())
         +(bIn?(' <span style="color:#2f9e4f">· '+bIn+' in</span>'):'')+'</div>';

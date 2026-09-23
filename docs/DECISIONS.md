@@ -2042,10 +2042,12 @@ seem to do nothing.
 offers "Submit N of M done". Confirming (with an optional reason) COMPLETES the
 job, credited to them, marked `partial:true`, with the plots nobody got to in
 `leftPlots`. Only the ticked plots go on the Field Log. Bill's board shows every
-such job under "Left over — needs someone" until he either presses "Assign the
-rest" (a NEW job with only `leftPlots`, for the person and day he picks, badged
-"Rest of job", linked back by `restOf`) or "Leave it". Either stamps
-`restAssigned` on the old job, which takes it off the list.
+such job as one row at the very top, above the day and above everybody's name,
+until he deals with it. Tapping the row opens "Assign the rest": he picks a day
+and a person and gets a NEW job holding only `leftPlots`, badged "Rest of job",
+linked back by `restOf`. The same sheet carries "Leave the rest undone" for
+ground not worth chasing. Either stamps `restAssigned` on the old job, which
+takes the row off the board.
 
 **Why:** Dillon asked for students to be able to hand in a half-done job and for
 Bill to give the remainder to someone else the same day or the next. Completing
@@ -2067,6 +2069,18 @@ which are not plot lists.
 - Lowering the sheets' z-index. At 60 the Leaflet map drew over the top half of
   every bottom sheet on the work map, including "Mark task complete?". They sit
   at 1200.
+
+**Amended 2026-09-23.** The leftover started life as its own section — a
+heading reading "Left over — needs someone · N" over rows carrying an "Assign
+the rest ›" pill and a small "Leave it" link. Dillon asked for the job to just
+sit at the top of the board and open when tapped, like any other job. So the
+heading is gone, the whole row is one tap (`data-rest` on the row itself), and
+"Leave the rest undone" moved inside the sheet the tap opens. Two things
+someone could get wrong putting this back: the row must NOT carry `data-task`,
+which would open the read-only job screen and leave Bill no way to hand the
+rest out; and "Leave the rest undone" has to exist somewhere, or a job nobody
+is going to finish sits on the board until it is assigned to somebody who then
+deletes it.
 
 ### The Task Board's categories and the Field Log's categories are the same 6, plus Maintenance — 2026-09-22
 

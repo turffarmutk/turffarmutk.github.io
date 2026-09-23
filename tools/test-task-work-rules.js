@@ -397,8 +397,14 @@ section('7. a student submits a part-finished job, and Bill hands out the rest')
   win.goRoot('taskboard'); win.__w.setBrief(false);
   win.renderBoard();
   const body = win.document.getElementById('tb-body').textContent;
-  ok('under "Left over", with who, what is left and why',
-     /Left over — needs someone/.test(body) && /did 1 · 1 left/.test(body) && /Ran out of time/.test(body));
+  ok('as one job row, with who, what is left and why',
+     /Rest of job/.test(body) && /did 1 · 1 left/.test(body) && /Ran out of time/.test(body));
+  /* The whole row is the tap, and it opens the assign picker -- not the task
+     screen. A row that carried data-task instead would open read-only detail
+     and Bill could never hand the rest out. */
+  const leftRow = win.document.querySelector('#tb-body [data-rest="' + t.id + '"]');
+  ok('and tapping the row itself opens the assign picker',
+     !!leftRow && leftRow.classList.contains('row') && !leftRow.getAttribute('data-task'));
 
   const beforeBill = doc(t);
   const d1 = new win.Date(); d1.setDate(d1.getDate() + 1);
@@ -416,7 +422,11 @@ section('7. a student submits a part-finished job, and Bill hands out the rest')
 
   const t2 = assigned('wr-8', { status: 'done', partial: true, leftPlots: ['P2'], donePlots: ['P1'], completedBy: STUDENT });
   win.dropRest(t2.id);
-  ok('"Leave it" takes it off the list without making a job', t2.restAssigned === 'none' && !win.tbLeftovers().some(x => x.id === t2.id));
+  ok('"Leave the rest undone" takes it off the list without making a job', t2.restAssigned === 'none' && !win.tbLeftovers().some(x => x.id === t2.id));
+  /* That choice now lives inside the sheet, so it has to actually be in it. */
+  win.openRestSheet(t.id);
+  ok('and it is offered inside the assign picker', !!win.document.getElementById('rs-drop'));
+  win.closeRestSheet();
 }
 
 section('8. nobody submits part of a job somebody else is still out on');

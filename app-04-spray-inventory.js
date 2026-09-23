@@ -1201,7 +1201,6 @@ document.getElementById('s-taskboard').addEventListener('click',function(e){
    return;
  }
  var rs=e.target.closest('[data-rest]'); if(rs){e.stopPropagation();openRestSheet(rs.getAttribute('data-rest'));return;}
- var rd=e.target.closest('[data-restdrop]'); if(rd){e.stopPropagation();dropRest(rd.getAttribute('data-restdrop'));return;}
  var mv=e.target.closest('[data-move]'); if(mv){e.stopPropagation();moveTask(mv.getAttribute('data-id'),mv.getAttribute('data-move'));return;}
  var claim=e.target.closest('[data-claim]');
  if(claim){e.stopPropagation();var t=TASKS.find(function(x){return x.id===claim.getAttribute('data-claim');});if(t){t.assignee=SESSION.pid;toast('Claimed ✓');renderTasks();}return;}
@@ -1719,16 +1718,24 @@ function tbLeftovers(){
     return t.status==='done'&&t.partial&&(t.leftPlots||[]).length&&!t.restAssigned;
   }));
 }
+/* One ordinary-looking job row, and the WHOLE row is the tap -- Dillon,
+   2026-09-23. It used to be a row with an "Assign the rest" pill and a
+   "Leave it" link beside it, under a section heading of its own. A job
+   waiting on somebody should look like a job and open like one, so the
+   heading is gone (renderBoard in app-03) and both choices now live inside
+   the sheet the tap opens. The "Rest of job" pill and the subtitle are what
+   say why this row is sitting above everybody's name. */
 function tbLeftRow(t){
   var lp=t.leftPlots||[], did=(t.donePlots||[]).filter(function(p){return lp.indexOf(p)<0;}).length;
   var who=nameOf(t.completedBy)||t.completedBy||'Somebody';
-  var sub=who+' did '+did+' · '+t.leftPlots.length+' left · '+plotsSummaryText(t.leftPlots);
-  return '<div class="row" style="align-items:flex-start"><div class="tap" data-task="'+t.id+'" style="flex:1;min-width:0">'
+  var sub=who+' did '+did+' · '+lp.length+' left · '+plotsSummaryText(lp);
+  return '<div class="row tap" data-rest="'+t.id+'" style="align-items:flex-start">'
+    +'<div style="flex:1;min-width:0">'
     +'<div class="rt">'+esc(t.title)+'</div><div class="rs">'+esc(sub)+'</div>'
     +(t.completedNote?'<div class="rs" style="margin-top:3px;color:#9a5b00">“'+esc(t.completedNote)+'”</div>':'')
-    +'</div><span style="display:flex;flex-direction:column;gap:6px;flex:none;align-items:flex-end">'
-    +'<span class="pill tap" data-rest="'+t.id+'" style="background:var(--acc);color:#fff;padding:5px 12px;font-size:10.5px">Assign the rest ›</span>'
-    +'<span class="tap" data-restdrop="'+t.id+'" style="font:700 10.5px \'Public Sans\';color:var(--muted)">Leave it</span>'
+    +'</div><span style="display:flex;align-items:center;gap:8px;flex:none">'
+    +'<span class="pill" style="background:#fef1dc;color:#9a5b00">Rest of job</span>'
+    +'<span style="color:var(--muted);font:800 16px \'Archivo\'">›</span>'
     +'</span></div>';
 }
 function plotsSummaryText(list){
@@ -1743,10 +1750,21 @@ function ensureRestSheet(){
     +'<div class="ds-title">Assign the rest</div><div class="ds-sub" id="rs-sub"></div>'
     +'<div class="ds-lbl">When</div><select class="inv-sel" id="rs-when" style="width:100%;max-width:none"></select>'
     +'<div class="ds-lbl">Who</div><div class="chiprow" id="rs-people" style="padding:0"></div>'
-    +'<div class="ds-btns"><div class="ds-cancel tap">Cancel</div><div class="ds-confirm part tap">Assign</div></div></div>';
+    +'<div class="ds-btns"><div class="ds-cancel tap">Cancel</div><div class="ds-confirm part tap">Assign</div></div>'
+    /* The other honest answer, in the same place as the first: some ground is
+       not worth chasing, and Bill needs a way to say so that is not "assign it
+       to somebody who then deletes it". It lives here rather than on the board
+       row so the row stays one tap. */
+    +'<div class="tap" id="rs-drop" style="text-align:center;margin-top:15px;font:700 12px \'Public Sans\';color:var(--muted);text-decoration:underline">Leave the rest undone</div>'
+    +'</div>';
   app.appendChild(restSheet);
   restSheet.querySelector('.ds-back').addEventListener('click',closeRestSheet);
   restSheet.querySelector('.ds-cancel').addEventListener('click',closeRestSheet);
+  restSheet.querySelector('#rs-drop').addEventListener('click',function(){
+    var id=REST&&REST.id; if(!id) return;
+    closeRestSheet();                 /* ask with the sheet out of the way */
+    dropRest(id);
+  });
   restSheet.querySelector('#rs-when').addEventListener('change',function(){ REST.ord=parseInt(this.value,10)||REST.ord; renderRestPeople(); });
   restSheet.querySelector('#rs-people').addEventListener('click',function(e){
     var p=e.target.closest('[data-person]'); if(!p) return;

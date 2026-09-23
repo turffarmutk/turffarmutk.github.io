@@ -686,18 +686,33 @@ pin this behaviour — keep them green.
 
 ## Field data & farm constants
 
-### Trial dots ask how many cans of paint, and it comes off the shelf — 2026-09-23
-**Decision:** finishing a **Trial Dots** job now asks, on the confirm sheet,
-how much paint went — a **dropdown of whole cans, 1 to 12, with no "None"**.
-The answer is stored on the task as `paintUsed` ({cans, item}), written into
-the Field Log's own product and amount columns, and taken off the inventory
-through `mixInvDecrement()`. The paint itself is **not named anywhere in the
-code**: it is whatever products sit in the **Paint · Cans** category of the
-inventory, which Bill adds on the Inventory screen. One product there and it
-is used without asking; more than one and the student picks which; none at all
-and the job **still finishes** — the count is kept, and the sheet says plainly
-that nothing came off the shelf. The amount subtracted is `cans × csize` in the
-product's own unit, the same sum the restock screen does.
+### Trial dots ask what paint went, and it comes off the shelf — 2026-09-23
+**Decision:** finishing a **Trial Dots** job now asks three things on the
+confirm sheet — the **type** (spray or liquid), the **colour**, and **how many
+cans**, a dropdown of whole cans 1 to 12 with no "None". The answer is stored
+on the task as `paintUsed` ({type, color, item, cans}), written into the Field
+Log's own product and amount columns, and taken off the inventory through
+`mixInvDecrement()`. The amount subtracted is `cans × csize` in the product's
+own unit, the same sum the restock screen does.
+
+The paint itself is **not named anywhere in the code**: it is whatever products
+sit in the **Paint · Cans** (or **Paint · Liquid**) category of the inventory.
+A paint is added **once per colour**, each with its own count, and each carries
+a **`color`** set on the Add item form — a box that only appears for those two
+categories, and is required there. The sheet's colour dropdown **is** that
+product list, labelled by colour. So "we now stock pink" is one item added on
+a phone, and the Inventory screen can say you are out of blue while there is
+still orange.
+
+The **type** is filled in from the job (`taskPaintType()` — Trial Dots means
+spray) but is **shown and changeable**, so a job set up wrong can be put right
+in the field instead of emptying the wrong shelf. **Liquid is deliberately not
+counted yet:** nobody has decided whether a liquid job is measured in whole
+jugs or in gallons, so picking Liquid records the type and the colour, asks for
+no amount, takes nothing off the shelf, and says so on the sheet. Give
+`PAINT_TYPES`' liquid row a `count` the day that is answered and the rest works
+unchanged. With no paint set up at all the job **still finishes** — what was
+picked is kept, and the sheet says plainly that nothing came off the shelf.
 **Why:** the cans were leaving the paint cage with nothing recording it, so the
 count on the Inventory screen was only ever right on the day somebody typed it
 in. The student who did the job is the only person who knows the number, and
@@ -709,7 +724,11 @@ cans, and a list does that by construction. No "None" because Dillon wants a
 real answer from every job (Dillon, 2026-09-23); 12 because that is past a big
 day of dots without being a long spin on a phone. Reading the product off the
 inventory rather than naming it here is the succession rule: a new colour or
-brand in 2030 must not need this file edited.
+brand in 2030 must not need this file edited. One item per colour rather than
+one paint with a colour picked per job, because "how much blue is left" is a
+question the farm actually asks and a single lumped count cannot answer it.
+The type is written in code rather than put on the task form — Dillon's call,
+2026-09-23 — only because Trial Dots is the farm's one painted job today.
 **Don't:** don't take `cans` off the shelf directly. A paint set up as a 17 oz
 can would then lose 2 oz instead of 34 — `paintCanAmount()` exists for this.
 Don't drop `paintUsed` from `isCompletion()` in `firestore.rules` or from
@@ -720,7 +739,13 @@ job will not close, with nothing on screen to say why — the same shape of bug
 published before the app is pushed** (`docs/PUBLISH-THE-RULES.md`), because
 until they are, the new field is exactly what gets refused. Don't make the
 question block a finish when no paint is set up either: stranding somebody on a
-finished job over paperwork is worse than a missing number.
+finished job over paperwork is worse than a missing number — and for the same
+reason don't make Liquid refuse to close while it has no count. Don't give
+liquid a guessed `count` to "finish the feature": a wrong amount on the farm's
+records every time is worse than an honest blank. And **the day a second
+painted job exists**, move `taskPaintType()` onto the task form rather than
+adding a second job name to it — one hardcoded name is a shortcut Dillon
+chose, two is the thing SUCCESSION.md exists to stop.
 
 ### Any plot may be picked; the machine's ground is a button — 2026-08-30
 **Decision:** the plot maps (the assign wizard and Choose plots) offer **every

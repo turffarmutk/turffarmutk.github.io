@@ -548,9 +548,18 @@ function mixInvDecrement(items,refId,noteText){
    other kind of task. */
 function taskPaintSummary(t){
   var p=t&&t.paintUsed;
-  if(!p||!(p.cans>0)) return null;
+  if(!p||!(p.cans>0||p.item||p.color)) return null;
   var it=p.item?INVENTORY.find(function(x){return x.id===p.item;}):null;
-  return {name:it?it.name:'Marking paint', text:p.cans+' can'+(p.cans===1?'':'s')};
+  var m=paintTypeMeta(p.type), word=(m&&m.word)||'can';
+  /* The product still on the shelf wins over the colour stored on the job:
+     if Bill corrects a paint's colour on the Inventory screen, a job finished
+     last week should read the corrected one rather than keep the old word. */
+  var name=it?paintFullName(it):(p.color?(p.color+' paint'):'Marking paint');
+  /* A liquid job carries no count, on purpose — see PAINT_TYPES. It still has
+     a colour worth writing down, so it says what it can. */
+  var text=(p.cans>0)?(p.cans+' '+word+(p.cans===1?'':'s'))
+                     :((m?m.label:'Paint')+' · amount not recorded');
+  return {name:name, text:text};
 }
 
 /* One-line summary that rides onto the Field Log when the task is completed. */
@@ -928,8 +937,11 @@ function nowTime(){var d=new Date(),h=d.getHours(),m=d.getMinutes();return (h%12
    Dillon, 2026-09-23. The dots are sprayed out of cans, and until now those
    cans left the shelf with nothing recording it -- so the Paint · Cans count
    on the Inventory screen was only ever right on the day somebody typed it
-   in. The student who did the job is the one who knows how many cans went, so
-   the finish sheet asks them, and the answer comes off the shelf.
+   in. The student who did the job is the one who knows what went, so the
+   finish sheet asks them, and the answer comes off the shelf.
+
+   THE SHEET ASKS THREE THINGS: the TYPE (spray or liquid), the COLOUR, and
+   HOW MANY CANS.
 
    WHOLE CANS ONLY, and a dropdown rather than a typed box on purpose: half a
    can is not something anybody can measure standing in a field, and a number
@@ -937,19 +949,58 @@ function nowTime(){var d=new Date(),h=d.getHours(),m=d.getMinutes();return (h%12
    answer for them, which is what Dillon asked for.
 
    THE PAINT ITSELF IS NOT NAMED HERE, and that is the point. It is whatever
-   products sit in the Paint · Cans category of the inventory, which Bill adds
-   on the Inventory screen -- so a new colour, a new brand or a second paint
-   never needs this file edited again. One product and it is used without
-   asking; more than one and the student says which. None set up yet and the
-   job still finishes -- it says plainly that nothing came off the shelf,
-   because refusing to let somebody close a job over paperwork is the mistake
-   that cost the farm three weeks in September. */
+   products sit in the Paint · Cans (or Paint · Liquid) category of the
+   inventory, which Bill adds on the Inventory screen -- one item per colour,
+   each with its own count, so the Inventory screen can say you are out of
+   blue while there is still orange. The COLOUR dropdown on this sheet IS the
+   product list, labelled by each product's own `color` field (set on the Add
+   item form). A new colour in 2030 is one item added on a phone; this file
+   never needs touching for it.
+
+   None set up yet and the job still finishes -- it says plainly that nothing
+   came off the shelf, because refusing to let somebody close a job over
+   paperwork is the mistake that cost the farm three weeks in September. */
 var PAINT_MAX_CANS=12;      /* where the dropdown stops — Dillon, 2026-09-23 */
-function paintCanItems(){
-  try{ return INVENTORY.filter(function(it){ return it&&it.cat==='paint_can'; }); }catch(e){ return []; }
+/* The two kinds of paint, and which shelf each one is counted on.
+   `count` is what a student is asked for. Liquid has none yet ON PURPOSE:
+   nobody has decided whether a liquid job is measured in whole jugs or in
+   gallons, and guessing would put a wrong number on the farm's records every
+   time. Until Dillon says, picking Liquid records the type and the colour,
+   asks for no amount, and takes nothing off the shelf -- and says so on the
+   sheet. Give it a `count` of 'container' the day that question is answered
+   and the rest of this works unchanged. */
+var PAINT_TYPES=[
+ {k:'spray', label:'Spray', cat:'paint_can', count:'container', word:'can'},
+ {k:'liquid',label:'Liquid',cat:'paint_liq', count:null,        word:''}
+];
+function paintTypeMeta(k){ return PAINT_TYPES.filter(function(p){return p.k===k;})[0]||null; }
+/* Which kind of paint a job uses. Written here rather than asked on the task
+   form because Trial Dots is the only painted job the farm has -- Dillon's
+   call, 2026-09-23. THE DAY THERE IS A SECOND ONE this wants to become a row
+   on the New task form, so a farm manager can set it from a phone instead of
+   somebody editing this file and pushing. See docs/DECISIONS.md. */
+function taskPaintType(t){
+  if(!t) return '';
+  if(typeof jobIsTrialDots==='function'&&jobIsTrialDots(t.type,t.title)) return 'spray';
+  return '';
 }
-function taskAsksPaint(t){
-  return !!t && typeof jobIsTrialDots==='function' && jobIsTrialDots(t.type,t.title);
+function taskAsksPaint(t){ return !!taskPaintType(t); }
+/* Every paint of one kind, and what to call each one on the sheet. A product
+   with no colour set falls back to its name, so an item added before the
+   colour box existed still works and still comes off the shelf. */
+function paintItems(type){
+  var m=paintTypeMeta(type); if(!m) return [];
+  try{ return INVENTORY.filter(function(it){ return it&&it.cat===m.cat; }); }catch(e){ return []; }
+}
+function paintColorOf(it){ return ((it&&it.color)||'').trim(); }
+function paintLabel(it){ return paintColorOf(it)||((it&&it.name)||'Paint'); }
+/* Name and colour together, for the Field Log and the task's own screen. The
+   colour is left off when the product's name already says it, so a paint Bill
+   named "Blue Marking Paint" does not read as "Blue Marking Paint · Blue". */
+function paintFullName(it){
+  var n=(it&&it.name)||'Paint', c=paintColorOf(it);
+  if(!c || n.toLowerCase().indexOf(c.toLowerCase())>=0) return n;
+  return n+' · '+c;
 }
 /* A can is a CONTAINER; the shelf is counted in the product's own unit. This
    is the same sum the restock screen does (containers x container size), so a
@@ -957,43 +1008,89 @@ function taskAsksPaint(t){
    can takes 34 oz off. Getting this wrong by using the can count directly
    would take 2 oz off a 17 oz can. */
 function paintCanAmount(it,cans){ return (+cans||0)*(+(it&&it.csize)||1); }
-/* What the finish sheet's paint dropdowns say right now. ok:false means the
-   job wants an answer and has not got one -- `why` is what to put on the
-   button. */
+
+/* What the sheet's paint answers are right now. Kept here rather than read
+   back off the dropdowns, because changing the type rebuilds the colour list
+   underneath -- reading the DOM would lose the answer mid-rebuild. */
+var DSPAINT=null;    /* {type, item, cans} while the finish sheet is open */
+function donePaintStart(t){
+  DSPAINT=null;
+  var type=taskPaintType(t); if(!type) return;
+  DSPAINT={type:type,item:'',cans:0};
+  donePaintAutoItem();
+}
+/* One paint of this kind on the shelf is not a question worth asking. */
+function donePaintAutoItem(){
+  if(!DSPAINT) return;
+  var list=paintItems(DSPAINT.type);
+  if(!list.some(function(it){return it.id===DSPAINT.item;})) DSPAINT.item='';
+  if(!DSPAINT.item&&list.length===1) DSPAINT.item=list[0].id;
+}
+/* ok:false means the job wants an answer and has not got one -- `why` is what
+   goes on the button. */
 function donePaintRead(t){
-  if(!taskAsksPaint(t)) return {ok:true,val:null};
-  var isel=document.getElementById('ds-paint-item'), csel=document.getElementById('ds-paint-cans');
-  if(isel&&!isel.value) return {ok:false,why:'Pick which paint you used'};
-  var cans=csel?parseInt(csel.value,10):NaN;
-  if(!(cans>0)) return {ok:false,why:'Pick how many cans you used'};
-  var items=paintCanItems(), id=isel?isel.value:((items[0]&&items[0].id)||'');
-  var val={cans:cans};
-  /* No id when nothing is set up under Paint · Cans yet. The count is still
-     recorded on the job; there is simply no shelf to take it off. */
-  if(id) val.item=id;
+  if(!taskAsksPaint(t)||!DSPAINT) return {ok:true,val:null};
+  var m=paintTypeMeta(DSPAINT.type), list=paintItems(DSPAINT.type);
+  if(list.length&&!DSPAINT.item) return {ok:false,why:'Pick the colour you used'};
+  var val={type:DSPAINT.type};
+  var it=DSPAINT.item?INVENTORY.find(function(x){return x.id===DSPAINT.item;}):null;
+  if(it){ val.item=it.id; if(paintColorOf(it)) val.color=paintColorOf(it); }
+  /* A kind of paint nobody has decided how to count asks for no amount, so it
+     must not be held up waiting for one. */
+  if(!m||!m.count) return {ok:true,val:val};
+  if(!(DSPAINT.cans>0)) return {ok:false,why:'Pick how many cans you used'};
+  val.cans=DSPAINT.cans;
   return {ok:true,val:val};
 }
 function donePaintHtml(t){
-  if(!taskAsksPaint(t)) return '';
-  var items=paintCanItems(), h='<div class="ds-lbl">Paint used</div>';
-  if(items.length>1){
-    h+='<select class="ds-sel" id="ds-paint-item"><option value="">Which paint?</option>'
-      +items.map(function(it){
-         return '<option value="'+esc(it.id)+'">'+esc(it.name)+' · '+esc(fmt(invQty(it))+' '+it.unit)+' on hand</option>';
+  if(!taskAsksPaint(t)||!DSPAINT) return '';
+  var m=paintTypeMeta(DSPAINT.type), list=paintItems(DSPAINT.type);
+  var h='<div class="ds-lbl">Paint used</div>';
+  /* Filled in from the job already. It is shown rather than hidden so a job
+     set up wrong can be put right out in the field instead of emptying the
+     wrong shelf. */
+  h+='<select class="ds-sel" id="ds-paint-type">'+PAINT_TYPES.map(function(p){
+       return '<option value="'+p.k+'"'+(p.k===DSPAINT.type?' selected':'')+'>'+esc(p.label)+'</option>';
+     }).join('')+'</select>';
+  if(list.length){
+    h+='<select class="ds-sel" id="ds-paint-color"><option value="">Which colour?</option>'
+      +list.map(function(it){
+         return '<option value="'+esc(it.id)+'"'+(it.id===DSPAINT.item?' selected':'')+'>'
+           +esc(paintLabel(it))+' · '+esc(fmt(invQty(it))+' '+it.unit)+' on hand</option>';
        }).join('')+'</select>';
   }
-  h+='<select class="ds-sel" id="ds-paint-cans"><option value="">How many cans?</option>';
-  for(var n=1;n<=PAINT_MAX_CANS;n++) h+='<option value="'+n+'">'+n+' can'+(n===1?'':'s')+'</option>';
-  h+='</select>';
-  h+='<div class="ds-hint">'+(items.length
-      ? (items.length===1?(esc(items[0].name)+' · '+esc(fmt(invQty(items[0]))+' '+items[0].unit)+' on hand. '):'')
-        +'Whole cans only — round to the nearest can.'
-      : 'No paint is set up under Paint · Cans on the Inventory screen yet, so nothing comes off the shelf. The number still goes on the job and the Field Log.')
-   +'</div>';
+  if(m&&m.count){
+    h+='<select class="ds-sel" id="ds-paint-cans"><option value="">How many '+esc(m.word)+'s?</option>';
+    for(var n=1;n<=PAINT_MAX_CANS;n++)
+      h+='<option value="'+n+'"'+(n===DSPAINT.cans?' selected':'')+'>'+n+' '+esc(m.word)+(n===1?'':'s')+'</option>';
+    h+='</select>';
+  }
+  h+='<div class="ds-hint">'+donePaintHintHtml(m,list)+'</div>';
   return h;
 }
-/* Only the button is redrawn when a dropdown changes. Rebuilding the block
-   would throw away the choice that was just made. */
+function donePaintHintHtml(m,list){
+  if(!list.length)
+    return 'No '+esc((m&&m.label||'paint').toLowerCase())+' paint is set up on the Inventory screen yet, so nothing comes off the shelf. What you pick here still goes on the job and the Field Log.';
+  if(!m||!m.count)
+    return 'Liquid paint is not counted in the app yet, so nothing comes off the shelf — tell Bill how much you used. The colour still goes on the job and the Field Log.';
+  return 'Whole '+esc(m.word)+'s only — round to the nearest '+esc(m.word)+'.';
+}
+/* A change of TYPE rebuilds the block, because it is a different shelf with
+   different colours on it. A change of colour or count only moves the button,
+   so the sheet does not jump under somebody's thumb. */
+function donePaintChange(el){
+  if(!DSPAINT||!el||!el.id) return;
+  if(el.id==='ds-paint-type'){
+    DSPAINT.type=el.value; DSPAINT.cans=0; donePaintAutoItem();
+    var box=document.getElementById('ds-extra');
+    if(box) box.innerHTML=donePaintHtml(TASKS.find(function(x){return x.id===doneTaskId;}));
+  }
+  else if(el.id==='ds-paint-color') DSPAINT.item=el.value;
+  else if(el.id==='ds-paint-cans') DSPAINT.cans=parseInt(el.value,10)||0;
+  donePaintPaint();
+}
+/* The Confirm button says what is still missing, and stays grey until nothing
+   is. Only the button moves here — see donePaintChange() above. */
 function donePaintPaint(){
   if(!doneSheet) return;
   var b=doneSheet.querySelector('.ds-confirm'); if(!b) return;
@@ -1003,7 +1100,7 @@ function donePaintPaint(){
 }
 var doneSheet=null, doneTaskId=null;
 function ensureDoneSheet(){ if(doneSheet)return; doneSheet=document.createElement('div'); doneSheet.id='donesheet'; doneSheet.innerHTML='<div class="ds-back"></div><div class="ds-card"><div class="ds-title">Mark task complete?</div><div class="ds-sub" id="ds-sub"></div><div id="ds-extra"></div><div class="ds-btns"><div class="ds-cancel tap">Cancel</div><div class="ds-confirm tap">Confirm ✓</div></div></div>'; app.appendChild(doneSheet); doneSheet.querySelector('.ds-back').addEventListener('click',closeDoneSheet); doneSheet.querySelector('.ds-cancel').addEventListener('click',closeDoneSheet);
- doneSheet.addEventListener('change',function(e){ if(e.target&&/^ds-paint-/.test(e.target.id||'')) donePaintPaint(); });
+ doneSheet.addEventListener('change',function(e){ if(e.target&&/^ds-paint-/.test(e.target.id||'')) donePaintChange(e.target); });
  doneSheet.querySelector('.ds-confirm').addEventListener('click',function(){
    var r=donePaintRead(TASKS.find(function(x){return x.id===doneTaskId;}));
    if(!r.ok){ toast(r.why); return; }
@@ -1018,8 +1115,9 @@ function openDoneSheet(id){ var t=TASKS.find(function(x){return x.id===id;});
    if(bad.length){ toast('Pick “'+bad[0].name+'” from inventory first'); return; }
  }
  ensureDoneSheet(); doneTaskId=id; doneSheet.querySelector('#ds-sub').textContent=t?t.title:'';
- /* A trial-dots job asks how much paint went before it will close. Everything
+ /* A trial-dots job asks what paint went before it will close. Everything
     else gets an empty block and the sheet it always had. */
+ donePaintStart(t);
  doneSheet.querySelector('#ds-extra').innerHTML=donePaintHtml(t);
  donePaintPaint();
  doneSheet.classList.add('show'); }
@@ -1035,7 +1133,7 @@ function completeTask(id,note,paint){ var t=TASKS.find(function(x){return x.id==
     tools/rules-model.js — leave it out of either and a student finishing a
     trial-dots job is refused by the database with nothing on screen to say
     why. See "The third trap" in CLAUDE.md. */
- if(paint&&paint.cans>0) t.paintUsed=paint;
+ if(paint&&(paint.cans>0||paint.item||paint.type)) t.paintUsed=paint;
  t.completedBy=t.assignee||SESSION.pid; t.closedBy=SESSION.pid; t.completedAt=isoLocal(new Date()); t.completedNote=note||''; var _flg=flAddFromTask(t); closeDoneSheet();
  /* Stock only comes off the shelf on a REAL completion (`_flg` — the same
     guard flAddFromTask() itself uses against a re-tap or a second phone
@@ -1052,10 +1150,14 @@ function completeTask(id,note,paint){ var t=TASKS.find(function(x){return x.id==
  }
  /* Trial-dots paint, on the same terms as the tank above: only on a REAL
     completion, through the one write point, and never blocking the finish —
-    a paint that is not set up in inventory just leaves the shelf alone. */
+    a paint that is not set up in inventory just leaves the shelf alone, and
+    so does a kind of paint nobody has decided how to count yet (liquid),
+    which carries no `cans` at all. */
  var _pn='';
  if(_flg&&t.paintUsed&&t.paintUsed.cans>0){
-   _pn=' · '+t.paintUsed.cans+' can'+(t.paintUsed.cans===1?'':'s')+' of paint';
+   var _pw=(paintTypeMeta(t.paintUsed.type)||{}).word||'can';
+   _pn=' · '+t.paintUsed.cans+' '+_pw+(t.paintUsed.cans===1?'':'s')
+      +(t.paintUsed.color?(' of '+t.paintUsed.color.toLowerCase()):' of paint');
    try{
      var _pit=t.paintUsed.item?INVENTORY.find(function(x){return x.id===t.paintUsed.item;}):null;
      if(_pit){
@@ -2022,6 +2124,9 @@ var CAT=[
  {k:'misc',      label:'Miscellaneous',         res:null}
 ];
 function catMeta(k){return CAT.find(function(c){return c.k===k;})||{k:k,label:k,emoji:'📦',res:null};}
+/* The two categories that carry a colour. A paint is added once PER COLOUR so
+   each colour keeps its own count — see the paint block over openDoneSheet(). */
+function invIsPaintCat(k){ return k==='paint_can'||k==='paint_liq'; }
 var INVENTORY=[
  /* Built by tools/build-inventory.py from
     reference/Inventory of Cages_Bulk Materials.xlsx (the April count).
@@ -2909,7 +3014,9 @@ function renderInvAlert(){
 function invRow(it){
  var low=isLow(it);
  var pill=low?'<span class="pill lowpill">Low</span>':'';
- return '<div class="row tap" data-item="'+it.id+'"><div class="invamt"'+(low?' style="color:#e8341f"':'')+'>'+amtStr(it)+'</div><div style="flex:1;min-width:0;display:flex;align-items:center;gap:8px"><div class="rt" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(it.name)+'</div>'+pill+'</div></div>';
+ /* A paint is stocked one item PER COLOUR, so three rows can all be called
+    "Marking Paint" and the list is useless without the colour on it. */
+ return '<div class="row tap" data-item="'+it.id+'"><div class="invamt"'+(low?' style="color:#e8341f"':'')+'>'+amtStr(it)+'</div><div style="flex:1;min-width:0;display:flex;align-items:center;gap:8px"><div class="rt" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(invIsPaintCat(it.cat)?paintFullName(it):it.name)+'</div>'+pill+'</div></div>';
 }
 function renderInvList(){
  renderInvAlert();
@@ -2918,7 +3025,8 @@ function renderInvList(){
  var items=INVENTORY.filter(function(it){
    if(invFilter==='low'&&!isLow(it))return false;
    if(invFilter!=='all'&&invFilter!=='low'&&it.cat!==invFilter)return false;
-   if(q){var s=(it.name+' '+(it.ai||'')).toLowerCase();if(s.indexOf(q)<0)return false;}
+   /* Searching "blue" should find the blue paint, which is not in its name. */
+   if(q){var s=(it.name+' '+(it.ai||'')+' '+(it.color||'')).toLowerCase();if(s.indexOf(q)<0)return false;}
    return true;
  });
  if(!items.length){body.innerHTML='<div class="sec" style="text-align:center;margin-top:26px">No products match</div>';return;}
@@ -2938,6 +3046,8 @@ function openItem(id){
  var stat=isLow(it)?'<span class="pill lowpill">Low</span>':'';
  var rows='';
  rows+=fldRowI('Category', cm.label);
+ /* The colour a paint is, which is what the Trial Dots finish sheet calls it. */
+ if(invIsPaintCat(it.cat))rows+=fldRowI('Colour', esc(it.color||'—'));
  if(it.ai)rows+=fldRowI('Active ingredient', it.ai);
  if(cm.res&&it.moa)rows+=fldRowI(cm.res+' group', it.moa);
  rows+=fldRowI('Formulation', it.form);
@@ -3187,6 +3297,11 @@ function renderAddItem(){
    '<div class="sec" style="margin:12px 18px 7px">Product</div><div class="list">'
   +'<div class="fld"><span class="fl">Brand name *</span><input class="inv-in" id="ai-name" placeholder="e.g. Daconil" style="max-width:160px"></div>'
   +'<div class="fld"><span class="fl">Category *</span><select class="inv-sel" id="ai-cat">'+catOpts('fungicide')+'</select></div>'
+  /* Paint only. One item per colour is the point: the Trial Dots finish sheet
+     lists these as its colour picker, and each colour keeps its own count, so
+     the Inventory screen can say you are out of blue while there is still
+     orange. Hidden for everything else — a fungicide has no colour. */
+  +'<div class="fld" id="ai-colorrow"><span class="fl">Colour *</span><input class="inv-in" id="ai-color" placeholder="e.g. Blue" style="max-width:120px"></div>'
   +'<div class="fld"><span class="fl">Active ingredient</span><input class="inv-in" id="ai-ai" placeholder="—" style="max-width:160px"></div>'
   +'<div class="fld"><span class="fl" id="ai-reslbl">FRAC group</span><input class="inv-in" id="ai-moa" placeholder="—" style="max-width:110px"></div>'
   +'<div class="fld" style="border-bottom:none"><span class="fl">Formulation</span><select class="inv-sel" id="ai-form">'+forms.map(function(f){return '<option'+(f==='SC'?' selected':'')+'>'+f+'</option>';}).join('')+'</select></div>'
@@ -3199,8 +3314,9 @@ function renderAddItem(){
   +'<div class="fld" style="border-bottom:none"><span class="fl">Reorder at</span><input class="inv-in" id="ai-thr" inputmode="decimal" placeholder="0" style="max-width:90px"></div>'
   +'</div>'
   +'<div style="margin:12px 16px;background:#eef4ff;border:1px solid #cfe0ff;border-radius:12px;padding:11px 13px;font:600 11.5px;color:#2456b8">Type a known brand name to autofill ingredient, category, formulation &amp; resistance group. Everything stays editable.</div>';
- var reslbl=function(){var c=catMeta(document.getElementById('ai-cat').value);document.getElementById('ai-reslbl').textContent=(c.res||'Resistance')+' group';};
- if(ed){var g=function(x){return document.getElementById('ai-'+x);};g('name').value=ed.name;g('ai').value=ed.ai||'';g('moa').value=ed.moa||'';g('cat').value=ed.cat;g('form').value=ed.form;g('loc').value=(ed.loc==='—'?'':ed.loc);g('ctype').value=ed.ctype;g('csize').value=ed.csize;g('unit').value=ed.unit;g('qty').value=fmt(invQty(ed));g('thr').value=ed.thr;}
+ var reslbl=function(){var c=catMeta(document.getElementById('ai-cat').value);document.getElementById('ai-reslbl').textContent=(c.res||'Resistance')+' group';
+   var cr=document.getElementById('ai-colorrow'); if(cr) cr.style.display=invIsPaintCat(document.getElementById('ai-cat').value)?'':'none';};
+ if(ed){var g=function(x){return document.getElementById('ai-'+x);};g('name').value=ed.name;g('ai').value=ed.ai||'';g('moa').value=ed.moa||'';g('cat').value=ed.cat;g('form').value=ed.form;g('loc').value=(ed.loc==='—'?'':ed.loc);g('ctype').value=ed.ctype;g('csize').value=ed.csize;g('unit').value=ed.unit;g('qty').value=fmt(invQty(ed));g('thr').value=ed.thr;g('color').value=ed.color||'';}
  reslbl();
  document.getElementById('ai-cat').addEventListener('change',reslbl);
  if(!ed)document.getElementById('ai-name').addEventListener('input',function(){
@@ -3213,9 +3329,14 @@ document.getElementById('ai-save').addEventListener('click',function(){
  var g=function(x){return document.getElementById('ai-'+x);};
  var name=g('name').value.trim(); if(!name){toast('Enter a brand name');return;}
  var csize=parseFloat(g('csize').value)||1, qty=parseFloat(g('qty').value)||0, thr=parseFloat(g('thr').value)||0;
+ /* A paint with no colour on it would be an unlabelled line in the Trial Dots
+    colour picker, which is worse than no line at all. Everything else may
+    leave it blank, because the box is not even shown to them. */
+ var color=invIsPaintCat(g('cat').value)?g('color').value.trim():'';
+ if(invIsPaintCat(g('cat').value)&&!color){toast('Give the paint a colour');return;}
  var ed=window.aiEdit?INVENTORY.find(function(x){return x.id===window.aiEdit;}):null;
  if(ed){
-   ed.name=name; ed.ai=g('ai').value.trim()||null; ed.moa=g('moa').value.trim()||null; ed.cat=g('cat').value; ed.form=g('form').value; ed.loc=g('loc').value.trim()||'—'; ed.ctype=g('ctype').value; ed.csize=csize; ed.unit=g('unit').value.trim()||'unit'; ed.thr=thr;
+   ed.name=name; ed.ai=g('ai').value.trim()||null; ed.moa=g('moa').value.trim()||null; ed.cat=g('cat').value; ed.form=g('form').value; ed.color=color||null; ed.loc=g('loc').value.trim()||'—'; ed.ctype=g('ctype').value; ed.csize=csize; ed.unit=g('unit').value.trim()||'unit'; ed.thr=thr;
     /* "On hand" on this form is a RECOUNT. Writing ed.qty would quietly
        rewrite the April opening balance and leave every movement since
        describing a shelf that no longer adds up. Book the difference instead,
@@ -3227,7 +3348,7 @@ document.getElementById('ai-save').addEventListener('click',function(){
    show('inventory'); stack=stack.filter(function(x){return x!=='additem'&&x!=='itemdetail';});
    return;
  }
- INVENTORY.push({id:newId('i'), name:name, ai:g('ai').value.trim()||null, moa:g('moa').value.trim()||null, cat:g('cat').value, form:g('form').value, loc:g('loc').value.trim()||'—', ctype:g('ctype').value, csize:csize, unit:g('unit').value.trim()||'unit', qty:qty, thr:thr});
+ INVENTORY.push({id:newId('i'), name:name, ai:g('ai').value.trim()||null, moa:g('moa').value.trim()||null, cat:g('cat').value, color:color||null, form:g('form').value, loc:g('loc').value.trim()||'—', ctype:g('ctype').value, csize:csize, unit:g('unit').value.trim()||'unit', qty:qty, thr:thr});
  if(!PRODREF.some(function(p){return p.name.toLowerCase()===name.toLowerCase();}))PRODREF.push({name:name,ai:g('ai').value.trim(),cat:g('cat').value,form:g('form').value,moa:g('moa').value.trim()});
  toast('Added '+name+' ✓'); invFilter=g('cat').value; show('inventory'); stack=stack.filter(function(x){return x!=='additem';});
 });

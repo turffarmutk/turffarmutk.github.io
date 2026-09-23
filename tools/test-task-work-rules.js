@@ -176,7 +176,7 @@ section('5b. the cans of paint a trial-dots job used');
      here rather than shipped in the app on purpose: the app must read whatever
      is in the Paint · Cans category, not a product named in the source. */
   win.INVENTORY.push({ id: 'ipaint', name: 'Field Marking Paint', ai: null, cat: 'paint_can',
-                       form: 'other', loc: 'Barn', ctype: 'can', csize: 1, unit: 'can', qty: 10, thr: 2 });
+                       color: 'Blue', form: 'other', loc: 'Barn', ctype: 'can', csize: 1, unit: 'can', qty: 10, thr: 2 });
   const paint = win.INVENTORY.find(x => x.id === 'ipaint');
   const before = win.invQty(paint);
 
@@ -193,7 +193,13 @@ section('5b. the cans of paint a trial-dots job used');
   ok('and the only answers offered are whole cans',
      cans && [...cans.options].slice(1).every(o => /^\d+ cans?$/.test(o.textContent) && String(+o.value) === o.value),
      cans && [...cans.options].map(o => o.textContent).join('|'));
-  ok('one paint in inventory is not a question worth asking', !win.document.getElementById('ds-paint-item'));
+  const type = win.document.getElementById('ds-paint-type');
+  ok('the spray/liquid type is filled in from the job', type && type.value === 'spray', type && type.value);
+  ok('and the student can still change it', type && [...type.options].map(o => o.value).join(',') === 'spray,liquid');
+  const col = win.document.getElementById('ds-paint-color');
+  ok('the colour picker names the colour, not the product', col && col.options[1].textContent.indexOf('Blue') === 0,
+     col && col.options[1].textContent);
+  ok('one paint on the shelf is picked for them', col && col.value === 'ipaint', col && col.value);
 
   const btn = sheet.querySelector('.ds-confirm');
   btn.click();
@@ -207,8 +213,9 @@ section('5b. the cans of paint a trial-dots job used');
 
   const finished = doc(t);
   ok('the job is done', t.status === 'done');
-  ok('the cans are on the job', t.paintUsed && t.paintUsed.cans === 3 && t.paintUsed.item === 'ipaint',
-     JSON.stringify(t.paintUsed));
+  ok('the cans, the colour and the type are all on the job',
+     t.paintUsed && t.paintUsed.cans === 3 && t.paintUsed.item === 'ipaint'
+     && t.paintUsed.color === 'Blue' && t.paintUsed.type === 'spray', JSON.stringify(t.paintUsed));
   ok('THE DATABASE ACCEPTS THE FINISH WITH THE PAINT ON IT',
      model.completionFieldsOk(server, finished, STUDENT), why(server, finished));
   ok('three cans came off the shelf', win.invQty(paint) === before - 3, before + ' -> ' + win.invQty(paint));
@@ -216,8 +223,8 @@ section('5b. the cans of paint a trial-dots job used');
      win.INVMOVES.some(m => m.item === 'ipaint' && m.delta === -3 && m.ref === t.id && m.who === STUDENT));
 
   const entry = win.__w.FIELDLOG.filter(e => e.taskId === t.id)[0];
-  ok('the Field Log says what went out and how much',
-     entry && entry.product === 'Field Marking Paint' && entry.amount === '3 cans',
+  ok('the Field Log says what went out, in what colour, and how much',
+     entry && entry.product === 'Field Marking Paint · Blue' && entry.amount === '3 cans',
      entry && entry.product + ' / ' + entry.amount);
 }
 
@@ -228,7 +235,7 @@ section('5c. a paint measured in ounces, not in cans');
      using the can count straight would empty a shelf eight times too slowly
      and make the Inventory screen quietly wrong. */
   win.INVENTORY.push({ id: 'ipaint2', name: 'Upside-Down Marker', ai: null, cat: 'paint_can',
-                       form: 'other', loc: 'Barn', ctype: 'can', csize: 17, unit: 'oz', qty: 170, thr: 0 });
+                       color: 'Orange', form: 'other', loc: 'Barn', ctype: 'can', csize: 17, unit: 'oz', qty: 170, thr: 0 });
   const oz = win.INVENTORY.find(x => x.id === 'ipaint2');
   const before = win.invQty(oz);
 
@@ -237,11 +244,14 @@ section('5c. a paint measured in ounces, not in cans');
   win.__w.setBrief(false);
   win.renderTaskWork();
   win.document.getElementById('tw-complete').click();
-  const pick = win.document.getElementById('ds-paint-item');
-  ok('with two paints on the shelf, the student says which', !!pick, 'no product dropdown');
+  const pick = win.document.getElementById('ds-paint-color');
+  ok('with two colours on the shelf, nothing is chosen for them', pick && pick.value === '', pick && pick.value);
+  ok('and both colours are offered by name',
+     pick && [...pick.options].slice(1).map(o => o.textContent.split(' \u00b7 ')[0]).join(',') === 'Blue,Orange',
+     pick && [...pick.options].map(o => o.textContent).join('|'));
   const btn = win.document.getElementById('donesheet').querySelector('.ds-confirm');
   btn.click();
-  ok('and it will not close until they do', t.status === 'todo' && /which paint/i.test(btn.textContent), btn.textContent);
+  ok('and it will not close until they pick one', t.status === 'todo' && /colour/i.test(btn.textContent), btn.textContent);
   pick.value = 'ipaint2';
   pick.dispatchEvent(new win.Event('change', { bubbles: true }));
   const cans = win.document.getElementById('ds-paint-cans');
@@ -250,6 +260,50 @@ section('5c. a paint measured in ounces, not in cans');
   btn.click();
   ok('two 17 oz cans take 34 oz off the shelf, not 2', win.invQty(oz) === before - 34,
      before + ' -> ' + win.invQty(oz));
+  ok('and the colour picked is the one recorded', t.paintUsed && t.paintUsed.color === 'Orange',
+     JSON.stringify(t.paintUsed));
+}
+
+section('5c2. switching the type to liquid');
+{
+  /* Dillon, 2026-09-23: liquid paint is deliberately NOT counted yet, because
+     nobody has said whether it is measured in whole jugs or in gallons. The
+     sheet must still let the job close, record what it can, and never take a
+     guessed amount off a shelf. */
+  win.sessionSet(STUDENT, { quiet: true });
+  win.INVENTORY.push({ id: 'ipaint3', name: 'Bulk Striping Paint', ai: null, cat: 'paint_liq',
+                       color: 'White', form: 'other', loc: 'Barn', ctype: 'jug', csize: 5, unit: 'gal', qty: 50, thr: 0 });
+  const liq = win.INVENTORY.find(x => x.id === 'ipaint3');
+  const before = win.invQty(liq);
+
+  const t = assigned('wr-4c2', { title: 'Trial Dots', type: 'Miscellaneous', plots: [], area: 'All active trials' });
+  const server = doc(t);
+  win.openTaskWork(t.id);
+  win.__w.setBrief(false);
+  win.renderTaskWork();
+  win.document.getElementById('tw-complete').click();
+  const type = win.document.getElementById('ds-paint-type');
+  type.value = 'liquid';
+  type.dispatchEvent(new win.Event('change', { bubbles: true }));
+
+  const col = win.document.getElementById('ds-paint-color');
+  ok('the colour list swaps to the liquid shelf', col && col.value === 'ipaint3', col && col.value);
+  ok('and no amount is asked for', !win.document.getElementById('ds-paint-cans'));
+  ok('the sheet says why, rather than going quiet',
+     /not counted in the app yet/i.test(win.document.querySelector('#ds-extra .ds-hint').textContent),
+     win.document.querySelector('#ds-extra .ds-hint').textContent);
+
+  const btn = win.document.getElementById('donesheet').querySelector('.ds-confirm');
+  ok('the job can still be finished', btn.textContent.indexOf('Confirm') === 0, btn.textContent);
+  btn.click();
+  ok('and it is', t.status === 'done', t.status);
+  ok('the colour and type are recorded with no count',
+     t.paintUsed && t.paintUsed.type === 'liquid' && t.paintUsed.color === 'White' && !t.paintUsed.cans,
+     JSON.stringify(t.paintUsed));
+  ok('NOTHING was guessed off the liquid shelf', win.invQty(liq) === before, before + ' -> ' + win.invQty(liq));
+  ok('the database still accepts it', model.completionFieldsOk(server, doc(t), STUDENT), why(server, doc(t)));
+
+  win.INVENTORY.splice(win.INVENTORY.indexOf(liq), 1);
 }
 
 section('5d. trial dots still finishes when no paint is set up at all');

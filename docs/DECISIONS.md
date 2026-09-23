@@ -1133,6 +1133,24 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### The Farm Manager is not a section on his own Task Board — 2026-09-23
+**Decision:** the Board tab lists the crew only. The signed-in manager's own
+name, and the jobs he assigned to himself, no longer appear there — they are on
+his **Mine** tab, which is the tab that exists for them. `boardOffChart()` skips
+his jobs for the same reason, so they cannot reappear under "Not on any day
+above".
+**Why:** Dillon, 2026-09-23: the Board is the screen he reads to see who is
+working and on what, and his own name sitting at the top of it was noise on the
+one screen that is meant to be about other people. It also put his name on every
+row of his own section. Mine already shows those jobs, numbered, with Start,
+exactly as before.
+**Don't:** don't "restore" him by putting `SESSION.pid` back into `people` in
+`renderBoard()` — and if you ever do, remember the two halves move together: the
+`isMe()` skip in `boardOffChart()` has to come out at the same time or half his
+work disappears. One real cost is worth knowing: a job he dates beyond the five
+day chips is now on no screen of his until that week comes round, the same as it
+already was for every crew member.
+
 ### Every page but Home, Tasks and the Map is "Coming Soon" for the crew — 2026-09-18
 **Decision:** Inventory, Trials, Equipment, Field Log, Time Clock, Calendar and
 Weather open faded under a "Coming Soon" card for everyone except the Farm

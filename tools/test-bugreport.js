@@ -1,5 +1,5 @@
 /*
- * Harness for "Report a technical bug" and for Bill's own rows on the board.
+ * Harness for "Report a technical bug" and for where Bill's own tasks show up.
  *
  * What it pins:
  *   1. Reachable   — every role can file a bug, including an undergrad whose
@@ -20,9 +20,14 @@
  *      everybody      the one phone it was typed into. Without this the form is
  *                     built, looks finished, and delivers nothing for anybody
  *                     except the person who set it up. See section 7.
- *   5. Bill's rows — a task Bill assigned to himself carries a Start button,
- *                    not the rank arrows and bin he uses to direct other
- *                    people. Everyone else's rows keep those controls.
+ *   5. Bill's rows — Bill is not a section on the Board tab at all. A task he
+ *                    assigned to himself shows on his MINE tab, with a Start
+ *                    button and none of the rank arrows and bin he uses to
+ *                    direct other people, and it must not reappear on the
+ *                    Board -- not as a section of his own and not in the
+ *                    "Not on any day above" list. Everyone else's rows on the
+ *                    Board keep those controls. Dillon asked for this on
+ *                    2026-09-23; see docs/DECISIONS.md.
  *
  * Run:  node tools/test-bugreport.js
  */
@@ -345,7 +350,7 @@ section('9. a queued report survives the move to hosting');
      JSON.stringify(b2.p.BUGS.map(x => x.what)));
 }
 
-section('10. Bill\'s own tasks carry a Start button');
+section('10. Bill is not on the Board; his own tasks are on Mine');
 {
   const b = boot({});
   b.p.sessionSet('p07');
@@ -362,29 +367,49 @@ section('10. Bill\'s own tasks carry a Start button');
   b.win.__set('boardDay', new Date().getDay());
   b.win.__get('renderBoard')();
 
-  const kids = [...b.doc.getElementById('tb-body').children];
-  let mine = null, crew = null;
+  const board = b.doc.getElementById('tb-body');
+  const boardText = board.textContent || '';
+  const billName = b.p.nameOf('p07');
   const crewName = b.p.nameOf(other);
+
+  /* His name nowhere on the board, and neither of his jobs either -- the
+     second half matters because dropping his section without also teaching
+     boardOffChart() to skip him just moves both jobs into "Not on any day
+     above", with his name on every row. */
+  ok('his name is not on the board', billName && boardText.indexOf(billName) < 0, boardText.slice(0, 160));
+  ok('and neither of his own jobs is', boardText.indexOf('ZZ Bill') < 0);
+  ok('the crew is still there', crewName && boardText.indexOf(crewName) >= 0);
+  ok('with their jobs', boardText.indexOf('ZZ Crew one') >= 0 && boardText.indexOf('ZZ Crew two') >= 0);
+
+  /* The crew's rows keep the controls he directs people with. */
+  let crew = null;
+  const kids = [...board.children];
   for (let i = 0; i < kids.length; i++) {
     if (!kids[i].classList.contains('sec')) continue;
     const t = kids[i].textContent || '', next = kids[i + 1];
     if (!next || !next.classList.contains('list')) continue;
-    if (/\(you\)/.test(t)) mine = next;
-    else if (crewName && t.indexOf(crewName) === 0 && !crew) crew = next;
+    if (crewName && t.indexOf(crewName) === 0 && !crew) crew = next;
   }
   const n = (el, s) => (el ? el.querySelectorAll(s).length : -1);
-
-  ok('his section renders', !!mine);
-  ok('there is a Start button', n(mine, '[data-start]') === 1, String(n(mine, '[data-start]')));
-  ok('on the next-up job only', n(mine, '.row') === 2, String(n(mine, '.row')));
-  ok('the rank arrows are gone', n(mine, '[data-move]') === 0, String(n(mine, '[data-move]')));
-  ok('and so is the bin', n(mine, '[data-del]') === 0, String(n(mine, '[data-del]')));
-
   ok('a crew member\'s section still renders', !!crew);
   ok('their rows keep both arrows', crew && n(crew, '[data-move]') === n(crew, '.row') * 2,
      n(crew, '[data-move]') + ' for ' + n(crew, '.row') + ' rows');
   ok('and keep the bin', crew && n(crew, '[data-del]') === n(crew, '.row'));
   ok('and get no Start button', n(crew, '[data-start]') === 0, String(n(crew, '[data-start]')));
+
+  /* And the jobs are not lost: Mine is where they live now, numbered, with a
+     Start button on the one that is up next and none of the manager controls. */
+  b.win.__set('tbTab', 'mine');
+  b.win.__get('renderBoard')();
+  const mineText = b.doc.getElementById('tb-body').textContent || '';
+  const mineList = b.doc.querySelector('#tb-body .list');
+  ok('both of his jobs are on his Mine tab',
+     mineText.indexOf('ZZ Bill one') >= 0 && mineText.indexOf('ZZ Bill two') >= 0);
+  ok('with one Start button', n(mineList, '[data-start]') === 1, String(n(mineList, '[data-start]')));
+  ok('on the next-up job only', n(mineList, '.row') === 2, String(n(mineList, '.row')));
+  ok('the rank arrows are not there', n(mineList, '[data-move]') === 0, String(n(mineList, '[data-move]')));
+  ok('and neither is the bin', n(mineList, '[data-del]') === 0, String(n(mineList, '[data-del]')));
+  ok('and the crew\'s work is not on his Mine tab', mineText.indexOf('ZZ Crew') < 0);
 }
 
 section('11. tapping your own task on the board opens it');

@@ -1532,9 +1532,16 @@ function boardOffChart(people){
   var dow=new Date().getDay(), weekend=(dow===0||dow===6);
   return TASKS.filter(function(t){
     if(t.status!=='todo'||t.kind!=='task') return false;
+    var whose=pidOf(t.assignee);
+    /* The person reading the board never appears on it -- their own work is on
+       their Mine tab. Without this line every job Bill put on himself would
+       fall in here instead, because he is no longer one of the people listed
+       above, and his name would be back on the board on every one of those
+       rows. The cost, and it is a real one: a job he dates beyond this week is
+       then on no screen until that week comes round. */
+    if(whose&&isMe(whose)) return false;
     var o=taskOrd(t);
     var onChip=o?(ords.indexOf(o)>=0):!weekend;
-    var whose=pidOf(t.assignee);
     return !onChip || !whose || !listed[whose];
   });
 }
@@ -1652,7 +1659,15 @@ function renderTasks(){
    var ro=currentRole!=='manager';
    var people=STUDENTS.slice();
    if(currentRole==='faculty'){ labMembers().map(function(m){return m.name;}).reverse().forEach(function(n){if(people.indexOf(n)<0)people.unshift(n);}); }
-   if(currentRole==='manager'&&SESSION.pid&&people.indexOf(SESSION.pid)<0){ people.unshift(SESSION.pid); }
+   /* The signed-in manager is NOT a section on this board. Dillon,
+      2026-09-23: the Board tab is who he has working for him today, and his
+      own name at the top of it was noise on the one screen he reads to see
+      the crew. Anything he assigns to himself is still his -- it shows on
+      his Mine tab, which is the tab that exists for exactly that. Adding
+      him back here also puts his name on every one of his own rows, which
+      is the thing he asked to stop seeing. See boardOffChart() below: it
+      has to skip his jobs too, or they all land in "Not on any day
+      above" instead and his name is right back on the board. */
    var bDate=asDateFromOrd(boardDayOrd());
    var bIn=schedCrewOn(bDate).length;
    /* Part-finished jobs waiting for Bill to hand out the rest -- at the top,
@@ -1667,7 +1682,7 @@ function renderTasks(){
         +(bIn?(' <span style="color:#2f9e4f">· '+bIn+' in</span>'):'')+'</div>';
    people.forEach(function(s){
      var mine=taskInOrder(TASKS.filter(function(t){return taskIsFor(t,s)&&t.status==='todo'&&t.kind==='task'&&taskOnDay(t);}));
-     var slabel=(isMe(s)?nameOf(s)+' (you)':nameOf(s));
+     var slabel=nameOf(s);
      /* Where they are in their day, as the color of their name: orange
         before they arrive, green while on the clock, red once they have
         clocked out or the shift is over. See tbPersonState(). Plain grey
@@ -1676,18 +1691,13 @@ function renderTasks(){
      html+='<div class="sec'+(bst?(' tbp-'+bst.k):'')+'">'+esc(slabel)+' · '+mine.length+(mine.length===1?' task':' tasks')
           +(bst?('<div class="tbp-sub"><span class="tbp-dot"></span>'+esc(bst.txt)+'</div>'):'')
           +'</div>';
-     /* Bill's own section is his work, not his paperwork. Everyone else's rows
-        keep the manager controls — rank arrows and a bin — because that is him
-        directing other people. On his own tasks those controls are meaningless
-        (he is the whole list, so reordering against himself and deleting his
-        own next job are not the actions he wants standing in a field), so his
-        rows render exactly like a crew member's: numbered, in order, with a
-        Start button on the one that is up next. Same row, same button, same
-        behaviour the crew already knows — the comment on the Mine tab has said
-        this was the intent since the day that tab was written. */
+     /* Every row here belongs to somebody else, so every row keeps the manager
+        controls — rank arrows and a bin — because that is him directing other
+        people. Nobody's own work appears on this tab any more; his own rows,
+        numbered with a Start button, are on the Mine tab. */
      html+= mine.length? '<div class="list">'+mine.map(function(t,i){
               if(ro) return roRow(numBadge(i+1),t.title,areaWithDue(t));
-              return isMe(s)?tbTaskRow(t,i+1,i===0):tbBoardRow(t,i+1,i===0,i===mine.length-1);
+              return tbBoardRow(t,i+1,i===0,i===mine.length-1);
             }).join('')+'</div>'
           : '<div class="list"><div class="row" style="border-bottom:none"><div style="flex:1"><div class="rs">All caught up ✓</div></div></div></div>';
    });

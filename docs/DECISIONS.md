@@ -1133,6 +1133,43 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### The graduate students are on the Task Board, and keep weekly hours — 2026-09-23
+**Decision:** two changes made together, because neither is worth much alone.
+(1) The Board tab lists the graduate students beside the undergraduates.
+`tbBoardPeople()` in `app-03-people.js` is now the one place that says who the
+board draws, and the once-a-minute color repaint (`tbStateSig()`) reads the
+same function. (2) The weekly schedule panel on the profile screen is open to
+grad students as well as undergrads — `schedKeepsHours()`, which asks the
+**roster** for the person's job, not `currentRole`.
+**Why:** Dillon asked for both, and they fit together. A job sitting on a grad
+student used to be drawn on no screen Bill had: the board listed the undergrad
+pool and nobody else, so `boardOffChart()` swept it into "Not on any day above"
+— the section for work the board cannot place. That is the same hole that made
+five mow jobs undeletable on 2026-08-31, still open for one whole role. And a
+name on the board is colored by whether the person is down to be in that day,
+so putting grad students up there without giving them anywhere to say when they
+work would have left four permanently grey names.
+**What this does NOT change:** who Bill may direct. He still only **asks** a
+grad student — `taskCan()` is untouched, and the assign screen still keeps them
+under "Grad students · sends a request" rather than in the day board he assigns
+from directly. Seeing what somebody is doing and setting their day are different
+questions, and the board answers the first one. That is why a grad student's row
+on the board carries their job title after their name and an undergrad's does
+not: the row looks identical otherwise, and what Bill may do with it is not.
+**Don't:** don't fold `rstGradIds()` and `rstUndergradIds()` into one list. The
+assign picker reads the undergrad list to decide who Bill hands work to
+**directly**, and a combined list would quietly move grad students into that row
+— the farm's organisation chart changed by a tidy-up. For the same reason
+`schedCrewOn()` still answers for the undergrad pool only; the board counts its
+own people for the "· N in" line instead. And don't narrow faculty to match the
+manager: a PI still sees their own lab plus the shared pool, not every grad on
+the farm.
+**Also fixed on the way past:** the faculty branch put display *names* into that
+list where everything else holds roster ids, so `tbPersonState()` could not
+resolve them and a PI never saw their own lab's hours or clock-ins on the board
+at all. It is ids now, and `tools/test-schedule.js` section 3c fails if a name
+ever gets back in.
+
 ### The Farm Manager is not a section on his own Task Board — 2026-09-23
 **Decision:** the Board tab lists the crew only. The signed-in manager's own
 name, and the jobs he assigned to himself, no longer appear there — they are on

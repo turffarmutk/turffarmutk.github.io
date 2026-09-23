@@ -323,6 +323,14 @@ function rstUndergradNames(){return rstActive().filter(function(p){return p.role
    selection is stored on a task, so what they carry has to be the key that
    ends up in the record. */
 function rstUndergradIds(){return rstActive().filter(function(p){return p.role==='Undergraduate Student';}).map(function(p){return p.id;});}
+/* The graduate students, as roster ids. Kept SEPARATE from the undergrad pool
+   above on purpose, even though the Task Board now draws both. The two lists
+   are read by screens that treat these people differently -- Bill DIRECTS an
+   undergrad and only ASKS a grad student -- so one combined list would quietly
+   drop grad students into the assign screen's "assign directly" row, which is
+   not the farm's organisation chart. The board is the one place they join up.
+   See tbBoardPeople(). */
+function rstGradIds(){return rstActive().filter(function(p){return p.role==='Graduate Student';}).map(function(p){return p.id;});}
 function rstCrewList(){return rstActive().filter(function(p){return p.role==='Graduate Student'||p.role==='Technician';})
   .map(function(p){return {pid:p.id,name:pName(p),role:p.role==='Graduate Student'?'Grad student':'Technician',lab:p.lab||'—'};});}
 /* Demo logins point at real roster entries, so editing a person on the roster
@@ -903,8 +911,9 @@ function semCurrent(){
 function semCurrentName(){ var s=semCurrent(); return s?s.name:''; }
 
 /* ---- weekly schedules ---------------------------------------------
-   What each undergrad says their standing hours are: one record per person per
-   term. This used to be a single localStorage key named after the ROLE --
+   What each undergrad -- and, since 2026-09-23, each grad student -- says
+   their standing hours are: one record per person per term. This used to be
+   a single localStorage key named after the ROLE --
    'ut_sched_undergrad_Fall 2026' -- so every undergrad who touched the same
    phone overwrote the others, which is the mistake the per-person prefs rule
    was written to stop. And nothing outside the profile screen ever read it, so
@@ -968,7 +977,11 @@ function schedShiftOn(pid,d){
 }
 function schedShiftLabel(pid,d){ var s=schedShiftOn(pid,d); return s?(schedFmt(s.start)+'–'+schedFmt(s.end)):''; }
 function schedHrsOn(pid,d){ var s=schedShiftOn(pid,d); return s?Math.round((schedToMin(s.end)-schedToMin(s.start))/6)/10:0; }
-/* Everyone down for a date, roster order kept. */
+/* The UNDERGRAD POOL down for a date, roster order kept. Deliberately just
+   the pool, and it has to stay that way: this is the count the assign picker
+   prints beside the people Bill hands work to DIRECTLY, and since 2026-09-23
+   grad students keep hours too without being in that group. The Task Board
+   counts its own people instead -- see the bIn line in renderTasks(). */
 function schedCrewOn(d){
   var out=[];
   try{ rstUndergradIds().forEach(function(p){ if(schedShiftOn(p,d)) out.push(p); }); }catch(e){}
@@ -997,9 +1010,24 @@ function schedIsEditing(){
   var a=document.activeElement;
   return !!(w&&a&&w.contains(a)&&a.tagName==='INPUT');
 }
+/* WHO KEEPS STANDING WEEKLY HOURS.
+   The undergraduates, and -- since 2026-09-23 -- the graduate students.
+   Dillon asked for it when the grads went onto the Task Board: their names
+   are now beside the undergrads on the board, and a name there is colored by
+   whether the person is down to be in. With no hours on file a grad student's
+   name is permanently grey, which tells Bill nothing.
+
+   It reads the ROSTER, not currentRole, for the reason written over fstRole():
+   currentRole is only which screen is showing, while the record this screen
+   writes is keyed on SESSION.pid. Asking the roster means the gate and the
+   record can never disagree about whose schedule is on screen. */
+function schedKeepsHours(pid){
+  var r=(typeof personRole==='function')?personRole(pid):null;
+  return r==='Undergraduate Student'||r==='Graduate Student';
+}
 function renderProfileSchedule(){
   var w=document.getElementById('pf-sched-wrap'); if(!w) return;
-  if(currentRole!=='undergrad'){ w.style.display='none'; w.innerHTML=''; return; }
+  if(!schedKeepsHours(SESSION.pid)){ w.style.display='none'; w.innerHTML=''; return; }
   w.style.display='block';
   if(!schedSem||!semFind(schedSem)) schedSem=semCurrentName();
   renderSchedule();
@@ -1025,6 +1053,13 @@ function renderSchedule(){
   var t=schedTotals(data);
   var sem=semFind(schedSem);
   var when=sem?(semDateLabel(sem.start)+' - '+semDateLabel(sem.end)):'';
+  /* The last sentence differs by who is reading it, because what Bill does
+     with the hours differs. He sets an undergrad's day from them; he only
+     ASKS a grad student, so telling a grad student that Bill uses these
+     "when he hands out work" would describe a farm that does not exist. */
+  var why=(personRole(pid)==='Graduate Student')
+    ? 'Bill sees these hours on his task board, so he knows when you are on the farm before he asks you to take something on.'
+    : 'Bill sees these hours on his day board when he hands out work.';
   /* The old screen carried a "Save schedule" button that did nothing but raise
      a toast -- every change was already written the moment it was made. Saying
      so plainly beats a button pretending to be the thing that saves. */
@@ -1035,8 +1070,8 @@ function renderSchedule(){
     +'<div class="list" style="margin-top:8px">'+rows+'</div>'
     +'<div class="sched-sum"><span>'+t.hrs+' hrs/week</span><span class="sub">&middot; '+t.days+' day'+(t.days===1?'':'s')+'</span></div>'
     +'<div class="sched-note">Your standard weekly hours for '+esc(schedSem)+'. Tap a day to turn it on or off, then set your times. '
-    +'Every change saves as you make it &mdash; there is nothing to press. Bill sees these hours on his day board when he hands out work, '
-    +'so keep them up to date if your classes change.</div>';
+    +'Every change saves as you make it &mdash; there is nothing to press. '+why+' '
+    +'Keep them up to date if your classes change.</div>';
   attachSchedule();
 }
 function attachSchedule(){
@@ -1515,9 +1550,10 @@ function deleteTask(id){
 
      - one whose date has passed, or falls outside this run. An overdue job
        does not turn red and does not move to today. It stops being drawn.
-     - one sitting on somebody the board does not list. That list is the
-       undergraduates plus Bill himself, so every job on a technician, a grad
-       student or faculty is off it.
+     - one sitting on somebody the board does not list. That list is
+       tbBoardPeople(): the undergraduates and, since 2026-09-23, the graduate
+       students. A job on a technician, on faculty, or on the person reading
+       the board is still off it.
 
    Both were invisible to the person running the farm, and until 2026-08-31
    both were also undeletable, because the bin only draws on a row the board
@@ -1593,16 +1629,55 @@ function tbPersonState(pid,d){
   }
   return {k:'sched',txt:'Scheduled '+span};
 }
+/* WHO THE BOARD TAB LISTS, and in what order.
+   ONE function, because the once-a-minute repaint below has to look at exactly
+   the same people the board drew. A name it does not know about is a name
+   whose color can change with nothing noticing.
+
+   Since 2026-09-23 that is the undergraduates AND the graduate students.
+   Dillon asked for the grads on the board beside the undergrads, and the
+   reason it matters is not tidiness: a job on a grad student appeared on no
+   screen Bill had. boardOffChart() swept it into "Not on any day above",
+   which is where a job on somebody the board does not list ends up.
+
+   It does NOT change who Bill may direct. He still only ASKS a grad student,
+   and the assign screen still keeps them in its "sends a request" section --
+   see taskCan(). This is the board he reads to see what the farm is doing
+   today, which is a different question from whose day he sets.
+
+   Faculty stay deliberately narrower: their own lab's grads and technicians,
+   plus the shared undergrad pool. The whole farm is the farm manager's
+   business, not a PI's -- the same scope the "Not on any day above" section
+   is held to a few lines down. */
+function tbBoardPeople(){
+  var people=STUDENTS.slice();
+  if(currentRole==='faculty'){
+    /* Roster ids, not display names. These went in as names until
+       2026-09-23, which every other reader here then had to resolve back
+       again -- and tbPersonState() could not, so a PI never saw their own
+       lab's hours or clock-ins on the board at all. */
+    labMembers().map(function(m){return m.pid;}).reverse()
+      .forEach(function(id){ if(id&&people.indexOf(id)<0) people.unshift(id); });
+  } else {
+    rstGradIds().forEach(function(id){ if(people.indexOf(id)<0) people.push(id); });
+  }
+  /* Whoever is reading the board is never a section on it -- their own work
+     lives on their Mine tab. Same rule boardOffChart() applies; see the note
+     inside renderTasks(). */
+  return people.filter(function(id){ return !isMe(id); });
+}
 /* The colors move on their own -- a shift ends, somebody on another phone
    clocks in -- and the board is otherwise only drawn when you open it. Once a
    minute, if the Board tab is showing today and any name's color would now
    be different, draw it again. Comparing first means a board nobody is
-   changing is left alone, so it does not jump under a thumb mid-scroll. */
+   changing is left alone, so it does not jump under a thumb mid-scroll.
+   The people it walks are tbBoardPeople(), just above -- the same list the
+   board itself drew, which is the whole reason that is one function. */
 var _tbStateSig='';
 function tbStateSig(){
   if(tbTab!=='board'||boardDayOrd()!==asTodayOrd()) return '';
   var d=asDateFromOrd(boardDayOrd());
-  return STUDENTS.map(function(s){var st=tbPersonState(s,d);return st?st.k+st.txt:'';}).join('|');
+  return tbBoardPeople().map(function(s){var st=tbPersonState(s,d);return st?st.k+st.txt:'';}).join('|');
 }
 function tbRefreshIfChanged(){
   try{
@@ -1657,8 +1732,7 @@ function renderTasks(){
  } else if(tbTab==='board'){
    showDays=true;
    var ro=currentRole!=='manager';
-   var people=STUDENTS.slice();
-   if(currentRole==='faculty'){ labMembers().map(function(m){return m.name;}).reverse().forEach(function(n){if(people.indexOf(n)<0)people.unshift(n);}); }
+   var people=tbBoardPeople();
    /* The signed-in manager is NOT a section on this board. Dillon,
       2026-09-23: the Board tab is who he has working for him today, and his
       own name at the top of it was noise on the one screen he reads to see
@@ -1667,9 +1741,15 @@ function renderTasks(){
       him back here also puts his name on every one of his own rows, which
       is the thing he asked to stop seeing. See boardOffChart() below: it
       has to skip his jobs too, or they all land in "Not on any day
-      above" instead and his name is right back on the board. */
+      above" instead and his name is right back on the board.
+      Who the list holds is tbBoardPeople() -- undergraduates and graduate
+      students, or a PI's own lab plus the pool. */
    var bDate=asDateFromOrd(boardDayOrd());
-   var bIn=schedCrewOn(bDate).length;
+   /* How many of the people ON THIS BOARD are down to be here. Not
+      schedCrewOn(), which answers for the undergrad pool alone -- that is the
+      number the assign picker wants, and since the grad students joined the
+      board the two questions no longer have the same answer. */
+   var bIn=people.filter(function(s){return schedShiftOn(s,bDate);}).length;
    /* Part-finished jobs waiting for Bill to hand out the rest -- at the top,
       whatever day is showing, because they are waiting on him right now.
       See PART-FINISHED JOBS in app-04. */
@@ -1682,7 +1762,13 @@ function renderTasks(){
         +(bIn?(' <span style="color:#2f9e4f">· '+bIn+' in</span>'):'')+'</div>';
    people.forEach(function(s){
      var mine=taskInOrder(TASKS.filter(function(t){return taskIsFor(t,s)&&t.status==='todo'&&t.kind==='task'&&taskOnDay(t);}));
-     var slabel=nameOf(s);
+     /* The board was undergraduates only until 2026-09-23, so a name on it
+        needed no explaining. Now that the graduate students are here too,
+        anyone who is not an undergrad carries their job title -- because what
+        Bill may do with the row differs: he sets an undergrad's day, and he
+        asks a grad student. Nothing else on the row says which he is looking
+        at. */
+     var slabel=nameOf(s)+(isUndergrad(s)?'':(titleOf(s)?' · '+titleOf(s):''));
      /* Where they are in their day, as the color of their name: orange
         before they arrive, green while on the clock, red once they have
         clocked out or the shift is over. See tbPersonState(). Plain grey

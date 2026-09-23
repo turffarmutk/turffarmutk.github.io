@@ -77,7 +77,7 @@ const EX = ['SCHEDULES','FARM_SEMS','SCHED_DAYS','SESSION','STUDENTS','PEOPLE',
             'STORE_DEFS','SHIFT','WEEKCREW','ROSTER','rstFind','nameOf',
             'tcPunchDocs','tcApplyRemote','tcDropRemote','tcSummary','tcShift','tcToggleClock',
             'SCHSYNC','TCSYNC','schsyncSummary','tcsyncSummary','assignsUndergrads',
-            'tbPersonState','CB_MAP'];
+            'tbPersonState','CB_MAP','TASKS'];
 
 /* The app is one file with no exports, so booting it in jsdom and reading the
    globals back out is the only way to test what it actually does. */
@@ -238,6 +238,113 @@ section('3b. the task board colors each name by where they are in their day');
   ok('the color-blind board colors exist', /body\.cb \.tbp-sched\{/.test(HTML) &&
      /body\.cb \.tbp-on\{/.test(HTML) && /body\.cb \.tbp-off\{/.test(HTML));
   ok('no errors in the second boot', c.errs.length === 0, c.errs[0]);
+}
+
+section('3c. the graduate students stand on the board with the undergraduates');
+{
+  /* Dillon, 2026-09-23. Until this, a job on a grad student was drawn on no
+     screen Bill had: the Board tab listed the undergrad pool and nobody else,
+     so boardOffChart() swept it into "Not on any day above" instead. */
+  const c = boot({});
+  const w = c.win;
+  w.sessionSet('p07');                       // Bill, the farm manager
+  w.boardEnter();
+  const people = w.tbBoardPeople();
+
+  ok('the undergrads are still on it', people.indexOf('p18') >= 0, people.join(','));
+  ok('and the grad students are on it now', people.indexOf('p09') >= 0, people.join(','));
+  ok('technicians are not', people.indexOf('p05') < 0, people.join(','));
+  ok('nor is the person reading it', people.indexOf('p07') < 0, people.join(','));
+  ok('every entry is a roster id, never a display name',
+     people.every(x => /^p\d+$/.test(x)), people.join(','));
+
+  const body = w.document.getElementById('tb-body').innerHTML;
+  ok("a grad student's name is drawn", body.indexOf('Rose Gibbons') >= 0);
+  ok('with their job title beside it, so Bill knows he asks rather than tells',
+     /Rose Gibbons · Grad Student/.test(body), body.slice(0, 200));
+  ok('an undergrad carries no title — nothing changed for them',
+     body.indexOf('Sam Dean · ') < 0 || /Sam Dean · \d/.test(body));
+
+  /* The job that used to disappear. */
+  /* TASKS and STUDENTS are declared with let/const, so they are not window
+     properties — the boot's export list is the way in. boardDay is a var and
+     so is reachable. */
+  const gid = w.newId('t');
+  c.p.TASKS.push({ id: gid, title: 'ZZ Collect plugs', area: 'Plots 1-2', assignee: 'p09',
+                   status: 'todo', kind: 'task', type: 'Miscellaneous',
+                   dueAt: w.atToday(null), repeat: 'None' });
+  w.eval('boardDay=' + new Date().getDay() + ';');
+  w.renderBoard();
+  const body2 = w.document.getElementById('tb-body').innerHTML;
+  ok("a grad student's job is drawn on their day", body2.indexOf('ZZ Collect plugs') >= 0);
+  ok('and no longer falls off the chart',
+     !w.boardOffChart(w.tbBoardPeople()).some(t => t.id === gid));
+
+  /* The line that must NOT have moved: who Bill hands work to directly. */
+  const pool = c.p.STUDENTS;
+  ok('the assign picker still offers undergrads only',
+     pool.indexOf('p09') < 0 && pool.indexOf('p18') >= 0, pool.join(','));
+  ok('and grad students still sit under "sends a request"',
+     /Grad students · sends a request/.test(SRC));
+
+  /* A PI sees their own lab, not the whole farm — and as ids, so the board
+     can read their hours. */
+  w.sessionSet('p14');
+  const fpeople = w.tbBoardPeople();
+  ok('a PI gets ids too, not names', fpeople.every(x => /^p\d+$/.test(x)), fpeople.join(','));
+  ok("a PI does not get the whole farm's grads",
+     fpeople.filter(x => ['p09','p10','p11','p12'].indexOf(x) >= 0).length < 4, fpeople.join(','));
+  ok('no errors while drawing any of it', c.errs.length === 0, c.errs[0]);
+}
+
+section('3d. a grad student fills in their hours on their own profile');
+{
+  const c = boot({});
+  const w = c.win, d = w.document;
+  const wrap = () => d.getElementById('pf-sched-wrap');
+
+  w.sessionSet('p18'); w.fillProfile();
+  ok('an undergrad still gets the schedule panel', wrap().style.display !== 'none');
+  ok('and it is still their weekly schedule', wrap().innerHTML.indexOf('My weekly schedule') >= 0);
+  ok('worded for somebody Bill hands work to',
+     wrap().innerHTML.indexOf('hands out work') >= 0);
+
+  w.sessionSet('p09'); w.fillProfile();
+  ok('a grad student gets it now too', wrap().style.display !== 'none');
+  ok('with the same five days to fill in',
+     ['Monday','Tuesday','Wednesday','Thursday','Friday']
+       .every(x => wrap().innerHTML.indexOf(x) >= 0));
+  ok('but not told Bill hands them their work — he asks',
+     wrap().innerHTML.indexOf('hands out work') < 0);
+  ok('it says what the hours are for instead',
+     wrap().innerHTML.indexOf('before he asks you to take something on') >= 0);
+
+  w.sessionSet('p07'); w.fillProfile();
+  ok('the farm manager does not keep standing hours', wrap().style.display === 'none');
+  w.sessionSet('p05'); w.fillProfile();
+  ok('nor does a technician', wrap().style.display === 'none');
+
+  /* It has to be a real record that leaves the phone, not a screen that
+     draws. The gate reads the roster, so switching people switches whose. */
+  w.sessionSet('p09');
+  w.eval("schedSave('p09','Fall 2026',(function(){var x=schedDefault();x.Tue={on:true,start:'07:00',end:'11:00'};return x;})());");
+  const tue = new Date(2026, 9, 13);   // a Tuesday inside Fall 2026
+  ok("the grad student's shift is now a shift like anybody's",
+     w.schedShiftLabel('p09', tue) === '7:00a–11:00a', w.schedShiftLabel('p09', tue));
+  ok('and the board colors their name from it',
+     (w.tbPersonState('p09', tue) || {}).k === 'sched',
+     JSON.stringify(w.tbPersonState('p09', tue)));
+  ok('their own hours are theirs to set', w.schedCanEdit('p09') === true);
+  w.sessionSet('p18');
+  ok("and not another student's to set", w.schedCanEdit('p09') === false);
+  w.sessionSet('p07');
+  ok('Bill may still fix anybody\'s', w.schedCanEdit('p09') === true);
+
+  /* The assign picker's count is the undergrad pool, and must stay that way
+     now that grads have hours — it sits beside the pills Bill assigns from. */
+  ok('the day-board count did not quietly gain the grads',
+     w.schedCrewOn(tue).indexOf('p09') < 0, w.schedCrewOn(tue).join(','));
+  ok('no errors', c.errs.length === 0, c.errs[0]);
 }
 
 section('4. THE WIPE — the time clock keeps its history across a pay period');

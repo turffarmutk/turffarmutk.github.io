@@ -444,6 +444,50 @@ section('6e. the six dot colours survive colour-blind mode');
      Object.keys(seen).length === 5, Object.keys(seen).join(' '));
 }
 
+section('6f. the switches are grouped by the page they come from');
+{
+  const { win, doc, n } = boot({});
+  n.signIn(n.RST_LOGIN.manager);
+  win.go('notifsettings');
+  const body = doc.getElementById('nts-body');
+
+  /* EVERY switch still gets drawn. The grouping builds its own headings from
+     the rows, so the way this could break is a row quietly falling out of the
+     screen while its setting carries on existing -- which looks like nothing
+     at all until somebody goes hunting for a switch that is not there. */
+  n.NOTIF_ALERTS.forEach(a => {
+    ok('"' + a.k + '" still has a switch on the screen',
+       !!body.querySelector('.nts-tgl[data-k="a_' + a.k + '"]'));
+  });
+
+  const heads = [...body.querySelectorAll('div')]
+    .filter(d => /text-transform:uppercase/.test(d.getAttribute('style') || ''))
+    .map(d => d.textContent);
+  ok('there is a Task board heading', heads.indexOf('Task board') >= 0, heads.join(' | '));
+  ok('and one per other page as well',
+     ['Equipment', 'Inventory', 'Weather', 'Trials', 'Time clock']
+       .every(h => heads.indexOf(h) >= 0), heads.join(' | '));
+
+  /* Every alert that really sends something today is a Task Board one, and
+     all six of them are under that heading rather than scattered. */
+  const board = n.NOTIF_ALERTS.filter(a => a.g === 'Task board').map(a => a.k).join(',');
+  ok('all six working alerts are on the Task board',
+     board === 'tasks,done,partial,reqnew,reqok,reqdone', board);
+  ok('nothing is left without a heading', n.NOTIF_ALERTS.every(a => !!a.g),
+     n.NOTIF_ALERTS.filter(a => !a.g).map(a => a.k).join(','));
+
+  /* Task board comes first: it is the part of the app the crew actually use,
+     and the only group whose switches do anything yet. */
+  ok('Task board is the first group', heads.filter(h => h !== 'Push notification hours')[0] === 'Task board',
+     heads.join(' | '));
+
+  /* Tapping still works after the regrouping -- the handler finds toggles by
+     data-k, which the headings do not change, but this is cheap to prove. */
+  const t = body.querySelector('.nts-tgl[data-k="a_reqdone"]');
+  t.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  ok('a grouped toggle still flips', n.NOTIF().a_reqdone === false, String(n.NOTIF().a_reqdone));
+}
+
 section('7. the toggles on the Notifications screen actually gate it');
 {
   const store = {};

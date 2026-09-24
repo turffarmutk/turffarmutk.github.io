@@ -1195,10 +1195,16 @@ phone buzz.
 nothing read them, so a person could turn "Equipment down" on, see it stay on
 through a reload, and reasonably conclude they would be told when a mower went
 down. A control that lies about what it does is worse than one that admits it.
+The switches are grouped under the **page of the app** each alert comes from,
+Task Board first, and the screen builds those headings from the rows
+themselves (`ntsAlertGroups()`).
 **Don't:** don't leave the label on after wiring an alert up — it goes in the
 same change, by adding `live:1` to that row of `NOTIF_ALERTS` (or
 `NOTIF_DELIVERY`) in `app-01-shell.js`. And delete `NTS_NOTE` in the change
-that makes push notifications actually work.
+that makes push notifications actually work. Don't put the headings in a list
+of their own either: a second list disagrees with the first eventually, and
+the way it fails is a switch that stops being drawn while its setting carries
+on existing — invisible until somebody goes hunting for it.
 
 ### A request can be taken back — 2026-09-23
 **Decision:** the Requests tab draws a bin on a request **you** raised, and

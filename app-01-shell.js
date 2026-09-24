@@ -441,26 +441,35 @@ document.addEventListener('click',function(e){
    labelled on the screen as not sending yet -- a toggle that quietly does
    nothing is worse than one that says so. Take the label off by adding
    live:1 in the same change that wires the alert up. */
+/* `g` is the heading a switch sits under, and it is the PAGE OF THE APP the
+   alert comes from. One flat list of eleven switches gave no clue which part
+   of the app any of them was about, and six of them are now the Task Board's
+   alone. Grouping by page means somebody looking for "why am I being told
+   about this" starts from the screen they saw it on.
+
+   The screen builds its headings from this column, in the order the rows are
+   written, so a new alert is still one row and a brand new page's heading
+   appears on its own. Nothing has a list of headings to keep in step. */
 var NOTIF_ALERTS=[
- {k:'tasks',  t:'Work assigned to me', d:1, live:1,
+ {g:'Task board', k:'tasks',  t:'Work assigned to me', d:1, live:1,
   sub:'Off means nobody tells you when a job lands on your list'},
- {k:'done',   t:'A job I handed out is finished', d:1, live:1},
- {k:'partial',t:'A job came back part-finished',  d:1, live:1,
+ {g:'Task board', k:'done',   t:'A job I handed out is finished', d:1, live:1},
+ {g:'Task board', k:'partial',t:'A job came back part-finished',  d:1, live:1,
   sub:'Somebody did what they could and left the rest for you to hand on'},
  /* The three stages of a labor request, each with its own switch because
     they are three different things to be interrupted about. Kept together and
     in order -- asked, accepted, finished -- so the screen reads as the story
     it is. Who gets which is worked out in ntfScan(); in short, the first goes
     to whoever is being asked and the other two go back to whoever asked. */
- {k:'reqnew', t:'A labor request lands on me', d:1, live:1,
+ {g:'Task board', k:'reqnew', t:'A labor request lands on me', d:1, live:1,
   sub:'Bill asking you to take a job on, or a grad or technician asking you for help'},
- {k:'reqok',  t:'A labor request I sent is accepted', d:1, live:1},
- {k:'reqdone',t:'A job I asked for is finished', d:1, live:1},
- {k:'equip',  t:'Equipment down',       d:1},
- {k:'low',    t:'Low stock alerts',     d:1},
- {k:'wx',     t:'Weather & spray window',d:1},
- {k:'trials', t:'Trials & restrictions',d:0},
- {k:'crew',   t:'Crew & time clock',    d:0}
+ {g:'Task board', k:'reqok',  t:'A labor request I sent is accepted', d:1, live:1},
+ {g:'Task board', k:'reqdone',t:'A job I asked for is finished', d:1, live:1},
+ {g:'Equipment',  k:'equip',  t:'Equipment down',        d:1},
+ {g:'Inventory',  k:'low',    t:'Low stock alerts',      d:1},
+ {g:'Weather',    k:'wx',     t:'Weather & spray window',d:1},
+ {g:'Trials',     k:'trials', t:'Trials & restrictions', d:0},
+ {g:'Time clock', k:'crew',   t:'Crew & time clock',     d:0}
 ];
 var NOTIF_DELIVERY=[
  {k:'push',  t:'Push notifications', d:1},
@@ -505,6 +514,28 @@ var NTS_NOTE='<div style="margin:12px 16px 0;padding:11px 13px;background:var(--
  +'inside the app</b> \u2014 on the bell at the top of the screen. Making your phone buzz '
  +'with the app closed is still to be built; the hours and delivery settings below are '
  +'ready for when it is.</div>';
+function ntsSec(t){
+  return '<div style="font:700 10px \'Public Sans\';color:var(--muted);text-transform:uppercase;'
+    +'letter-spacing:.5px;margin:16px 18px 6px">'+t+'</div>';
+}
+/* One heading per page, in the order the rows are written in NOTIF_ALERTS.
+   Built from the rows themselves rather than from a list of headings kept
+   beside them -- a second list is a list that eventually disagrees, and the
+   way it fails is a switch that quietly stops being drawn. */
+function ntsAlertGroups(){
+  var order=[], by={};
+  NOTIF_ALERTS.forEach(function(a){
+    var g=a.g||'Alerts';
+    if(!by[g]){ by[g]=[]; order.push(g); }
+    by[g].push(a);
+  });
+  return order.map(function(g){
+    var rows=by[g];
+    return ntsSec(g)+'<div class="list">'+rows.map(function(a,i){
+      return ntsToggle('a_'+a.k,a.t,a.live?(a.sub||''):'Not sending yet',i===rows.length-1);
+    }).join('')+'</div>';
+  }).join('');
+}
 function renderNotifSettings(){
  var body=document.getElementById('nts-body'); if(!body)return;
  var quietExtra='';
@@ -516,7 +547,7 @@ function renderNotifSettings(){
     +'<input type="time" class="sched-in nts-time" data-k="end" value="'+NOTIF.end+'" style="max-width:98px"></span></div>'
     +ntsToggle('summary','Morning summary','Recap what you missed overnight when you log in',true);
  }
- function sec(t){return '<div style="font:700 10px \'Public Sans\';color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:16px 18px 6px">'+t+'</div>';}
+ var sec=ntsSec;
  body.innerHTML=
    NTS_NOTE
   +sec('Push notification hours')
@@ -526,11 +557,7 @@ function renderNotifSettings(){
                  :'Off · push notifications come through any time',!NOTIF.quiet)
    +quietExtra
   +'</div>'
-  +sec('Alerts')
-  +'<div class="list">'+NOTIF_ALERTS.map(function(a,i){
-      return ntsToggle('a_'+a.k,a.t,a.live?(a.sub||''):'Not sending yet',
-                       i===NOTIF_ALERTS.length-1);
-    }).join('')+'</div>'
+  +ntsAlertGroups()
   +sec('Delivery')
   +'<div class="list">'+NOTIF_DELIVERY.map(function(a,i){
       return ntsToggle('d_'+a.k,a.t,a.live?'':'Not sending yet',i===NOTIF_DELIVERY.length-1);

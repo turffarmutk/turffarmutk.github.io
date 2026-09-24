@@ -469,7 +469,17 @@ var NOTIF_ALERTS=[
  {g:'Inventory',  k:'low',    t:'Low stock alerts',      d:1},
  {g:'Weather',    k:'wx',     t:'Weather & spray window',d:1},
  {g:'Trials',     k:'trials', t:'Trials & restrictions', d:0},
- {g:'Time clock', k:'crew',   t:'Crew & time clock',     d:0}
+ /* The clock's four. The first two are for whoever runs the crew -- they only
+    ever raise on a phone that can edit a timesheet -- and the last two are
+    for the student whose shift it is. Everybody sees all four switches,
+    because preferences follow the person and not the role; a switch that can
+    never fire for you simply never fires. */
+ {g:'Time clock', k:'clockin', t:'Somebody clocks in',  d:1, live:1},
+ {g:'Time clock', k:'clockout',t:'Somebody clocks out', d:1, live:1},
+ {g:'Time clock', k:'shiftauto',t:'My shift was closed for me', d:1, live:1,
+  sub:'You forgot to clock out and the app closed it at your scheduled finish'},
+ {g:'Time clock', k:'shiftask', t:'I forgot to clock out', d:1, live:1,
+  sub:'Only when the app has no scheduled finish to use, so it asks you instead'}
 ];
 var NOTIF_DELIVERY=[
  {k:'push',  t:'Push notifications', d:1},
@@ -617,14 +627,23 @@ notifLoad();
      base   -- when this phone started watching; 0 means it never has        */
 var NTF_MAX=120;           /* events kept per person */
 var NTF_KEEP_DAYS=30;      /* and for how long, whichever runs out first */
-var NTF={seen:{},list:[],readAt:0,base:0};
+/* `seen` is jobs and `pseen` is time-clock punches, with a baseline each.
+   Two maps rather than one because each walk REPLACES its own map to throw
+   away records that have gone -- one shared map would have the job walk
+   quietly delete every punch. Two baselines because the two lists arrive at
+   different moments: a phone can easily know about the farm's jobs a minute
+   before the first punch reaches it, and counting that as "I have now seen
+   the time clock" would make every historical shift look like news. */
+var NTF={seen:{},pseen:{},list:[],readAt:0,base:0,pbase:0};
 function ntfLoad(){
   var s=prefsGet('ntfeed',null)||{};
   NTF={seen:(s.seen&&typeof s.seen==='object')?s.seen:{},
+       pseen:(s.pseen&&typeof s.pseen==='object')?s.pseen:{},
        list:Array.isArray(s.list)?s.list:[],
-       readAt:+s.readAt||0, base:+s.base||0};
+       readAt:+s.readAt||0, base:+s.base||0, pbase:+s.pbase||0};
 }
-function ntfSave(){ prefsSet('ntfeed',{seen:NTF.seen,list:NTF.list,readAt:NTF.readAt,base:NTF.base}); }
+function ntfSave(){ prefsSet('ntfeed',{seen:NTF.seen,pseen:NTF.pseen,list:NTF.list,
+                                       readAt:NTF.readAt,base:NTF.base,pbase:NTF.pbase}); }
 function ntfOn(k){ try{ return NOTIF['a_'+k]!==false; }catch(e){ return true; } }
 
 /* Whose plate the job is on. Just the assignee: a labor request that has not
@@ -694,9 +713,20 @@ function ntfScan(){
   var me=null;
   try{ me=(typeof SESSION!=='undefined'&&SESSION)?SESSION.pid:null; }catch(e){}
   if(!me) return 0;                              /* nobody signed in yet */
+  var now=Date.now();
+  /* Two walks, each with its own guard, and NEITHER may be able to stop the
+     other running. They were one function for about an hour and the time
+     clock sat behind the job walk's "no jobs, nothing to do" line -- so on a
+     farm with an empty task list the clock alerts silently did not exist.
+     Nothing on screen said so; the test caught it. */
+  var a=ntfScanTasks(me,now), b=ntfScanPunches(me,now);
+  if(a.changed||b.changed){ ntfTrim(); ntfSave(); }
+  return a.made+b.made;
+}
+function ntfScanTasks(me,now){
   var all=null; try{ all=TASKS; }catch(e){}
-  if(!all||!all.length) return 0;
-  var first=!NTF.base, fresh={}, made=0, now=Date.now();
+  if(!all||!all.length) return {made:0,changed:false};
+  var first=!NTF.base, fresh={}, made=0;
   all.forEach(function(t){
     if(!t||!t.id) return;
     var id=String(t.id), is=ntfWatch(t,me);
@@ -743,8 +773,102 @@ function ntfScan(){
   var changed=first||made>0||ntfSeenDiff(NTF.seen,fresh);
   NTF.seen=fresh;
   if(first) NTF.base=now;
-  if(changed||first){ ntfTrim(); ntfSave(); }
-  return made;
+  return {made:made,changed:changed};
+}
+
+/* ---- the time clock ----
+   The same idea as the walk above, over punches instead of jobs, and with the
+   same two rules: notice CHANGE, and take a silent baseline the first time.
+
+   WHO HEARS WHAT. Clocking in and clocking out are for whoever runs the crew,
+   and they only ever raise on a phone that is allowed to correct a timesheet
+   -- the same tcCanEditPunches() test the database makes. The other two are
+   for the student whose shift it is, and raise on their phone alone.
+
+   THE ONE DELIBERATE SILENCE. A shift closed automatically does NOT tell the
+   manager. Dillon, 2026-09-24: "just do it silently". The student is told,
+   because it is their pay and their chance to say the time is wrong before
+   payroll. If that ever needs turning back on it is one branch here plus one
+   row in NOTIF_ALERTS -- nothing else. */
+function ntfPunchWatch(p,me,ask){
+  return { o:p.out?1:0,
+           a:(p.out&&p.auto)?1:0,
+           k:(String(p.pid)===me&&ask[String(p.id)])?1:0 };
+}
+function ntfScanPunches(me,now){
+  var all=null;
+  try{ all=(typeof tcPunchDocs==='function')?tcPunchDocs():null; }catch(e){}
+  if(!all||!all.length) return {made:0,changed:false};
+  /* The shifts the app refused to close because it had no honest finish time
+     -- exactly the ones whose owner has to be asked. tcOpenPunches() is the
+     time clock's own answer, borrowed rather than worked out a second time
+     here, so the alert and the thing that closes shifts can never disagree. */
+  var ask={};
+  try{
+    if(typeof tcOpenPunches==='function')
+      tcOpenPunches().forEach(function(r){ if(!r.end&&r.punch&&r.punch.id) ask[String(r.punch.id)]=1; });
+  }catch(e){}
+  var mgr=false;
+  try{ mgr=(typeof tcCanEditPunches==='function')&&tcCanEditPunches(); }catch(e){}
+
+  var first=!NTF.pbase, fresh={}, made=0;
+  all.forEach(function(p){
+    if(!p||!p.id) return;
+    var id=String(p.id), is=ntfPunchWatch(p,me,ask), prev=NTF.pseen[id];
+    fresh[id]=is;
+    var mine=(String(p.pid)===me);
+
+    /* THE ONE ALERT THE BASELINE DOES NOT SWALLOW. "You never clocked out and
+       the app has no scheduled finish to use" is a standing CONDITION, not a
+       moment: it is just as true on a phone that has only just started
+       watching. Baselining it the way everything else is baselined meant a
+       student who got a new phone, or cleared their browser, was never asked
+       again about a shift still sitting open -- and this is the only clock
+       alert with something for them to actually do about it.
+
+       Safe to raise on a first look precisely because it can only ever be
+       about the signed-in person's OWN shifts, of which there are a handful,
+       never the farm's whole history. */
+    if(is.k&&mine&&!(prev&&prev.k)&&ntfOn('shiftask')){
+      ntfPushPunch('shiftask',p,now); made++; return;
+    }
+    if(first) return;                            /* the baseline walk tells nobody anything else */
+
+    if(prev===undefined){
+      /* Brand new to this phone. A punch that arrives already CLOSED is
+         history, not news -- otherwise a phone catching up on a season of
+         timesheets would announce every shift the farm has ever worked. */
+      if(!is.o&&!mine&&mgr&&ntfOn('clockin')){ ntfPushPunch('clockin',p,now); made++; }
+      return;
+    }
+    if(!prev.o&&is.o){
+      if(is.a&&mine&&ntfOn('shiftauto')){ ntfPushPunch('shiftauto',p,now); made++; }
+      else if(!is.a&&!mine&&mgr&&ntfOn('clockout')){ ntfPushPunch('clockout',p,now); made++; }
+    }
+  });
+  var changed=first||made>0||ntfSeenDiff(NTF.pseen,fresh);
+  NTF.pseen=fresh;
+  if(first) NTF.pbase=now;
+  return {made:made,changed:changed};
+}
+/* Same shape of record as a job's event, with the punch's own facts copied in
+   so a row still reads as a sentence after the punch has been corrected or
+   removed. `at` is the time the row is about; `hrs` only means anything on a
+   clock-out. */
+function ntfPushPunch(kind,p,now){
+  var d=null; try{ d=String(p.date||''); }catch(e){ d=''; }
+  NTF.list.unshift({ id:'n'+now.toString(36)+Math.random().toString(36).slice(2,7),
+    k:kind, punch:String(p.id), t:now,
+    who:String(p.pid||''), d:d,
+    at:String((kind==='clockin'||kind==='shiftask')?(p.in||''):(p.out||'')),
+    inAt:String(p.in||''),
+    off:(p.locOk===false)?1:0,
+    hrs:ntfHrs(p.in,p.out) });
+}
+function ntfHrs(a,b){
+  if(!a||!b) return 0;
+  function m(t){ var x=String(t).split(':'); return (+x[0])*60+(+x[1]); }
+  return Math.round(Math.max(0,m(b)-m(a))/6)/10;
 }
 function ntfSeenDiff(a,b){
   var ka=Object.keys(a),kb=Object.keys(b);
@@ -811,8 +935,28 @@ var NTF_KIND={
   partial: {c:'#d17a00'},   /* diamond  - needs attention */
   reqnew:  {c:'#7c5cbf'},   /* triangle - somebody is asking */
   reqok:   {c:'#2456b8'},   /* ring     - informational */
-  reqdone: {c:'#2f9e4f'}    /* circle   - complete, same as done on purpose */
+  reqdone: {c:'#2f9e4f'},   /* circle   - complete, same as done on purpose */
+  clockin: {c:'#2f7d3a'},   /* circle   - somebody is on the farm */
+  clockout:{c:'#517c96'},   /* ring     - informational, the day is done */
+  shiftauto:{c:'#9a5b00'},  /* diamond  - check this, it is your pay */
+  shiftask:{c:'#c0392b'}    /* square   - urgent, only you can answer it */
 };
+/* 24-hour "07:02" as the farm reads it. The time clock has its own t12()
+   inside its closure; this is the same answer where the bell can reach it. */
+function ntfT12(t){
+  if(!t) return '—';
+  var a=String(t).split(':'), h=+a[0], m=a[1]||'00';
+  return (h%12||12)+':'+m+(h<12?'am':'pm');
+}
+/* " · Tuesday" on anything older than today, and nothing at all on today --
+   the row already says "now" down the right-hand side. */
+function ntfDay(di){
+  if(!di) return '';
+  var p=String(di).split('-'); if(p.length!==3) return '';
+  var d=new Date(+p[0],+p[1]-1,+p[2]), n=new Date();
+  if(d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate()) return '';
+  return ' · '+['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
+}
 function ntfWho(pid){
   var n=null; try{ n=(typeof nameOf==='function')?nameOf(pid):null; }catch(e){}
   return n||'Somebody';
@@ -832,6 +976,18 @@ function ntfLine(e){
       : ntfWho(e.who)+' is asking for help'+(e.n?' · '+e.n+' student'+(e.n===1?'':'s'):'');
     return { t:esq(e.ttl), s:how+where };
   }
+  /* The time clock's four. These carry no job title -- the sentence is the
+     person, the day and the time -- so they build their own line rather than
+     leaning on e.ttl, which is blank for them. */
+  if(e.k==='clockin')  return { t:ntfWho(e.who)+' clocked in',
+    s:ntfT12(e.at)+(e.off?' · off-site':'')+ntfDay(e.d) };
+  if(e.k==='clockout') return { t:ntfWho(e.who)+' clocked out',
+    s:ntfT12(e.inAt)+'–'+ntfT12(e.at)+' · '+e.hrs+' h'+ntfDay(e.d) };
+  if(e.k==='shiftauto')return { t:'Your shift was closed for you',
+    s:'Clocked out at '+ntfT12(e.at)+', your scheduled finish'+ntfDay(e.d)
+      +' · tell Bill if that is wrong' };
+  if(e.k==='shiftask') return { t:'You did not clock out',
+    s:'Clocked in at '+ntfT12(e.inAt)+ntfDay(e.d)+' · tap to say when you left' };
   if(e.k==='reqok')   return { t:esq(e.ttl)+' was accepted', s:ntfWho(e.who)+' has taken it on'+where };
   if(e.k==='reqdone') return { t:esq(e.ttl)+' is done', s:ntfWho(e.who)+' finished the job you asked for'+where };
   return { t:esq(e.ttl)+' came back part-finished',
@@ -888,6 +1044,15 @@ document.getElementById('s-notifications').addEventListener('click',function(e){
   var ev=null, id=r.getAttribute('data-ntf');
   for(var i=0;i<NTF.list.length;i++) if(NTF.list[i].id===id) ev=NTF.list[i];
   if(!ev) return;
+  /* A time-clock row is about a punch, not a job. "You did not clock out" is
+     the only one with something to do, and it opens the sheet that asks. The
+     other three are news: tapping them does nothing rather than dropping
+     somebody on a screen they cannot even reach (the Time Clock page is
+     behind the Coming Soon cover for everybody but Bill). */
+  if(ev.punch){
+    if(ev.k==='shiftask'&&typeof tcAskOutSheet==='function') tcAskOutSheet(ev.punch);
+    return;
+  }
   var t=null; try{ t=TASKS.find(function(x){return x.id===ev.task;}); }catch(_e){}
   if(!t){ toast('That job is no longer on the farm’s list'); return; }
   if(ev.k==='partial'&&ntfPart(t)&&typeof openRestSheet==='function'){ openRestSheet(t.id); return; }
@@ -2235,7 +2400,7 @@ function show(id,push){ const el=document.getElementById('s-'+id); if(!el)return
      SESSION replaces — your role comes from who signed in, so a screen can no
      longer promote you by being opened. The attribute stays as a label, used
      below to pick which home layout to paint. */
-  if(id==='profile')fillProfile(); if(id==='profedit')renderProfEdit(); if(id==='roster')rstRender(); if(id==='rosteredit')rstEditRender(); if(id==='adminxfer')axfRender(); if(id==='spraysettings')sprRender(); if(id==='farmsettings')fstRender(); if(id==='bugreport')bugRender(); if(id==='bugsettings')bgsRender(); if(id==='sharedb')sdbRender(); if(id==='admin')admRender(); if(id==='flfix')flxRender(); if(id==='mowersettings')mwsRender(); if(id==='labsettings')lbsRender(); if(id==='semsettings')smsRender(); if(id==='roles')authRenderAccount();
+  if(id==='profile')fillProfile(); if(id==='profedit')renderProfEdit(); if(id==='roster')rstRender(); if(id==='rosteredit')rstEditRender(); if(id==='adminxfer')axfRender(); if(id==='spraysettings')sprRender(); if(id==='farmsettings')fstRender(); if(id==='bugreport')bugRender(); if(id==='bugsettings')bgsRender(); if(id==='clocksettings')clkRender(); if(id==='sharedb')sdbRender(); if(id==='admin')admRender(); if(id==='flfix')flxRender(); if(id==='mowersettings')mwsRender(); if(id==='labsettings')lbsRender(); if(id==='semsettings')smsRender(); if(id==='roles')authRenderAccount();
   if(id==='login')authRenderLogin(); if(id==='notifications'){try{ntfScan();renderNotifFeed();}catch(e){}setSeen(Date.now());try{ntfMarkRead();}catch(e){}setTimeout(updateBellBadges,0);} if(id==='home-manager')renderHomeNotif(); if(id==='weather')wxEnter(); if(id==='map')mapEnter(); if(id==='taskboard')boardEnter(); if(id==='templates')renderTemplates(); if(id==='assign')assignEnter(); if(id==='plotpick')renderPlotPick(); if(id==='taskwork')renderTaskWork(); if(id==='taskprep')renderTaskPrep(); if(id==='eqpick')renderEqPick(); if(id==='inventory')invEnter(); if(id==='lowstock')renderLowStock(); if(id==='additem')renderAddItem(); if(id==='invlog')renderInvLog(); if(id==='itemdetail')0; if(id==='equipment')equipEnter(); if(id==='eqreport')renderEqReport(); if(id==='eqmaint')renderEqMaint(); if(id==='eqedit')renderEqEdit(); if(id==='eqsched')renderEqSched(); if(id==='calendar')calEnter(); if(id==='caladd')renderCalAdd(); if(id==='timeclock')tcEnter(); if(id==='tcperson')tcRenderPerson(); if(id==='fieldlog')fieldlogEnter(); if(id==='flexport')renderFlExport(); if(id==='flnew')renderFlNew(); if(id==='fldetail')renderFlDetail(); if(id==='more')moreEnter(); if(id==='trial')trialsEnter(); if(id==='trialdetail')trRenderDetail(); if(id==='trialedit')trRenderEdit(); if(id==='trialres')trRenderRes(); if(id==='trialpin')trRenderPin(); if(id==='navsettings')renderPrefsHub(); if(id==='notifsettings')renderNotifSettings(); if(id==='powersettings')renderPowerSettings(); if(id==='navtabs')renderNavSettings(); if(id==='homescreen')renderHomeSettings(); if(id==='theme')renderTheme(); if(id.indexOf('home-')===0)hwApply(r||currentRole); renderTabs();
   try{csApply(el,id);}catch(e){}
   try{updateBellBadges();}catch(e){}

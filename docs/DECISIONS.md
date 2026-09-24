@@ -1133,6 +1133,65 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### A shift nobody clocked out of is closed at the SCHEDULED finish, or not at all — 2026-09-24
+**Decision:** after a cut-off time the farm sets itself (`farmsettings/clockcut`,
+8:00pm out of the box), `tcAutoClose()` in `app-05-tasks-clock.js` closes any
+open punch on a day that has passed — at the hours that person was **scheduled
+to finish**, never at the cut-off. It marks the punch `auto:true` and
+`editedBy:'auto'` so a timesheet can tell it from a real one. If there is no
+honest end time — no schedule for that date, no term filled in, or a clock-in
+*after* the scheduled finish — **it writes nothing** and the student is asked
+instead (the `shiftask` alert and `tcAskOutSheet()`).
+**Why:** an open punch is a question somebody can still answer; a made-up
+eight-hour day on a payroll record is a lie that gets paid. Closing at the
+cut-off would have paid a student for standing in a field until eight at night.
+**Don't:** don't make it fall back to the cut-off, or to a "typical" shift
+length, to avoid leaving records open. Dillon chose the refusal on 2026-09-24
+knowing it leaves work for him. And don't widen who runs it: only a phone that
+`tcCanEditPunches()` allows does, because `canPunchFor()` in `firestore.rules`
+is the same test — a student's phone writing another student's hours is the
+thing that rule exists to stop.
+
+### Closing a shift tells the student, not the manager — 2026-09-24
+**Decision:** the manager hears when somebody clocks in and when somebody
+clocks out, and hears **nothing** when the app closes a shift for them. The
+student whose shift it is hears both "your shift was closed for you" and, when
+the app would not guess, "you did not clock out — tap to say when you left".
+**Why:** Dillon, asked directly: "just do it silently". It is a correction, not
+an event he has to act on. The student is told because it is their pay and
+their one chance to say the time is wrong before payroll.
+**Don't:** don't read the silence as an oversight and add a manager alert while
+"tidying". It is one branch in `ntfScanPunches()` plus one row in
+`NOTIF_ALERTS`, deliberately absent.
+
+### "You did not clock out" is the one alert the baseline does not swallow — 2026-09-24
+**Decision:** every other alert works by noticing a CHANGE since the phone last
+looked, and a phone's first look is a silent baseline so nobody's first sign-in
+opens onto the farm's whole history. `shiftask` is exempt: it raises on a first
+look too.
+**Why:** it is a standing condition rather than a moment — "you have a shift
+still open that the app cannot close" is just as true on a phone that only
+started watching today. Baselining it meant a student who got a new phone or
+cleared their browser was never asked again, and this is the only clock alert
+with something for them to actually do. Safe because it can only ever be about
+the signed-in person's own shifts, of which there are a handful.
+**Don't:** don't "make it consistent" with the others by moving it back below
+the `if(first) return;` line. That is exactly the bug, and nothing on any screen
+shows it — the shift simply stays open for ever.
+
+### A new bottom sheet must be named in all four CSS rules — 2026-09-24
+**Decision:** `#donesheet`, `#partsheet`, `#restsheet` and `#asksheet` are
+listed by id in four rules in the page's stylesheet. A sheet added without
+being added to all four gets no positioning and no display rule.
+**Why:** it fails silently and confusingly — the sheet never hides, sits at the
+top of the screen with no dark backdrop, and nothing errors. `#asksheet` did
+exactly that on its first outing and the tests sailed past it, because the
+markup and the behaviour were both right.
+**Don't:** don't convert these to a class to "fix" it without checking every
+sheet still hides — and if you do add a sheet, `tools/test-notifications.js`
+section 18 now fails when its id is missing from a rule that names
+`#restsheet`.
+
 ### A labor request gets three alerts of its own, not the task ones — 2026-09-24
 **Decision:** a labor request — Bill asking a grad or technician to take a job
 on, or a grad or technician asking for help — raises **`reqnew`** when it is

@@ -866,7 +866,8 @@ service cloud.firestore {
 
        Four small things rather than a list of records, so this block is shaped
        differently: ONE DOCUMENT PER GROUP, and the group's name IS the document
-       id. `farmsettings/spray`, `/mowers`, `/labs`, `/semesters`, `/bugcfg`.
+       id. `farmsettings/spray`, `/mowers`, `/labs`, `/semesters`, `/bugcfg`,
+       `/clockcut`.
 
        `v` carries the value, and `v: null` means "back to the built-in
        defaults" -- a real answer, not an absence. A reset that travelled as a
@@ -887,6 +888,16 @@ service cloud.firestore {
        Dillon added faculty to the whole of Farm settings on 2026-08-26. */
     function canEditFarmKit() {
       return isAppManager() || (actor() && roleOf(me()) != 'Undergraduate Student');
+    }
+
+    /* App: clockCutCanEdit() -- the hour after which the app closes a shift
+       nobody clocked out of. It writes a time onto somebody's PAYROLL record,
+       so it is exactly the people the punch rules already trust to correct
+       one: the same test canPunchFor() makes for somebody else's punch. Keep
+       these two in step -- widening this one without widening that one gives
+       somebody the power to set a time they are not allowed to write. */
+    function canEditClockSettings() {
+      return isAppManager() || (actor() && assignsUndergrads(me()));
     }
 
     /* App: fstCanEditLists() -- the labs list and the semester dates. These two
@@ -921,9 +932,10 @@ service cloud.firestore {
              ((group == 'spray' || group == 'mowers') && canEditFarmKit())
           || ((group == 'labs'  || group == 'semesters') && canEditFarmLists())
           || (group == 'bugcfg' && canEditBugSettings())
+          || (group == 'clockcut' && canEditClockSettings())
         );
 
-      /* A group that is not one of the five is not a settings group. Anything
+      /* A group that is not one of the six is not a settings group. Anything
          else here would be a document nothing reads and nothing maintains. */
       allow delete: if false;
     }

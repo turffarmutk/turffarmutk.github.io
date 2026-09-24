@@ -391,9 +391,9 @@ section('6d. one row per job per look, and the six switches are separate');
   ok('and it is the latest stage', n.ntf().list[0].k === 'reqdone', n.ntf().list[0].k);
 
   /* Each switch works on its own. */
-  const kinds = ['tasks', 'done', 'partial', 'reqnew', 'reqok', 'reqdone'];
+  const kinds = 'tasks,done,partial,reqnew,reqok,reqdone,clockin,clockout,shiftauto,shiftask'.split(',');
   const live = n.NOTIF_ALERTS.filter(a => a.live).map(a => a.k);
-  ok('all six are marked as really sending', live.join(',') === kinds.join(','), live.join(','));
+  ok('all ten are marked as really sending', live.join(',') === kinds.join(','), live.join(','));
   kinds.forEach(k => {
     ok('"' + k + '" has its own switch, on by default',
        n.NOTIF()['a_' + k] === true, String(n.NOTIF()['a_' + k]));
@@ -425,7 +425,7 @@ section('6d. one row per job per look, and the six switches are separate');
   ok('and is the right kind', b3.n.ntf().list[0].k === 'reqdone', b3.n.ntf().list[0].k);
 }
 
-section('6e. the six dot colours survive colour-blind mode');
+section('6e. the dot colours survive colour-blind mode');
 {
   /* A colour that is not a CB_MAP key still draws, but loses its SHAPE in
      colour-blind mode -- and shape is the half of the signal that does not
@@ -437,11 +437,16 @@ section('6e. the six dot colours survive colour-blind mode');
     const hex = kinds[k].c.toLowerCase();
     ok('"' + k + '" uses a colour the colour-blind palette knows', !!map[hex], hex);
     ok('"' + k + '" gets a dot shape', !!shape[hex], hex);
-    seen[map[hex] + '/' + shape[hex]] = (seen[map[hex] + '/' + shape[hex]] || 0) + 1;
+    const pair = map[hex] + '/' + shape[hex];
+    (seen[pair] = seen[pair] || []).push(k);
   });
-  /* done and reqdone share one on purpose; everything else is distinct. */
-  ok('five distinct colour-and-shape pairs across six alerts',
-     Object.keys(seen).length === 5, Object.keys(seen).join(' '));
+  /* "a job I handed out is finished" and "a job I asked for is finished" share
+     one on purpose -- they are the same news down two different routes. Any
+     OTHER pair sharing means two unrelated alerts are indistinguishable to
+     somebody reading the dots rather than the words. */
+  const shared = Object.keys(seen).filter(p => seen[p].length > 1).map(p => seen[p].join('+'));
+  ok('only the two "finished" alerts share a colour and shape',
+     shared.length === 1 && shared[0] === 'done+reqdone', shared.join(' | ') || 'none');
 }
 
 section('6f. the switches are grouped by the page they come from');
@@ -509,8 +514,8 @@ section('7. the toggles on the Notifications screen actually gate it');
   ok('turned back on and it works again', n.ntfScan() === 1);
 
   const live = n.NOTIF_ALERTS.filter(a => a.live).map(a => a.k).join(',');
-  ok('six alerts are marked as really sending',
-     live === 'tasks,done,partial,reqnew,reqok,reqdone', live);
+  ok('ten alerts are marked as really sending',
+     live === 'tasks,done,partial,reqnew,reqok,reqdone,clockin,clockout,shiftauto,shiftask', live);
 }
 
 section('8. the feed is the person’s, not the phone’s');
@@ -600,6 +605,266 @@ section('11. the app still opens cleanly');
 {
   const { errs } = boot({});
   ok('nothing threw while the page loaded', errs.length === 0, errs.join(' | '));
+}
+
+/* ---------------------------------------------------------------------
+   THE TIME CLOCK. Three things, and the third is the one with teeth:
+
+     - Bill hears when somebody clocks in and when they clock out.
+     - A shift nobody clocked out of is closed at the hours that person was
+       SCHEDULED to finish, after a cut-off time the farm sets itself.
+     - When there is no honest finish time to use, NOTHING is written and the
+       student is asked instead. A made-up eight-hour day on a payroll record
+       is the failure this whole section exists to prevent.
+   --------------------------------------------------------------------- */
+
+/* A weekday inside a term, with a shift on it, for whoever we name. Returns
+   the ISO date. Seeding a term as well as a shift because schedShiftOn()
+   answers nothing for a date between terms, which would quietly turn every
+   check below into "no honest end time". */
+function seedShift(win, pid, daysAgo, start, end) {
+  win.eval("FARM_SEMS.length=0; FARM_SEMS.push({id:'sem-t',name:'Test term',start:'2020-01-01',end:'2035-12-31'});");
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
+  const key = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+  const days = { Mon: { on: false }, Tue: { on: false }, Wed: { on: false },
+                 Thu: { on: false }, Fri: { on: false } };
+  days[key] = { on: true, start: start, end: end };
+  win.eval("schedSave('" + pid + "','Test term'," + JSON.stringify(days) + ");");
+  const p2 = n => (n < 10 ? '0' : '') + n;
+  return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+}
+function punch(win, o) {
+  win.eval("tcApplyRemote([" + JSON.stringify(o) + "]);");
+}
+
+section('12. a shift nobody clocked out of gets closed at their scheduled finish');
+{
+  const store = {};
+  const { win, n } = boot(store);
+  const BILL = n.RST_LOGIN.manager, STU = n.RST_LOGIN.undergrad;
+  n.signIn(BILL);
+  const day = seedShift(win, STU, 1, '08:00', '12:00');   /* yesterday, 8-12 */
+  punch(win, { id: 'pu-a', pid: STU, date: day, in: '08:03', out: null });
+
+  ok('the shift is open to start with',
+     win.tcPunchDocs().find(p => p.id === 'pu-a').out === null);
+  ok('and the app can see it needs dealing with',
+     win.tcOpenPunches().some(r => r.punch.id === 'pu-a'));
+
+  ok('one shift closed', win.tcAutoClose() === 1);
+  const p = win.tcPunchDocs().find(x => x.id === 'pu-a');
+  ok('at the hours they were scheduled to finish', p.out === '12:00', String(p.out));
+  ok('NOT at the cut-off time', p.out !== win.clockCut());
+  ok('and it is marked as the app doing it, not a real punch', p.auto === true);
+  ok('which the timesheet field says too', p.editedBy === 'auto', String(p.editedBy));
+
+  ok('running it again changes nothing', win.tcAutoClose() === 0);
+}
+
+section('13. it refuses to guess, and asks the person instead');
+{
+  const store = {};
+  const { win, n } = boot(store);
+  const BILL = n.RST_LOGIN.manager, STU = n.RST_LOGIN.undergrad;
+  n.signIn(BILL);
+  /* A shift on a day they were NOT scheduled -- the app has no end time. */
+  const day = seedShift(win, STU, 1, '08:00', '12:00');
+  const other = new Date(day + 'T00:00:00');
+  other.setDate(other.getDate() - 1);
+  while (other.getDay() === 0 || other.getDay() === 6) other.setDate(other.getDate() - 1);
+  const p2 = x => (x < 10 ? '0' : '') + x;
+  const offDay = other.getFullYear() + '-' + p2(other.getMonth() + 1) + '-' + p2(other.getDate());
+  punch(win, { id: 'pu-b', pid: STU, date: offDay, in: '13:00', out: null });
+
+  ok('nothing is closed', win.tcAutoClose() === 0);
+  ok('the shift is still open', win.tcPunchDocs().find(x => x.id === 'pu-b').out === null);
+  const open = win.tcOpenPunches().find(r => r.punch.id === 'pu-b');
+  ok('and the app knows it has no honest time for it', open && open.end === null);
+
+  /* The other refusal: clocked in AFTER their shift was due to end. Closing
+     that at the scheduled finish would write a negative day. */
+  const day2 = seedShift(win, STU, 1, '08:00', '12:00');
+  punch(win, { id: 'pu-c', pid: STU, date: day2, in: '14:00', out: null });
+  ok('a clock-in after the scheduled finish is refused too', win.tcAutoClose() === 0);
+  ok('that one is left open as well',
+     win.tcPunchDocs().find(x => x.id === 'pu-c').out === null);
+}
+
+section('14. only a phone allowed to correct a timesheet does it');
+{
+  const store = {};
+  const { win, n } = boot(store);
+  const BILL = n.RST_LOGIN.manager, STU = n.RST_LOGIN.undergrad;
+  const day = seedShift(win, STU, 1, '08:00', '12:00');
+
+  n.signIn(STU);
+  punch(win, { id: 'pu-d', pid: STU, date: day, in: '08:00', out: null });
+  ok('a student’s own phone closes nothing', win.tcAutoClose() === 0,
+     String(win.tcPunchDocs().find(x => x.id === 'pu-d').out));
+  ok('which is the same answer the database gives', win.tcCanEditPunches() === false);
+
+  n.signIn(BILL);
+  ok('Bill’s phone does', win.tcAutoClose() === 1);
+  ok('and the database agrees he may', win.tcCanPunchFor(STU) === true);
+}
+
+section('15. the cut-off is a farm setting, not a number in the source');
+{
+  const store = {};
+  const { win, n } = boot(store);
+  ok('it starts at eight in the evening', win.clockCut() === '20:00', win.clockCut());
+  ok('and reads as words somebody can check', win.clockCutLabel() === '8:00pm', win.clockCutLabel());
+  ok('untouched, it sends nothing to the shared copy', win.clockcfgRead() === null);
+
+  win.eval("clockcfgApply({cut:'18:30'});");
+  ok('changing it takes', win.clockCut() === '18:30', win.clockCut());
+  ok('and now it travels', JSON.stringify(win.clockcfgRead()) === '{"cut":"18:30"}',
+     JSON.stringify(win.clockcfgRead()));
+  win.eval("clockcfgApply({cut:'nonsense'});");
+  ok('rubbish falls back to the default rather than being stored',
+     win.clockCut() === '20:00', win.clockCut());
+  win.eval("clockcfgRestore();");
+  ok('restore puts the built-in value back', win.clockcfgRead() === null);
+
+  /* Today's shift is only closed once the clock has gone past the cut-off --
+     that is the whole point of the time. Yesterday's always is. */
+  const BILL = n.RST_LOGIN.manager, STU = n.RST_LOGIN.undergrad;
+  n.signIn(BILL);
+  const today = seedShift(win, STU, 0, '08:00', '12:00');
+  punch(win, { id: 'pu-e', pid: STU, date: today, in: '08:00', out: null });
+  win.eval("clockcfgApply({cut:'23:59'});");
+  const late = win.tcOpenPunches().some(r => r.punch.id === 'pu-e');
+  ok('before the cut-off, today’s open shift is left well alone', late === false);
+  win.eval("clockcfgApply({cut:'00:00'});");
+  ok('after it, the same shift is in hand', win.tcOpenPunches().some(r => r.punch.id === 'pu-e'));
+}
+
+section('16. who hears what about the clock');
+{
+  const store = {};
+  const { win, n, doc } = boot(store);
+  const BILL = n.RST_LOGIN.manager, STU = n.RST_LOGIN.undergrad;
+
+  /* --- Bill's phone --- */
+  n.signIn(BILL);
+  const day = seedShift(win, STU, 0, '08:00', '12:00');
+  punch(win, { id: 'pu-x', pid: STU, date: day, in: '07:02', out: null });
+  n.ntfScan();                                   /* baseline over the punch list */
+  ok('the first look tells him nothing', n.ntf().list.length === 0,
+     JSON.stringify(n.ntf().list.map(e => e.k)));
+
+  punch(win, { id: 'pu-y', pid: STU, date: day, in: '08:00', out: null });
+  ok('a new clock-in raises one', n.ntfScan() === 1);
+  ok('and it is the right kind', n.ntf().list[0].k === 'clockin', n.ntf().list[0].k);
+  ok('naming the person', n.ntf().list[0].who === STU);
+  n.go('notifications');
+  ok('the row reads as a sentence',
+     /clocked in/.test(doc.getElementById('ntf-body').innerHTML));
+
+  punch(win, { id: 'pu-y', pid: STU, date: day, in: '08:00', out: '12:30' });
+  ok('clocking out raises one too', n.ntfScan() === 1);
+  ok('as the clock-out alert', n.ntf().list[0].k === 'clockout', n.ntf().list[0].k);
+  ok('with the hours worked on it', n.ntf().list[0].hrs === 4.5, String(n.ntf().list[0].hrs));
+
+  /* THE DELIBERATE SILENCE. Dillon, 2026-09-24: closing a shift automatically
+     is done quietly. Bill is not interrupted about it. */
+  win.eval("clockcfgApply({cut:'00:00'});");
+  const closed = win.tcAutoClose();
+  ok('the app closes the shift nobody closed', closed === 1, String(closed));
+  ok('and says nothing at all to Bill about it', n.ntfScan() === 0,
+     JSON.stringify(n.ntf().list.slice(0, 2).map(e => e.k)));
+}
+
+section('17. the student hears about their own shift');
+{
+  const store = {};
+  const { win, n, doc } = boot(store);
+  const BILL = n.RST_LOGIN.manager, STU = n.RST_LOGIN.undergrad;
+  n.signIn(STU);
+  const day = seedShift(win, STU, 1, '08:00', '12:00');
+  punch(win, { id: 'pu-z', pid: STU, date: day, in: '08:00', out: null });
+  n.ntfScan();                                   /* baseline */
+  ok('nothing yet', n.ntf().list.length === 0);
+
+  /* Bill's phone closes it; the record reaches theirs. */
+  punch(win, { id: 'pu-z', pid: STU, date: day, in: '08:00', out: '12:00', auto: true });
+  ok('the student is told', n.ntfScan() === 1);
+  ok('that it was closed for them', n.ntf().list[0].k === 'shiftauto', n.ntf().list[0].k);
+  n.go('notifications');
+  const html = doc.getElementById('ntf-body').innerHTML;
+  ok('the row says what time was written', /12:00pm/.test(html), html.slice(0, 200));
+  ok('and tells them how to argue with it', /tell Bill if that is wrong/.test(html));
+}
+
+section('18. the shift the app would not guess at asks its owner');
+{
+  const store = {};
+  const b = boot(store);
+  const { win, n, doc } = b;
+  const BILL = n.RST_LOGIN.manager, STU = n.RST_LOGIN.undergrad;
+  n.signIn(STU);
+  /* A term with no shift on the day they worked: nothing to close it at. */
+  const day = seedShift(win, STU, 1, '08:00', '12:00');
+  const other = new Date(day + 'T00:00:00');
+  other.setDate(other.getDate() - 1);
+  while (other.getDay() === 0 || other.getDay() === 6) other.setDate(other.getDate() - 1);
+  const p2 = x => (x < 10 ? '0' : '') + x;
+  const offDay = other.getFullYear() + '-' + p2(other.getMonth() + 1) + '-' + p2(other.getDate());
+
+  n.setTasks([]);
+  punch(win, { id: 'pu-q', pid: STU, date: offDay, in: '13:00', out: null });
+  ok('the student is asked', n.ntfScan() === 1);
+  ok('by the right alert', n.ntf().list[0].k === 'shiftask', n.ntf().list[0].k);
+  n.go('notifications');
+  ok('and the row says what to do',
+     /tap to say when you left/.test(doc.getElementById('ntf-body').innerHTML));
+  ok('asking twice does not ask twice', n.ntfScan() === 0);
+
+  /* Tapping it opens the sheet, and the sheet writes THEIR punch. */
+  doc.querySelector('#ntf-body [data-ntf]').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  ok('the sheet opens', !!doc.getElementById('asksheet'));
+  ok('and it is showing', doc.getElementById('asksheet').classList.contains('show'));
+  /* THE BOTTOM-SHEET CSS IS KEYED TO IDS, NOT TO A CLASS. A sheet whose id is
+     missing from one of those rules gets no positioning or no display rule:
+     it never hides, it sits at the top of the screen with no backdrop, and
+     nothing errors. #asksheet did exactly that the first time it was written.
+     So: every rule that names an existing sheet must name this one too. */
+  const CSS = HTML.slice(HTML.indexOf('<style'), HTML.lastIndexOf('</style>'));
+  const rules = CSS.split('}').filter(r => r.indexOf('#restsheet') >= 0);
+  ok('the CSS still has the bottom-sheet rules', rules.length === 4, String(rules.length));
+  rules.forEach(r => {
+    const sel = r.slice(r.lastIndexOf('\n') + 1).split('{')[0].trim();
+    ok('#asksheet is in the same rule as #restsheet: ' + sel.slice(0, 48),
+       r.indexOf('#asksheet') >= 0, sel);
+  });
+
+  doc.getElementById('ask-time').value = '17:15';
+  doc.querySelector('#asksheet .ds-confirm').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  const p = win.tcPunchDocs().find(x => x.id === 'pu-q');
+  ok('the time they typed is on the punch', p.out === '17:15', String(p.out));
+  ok('and it is credited to them, not to the app', p.editedBy === STU, String(p.editedBy));
+  ok('it is not marked as automatic, because it was not', !p.auto);
+
+  /* A time before the clock-in is refused rather than stored. */
+  punch(win, { id: 'pu-r', pid: STU, date: offDay, in: '13:00', out: null });
+  win.tcAskOutSheet('pu-r');
+  doc.getElementById('ask-time').value = '09:00';
+  doc.querySelector('#asksheet .ds-confirm').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  ok('a time before they clocked in is refused',
+     win.tcPunchDocs().find(x => x.id === 'pu-r').out === null);
+
+  /* Somebody else's shift is not theirs to close, whatever the alert says. */
+  punch(win, { id: 'pu-s', pid: 'p19', date: offDay, in: '13:00', out: null });
+  ok('and somebody else’s shift cannot be touched from here',
+     win.tcAskOutSheet('pu-s') === false);
+
+  /* NOTHING MAY THROW ON THE WAY THROUGH. Saving wrote the punch correctly and
+     then threw on the next line, reading a record it had just dropped -- so
+     every check above passed while the toast never appeared, the screen never
+     repainted and the bell never updated. Only the console showed it. */
+  ok('and none of that threw', b.errs.length === 0, b.errs.join(' | '));
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

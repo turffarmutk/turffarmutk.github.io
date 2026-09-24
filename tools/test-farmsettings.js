@@ -99,13 +99,13 @@ const p = b.p, w = b.win;
 const J = JSON.stringify;
 
 /* ---------------------------------------------------------------- */
-section('0. it boots, and there are five groups');
+section('0. it boots, and there are six groups');
 ok('no jsdom errors on load', b.errs.length === 0, b.errs[0]);
 {
   const ids = (p.FST_GROUPS || []).map(g => g.id);
-  ok('five settings groups', ids.length === 5, ids.join(','));
-  ok('and they are the five screens on the page',
-     ids.slice().sort().join(',') === 'bugcfg,labs,mowers,semesters,spray', ids.join(','));
+  ok('six settings groups', ids.length === 6, ids.join(','));
+  ok('and they are the six screens on the page',
+     ids.slice().sort().join(',') === 'bugcfg,clockcut,labs,mowers,semesters,spray', ids.join(','));
   (p.FST_GROUPS || []).forEach(g => {
     ok(g.id + ' can be read, applied, restored and asked about',
        typeof g.read === 'function' && typeof g.apply === 'function'
@@ -294,6 +294,17 @@ section('7. the rules file says all of it');
   ok('and that line is Bill or the App Manager, not faculty',
      /function canEditBugSettings\(\)[\s\S]{0,220}?roleOf\(me\(\)\) == 'Farm Manager'/.test(RULES)
      && !/function canEditBugSettings\(\)[\s\S]{0,220}?Faculty/.test(RULES));
+  /* The clock cut-off writes a time onto somebody's payroll record, so it has
+     to be the same people the punch rules trust to correct one. These two
+     drifting apart would hand somebody the power to set a time they are not
+     allowed to write. */
+  ok('the clock cut-off goes through its own line',
+     /\(group == 'clockcut' && canEditClockSettings\(\)\)/.test(RULES));
+  ok('and that line is the same test the punches use',
+     /function canEditClockSettings\(\)[\s\S]{0,240}?assignsUndergrads\(me\(\)\)/.test(RULES));
+  ok('which is what canPunchFor() uses for somebody else\u2019s punch',
+     /function canPunchFor\(pid\)[\s\S]{0,160}?assignsUndergrads\(me\(\)\)/.test(RULES));
+
   ok('the App Manager post is read off the token, not the roster',
      /function isAppManager\(\)[\s\S]{0,200}?request\.auth\.token\.app_admin == true/.test(RULES));
   ok('and it is defined exactly once', (RULES.match(/function isAppManager\(/g) || []).length === 1);

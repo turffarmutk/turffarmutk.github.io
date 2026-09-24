@@ -689,10 +689,15 @@ body{background:#0f1011;display:flex;align-items:center;justify-content:center;f
 /* Above the map. Leaflet's own layers stack at 400-1000, so at the old 60 the
    work map drew straight over the top half of these sheets -- title and all --
    on the one screen they are opened from most. */
-#donesheet,#partsheet,#restsheet{position:absolute;inset:0;display:none;z-index:1200}
-#donesheet.show,#partsheet.show,#restsheet.show{display:block}
-#donesheet .ds-back,#partsheet .ds-back,#restsheet .ds-back{position:absolute;inset:0;background:rgba(0,0,0,.42)}
-#donesheet .ds-card,#partsheet .ds-card,#restsheet .ds-card{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;padding:18px 18px 20px;max-height:86%;overflow:auto}
+/* EVERY bottom sheet has to be named in all four of these. They are keyed
+   to ids, not to a class, so a new sheet that is not listed gets NO
+   positioning and NO display rule -- which means it never hides, sits at
+   the top of the screen with no dark backdrop, and looks broken without
+   erroring. #asksheet was added 2026-09-24 and did exactly that first. */
+#donesheet,#partsheet,#restsheet,#asksheet{position:absolute;inset:0;display:none;z-index:1200}
+#donesheet.show,#partsheet.show,#restsheet.show,#asksheet.show{display:block}
+#donesheet .ds-back,#partsheet .ds-back,#restsheet .ds-back,#asksheet .ds-back{position:absolute;inset:0;background:rgba(0,0,0,.42)}
+#donesheet .ds-card,#partsheet .ds-card,#restsheet .ds-card,#asksheet .ds-card{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:18px 18px 0 0;padding:18px 18px 20px;max-height:86%;overflow:auto}
 /* Part-finished jobs: the student's "why I stopped" box and Bill's hand-out sheet */
 .ds-in{width:100%;box-sizing:border-box;margin-top:12px;border:1px solid var(--line);border-radius:11px;padding:10px 12px;font:600 13.5px 'Public Sans';color:var(--ink);background:var(--card);resize:vertical;min-height:62px}
 .ds-lbl{font:800 11px 'Public Sans';letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
@@ -1866,6 +1871,10 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
 </div>
 <div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab"><span class="te">📋</span>Tasks</div><div class="tab"><span class="te">🗺️</span>Map</div><div class="tab"><span class="te">📦</span>Inventory</div><div class="tab on"><span class="te">•••</span>More</div></div>
 </section>
+<section class="screen" id="s-clocksettings"><div class="app field">
+<div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Unfinished shifts</div></div>
+<div style="flex:1;overflow-y:auto" id="clk-body"></div>
+</div></section>
 <section class="screen" id="s-bugsettings"><div class="app field">
 <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Bug reports</div></div>
 <div style="flex:1;overflow-y:auto" id="bgs-body"></div>
@@ -2569,6 +2578,9 @@ var FARM_CATS=[
     if(!dbConfigured()) return 'The database code did not load on this device';
     var at=rosterSentAt();
     return at ? ('Roster sent '+at.slice(0,10)) : 'The roster has not been sent yet — nothing can save until it is';
+  }},
+ {go:'clocksettings', t:'Unfinished shifts', d:function(){
+    return 'Closed at their scheduled finish after '+clockCutLabel();
   }},
  {go:'bugsettings', t:'Bug reports', d:function(){
     if(!bugConfigured()) return 'Not set up — crew reports are piling up on their phones';
@@ -7906,6 +7918,7 @@ function storeSaveLocal(){
   try{ mowersScan(); }catch(e){}
   try{ labsScan(); }catch(e){}
   try{ bugcfgScan(); }catch(e){}
+  try{ clockcfgScan(); }catch(e){}
 }
 
 /* Save to the phone, then offer everything to the shared database. Only the
@@ -9566,6 +9579,57 @@ function bgsRender(){
   });
   var fl=document.getElementById('bgs-flush');
   if(fl)fl.addEventListener('click',function(){ if(navigator.onLine===false){toast('No signal right now');return;} toast('Sending…'); bugFlush(true); setTimeout(bgsRender,1200); });
+}
+
+/* ---- Unfinished shifts: when the app gives up waiting for a clock-out ----
+   The value lives in app-02-fieldlog-sync.js beside the other farm settings
+   and travels in the `farmsettings` drawer, so setting it on one phone sets
+   it for the farm. This is only the screen. */
+function clkRender(){
+  var body=document.getElementById('clk-body'); if(!body) return;
+  var edit=clockCutCanEdit();
+  body.innerHTML=
+     '<div style="margin:14px 16px 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px">'
+    +'<div style="font:800 13px \'Archivo\';color:var(--ink)">A shift nobody clocked out of</div>'
+    +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:3px;line-height:1.45">'
+    +'Somebody clocks in, finishes for the day and forgets to clock out. After the time below, '
+    +'the app closes that shift itself — at the hours they were <b>scheduled to finish</b>, never at '
+    +'this time, which would pay them for standing in a field all evening.'
+    +'<br><br>It only happens on a phone that is allowed to correct a timesheet, so it runs when '
+    +'yours is open. Miss an evening and it catches up the next time you open the app; the time '
+    +'written on the timesheet is the same either way.'
+    +'<br><br>If the app has no scheduled finish for that day — an unscheduled shift, or somebody '
+    +'who has not filled in their hours — <b>it does not guess</b>. The shift stays open and that '
+    +'person is asked to say when they left.</div></div>'
+    +(edit?('<div class="list" style="margin-top:12px">'
+      +'<div class="fld" style="border-bottom:none"><span class="fl">Give up waiting at</span>'
+      +'<input type="time" class="sched-in" id="clk-cut" value="'+esc(clockCut())+'" style="max-width:120px"></div>'
+      +'</div>'
+      +'<div style="margin:12px 16px;display:flex;gap:8px">'
+      +'<div class="action tap" id="clk-save" style="flex:1">Save</div>'
+      +(clockcfgRead()?'<div class="action tap" id="clk-reset" style="flex:none;background:#e7e9e6;color:#2f3133">Back to '+esc(CLOCKCFG_DEF)+'</div>':'')
+      +'</div>')
+    :('<div class="list" style="margin-top:12px">'
+      +fldRow('Give up waiting at',esc(clockCutLabel()),true)+'</div>'
+      +'<div style="margin:12px 16px;font:600 11px \'Public Sans\';color:var(--muted)">'
+      +'Only the Farm Manager changes this — the same people the database lets correct a punch.</div>'))
+    +'<div style="height:22px"></div>';
+
+  var sv=document.getElementById('clk-save');
+  if(sv)sv.addEventListener('click',function(){
+    var v=(document.getElementById('clk-cut').value||'').trim();
+    if(!clockCutValid(v)){ toast('Pick a time first'); return; }
+    CLOCKCFG.cut=v;
+    try{ storeTouch(); }catch(e){}
+    toast('Saved · shifts close after '+clockCutLabel());
+    clkRender();
+  });
+  var rs=document.getElementById('clk-reset');
+  if(rs)rs.addEventListener('click',function(){
+    clockcfgRestore();
+    try{ storeTouch(); }catch(e){}
+    toast('Back to '+CLOCKCFG_DEF); clkRender();
+  });
 }
 
 /* ============================ SIGN IN ============================

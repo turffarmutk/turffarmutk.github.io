@@ -1076,6 +1076,58 @@ function tcCanEditPunches(){
   return !!SESSION.pid&&(typeof assignsUndergrads==='function')&&assignsUndergrads(SESSION.pid);
 }
 
+/* ---- WHEN THE APP GIVES UP WAITING FOR A CLOCK-OUT ----
+   A student clocks in, walks off at the end of the day and forgets to clock
+   out. The punch sits open, their timesheet says nothing, and the first
+   anybody knows is payroll.
+
+   After this time, on a day that has passed, the app closes the shift itself
+   at the hours that student was SCHEDULED to finish -- never at the cut-off
+   itself, which would pay them for standing in a field until eight at night.
+   See tcAutoClose() in app-05-tasks-clock.js for what actually happens.
+
+   It is a farm setting and not a number in this file because the SUCCESSION
+   rule says so: a farm manager could reasonably want this at six in the
+   evening, or at ten, and they should not need somebody who can edit source
+   code to do it. It travels in the `farmsettings` drawer like the sprayer
+   figures and the semester dates.                                          */
+var CLOCKCFG_KEY='ut_clockcfg_v1';
+var CLOCKCFG_DEF='20:00';
+var CLOCKCFG={cut:CLOCKCFG_DEF};
+try{ var _cc=localStorage.getItem(CLOCKCFG_KEY);
+     if(_cc){ var _cp=JSON.parse(_cc); if(_cp&&typeof _cp==='object'&&_cp.cut) CLOCKCFG.cut=String(_cp.cut); } }catch(e){}
+/* HH:MM on a 24-hour clock, and nothing else gets in. A bad value here does
+   not draw wrong, it closes shifts at the wrong time on a payroll record. */
+function clockCutValid(v){ return typeof v==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(v); }
+function clockCut(){ return clockCutValid(CLOCKCFG.cut)?CLOCKCFG.cut:CLOCKCFG_DEF; }
+function clockCutMin(){ var a=clockCut().split(':'); return (+a[0])*60+(+a[1]); }
+function clockCutLabel(){
+  var a=clockCut().split(':'), h=+a[0], m=+a[1];
+  return ((h%12)||12)+':'+(m<10?'0':'')+m+(h<12?'am':'pm');
+}
+/* Who may change it: the same people the database lets correct a punch, which
+   is the same test tcCanEditPunches() makes. One rule, three places -- here,
+   firestore.rules and tools/rules-model.js -- and they must never drift. */
+function clockCutCanEdit(){ return (typeof tcCanEditPunches==='function')&&tcCanEditPunches(); }
+function clockcfgScan(){
+  var s; try{ s=JSON.stringify(CLOCKCFG); }catch(e){ return; }
+  if(_storeSeen['clockcfg']===s) return;
+  if(clockCut()===CLOCKCFG_DEF){
+    try{ localStorage.removeItem(CLOCKCFG_KEY); }catch(e){}
+    _storeSeen['clockcfg']=s; return;
+  }
+  if(storeWriteRaw({key:CLOCKCFG_KEY},s)) _storeSeen['clockcfg']=s;
+}
+/* null while nobody has changed it, so an untouched phone never seeds the
+   shared copy with what is only the built-in default anyway. */
+function clockcfgRead(){ return (clockCut()===CLOCKCFG_DEF)?null:{cut:clockCut()}; }
+function clockcfgApply(v){
+  var c=(v&&v.cut)?String(v.cut):CLOCKCFG_DEF;
+  CLOCKCFG.cut=clockCutValid(c)?c:CLOCKCFG_DEF;
+  try{ clockcfgScan(); }catch(e){}
+}
+function clockcfgRestore(){ CLOCKCFG.cut=CLOCKCFG_DEF; try{ clockcfgScan(); }catch(e){} }
+
 /* ================= SCHEDULES ================= */
 var SCHSYNC_COLL='schedules';
 var SCHSYNC_RETRY_MS=10000;
@@ -2713,6 +2765,13 @@ var FST_GROUPS=[
     try{ storeSaveLocal(); }catch(e){}
   },
   repaint:function(){ _fstRepaint('s-semsettings','smsRender'); }},
+
+ {id:'clockcut', label:'when unfinished shifts get closed',
+  can:function(){ return (typeof clockCutCanEdit==='function')&&clockCutCanEdit(); },
+  read:function(){ return (typeof clockcfgRead==='function')?clockcfgRead():null; },
+  apply:function(v){ if(typeof clockcfgApply==='function') clockcfgApply(v); },
+  restore:function(){ if(typeof clockcfgRestore==='function') clockcfgRestore(); },
+  repaint:function(){ _fstRepaint('s-clocksettings','clkRender'); }},
 
  /* Where the crew's bug reports get delivered. Not a farm setting like the
     other four, but it has exactly the same problem and therefore the same

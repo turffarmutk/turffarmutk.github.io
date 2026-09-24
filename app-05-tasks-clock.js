@@ -1940,6 +1940,162 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
     }
     return out;
   };
+
+  /* ---- CLOSING A SHIFT NOBODY CLOCKED OUT OF ----
+     Somebody clocks in, finishes for the day and walks off without clocking
+     out. Before this the punch sat open for ever: their timesheet said
+     nothing, the "On clock now" count on Bill's screen was wrong from then
+     on, and the first anybody knew was payroll.
+
+     WHAT IT WRITES, and what it refuses to write. The clock-out time is the
+     hours that person was SCHEDULED to finish that day -- never the cut-off
+     time itself, which would pay a student for standing in a field until
+     eight at night. If the app has no honest end time for that day, it
+     writes NOTHING: no schedule for that date, no term filled in, or a
+     scheduled finish that is somehow before they clocked in. An open shift is
+     a question somebody can still answer; a made-up eight-hour day on a
+     payroll record is a lie that gets paid. Those are the ones the person
+     themselves is asked about -- see the shiftask alert in app-01-shell.js.
+
+     WHOSE PHONE DOES IT. There is no server, so a phone has to. The database
+     only lets you write somebody else's punch if you are Bill or hold his
+     grant (canPunchFor in firestore.rules, tcCanPunchFor here), so this runs
+     on those phones alone and checks the same test first. That is also why it
+     catches up: it walks back over the whole pay period, so an evening when
+     nobody opened the app is closed the next morning, at the same time it
+     would have written the night before.
+
+     IT NEVER TOUCHES THE NETWORK. save() writes to this phone; the punch
+     drawer's own two-second heartbeat sends it. Calling storeTouch() from
+     here would be the 2026-08-31 mistake in a new place. See CLAUDE.md. */
+  function tcCutMin(){
+    try{ return (typeof clockCutMin==='function')?clockCutMin():1200; }catch(e){ return 1200; }
+  }
+  /* Is this date far enough past the cut-off to act on. Today counts only
+     once the clock has gone past it; any day before today always does. */
+  function tcPastCut(di,now){
+    var t=iso(now);
+    if(di<t) return true;
+    if(di>t) return false;
+    return (now.getHours()*60+now.getMinutes())>=tcCutMin();
+  }
+  /* The end time to write, or null when there is no honest one. */
+  function tcAutoOutFor(name,p){
+    var d=parseISO(p.date); if(!d) return null;
+    var sh=tcSchedOn(name,d); if(!sh||!sh.end) return null;
+    if(hm(sh.end)<=hm(p.in)) return null;      /* clocked in after their shift ended */
+    return sh.end;
+  }
+  /* Every open punch this phone is allowed to close, and can honestly close.
+     Exposed because the notification feed needs the same answer without
+     writing anything -- one definition, not two that drift. */
+  window.tcOpenPunches=function(){
+    var now=new Date(), out=[];
+    Object.keys(TC_PUNCHES).forEach(function(name){
+      (TC_PUNCHES[name]||[]).forEach(function(p){
+        if(!p||!p.id||!p.date||p.out) return;
+        if(!tcPastCut(p.date,now)) return;
+        out.push({pid:name,punch:p,end:tcAutoOutFor(name,p)});
+      });
+    });
+    return out;
+  };
+  window.tcAutoClose=function(){
+    if(typeof tcCanEditPunches!=='function'||!tcCanEditPunches()) return 0;
+    var n=0;
+    window.tcOpenPunches().forEach(function(r){
+      if(!r.end) return;                        /* no honest time -- leave it open */
+      if(!tcCanPunchFor(r.pid)) return;         /* the same test the database makes */
+      r.punch.out=r.end;
+      /* `auto` is what lets every other screen, and payroll, tell this from a
+         time somebody actually pressed a button for. editedBy carries the
+         same thing in the field the punch already had. */
+      r.punch.auto=true;
+      r.punch.editedBy='auto';
+      n++;
+    });
+    if(n){ save(); tcRepaintOpen(); }
+    return n;
+  };
+
+
+  /* ---- "WHEN DID YOU LEAVE?" ----
+     The other half of tcAutoClose(). When the app has no scheduled finish to
+     use it refuses to guess, and the shift stays open -- so the only person
+     who knows has to be asked. That is this.
+
+     It has to be a sheet of its own rather than a row on the Time Clock
+     screen, because the Time Clock page is behind the Coming Soon cover for
+     everybody who is not Bill (CS_LOCKED, app-01-shell.js). A student cannot
+     reach that screen at all; they reach this from the bell.
+
+     They are writing their OWN punch, which the database has always allowed
+     -- canPunchFor() in firestore.rules is "you, or Bill". Nothing here needs
+     a rules change and nothing here can touch anybody else's hours: the punch
+     is looked up by id and then checked against the person signed in. */
+  var askSheet=null, ASKP=null;
+  function ensureAskSheet(){
+    if(askSheet) return;
+    askSheet=document.createElement('div'); askSheet.id='asksheet';
+    askSheet.innerHTML='<div class="ds-back"></div><div class="ds-card">'
+      +'<div class="ds-title">When did you leave?</div><div class="ds-sub" id="ask-sub"></div>'
+      +'<div class="ds-lbl">Clocked out at</div>'
+      +'<input type="time" class="sched-in" id="ask-time" style="width:100%;max-width:none">'
+      +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:8px;line-height:1.45" id="ask-note"></div>'
+      +'<div class="ds-btns"><div class="ds-cancel tap">Not now</div><div class="ds-confirm tap">Save</div></div>'
+      +'</div>';
+    app.appendChild(askSheet);
+    askSheet.querySelector('.ds-back').addEventListener('click',closeAskSheet);
+    askSheet.querySelector('.ds-cancel').addEventListener('click',closeAskSheet);
+    askSheet.querySelector('.ds-confirm').addEventListener('click',function(){
+      if(!ASKP) return;
+      var v=(document.getElementById('ask-time').value||'').trim();
+      if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(v)){ toast('Pick a time first'); return; }
+      if(hm(v)<=hm(ASKP.in)){ toast('That is before you clocked in'); return; }
+      ASKP.out=v;
+      /* Marked as theirs, not as the app's: this IS somebody pressing a
+         button, just a day late. Bill can still see it on the timesheet as an
+         edit rather than a live punch. */
+      ASKP.editedBy=SESSION.pid||'';
+      delete ASKP.auto;
+      save();
+      /* Read the hours BEFORE closing: closeAskSheet() drops ASKP, so anything
+         below that line reading it throws -- which is what this did on its
+         first outing. The punch was already written, so nothing looked wrong
+         except a missing toast and a red line in the console nobody was
+         watching. It is also why tcRepaintOpen() and the bell never ran. */
+      var hrs=fh(dur(ASKP.in,ASKP.out));
+      closeAskSheet();
+      toast('Thanks · '+hrs+' h logged');
+      tcRepaintOpen();
+      try{ if(typeof ntfScan==='function'){ ntfScan(); updateBellBadges(); } }catch(e){}
+    });
+  }
+  function closeAskSheet(){ if(askSheet) askSheet.classList.remove('show'); ASKP=null; }
+  /* Opened from the bell. Checks the punch is real, still open, and THEIRS
+     before drawing anything -- the alert may be days old and Bill may have
+     filled the time in himself in the meantime. */
+  window.tcAskOutSheet=function(punchId){
+    var found=null;
+    Object.keys(TC_PUNCHES).forEach(function(n){
+      (TC_PUNCHES[n]||[]).forEach(function(p){ if(p&&String(p.id)===String(punchId)) found=p; });
+    });
+    if(!found){ toast('That shift is no longer on the farm’s records'); return false; }
+    if(String(found.pid)!==String(SESSION.pid)){ toast('That shift is not yours'); return false; }
+    if(found.out){ toast('That shift is already closed · '+t12(found.out)); return false; }
+    ensureAskSheet();
+    ASKP=found;
+    var d=parseISO(found.date);
+    document.getElementById('ask-sub').textContent=
+      DOWF[d.getDay()]+' '+mdd(d)+' · clocked in at '+t12(found.in);
+    document.getElementById('ask-time').value='';
+    document.getElementById('ask-note').textContent=
+      'You did not clock out, and the app had no scheduled finish for that day to use, '
+      +'so it did not guess. Tell Bill if you cannot remember.';
+    askSheet.classList.add('show');
+    return true;
+  };
+
   /* ---- the three doors the shared-database module comes in through ----
      Every punch lives in this closure. Rather than let the sync module keep a
      second copy -- two copies of a payroll record is how hours go missing --
@@ -2006,6 +2162,9 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
     }catch(e){}
   }
   window.tcEnter=function(){
+    /* Before drawing, not after: the "On clock now" count and every open row
+       on this screen are exactly what a shift nobody closed makes wrong. */
+    try{ window.tcAutoClose(); }catch(e){}
     var body=document.getElementById('tc-body'),bk=document.getElementById('tc-back');
     if(currentRole==='undergrad'){renderWorker(body);if(bk)bk.style.display='none';}
     else if(currentRole==='manager'){renderManager(body);if(bk)bk.style.display='';}
@@ -2034,6 +2193,19 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
     if(x=e.target.closest('[data-tcexlate]'))return excuseLate(x.getAttribute('data-tcexlate'));
     if(x=e.target.closest('[data-tcunlate]'))return unexcuseLate(x.getAttribute('data-tcunlate'));
   });
+
+  /* THE ONLY THING THAT MAKES THE CUT-OFF TIME MEAN ANYTHING. Everywhere else
+     this is called -- opening the Time Clock, signing in -- is somebody doing
+     something. Eight in the evening is nobody doing anything, so if the app
+     is sitting open on Bill's desk at eight, this is what notices.
+
+     Five minutes, not one second: it walks a fortnight of punches and writes
+     nothing at all on every tick but one in a day, and a phone in a pocket
+     should not be doing that constantly. Being a few minutes late costs
+     nothing, because the time WRITTEN is the scheduled finish, not now. */
+  setInterval(function(){
+    try{ if(window.tcAutoClose()&&typeof ntfScan==='function'){ ntfScan(); updateBellBadges(); } }catch(e){}
+  },300000);
 })();
 
 /* ============================================================

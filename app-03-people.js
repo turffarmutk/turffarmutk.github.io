@@ -413,6 +413,11 @@ function sessionSet(pid,opts){
   USERS[currentRole]=meCard(p);
   try{ localStorage.setItem(SESSION_KEY,p.id); }catch(e){}
   if(typeof prefsSwitch==='function') prefsSwitch();
+  /* Take a baseline of the task list for whoever just signed in. Without this
+     their first look at the bell would count every job already on the farm as
+     news -- and a phone somebody else was using would hand them the wrong
+     news. ntfLoad() in prefsSwitch() above has already swapped to their feed. */
+  try{ if(typeof ntfScan==='function'){ ntfScan(); updateBellBadges(); } }catch(e){}
   if(typeof rstSync==='function' && !(opts&&opts.quiet)) rstSync();
   return true;
 }
@@ -1124,7 +1129,18 @@ function updateBellBadges(){
 }
 function renderHomeNotif(){ updateBellBadges(); }
 function _oldRenderHomeNotif(){var el=document.getElementById('homenotif');if(!el)return;var seen=getSeen()||(Date.now()-12*3600e3),now=Date.now();var nw=NOTIFS.filter(function(n){return (now-n.h*3600e3)>seen;});if(!nw.length){el.style.display='none';el.innerHTML='';return;}var rows=nw.map(function(n){return '<div class="row"><span class="dot" style="background:'+n.c+'"></span><div style="flex:1"><div class="rt">'+n.t+'</div><div class="rs">'+n.s+'</div></div><span class="rs" style="flex:none">'+n.time+'</span></div>';}).join('');rows+='<div class="row tap" data-go="notifications" style="justify-content:center"><div class="rt" style="color:var(--acc)">View all notifications ›</div></div>';el.innerHTML='<div class="list" style="margin:0">'+rows+'</div>';el.style.display='block';}
-function newCount(){var seen=getSeen()||(Date.now()-12*3600e3),now=Date.now();return NOTIFS.filter(function(n){return (now-n.h*3600e3)>seen;}).length;}
+/* Two lists feed the bell. NTF is the real one -- jobs handed out, finished
+   and part-finished, worked out from the task list on this phone (see the
+   notification feed in app-01-shell.js). NOTIFS is the older in-memory one
+   that a couple of places still push onto during a session: the plot
+   proximity alert and the off-site clock-in. Those vanish on a reload, which
+   is why they are counted against `seen` rather than against readAt. */
+function newCount(){
+  var seen=getSeen()||(Date.now()-12*3600e3),now=Date.now();
+  var n=NOTIFS.filter(function(x){return (now-x.h*3600e3)>seen;}).length;
+  try{ n+=ntfUnread(); }catch(e){}
+  return n;
+}
 function updateNewBanner(){var el=document.getElementById('newnotif');if(!el)return;var c=newCount();if(c>0){document.getElementById('newnotif-t').textContent=c+' new since your last visit';el.style.display='flex';}else{el.style.display='none';}}
 const kpiMap={'Open':'taskboard','Restrict':'map','Low':'inventory','Down':'equipment'};
 document.querySelectorAll('#s-home-manager .kpi').forEach(k=>{const l=k.querySelector('.l');const d=l&&kpiMap[l.textContent.trim()];if(d){k.classList.add('tap');k.setAttribute('data-go',d);}});

@@ -122,6 +122,7 @@ function prefsSwitch(){
   try{ localStorage.setItem(PREFS_LAST_KEY,prefsWho()); }catch(e){}
   try{ themeLoad(); applyTextSize(); applyBanner(); cbApply(); }catch(e){}
   try{ notifLoad(); }catch(e){}
+  try{ ntfLoad(); }catch(e){}
 }
 prefsLoad();
 /* Default bottom tabs per role. What a person actually chose lives in their own
@@ -435,8 +436,17 @@ document.addEventListener('click',function(e){
 
    Defaults match what the old markup showed as pre-ticked, so nobody's screen
    looks different on the first load after this change.                     */
+/* `live` marks the ones that actually send something today. The rest are the
+   screen's original rows, kept because the farm wants them, and they are
+   labelled on the screen as not sending yet -- a toggle that quietly does
+   nothing is worse than one that says so. Take the label off by adding
+   live:1 in the same change that wires the alert up. */
 var NOTIF_ALERTS=[
- {k:'tasks',  t:'Tasks assigned to me', d:1},
+ {k:'tasks',  t:'Work assigned to me', d:1, live:1,
+  sub:'Off means nobody tells you when a job lands on your list'},
+ {k:'done',   t:'A job I handed out is finished', d:1, live:1},
+ {k:'partial',t:'A job came back part-finished',  d:1, live:1,
+  sub:'Somebody did what they could and left the rest for you to hand on'},
  {k:'equip',  t:'Equipment down',       d:1},
  {k:'low',    t:'Low stock alerts',     d:1},
  {k:'wx',     t:'Weather & spray window',d:1},
@@ -476,6 +486,16 @@ function ntsToggle(k,label,sub,last){
   +(sub?'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:2px">'+sub+'</div>':'')+'</div>'
   +'<span class="tgl nts-tgl'+(NOTIF[k]?' on':'')+'" data-k="'+k+'"></span></div>';
 }
+/* Said once at the top, because three sections of this screen are about a
+   phone buzzing with the app shut, and that is not built yet. A settings
+   screen that quietly promises something it cannot do is worse than one that
+   admits it. Delete this note in the same change that makes push work. */
+var NTS_NOTE='<div style="margin:12px 16px 0;padding:11px 13px;background:var(--card);'
+ +'border:1px solid var(--line);border-radius:12px;font:600 11.5px \'Public Sans\';'
+ +'color:var(--muted);line-height:1.5">These alerts reach you <b style="color:var(--ink)">'
+ +'inside the app</b> \u2014 on the bell at the top of the screen. Making your phone buzz '
+ +'with the app closed is still to be built; the hours and delivery settings below are '
+ +'ready for when it is.</div>';
 function renderNotifSettings(){
  var body=document.getElementById('nts-body'); if(!body)return;
  var quietExtra='';
@@ -489,7 +509,8 @@ function renderNotifSettings(){
  }
  function sec(t){return '<div style="font:700 10px \'Public Sans\';color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:16px 18px 6px">'+t+'</div>';}
  body.innerHTML=
-   sec('Push notification hours')
+   NTS_NOTE
+  +sec('Push notification hours')
   +'<div class="list">'
    +ntsToggle('quiet','Limit delivery hours',
       NOTIF.quiet?'On · push notifications only arrive in this window'
@@ -498,11 +519,12 @@ function renderNotifSettings(){
   +'</div>'
   +sec('Alerts')
   +'<div class="list">'+NOTIF_ALERTS.map(function(a,i){
-      return ntsToggle('a_'+a.k,a.t,'',i===NOTIF_ALERTS.length-1);
+      return ntsToggle('a_'+a.k,a.t,a.live?(a.sub||''):'Not sending yet',
+                       i===NOTIF_ALERTS.length-1);
     }).join('')+'</div>'
   +sec('Delivery')
   +'<div class="list">'+NOTIF_DELIVERY.map(function(a,i){
-      return ntsToggle('d_'+a.k,a.t,'',i===NOTIF_DELIVERY.length-1);
+      return ntsToggle('d_'+a.k,a.t,a.live?'':'Not sending yet',i===NOTIF_DELIVERY.length-1);
     }).join('')+'</div>'
   +'<div style="margin:12px 16px;font:600 11px \'Public Sans\';color:var(--muted)">These settings are yours alone — they follow you, not your role.</div>'
   +'<div style="height:16px"></div>';
@@ -523,6 +545,216 @@ document.getElementById('s-notifsettings').addEventListener('change',function(e)
  notifSave();
 });
 notifLoad();
+
+/* ===================== The notification feed =====================
+   What the bell actually counts, and what the Notifications screen actually
+   shows. Until now both were pretending: the list behind them held six
+   hand-typed examples, the same on every phone, and nothing in the app ever
+   added to it or took anything away.
+
+   THE ONE DECISION THAT SHAPES ALL OF THIS: a notification is not a record.
+   Nothing here is stored in the shared database and nothing here is sent
+   anywhere. Every phone already holds every task, so "a job landed on me" is
+   just this phone noticing that a task it already had now has my name on it.
+   Working it out costs one walk down the task list; storing it would cost a
+   new drawer, a new set of permission rules, a record per person per event
+   piling up forever, and a fresh chance to build the send-it-back-and-forth
+   loop that spent 4.4 million reads in an afternoon on 2026-08-31. See
+   CLAUDE.md. Derived beats stored here, and it is not close.
+
+   WHAT THAT COSTS, so nobody is surprised later. A phone can only tell you
+   about a change it has seen. Sign in on a brand new phone and its first look
+   at the task list is a baseline, not a pile of catching-up -- otherwise
+   everyone's first sign-in would open onto two hundred alerts about jobs from
+   last season. And this reaches somebody when they OPEN the app; making a
+   phone buzz with the app shut is a separate job, needing each person to add
+   the app to their home screen and something outside the phones to do the
+   sending. Nothing here has to be rewritten when that is built: these events
+   are what it will send.
+
+   WHAT EACH PHONE REMEMBERS, under the signed-in person like every other
+   preference, so two people sharing a phone do not read each other's alerts:
+     seen   -- the last state this phone acted on, one small entry per task,
+               thrown away with the task itself so it cannot grow forever
+     list   -- the events themselves, newest first, capped both ways
+     readAt -- when this person last opened the screen
+     base   -- when this phone started watching; 0 means it never has        */
+var NTF_MAX=120;           /* events kept per person */
+var NTF_KEEP_DAYS=30;      /* and for how long, whichever runs out first */
+var NTF={seen:{},list:[],readAt:0,base:0};
+function ntfLoad(){
+  var s=prefsGet('ntfeed',null)||{};
+  NTF={seen:(s.seen&&typeof s.seen==='object')?s.seen:{},
+       list:Array.isArray(s.list)?s.list:[],
+       readAt:+s.readAt||0, base:+s.base||0};
+}
+function ntfSave(){ prefsSet('ntfeed',{seen:NTF.seen,list:NTF.list,readAt:NTF.readAt,base:NTF.base}); }
+function ntfOn(k){ try{ return NOTIF['a_'+k]!==false; }catch(e){ return true; } }
+
+/* Work reaches a person two ways and the feed treats them the same: a task
+   assigned straight to them, or a request raised at them that they have not
+   picked up yet. Both mean "this is on your plate now". */
+function ntfPlate(t){ return t.assignee||((t.kind==='request'&&t.target)?t.target:null); }
+/* Who handed it out. Three fields because three routes make a job: the assign
+   wizard stamps assignedBy, a request stamps requestedBy, and anything older
+   or self-made only carries createdBy. */
+function ntfFrom(t){ return t.assignedBy||t.requestedBy||t.createdBy||null; }
+/* Part-finished and still nobody's problem. restAssigned is stamped the moment
+   Bill hands the rest on or writes it off, which is what ends the alert. */
+function ntfPart(t){
+  return t.status==='done'&&!!t.partial&&((t.leftPlots||[]).length>0)&&!t.restAssigned;
+}
+/* The three facts about a task this feed reacts to, as 1s and 0s, from the
+   point of view of one person. Small on purpose: it is stored once per task. */
+function ntfWatch(t,me){
+  return { a:(ntfPlate(t)===me)?1:0, s:(t.status==='done')?1:0, p:ntfPart(t)?1:0 };
+}
+
+/* Walk the task list, and for anything that changed since the last walk, add
+   the event to this person's feed. Returns how many were added, which is only
+   used by the tests -- nothing in the app cares.
+
+   Cheap by design: no database, no network, and it writes to the phone only
+   when something actually changed. It is safe to call from a snapshot handler
+   for the same reason -- it touches prefs, never storeScan() or storeTouch().
+   See CLAUDE.md, the two traps. */
+function ntfScan(){
+  var me=null;
+  try{ me=(typeof SESSION!=='undefined'&&SESSION)?SESSION.pid:null; }catch(e){}
+  if(!me) return 0;                              /* nobody signed in yet */
+  var all=null; try{ all=TASKS; }catch(e){}
+  if(!all||!all.length) return 0;
+  var first=!NTF.base, fresh={}, made=0, now=Date.now();
+  all.forEach(function(t){
+    if(!t||!t.id) return;
+    var id=String(t.id), is=ntfWatch(t,me);
+    fresh[id]=is;
+    if(first) return;                            /* the baseline walk tells nobody anything */
+    var was=NTF.seen[id]||{a:0,s:0,p:0};
+    var from=ntfFrom(t), mine=(from===me);
+    /* 1. Work landed on me. Not for a job I gave myself -- I was there. */
+    if(is.a&&!was.a&&!mine&&ntfOn('tasks')){ ntfPush('assigned',t,me,now); made++; }
+    /* 2 and 3 are both "a job I handed out came back", and a part-finished
+       job is also a finished one, so the part-finished alert wins outright --
+       two rows about one job reads as a bug and buries the ask. */
+    else if(is.p&&!was.p&&mine&&ntfOn('partial')){ ntfPush('partial',t,me,now); made++; }
+    else if(is.s&&!was.s&&mine&&t.completedBy!==me&&ntfOn('done')){ ntfPush('done',t,me,now); made++; }
+  });
+  /* Replacing the whole thing rather than merging is what keeps `seen` from
+     growing forever: a task that has been deleted is simply not in `fresh`. */
+  var changed=first||made>0||ntfSeenDiff(NTF.seen,fresh);
+  NTF.seen=fresh;
+  if(first) NTF.base=now;
+  if(changed||first){ ntfTrim(); ntfSave(); }
+  return made;
+}
+function ntfSeenDiff(a,b){
+  var ka=Object.keys(a),kb=Object.keys(b);
+  if(ka.length!==kb.length) return true;
+  for(var i=0;i<kb.length;i++){
+    var x=a[kb[i]],y=b[kb[i]];
+    if(!x||x.a!==y.a||x.s!==y.s||x.p!==y.p) return true;
+  }
+  return false;
+}
+/* The event as it is kept. The task's title and the plot count are copied in
+   rather than looked up later, so a job that is deleted next week still reads
+   as a sentence instead of a blank row. */
+function ntfPush(kind,t,me,now){
+  NTF.list.unshift({ id:'n'+now.toString(36)+Math.random().toString(36).slice(2,7),
+    k:kind, task:String(t.id), t:now,
+    ttl:String(t.title||'A job'),
+    who:(kind==='assigned'?ntfFrom(t):(t.completedBy||t.assignee||null)),
+    area:String(t.area||''),
+    n:(kind==='partial'?(t.leftPlots||[]).length:0) });
+}
+function ntfTrim(){
+  var cut=Date.now()-NTF_KEEP_DAYS*86400000;
+  NTF.list=NTF.list.filter(function(e){ return e&&e.t>cut; }).slice(0,NTF_MAX);
+}
+function ntfUnread(){
+  var r=NTF.readAt||0, n=0;
+  for(var i=0;i<NTF.list.length;i++) if(NTF.list[i].t>r) n++;
+  return n;
+}
+function ntfMarkRead(){ NTF.readAt=Date.now(); ntfSave(); }
+
+/* ---- the screen ---- */
+/* Short enough to sit on the right of a row without wrapping. */
+function ntfAgo(ms){
+  var d=Date.now()-ms;
+  if(d<60000) return 'now';
+  if(d<3600000) return Math.floor(d/60000)+'m';
+  if(d<86400000) return Math.floor(d/3600000)+'h';
+  if(d<604800000) return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(ms).getDay()];
+  var dt=new Date(ms);
+  return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()]+' '+dt.getDate();
+}
+var NTF_KIND={
+  assigned:{c:'#489FDF'},
+  done:    {c:'#2f9e4f'},
+  partial: {c:'#d17a00'}
+};
+function ntfWho(pid){
+  var n=null; try{ n=(typeof nameOf==='function')?nameOf(pid):null; }catch(e){}
+  return n||'Somebody';
+}
+function ntfLine(e){
+  var esq=(typeof esc==='function')?esc:function(x){return x==null?'':String(x);};
+  if(e.k==='assigned') return { t:esq(e.ttl), s:ntfWho(e.who)+' gave you this job'+(e.area?' · '+esq(e.area):'') };
+  if(e.k==='done')     return { t:esq(e.ttl)+' is done', s:ntfWho(e.who)+' finished it'+(e.area?' · '+esq(e.area):'') };
+  return { t:esq(e.ttl)+' came back part-finished',
+           s:ntfWho(e.who)+' did what they could · '+e.n+' plot'+(e.n===1?'':'s')+' left to hand out' };
+}
+function ntfRow(e,last){
+  var l=ntfLine(e), k=NTF_KIND[e.k]||{c:'#58595b'};
+  var isNew=e.t>(NTF.readAt||0);
+  return '<div class="row tap" data-ntf="'+e.id+'"'+(last?'':'')+'>'
+    +'<span class="dot" style="background:'+k.c+'"></span>'
+    +'<div style="flex:1;min-width:0">'
+      +'<div class="rt">'+l.t+(isNew?' <span style="color:var(--acc);font-size:15px;line-height:0">•</span>':'')+'</div>'
+      +'<div class="rs">'+l.s+'</div></div>'
+    +'<span class="rs" style="flex:none">'+ntfAgo(e.t)+'</span></div>';
+}
+function renderNotifFeed(){
+  var body=document.getElementById('ntf-body'); if(!body)return;
+  ntfTrim();
+  if(!NTF.list.length){
+    /* Capped rather than left to fill the window: on a laptop the rail hands
+       this 1,200px and one sentence stretched across all of it. */
+    body.innerHTML='<div style="padding:44px 26px;text-align:center;max-width:380px;margin:0 auto">'
+      +'<div style="font:800 15px \'Archivo\';color:var(--ink)">Nothing yet</div>'
+      +'<div style="font:600 12px \'Public Sans\';color:var(--muted);margin-top:6px;line-height:1.5">'
+      +'You\'ll hear here when a job is given to you, when a job you handed out is finished, '
+      +'and when one comes back only part-done.</div></div>';
+    return;
+  }
+  var now=Date.now(), buckets=[['Today',86400000],['This week',604800000],['Previous',Infinity]];
+  var used=0, html='';
+  buckets.forEach(function(b){
+    var rows=NTF.list.filter(function(e){ var age=now-e.t; return age<b[1]&&age>=used; });
+    used=(b[1]===Infinity)?used:b[1];
+    if(!rows.length) return;
+    html+='<div style="font:700 10px \'Public Sans\';color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:12px 18px 6px">'+b[0]+'</div>'
+      +'<div class="list">'+rows.map(function(e,i){ return ntfRow(e,i===rows.length-1); }).join('')+'</div>';
+  });
+  body.innerHTML=html+'<div style="height:16px"></div>';
+}
+/* Tapping a row opens the job it is about. The part-finished one goes straight
+   to the sheet that hands the rest on, because that is the whole point of the
+   alert -- and only when the rest is still going begging, since somebody may
+   have dealt with it between the alert and the tap. */
+document.getElementById('s-notifications').addEventListener('click',function(e){
+  var r=e.target.closest('[data-ntf]'); if(!r)return;
+  var ev=null, id=r.getAttribute('data-ntf');
+  for(var i=0;i<NTF.list.length;i++) if(NTF.list[i].id===id) ev=NTF.list[i];
+  if(!ev) return;
+  var t=null; try{ t=TASKS.find(function(x){return x.id===ev.task;}); }catch(_e){}
+  if(!t){ toast('That job is no longer on the farm’s list'); return; }
+  if(ev.k==='partial'&&ntfPart(t)&&typeof openRestSheet==='function'){ openRestSheet(t.id); return; }
+  if(typeof openTask==='function') openTask(t.id);
+});
+ntfLoad();
 
 function renderPrefsHub(){
  var body=document.getElementById('prf-body'); if(!body)return;
@@ -1857,7 +2089,7 @@ function show(id,push){ const el=document.getElementById('s-'+id); if(!el)return
      longer promote you by being opened. The attribute stays as a label, used
      below to pick which home layout to paint. */
   if(id==='profile')fillProfile(); if(id==='profedit')renderProfEdit(); if(id==='roster')rstRender(); if(id==='rosteredit')rstEditRender(); if(id==='adminxfer')axfRender(); if(id==='spraysettings')sprRender(); if(id==='farmsettings')fstRender(); if(id==='bugreport')bugRender(); if(id==='bugsettings')bgsRender(); if(id==='sharedb')sdbRender(); if(id==='admin')admRender(); if(id==='flfix')flxRender(); if(id==='mowersettings')mwsRender(); if(id==='labsettings')lbsRender(); if(id==='semsettings')smsRender(); if(id==='roles')authRenderAccount();
-  if(id==='login')authRenderLogin(); if(id==='notifications'){setSeen(Date.now());setTimeout(updateBellBadges,0);} if(id==='home-manager')renderHomeNotif(); if(id==='weather')wxEnter(); if(id==='map')mapEnter(); if(id==='taskboard')boardEnter(); if(id==='templates')renderTemplates(); if(id==='assign')assignEnter(); if(id==='plotpick')renderPlotPick(); if(id==='taskwork')renderTaskWork(); if(id==='taskprep')renderTaskPrep(); if(id==='eqpick')renderEqPick(); if(id==='inventory')invEnter(); if(id==='lowstock')renderLowStock(); if(id==='additem')renderAddItem(); if(id==='invlog')renderInvLog(); if(id==='itemdetail')0; if(id==='equipment')equipEnter(); if(id==='eqreport')renderEqReport(); if(id==='eqmaint')renderEqMaint(); if(id==='eqedit')renderEqEdit(); if(id==='eqsched')renderEqSched(); if(id==='calendar')calEnter(); if(id==='caladd')renderCalAdd(); if(id==='timeclock')tcEnter(); if(id==='tcperson')tcRenderPerson(); if(id==='fieldlog')fieldlogEnter(); if(id==='flexport')renderFlExport(); if(id==='flnew')renderFlNew(); if(id==='fldetail')renderFlDetail(); if(id==='more')moreEnter(); if(id==='trial')trialsEnter(); if(id==='trialdetail')trRenderDetail(); if(id==='trialedit')trRenderEdit(); if(id==='trialres')trRenderRes(); if(id==='trialpin')trRenderPin(); if(id==='navsettings')renderPrefsHub(); if(id==='notifsettings')renderNotifSettings(); if(id==='powersettings')renderPowerSettings(); if(id==='navtabs')renderNavSettings(); if(id==='homescreen')renderHomeSettings(); if(id==='theme')renderTheme(); if(id.indexOf('home-')===0)hwApply(r||currentRole); renderTabs();
+  if(id==='login')authRenderLogin(); if(id==='notifications'){try{ntfScan();renderNotifFeed();}catch(e){}setSeen(Date.now());try{ntfMarkRead();}catch(e){}setTimeout(updateBellBadges,0);} if(id==='home-manager')renderHomeNotif(); if(id==='weather')wxEnter(); if(id==='map')mapEnter(); if(id==='taskboard')boardEnter(); if(id==='templates')renderTemplates(); if(id==='assign')assignEnter(); if(id==='plotpick')renderPlotPick(); if(id==='taskwork')renderTaskWork(); if(id==='taskprep')renderTaskPrep(); if(id==='eqpick')renderEqPick(); if(id==='inventory')invEnter(); if(id==='lowstock')renderLowStock(); if(id==='additem')renderAddItem(); if(id==='invlog')renderInvLog(); if(id==='itemdetail')0; if(id==='equipment')equipEnter(); if(id==='eqreport')renderEqReport(); if(id==='eqmaint')renderEqMaint(); if(id==='eqedit')renderEqEdit(); if(id==='eqsched')renderEqSched(); if(id==='calendar')calEnter(); if(id==='caladd')renderCalAdd(); if(id==='timeclock')tcEnter(); if(id==='tcperson')tcRenderPerson(); if(id==='fieldlog')fieldlogEnter(); if(id==='flexport')renderFlExport(); if(id==='flnew')renderFlNew(); if(id==='fldetail')renderFlDetail(); if(id==='more')moreEnter(); if(id==='trial')trialsEnter(); if(id==='trialdetail')trRenderDetail(); if(id==='trialedit')trRenderEdit(); if(id==='trialres')trRenderRes(); if(id==='trialpin')trRenderPin(); if(id==='navsettings')renderPrefsHub(); if(id==='notifsettings')renderNotifSettings(); if(id==='powersettings')renderPowerSettings(); if(id==='navtabs')renderNavSettings(); if(id==='homescreen')renderHomeSettings(); if(id==='theme')renderTheme(); if(id.indexOf('home-')===0)hwApply(r||currentRole); renderTabs();
   try{csApply(el,id);}catch(e){}
   try{updateBellBadges();}catch(e){}
   try{syncBack(el);}catch(e){}

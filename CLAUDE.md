@@ -85,7 +85,7 @@ show up." Never edit `sw.js` by hand; this command writes it.
 npm test
 ```
 
-41 sets of automated checks, about 2,400 in total, in a minute or so. They
+42 sets of automated checks, about 2,700 in total, in a minute or so. They
 run several at a time (`tools/run-tests.js`); `npm run test:serial` runs them
 one after another instead, which is slower but easier to read when two of them
 disagree.
@@ -241,6 +241,7 @@ get wrong.
 | `flMixItems()` in `app-04-spray-inventory.js` | Decides whether a chemical amount is `mixCompute()`'s `total` (the whole tank, boom-charge buffer included) or its `onTarget` (just the ground, nothing else) — `sprayIsBoom()` decides which. Reading `mixCompute(t).items[i].need`/`.short` directly anywhere gets the **tank** figure always, which overstates what a backpack or granular job actually needs. Both `flSave()` (`app-02`, the manual Field Log entry) and `completeTask()` (`app-04`, finishing an assigned task) go through this and then `mixInvDecrement()` — one call per product, never blocking a save or a completion if a product doesn't match inventory. |
 | Bare class names in the CSS, like `.del` | The page has one stylesheet for the whole app, so a rule written for one screen reaches every element with that class. `.del` is pinned to a 30px square for a little round X button — and the plot popup's Delete button carries the same class, so "Delete" was squeezed into 30px and cut off for months. If a new rule uses a short, ordinary word as a class, scope it (`.plotpop .pp-btn`) or expect it to land somewhere you were not looking. Two other things to know here: `font: 600 12px inherit` is **not valid CSS** — `inherit` cannot be the family inside the `font` shorthand, so the browser throws the whole line away and the element silently draws at the page default; write it longhand. And measure rather than squint: `scrollWidth > clientWidth` on a button is how the clipping above was actually found. |
 | Files at the top level | The website serves this folder directly, so these filenames *are* the web address. Nothing the live app needs can move into a subfolder. |
+| The seven task fields the bell reads | `assignee`, `assignedBy`, `requestedBy`, `completedBy`, `partial`, `leftPlots`, `restAssigned`. The notification feed (`ntfScan()`, `app-01-shell.js`) works out who to tell by watching these change. Rename one in the task code and the alerts stop — no error, no empty screen, just a bell that never lights up again. `tools/test-notifications.js` section 10 checks the app still writes all seven. **The feed is derived, not stored:** it is worked out on each phone from the task list, so there is no drawer, no rule and no row in `test-sync-settles.js` to add. Don't turn it into one without reading `docs/DECISIONS.md`, 2026-09-24. |
 | `roster-emails.local.json` | The crew's email addresses. Deliberately kept out of the public repo. Never commit it. |
 
 ---
@@ -252,7 +253,7 @@ The app is about 24,800 lines spread over the page and five files beside it.
 
 | File | Roughly | What is in it |
 |---|---|---|
-| `app-01-shell.js` | 1,900 | Per-person preferences, the phone/roomy shell, notifications, home-screen widgets, theme and color-blind mode |
+| `app-01-shell.js` | 2,200 | Per-person preferences, the phone/roomy shell, the notification feed (`ntfScan()` and the Notifications screen), home-screen widgets, theme and color-blind mode |
 | `app-02-fieldlog-sync.js` | 4,000 | The Field Log **screen** — including its manual "Add entry" form, which since 2026-09-22 picks a category and a real task name (`FL_CAT_TASKCAT`) and, for a Spray/Fertilize entry, embeds app-04's mix calculator (`flMixTask()`/`flMixItems()`) rather than a hand-typed amount; the shared-database drawers, including the roster one; ids and timestamps |
 | `app-03-people.js` | 1,700 | The Roster **screen**, labs, session, sign-in, profile, semesters, and who may change what. It no longer owns who is on the farm — the database does, and `RSTSYNC` in `app-02` is what carries it. |
 | `app-04-spray-inventory.js` | 3,800 | The spray mix calculator (`mixCompute()`, `MIX_UNITS`) — used by both a task's own work screen and, since 2026-09-22, the Field Log's manual entry — undergrad task-work mode, inventory, equipment. `completeTask()` here now also takes stock off the shelf for a finished chemical job (`mixInvDecrement()`) — see the table below. |

@@ -1133,6 +1133,48 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### Notifications are worked out on the phone, never stored in the database — 2026-09-24
+**Decision:** the bell and the Notifications screen show three real things — work
+assigned to you, a job you handed out being finished, and a job coming back
+part-finished — and every one of them is **derived from the task list each phone
+already holds**. There is no notifications collection, no permission rule, no
+drawer and no row in `tools/test-sync-settles.js`, because nothing is ever sent.
+Each phone keeps only its own small ledger under the signed-in person
+(`prefsGet('ntfeed')`): the last state it acted on for each task, the events it
+has raised, and when that person last read them. A phone's first look at the
+task list is a silent baseline, so nobody's first sign-in opens onto every job
+on the farm. `ntfScan()` and the rest are in `app-01-shell.js`; the hook is
+`tsyncRepaint()` in the page, which is where a task actually changes.
+**Why:** a notification is a fact about a task, and every phone already has
+every task. Storing them would have cost a record per person per event, piling
+up forever with no natural end — the exact shape CLAUDE.md warns about — plus
+rules, a settle test, and another chance to build the send-it-back-and-forth
+loop that spent 4.4 million reads on 2026-08-31. Derived costs **nothing**: no
+extra read, no extra write, and it keeps working with no signal.
+**Don't:** don't "fix" this by making notifications a shared drawer so they
+follow a person between phones. That trade is real — sign in on a new phone and
+you start from that moment, with no history — and it was made deliberately in
+favour of costing the farm nothing. If it ever has to change, the thing to
+change is push, not storage. And don't rename `assignee`, `assignedBy`,
+`requestedBy`, `completedBy`, `partial`, `leftPlots` or `restAssigned` on a task
+without looking here: those seven field names are the whole feed, and renaming
+one kills the alerts with nothing on screen to say so.
+`tools/test-notifications.js` section 10 is the tripwire.
+
+### A settings screen says when it is not doing anything — 2026-09-24
+**Decision:** the five alert types that are not wired up yet, and both Delivery
+toggles, carry the words **"Not sending yet"**, and a note at the top of the
+screen says these alerts reach you inside the app rather than by making the
+phone buzz.
+**Why:** the toggles saved their state from the day they were written but
+nothing read them, so a person could turn "Equipment down" on, see it stay on
+through a reload, and reasonably conclude they would be told when a mower went
+down. A control that lies about what it does is worse than one that admits it.
+**Don't:** don't leave the label on after wiring an alert up — it goes in the
+same change, by adding `live:1` to that row of `NOTIF_ALERTS` (or
+`NOTIF_DELIVERY`) in `app-01-shell.js`. And delete `NTS_NOTE` in the change
+that makes push notifications actually work.
+
 ### A request can be taken back — 2026-09-23
 **Decision:** the Requests tab draws a bin on a request **you** raised, and
 tapping it asks before it removes the job everywhere. **Everyone who can raise

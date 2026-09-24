@@ -88,7 +88,9 @@ function boot(store) {
       + 'renderNotifFeed:renderNotifFeed,newCount:newCount,updateBellBadges:updateBellBadges,'
       + 'tasks:function(){return TASKS;},setTasks:function(a){TASKS.length=0;a.forEach(function(t){TASKS.push(t);});},'
       + 'signIn:function(pid){return sessionSet(pid,{quiet:true});},'
-      + 'RST_LOGIN:RST_LOGIN,NOTIF_ALERTS:NOTIF_ALERTS,go:go'
+      + 'RST_LOGIN:RST_LOGIN,NOTIF_ALERTS:NOTIF_ALERTS,go:go,'
+      + 'acceptCrewReq:acceptCrewReq,assignsUndergrads:assignsUndergrads,'
+      + 'ntfReqFor:function(t,me){return ntfReqFor(t,me);}'
       + '};');
   } catch (e) { console.log('app script threw: ' + e.message); fail++; }
   return { win, doc: win.document, n: win.__n || {}, errs };
@@ -124,6 +126,24 @@ section('2. a phone that has never looked takes a silent baseline');
   ok('but the phone has written down where it started', n.ntf().base > 0);
   ok('and it knows about both jobs', Object.keys(n.ntf().seen).length === 2);
   ok('the bell is clear', n.ntfUnread() === 0);
+
+  /* AN EMPTY LIST IS NOT A BASELINE, and that is deliberate. Signing in
+     happens before the first snapshot comes back, so the task list is very
+     often empty at that moment. Counting that as "I have now seen the farm"
+     would make every one of the two hundred jobs that arrive a second later
+     look brand new, which is the flood this whole section exists to stop. */
+  const s2 = {};
+  const b2 = boot(s2);
+  b2.n.signIn(b2.n.RST_LOGIN.undergrad);
+  b2.n.setTasks([]);
+  b2.n.ntfScan();
+  ok('a scan with no tasks does not count as having looked', b2.n.ntf().base === 0,
+     String(b2.n.ntf().base));
+  b2.n.setTasks([task({ id: 'a1', assignee: b2.n.RST_LOGIN.undergrad, assignedBy: BILL }),
+                 task({ id: 'a2', assignee: b2.n.RST_LOGIN.undergrad, assignedBy: BILL })]);
+  ok('so the list arriving a moment later is the baseline, not news',
+     b2.n.ntfScan() === 0, JSON.stringify(b2.n.ntf().list.map(e => e.k)));
+  ok('and now it has looked', b2.n.ntf().base > 0);
 }
 
 section('3. a job given to me AFTER that does show up');
@@ -144,11 +164,9 @@ section('3. a job given to me AFTER that does show up');
   ok('the bell shows one', n.ntfUnread() === 1);
   ok('and the badge agrees', n.newCount() === 1, String(n.newCount()));
 
-  /* A request raised at somebody is work landing on them just the same. */
-  n.tasks().push(task({ id: 'r1', kind: 'request', assignee: null, target: STU,
-                        requestedBy: BILL, title: 'Blow the paths' }));
-  ok('a request aimed at me counts too', n.ntfScan() === 1);
-  ok('and it says who asked', n.ntf().list[0].who === BILL);
+  /* A second job, so the screen has more than one row to draw. */
+  n.tasks().push(task({ id: 'a2', assignee: STU, assignedBy: BILL, title: 'Blow the paths' }));
+  ok('a second job raises a second event', n.ntfScan() === 1);
 
   /* Opening the screen draws it and clears the count. */
   n.go('notifications');
@@ -231,6 +249,201 @@ section('6. a part-finished job raises ONE alert, and it is the useful one');
   ok('handing the rest on raises nothing new', n.ntfScan() === 0);
 }
 
+section('6b. a labor request from Bill to a technician, the whole way through');
+{
+  const store = {};
+  const { n, doc } = boot(store);
+  const BILL = n.RST_LOGIN.manager, TECH = n.RST_LOGIN.tech;
+
+  /* --- the technician's phone: being asked, then accepting --- */
+  n.signIn(TECH);
+  n.setTasks([task({ id: 'z0', title: 'Something else entirely', assignee: null })]);
+  n.ntfScan();                                   /* baseline on an empty list */
+  /* Exactly what openCrewReq()/the Assign wizard write (app-05). */
+  n.tasks().push(task({ id: 'r1', kind: 'request', origin: 'manager', target: TECH,
+                        requestedBy: BILL, assignee: null, createdBy: BILL,
+                        title: 'Spray the back fence line' }));
+  ok('being asked raises one event', n.ntfScan() === 1);
+  let e = n.ntf().list[0];
+  ok('and it is the request one', e && e.k === 'reqnew', e && e.k);
+  ok('it says who is asking', e && e.who === BILL, e && e.who);
+  ok('it remembers which way it was going', e && e.o === 'manager', e && e.o);
+  n.go('notifications');
+  ok('the row says what is being asked',
+     /is asking you to take this on/.test(doc.getElementById('ntf-body').innerHTML));
+
+  /* Accepting is the app's own acceptCrewReq(), not a hand-set field. */
+  n.acceptCrewReq('r1');
+  const acc = n.tasks().find(t => t.id === 'r1');
+  ok('accepting turned it into a task', acc.kind === 'task' && acc.assignee === TECH,
+     acc.kind + '/' + acc.assignee);
+  ok('and the technician is NOT told work was assigned to them', n.ntfScan() === 0,
+     JSON.stringify(n.ntf().list.map(x => x.k)));
+
+  /* --- Bill's phone: the same records arriving --- */
+  const s2 = {};
+  const b2 = boot(s2);
+  b2.n.signIn(BILL);
+  b2.n.setTasks([task({ id: 'r1', kind: 'request', origin: 'manager', target: TECH,
+                        requestedBy: BILL, assignee: null, createdBy: BILL,
+                        title: 'Spray the back fence line' })]);
+  b2.n.ntfScan();                                /* baseline: he raised it, he knows */
+  ok('Bill is not told about his own request', b2.n.ntf().list.length === 0);
+  Object.assign(b2.n.tasks()[0], { kind: 'task', assignee: TECH });
+  ok('but he IS told when it is accepted', b2.n.ntfScan() === 1);
+  e = b2.n.ntf().list[0];
+  ok('and it is the accepted one', e.k === 'reqok', e.k);
+  ok('naming who took it on', e.who === TECH, e.who);
+  b2.n.go('notifications');
+  ok('the row reads as a sentence',
+     /was accepted/.test(b2.doc.getElementById('ntf-body').innerHTML) &&
+     /has taken it on/.test(b2.doc.getElementById('ntf-body').innerHTML));
+
+  /* And finished. This is the job Bill ASKED for, so it is reqdone, not the
+     "a job I handed out is finished" alert -- two switches, two alerts. */
+  Object.assign(b2.n.tasks()[0], { status: 'done', completedBy: TECH });
+  ok('finishing raises one more', b2.n.ntfScan() === 1);
+  ok('and it is the asked-for one, not the handed-out one',
+     b2.n.ntf().list[0].k === 'reqdone', b2.n.ntf().list[0].k);
+  b2.n.go('notifications');
+  ok('which says whose job it was',
+     /finished the job you asked for/.test(b2.doc.getElementById('ntf-body').innerHTML));
+}
+
+section('6c. a labor request the other way: a technician asking for help');
+{
+  const store = {};
+  const { n, doc } = boot(store);
+  const BILL = n.RST_LOGIN.manager, TECH = n.RST_LOGIN.tech, STU = n.RST_LOGIN.undergrad;
+
+  /* It reaches whoever hands work to undergraduates, read off the roster --
+     never a hardcoded Bill, so it still lands the week he is away. */
+  ok('Bill is the one who hands work to undergraduates', n.assignsUndergrads(BILL) === true);
+  ok('a technician is not', n.assignsUndergrads(TECH) === false);
+
+  n.signIn(BILL);
+  n.setTasks([task({ id: 'z0', title: 'Something else entirely', assignee: null })]);
+  n.ntfScan();
+  /* What openReqForm() writes (app-05): no target, a head count, origin crew. */
+  n.tasks().push(task({ id: 'r2', kind: 'request', origin: 'crew', assignee: null,
+                        requestedBy: TECH, createdBy: TECH, students: 2,
+                        title: 'Help pulling covers' }));
+  ok('it reaches Bill', n.ntfScan() === 1);
+  let e = n.ntf().list[0];
+  ok('as a request', e.k === 'reqnew', e.k);
+  ok('from the technician', e.who === TECH, e.who);
+  ok('with the head count on it', e.n === 2, String(e.n));
+  n.go('notifications');
+  ok('and the row asks the right question, not the other kind',
+     /is asking for help/.test(doc.getElementById('ntf-body').innerHTML) &&
+     /2 students/.test(doc.getElementById('ntf-body').innerHTML));
+
+  /* Bill puts an undergrad on it -- the data-assign handler in app-04. */
+  Object.assign(n.tasks().find(t => t.id === 'r2'), { kind: 'task', assignee: STU });
+  ok('Bill is not told his own answer back', n.ntfScan() === 0,
+     JSON.stringify(n.ntf().list.map(x => x.k)));
+
+  /* The technician who asked hears that it was accepted. */
+  const s2 = {};
+  const b2 = boot(s2);
+  b2.n.signIn(TECH);
+  b2.n.setTasks([task({ id: 'r2', kind: 'request', origin: 'crew', assignee: null,
+                        requestedBy: TECH, createdBy: TECH, students: 2,
+                        title: 'Help pulling covers' })]);
+  b2.n.ntfScan();
+  ok('the technician is not told about their own ask', b2.n.ntf().list.length === 0);
+  Object.assign(b2.n.tasks()[0], { kind: 'task', assignee: STU });
+  ok('but is told it was picked up', b2.n.ntfScan() === 1);
+  ok('as the accepted alert', b2.n.ntf().list[0].k === 'reqok', b2.n.ntf().list[0].k);
+  ok('naming the undergrad Bill put on it', b2.n.ntf().list[0].who === STU);
+
+  /* And the undergrad DOES get told work landed on them -- they were never
+     asked about it, so this is news to them. */
+  const s3 = {};
+  const b3 = boot(s3);
+  b3.n.signIn(STU);
+  b3.n.setTasks([task({ id: 'r2', kind: 'request', origin: 'crew', assignee: null,
+                        requestedBy: TECH, createdBy: TECH, students: 2,
+                        title: 'Help pulling covers' })]);
+  b3.n.ntfScan();
+  ok('an open crew request is not on the undergrad plate yet', b3.n.ntf().list.length === 0);
+  Object.assign(b3.n.tasks()[0], { kind: 'task', assignee: STU });
+  ok('being put on it is news to them', b3.n.ntfScan() === 1);
+  ok('and it is the plain assigned alert', b3.n.ntf().list[0].k === 'assigned',
+     b3.n.ntf().list[0].k);
+}
+
+section('6d. one row per job per look, and the six switches are separate');
+{
+  const store = {};
+  const { n } = boot(store);
+  const BILL = n.RST_LOGIN.manager, TECH = n.RST_LOGIN.tech;
+
+  /* A phone out of signal all morning: requested, accepted and finished all
+     land in one look. Only the last one is still worth saying. */
+  n.signIn(BILL);
+  n.setTasks([task({ id: 'z0', title: 'Something else entirely', assignee: null })]);
+  n.ntfScan();
+  n.tasks().push(task({ id: 'r3', kind: 'task', origin: 'manager', target: TECH,
+                        requestedBy: BILL, assignee: TECH, createdBy: BILL,
+                        status: 'done', completedBy: TECH, title: 'Fix the fence' }));
+  ok('three stages in one look raise exactly one row', n.ntfScan() === 1);
+  ok('and it is the latest stage', n.ntf().list[0].k === 'reqdone', n.ntf().list[0].k);
+
+  /* Each switch works on its own. */
+  const kinds = ['tasks', 'done', 'partial', 'reqnew', 'reqok', 'reqdone'];
+  const live = n.NOTIF_ALERTS.filter(a => a.live).map(a => a.k);
+  ok('all six are marked as really sending', live.join(',') === kinds.join(','), live.join(','));
+  kinds.forEach(k => {
+    ok('"' + k + '" has its own switch, on by default',
+       n.NOTIF()['a_' + k] === true, String(n.NOTIF()['a_' + k]));
+  });
+
+  /* Turning the request switches off one at a time stops exactly that one. */
+  const s2 = {};
+  const b2 = boot(s2);
+  b2.n.signIn(TECH);
+  b2.n.NOTIF().a_reqnew = false;
+  b2.n.setTasks([task({ id: 'z0', title: 'Something else entirely', assignee: null })]);
+  b2.n.ntfScan();
+  b2.n.tasks().push(task({ id: 'r4', kind: 'request', origin: 'manager', target: TECH,
+                           requestedBy: BILL, assignee: null, title: 'Blow the shop out' }));
+  ok('with "a labor request lands on me" off, nothing is raised', b2.n.ntfScan() === 0);
+
+  const s3 = {};
+  const b3 = boot(s3);
+  b3.n.signIn(BILL);
+  b3.n.NOTIF().a_reqok = false;
+  b3.n.setTasks([task({ id: 'r5', kind: 'request', origin: 'manager', target: TECH,
+                        requestedBy: BILL, assignee: null, title: 'Blow the shop out' })]);
+  b3.n.ntfScan();
+  Object.assign(b3.n.tasks()[0], { kind: 'task', assignee: TECH });
+  ok('with "accepted" off, acceptance is silent', b3.n.ntfScan() === 0);
+  /* but finishing still comes through, because that is a different switch */
+  Object.assign(b3.n.tasks()[0], { status: 'done', completedBy: TECH });
+  ok('while "a job I asked for is finished" still works', b3.n.ntfScan() === 1);
+  ok('and is the right kind', b3.n.ntf().list[0].k === 'reqdone', b3.n.ntf().list[0].k);
+}
+
+section('6e. the six dot colours survive colour-blind mode');
+{
+  /* A colour that is not a CB_MAP key still draws, but loses its SHAPE in
+     colour-blind mode -- and shape is the half of the signal that does not
+     depend on seeing colour. */
+  const { win } = boot({});
+  const kinds = win.NTF_KIND, map = win.CB_MAP, shape = win.CB_SHAPE;
+  const seen = {};
+  Object.keys(kinds).forEach(k => {
+    const hex = kinds[k].c.toLowerCase();
+    ok('"' + k + '" uses a colour the colour-blind palette knows', !!map[hex], hex);
+    ok('"' + k + '" gets a dot shape', !!shape[hex], hex);
+    seen[map[hex] + '/' + shape[hex]] = (seen[map[hex] + '/' + shape[hex]] || 0) + 1;
+  });
+  /* done and reqdone share one on purpose; everything else is distinct. */
+  ok('five distinct colour-and-shape pairs across six alerts',
+     Object.keys(seen).length === 5, Object.keys(seen).join(' '));
+}
+
 section('7. the toggles on the Notifications screen actually gate it');
 {
   const store = {};
@@ -252,7 +465,8 @@ section('7. the toggles on the Notifications screen actually gate it');
   ok('turned back on and it works again', n.ntfScan() === 1);
 
   const live = n.NOTIF_ALERTS.filter(a => a.live).map(a => a.k).join(',');
-  ok('three alerts are marked as really sending', live === 'tasks,done,partial', live);
+  ok('six alerts are marked as really sending',
+     live === 'tasks,done,partial,reqnew,reqok,reqdone', live);
 }
 
 section('8. the feed is the person’s, not the phone’s');

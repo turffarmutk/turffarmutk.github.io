@@ -447,6 +447,15 @@ var NOTIF_ALERTS=[
  {k:'done',   t:'A job I handed out is finished', d:1, live:1},
  {k:'partial',t:'A job came back part-finished',  d:1, live:1,
   sub:'Somebody did what they could and left the rest for you to hand on'},
+ /* The three stages of a labor request, each with its own switch because
+    they are three different things to be interrupted about. Kept together and
+    in order -- asked, accepted, finished -- so the screen reads as the story
+    it is. Who gets which is worked out in ntfScan(); in short, the first goes
+    to whoever is being asked and the other two go back to whoever asked. */
+ {k:'reqnew', t:'A labor request lands on me', d:1, live:1,
+  sub:'Bill asking you to take a job on, or a grad or technician asking you for help'},
+ {k:'reqok',  t:'A labor request I sent is accepted', d:1, live:1},
+ {k:'reqdone',t:'A job I asked for is finished', d:1, live:1},
  {k:'equip',  t:'Equipment down',       d:1},
  {k:'low',    t:'Low stock alerts',     d:1},
  {k:'wx',     t:'Weather & spray window',d:1},
@@ -591,10 +600,10 @@ function ntfLoad(){
 function ntfSave(){ prefsSet('ntfeed',{seen:NTF.seen,list:NTF.list,readAt:NTF.readAt,base:NTF.base}); }
 function ntfOn(k){ try{ return NOTIF['a_'+k]!==false; }catch(e){ return true; } }
 
-/* Work reaches a person two ways and the feed treats them the same: a task
-   assigned straight to them, or a request raised at them that they have not
-   picked up yet. Both mean "this is on your plate now". */
-function ntfPlate(t){ return t.assignee||((t.kind==='request'&&t.target)?t.target:null); }
+/* Whose plate the job is on. Just the assignee: a labor request that has not
+   been taken on yet is NOT on anybody's plate, it is a question, and it has
+   its own three alerts below. */
+function ntfPlate(t){ return t.assignee||null; }
 /* Who handed it out. Three fields because three routes make a job: the assign
    wizard stamps assignedBy, a request stamps requestedBy, and anything older
    or self-made only carries createdBy. */
@@ -604,10 +613,46 @@ function ntfFrom(t){ return t.assignedBy||t.requestedBy||t.createdBy||null; }
 function ntfPart(t){
   return t.status==='done'&&!!t.partial&&((t.leftPlots||[]).length>0)&&!t.restAssigned;
 }
-/* The three facts about a task this feed reacts to, as 1s and 0s, from the
-   point of view of one person. Small on purpose: it is stored once per task. */
+
+/* ---- labor requests ----
+   A request is a job somebody is ASKING for rather than handing out, and it
+   goes two ways. Both end up as the same record, which is why one set of
+   helpers covers both:
+
+     Bill (or whoever holds his job) -> a grad student or technician.
+       origin 'manager', target is the person being asked. Made either from
+       the request form (openCrewReq, app-05) or from the Assign wizard, which
+       quietly turns into a request the moment Bill picks somebody who is not
+       an undergrad -- see the isCrew() line in commitTask(). They ACCEPT it
+       (acceptCrewReq, app-03), which sets assignee to themselves.
+
+     A grad student or technician -> whoever hands work to undergraduates.
+       origin 'crew', no target, students is how many people they need. It is
+       ACCEPTED by that person picking an undergrad on the task sheet (the
+       data-assign handler in app-04), which sets assignee to the undergrad.
+
+   So "accepted" is the same moment in both: it stops being a request and
+   starts being somebody's task. Nothing in the record says WHO accepted it,
+   and nothing needs to -- see the note over the reqok branch in ntfScan(). */
+function ntfIsReq(t){ return t.kind==='request'||!!t.requestedBy||!!t.origin; }
+function ntfReqOpen(t){ return t.kind==='request'&&!t.assignee; }
+/* Is this open request MY question to answer. For Bill's kind, the person he
+   asked. For the crew's kind, whoever can hand work to undergraduates -- read
+   off the roster through assignsUndergrads() rather than hardcoding Bill, so
+   it still reaches the right person the week he is away, and in 2030. */
+function ntfReqFor(t,me){
+  if(!ntfReqOpen(t)) return 0;
+  if(t.origin==='manager') return (t.target===me)?1:0;
+  try{ return (typeof assignsUndergrads==='function'&&assignsUndergrads(me))?1:0; }
+  catch(e){ return 0; }
+}
+/* The five facts about a task this feed reacts to, as 1s and 0s, from the
+   point of view of one person. Small on purpose: it is stored once per task.
+   A missing field reads as 0, which is what makes adding one here safe for
+   phones that already have a ledger written under the old shape. */
 function ntfWatch(t,me){
-  return { a:(ntfPlate(t)===me)?1:0, s:(t.status==='done')?1:0, p:ntfPart(t)?1:0 };
+  return { a:(ntfPlate(t)===me)?1:0, s:(t.status==='done')?1:0, p:ntfPart(t)?1:0,
+           q:ntfReqOpen(t)?1:0, r:ntfReqFor(t,me) };
 }
 
 /* Walk the task list, and for anything that changed since the last walk, add
@@ -630,15 +675,41 @@ function ntfScan(){
     var id=String(t.id), is=ntfWatch(t,me);
     fresh[id]=is;
     if(first) return;                            /* the baseline walk tells nobody anything */
-    var was=NTF.seen[id]||{a:0,s:0,p:0};
-    var from=ntfFrom(t), mine=(from===me);
-    /* 1. Work landed on me. Not for a job I gave myself -- I was there. */
-    if(is.a&&!was.a&&!mine&&ntfOn('tasks')){ ntfPush('assigned',t,me,now); made++; }
-    /* 2 and 3 are both "a job I handed out came back", and a part-finished
-       job is also a finished one, so the part-finished alert wins outright --
-       two rows about one job reads as a bug and buries the ask. */
-    else if(is.p&&!was.p&&mine&&ntfOn('partial')){ ntfPush('partial',t,me,now); made++; }
-    else if(is.s&&!was.s&&mine&&t.completedBy!==me&&ntfOn('done')){ ntfPush('done',t,me,now); made++; }
+    var was=NTF.seen[id]||{a:0,s:0,p:0,q:0,r:0};
+    var mine=(ntfFrom(t)===me);                  /* I handed it out, or I asked for it */
+    var req=ntfIsReq(t), asked=(req&&t.requestedBy===me);
+
+    /* ONE ROW PER JOB PER LOOK, and the chain below is in lifecycle order,
+       LATEST FIRST. A phone that was out of signal all morning can come back
+       to a job that was requested, accepted and finished since it last looked;
+       the only one of those three still worth saying is the last. */
+
+    /* Finished, and came back with plots nobody has been given. This one wins
+       over plain "finished" outright: a part-finished job IS a finished one,
+       and two rows about one job reads as a bug and buries the ask. */
+    if(is.p&&!was.p&&mine&&ntfOn('partial')){ ntfPush('partial',t,t.completedBy||t.assignee||null,now); made++; }
+    /* Finished. The job I ASKED for and the job I HANDED OUT are two different
+       alerts with two different switches, because they are two different
+       relationships -- so each branch excludes the other's jobs. */
+    else if(is.s&&!was.s&&asked&&t.completedBy!==me&&ntfOn('reqdone')){
+      ntfPush('reqdone',t,t.completedBy||t.assignee||null,now); made++; }
+    else if(is.s&&!was.s&&mine&&!req&&t.completedBy!==me&&ntfOn('done')){
+      ntfPush('done',t,t.completedBy||t.assignee||null,now); made++; }
+    /* Accepted -- it has stopped being a question and become somebody's job.
+       Only the person who ASKED is told, and the record never says who
+       accepted it because it never has to: in both directions the person who
+       accepts is somebody other than the person who asked. The t.assignee
+       guard is belt and braces for a route that does not exist yet. */
+    else if(was.q&&!is.q&&asked&&t.assignee!==me&&ntfOn('reqok')){
+      ntfPush('reqok',t,t.assignee||null,now); made++; }
+    /* Work landed on me. Not for a job I gave myself -- I was there. Not for
+       a request I was asked about and then accepted either: I already heard
+       about that one as a request, and I am the one who said yes. */
+    else if(is.a&&!was.a&&!mine&&t.target!==me&&ntfOn('tasks')){
+      ntfPush('assigned',t,ntfFrom(t),now); made++; }
+    /* Somebody is asking. Last in the chain because it is the earliest stage. */
+    else if(is.r&&!was.r&&!asked&&ntfOn('reqnew')){
+      ntfPush('reqnew',t,t.requestedBy||null,now); made++; }
   });
   /* Replacing the whole thing rather than merging is what keeps `seen` from
      growing forever: a task that has been deleted is simply not in `fresh`. */
@@ -657,16 +728,27 @@ function ntfSeenDiff(a,b){
   }
   return false;
 }
-/* The event as it is kept. The task's title and the plot count are copied in
+/* The event as it is kept. The title, the area and the count are copied in
    rather than looked up later, so a job that is deleted next week still reads
-   as a sentence instead of a blank row. */
-function ntfPush(kind,t,me,now){
+   as a sentence instead of a blank row. `who` is the OTHER person in the
+   sentence and differs by kind, so the caller says who rather than this
+   working it out twice.
+
+     n  the number that belongs in the sentence: plots still to hand out on a
+        part-finished job, people asked for on a new labor request
+     o  which way a labor request was going, so the row can say "is asking
+        you to take this on" or "is asking for help" -- the record's own
+        `origin` is unreliable to read later because the request has by then
+        become an ordinary task                                            */
+function ntfPush(kind,t,who,now){
   NTF.list.unshift({ id:'n'+now.toString(36)+Math.random().toString(36).slice(2,7),
     k:kind, task:String(t.id), t:now,
     ttl:String(t.title||'A job'),
-    who:(kind==='assigned'?ntfFrom(t):(t.completedBy||t.assignee||null)),
+    who:who||null,
     area:String(t.area||''),
-    n:(kind==='partial'?(t.leftPlots||[]).length:0) });
+    o:(t.origin||''),
+    n:(kind==='partial'?(t.leftPlots||[]).length
+      :kind==='reqnew'?(+t.students||0):0) });
 }
 function ntfTrim(){
   var cut=Date.now()-NTF_KEEP_DAYS*86400000;
@@ -690,10 +772,19 @@ function ntfAgo(ms){
   var dt=new Date(ms);
   return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()]+' '+dt.getDate();
 }
+/* Every one of these is a key in CB_MAP, and they map to six DIFFERENT
+   color-blind-safe colors with six different dot shapes. Pick a color that is
+   not in that table and the row still draws, but in color-blind mode it falls
+   through to the generic shift and loses its SHAPE, which is the half of the
+   signal that does not depend on seeing color at all. See CB_MAP and CB_SHAPE
+   further down this file. */
 var NTF_KIND={
-  assigned:{c:'#489FDF'},
-  done:    {c:'#2f9e4f'},
-  partial: {c:'#d17a00'}
+  assigned:{c:'#489FDF'},   /* ring     - informational */
+  done:    {c:'#2f9e4f'},   /* circle   - complete */
+  partial: {c:'#d17a00'},   /* diamond  - needs attention */
+  reqnew:  {c:'#7c5cbf'},   /* triangle - somebody is asking */
+  reqok:   {c:'#2456b8'},   /* ring     - informational */
+  reqdone: {c:'#2f9e4f'}    /* circle   - complete, same as done on purpose */
 };
 function ntfWho(pid){
   var n=null; try{ n=(typeof nameOf==='function')?nameOf(pid):null; }catch(e){}
@@ -701,8 +792,21 @@ function ntfWho(pid){
 }
 function ntfLine(e){
   var esq=(typeof esc==='function')?esc:function(x){return x==null?'':String(x);};
-  if(e.k==='assigned') return { t:esq(e.ttl), s:ntfWho(e.who)+' gave you this job'+(e.area?' · '+esq(e.area):'') };
-  if(e.k==='done')     return { t:esq(e.ttl)+' is done', s:ntfWho(e.who)+' finished it'+(e.area?' · '+esq(e.area):'') };
+  var where=e.area?' · '+esq(e.area):'';
+  if(e.k==='assigned') return { t:esq(e.ttl), s:ntfWho(e.who)+' gave you this job'+where };
+  if(e.k==='done')     return { t:esq(e.ttl)+' is done', s:ntfWho(e.who)+' finished it'+where };
+  if(e.k==='reqnew'){
+    /* Bill asking a technician to take a job on reads differently from a
+       technician asking for help, and the row has to say which, because what
+       you do next is not the same: one you accept, the other you put somebody
+       on. */
+    var how=(e.o==='manager')
+      ? ntfWho(e.who)+' is asking you to take this on'
+      : ntfWho(e.who)+' is asking for help'+(e.n?' · '+e.n+' student'+(e.n===1?'':'s'):'');
+    return { t:esq(e.ttl), s:how+where };
+  }
+  if(e.k==='reqok')   return { t:esq(e.ttl)+' was accepted', s:ntfWho(e.who)+' has taken it on'+where };
+  if(e.k==='reqdone') return { t:esq(e.ttl)+' is done', s:ntfWho(e.who)+' finished the job you asked for'+where };
   return { t:esq(e.ttl)+' came back part-finished',
            s:ntfWho(e.who)+' did what they could · '+e.n+' plot'+(e.n===1?'':'s')+' left to hand out' };
 }
@@ -740,10 +844,18 @@ function renderNotifFeed(){
   });
   body.innerHTML=html+'<div style="height:16px"></div>';
 }
-/* Tapping a row opens the job it is about. The part-finished one goes straight
-   to the sheet that hands the rest on, because that is the whole point of the
-   alert -- and only when the rest is still going begging, since somebody may
-   have dealt with it between the alert and the tap. */
+/* Tapping a row takes you to the thing the alert is asking you to DO, which
+   is not always the same screen:
+
+     part-finished  -> straight to the sheet that hands the rest on
+     somebody is asking YOU to take a job on -> the Requests tab, because the
+       Accept button lives there and nowhere else. The task sheet would be
+       actively wrong here: for any unaccepted request it offers "Assign to
+       undergrad", which is Bill's answer to a request, not a technician's.
+     anything else  -> the job itself
+
+   Each one re-checks the situation rather than trusting the alert, because
+   somebody may well have dealt with it between the alert and the tap. */
 document.getElementById('s-notifications').addEventListener('click',function(e){
   var r=e.target.closest('[data-ntf]'); if(!r)return;
   var ev=null, id=r.getAttribute('data-ntf');
@@ -752,6 +864,14 @@ document.getElementById('s-notifications').addEventListener('click',function(e){
   var t=null; try{ t=TASKS.find(function(x){return x.id===ev.task;}); }catch(_e){}
   if(!t){ toast('That job is no longer on the farm’s list'); return; }
   if(ev.k==='partial'&&ntfPart(t)&&typeof openRestSheet==='function'){ openRestSheet(t.id); return; }
+  if(ev.k==='reqnew'&&t.origin==='manager'&&ntfReqOpen(t)){
+    /* Tab AFTER the go(), never before: boardEnter() sets tbTab itself every
+       time the board is opened, so anything set first is thrown away. Same
+       order submitGradReq() uses in app-03 for the same reason. */
+    go('taskboard');
+    try{ tbTab='requests'; renderBoard(); }catch(_e){}
+    return;
+  }
   if(typeof openTask==='function') openTask(t.id);
 });
 ntfLoad();

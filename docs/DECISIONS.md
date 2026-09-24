@@ -1133,6 +1133,31 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### A labor request gets three alerts of its own, not the task ones — 2026-09-24
+**Decision:** a labor request — Bill asking a grad or technician to take a job
+on, or a grad or technician asking for help — raises **`reqnew`** when it is
+sent, **`reqok`** when it is accepted, and **`reqdone`** when the job is
+finished. Each has its own switch on the Notifications screen. The first goes
+to whoever is being asked; the other two go back to whoever asked. The plain
+"work assigned to me" and "a job I handed out is finished" alerts now
+deliberately **exclude** request jobs, so no job ever raises two rows.
+Who a crew request reaches is read off the roster through
+`assignsUndergrads()`, never a hardcoded Bill, so it still lands the week he is
+away and after he has gone.
+**Why:** being asked, being told yes, and being told it is done are three
+different interruptions with three different answers, and Dillon asked for a
+switch on each. Folding them into the two task alerts would have meant one
+switch for two unrelated relationships — and, worse, two rows about the same
+job, because a request that is accepted becomes an ordinary assigned task and
+would have tripped both.
+**Don't:** don't "simplify" `ntfPlate()` back to including a request's
+`target`. That is what makes a technician who ACCEPTS a request get told, one
+tick later, that work was assigned to them — by themselves. The `t.target!==me`
+guard on the assigned branch is the other half of the same fix. And don't
+reorder the branch chain in `ntfScan()`: it runs latest-stage-first on purpose,
+so a phone that was out of signal all morning hears "it is done" rather than
+"somebody is asking".
+
 ### Notifications are worked out on the phone, never stored in the database — 2026-09-24
 **Decision:** the bell and the Notifications screen show three real things — work
 assigned to you, a job you handed out being finished, and a job coming back

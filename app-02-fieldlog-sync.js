@@ -2744,6 +2744,26 @@ var FST_GROUPS=[
   restore:function(){ if(_labsBase){ try{ labsApply(JSON.parse(_labsBase)); }catch(e){} } },
   repaint:function(){ _fstRepaint('s-labsettings','lbsRender'); }},
 
+ /* The two trials lists. Both live in the page beside the rest of the trials
+    code, so every call here is guarded -- this file is read before that one,
+    and these bodies only ever run afterwards. */
+ {id:'trialcats', label:'the study categories',
+  can:function(){ return (typeof trialCatsCanEdit==='function')&&trialCatsCanEdit(); },
+  read:function(){ return (typeof trialCatsDiff==='function')?trialCatsDiff():null; },
+  apply:function(v){ if(typeof trialCatsApply==='function') trialCatsApply(v); },
+  restore:function(){ if(typeof _trcatBase!=='undefined'&&_trcatBase){ try{ trialCatsApply(JSON.parse(_trcatBase)); }catch(e){} } },
+  repaint:function(){ _fstRepaint('s-catsettings','scsRender'); }},
+
+ /* resTypesApply() is what carries a change into the map badges, the plot
+    popup and jobResCfg() -- everything reads TR_RTYPES by name at draw time,
+    so replacing its contents is the whole of the update. */
+ {id:'restypes', label:'the restriction types',
+  can:function(){ return (typeof resTypesCanEdit==='function')&&resTypesCanEdit(); },
+  read:function(){ return (typeof resTypesDiff==='function')?resTypesDiff():null; },
+  apply:function(v){ if(typeof resTypesApply==='function') resTypesApply(v); },
+  restore:function(){ if(typeof _trrtBase!=='undefined'&&_trrtBase){ try{ resTypesApply(JSON.parse(_trrtBase)); }catch(e){} } },
+  repaint:function(){ _fstRepaint('s-ressettings','rtsRender'); }},
+
  {id:'semesters', label:'the semester dates',
   can:function(){ return (typeof semCanEdit==='function')&&semCanEdit(); },
   /* Not a diff -- the whole list travels -- but still null while nobody has

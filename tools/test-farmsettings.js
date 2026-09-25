@@ -99,13 +99,13 @@ const p = b.p, w = b.win;
 const J = JSON.stringify;
 
 /* ---------------------------------------------------------------- */
-section('0. it boots, and there are six groups');
+section('0. it boots, and there are eight groups');
 ok('no jsdom errors on load', b.errs.length === 0, b.errs[0]);
 {
   const ids = (p.FST_GROUPS || []).map(g => g.id);
-  ok('six settings groups', ids.length === 6, ids.join(','));
-  ok('and they are the six screens on the page',
-     ids.slice().sort().join(',') === 'bugcfg,clockcut,labs,mowers,semesters,spray', ids.join(','));
+  ok('eight settings groups', ids.length === 8, ids.join(','));
+  ok('and they are the eight screens on the page',
+     ids.slice().sort().join(',') === 'bugcfg,clockcut,labs,mowers,restypes,semesters,spray,trialcats', ids.join(','));
   (p.FST_GROUPS || []).forEach(g => {
     ok(g.id + ' can be read, applied, restored and asked about',
        typeof g.read === 'function' && typeof g.apply === 'function'
@@ -117,6 +117,7 @@ ok('no jsdom errors on load', b.errs.length === 0, b.errs[0]);
 section('1. none of the five gates reads currentRole');
 {
   ['sprCanEdit', 'mowCanEdit', 'labsCanEdit', 'semCanEdit', 'farmCanSee',
+   'trialCatsCanEdit', 'resTypesCanEdit',
    'fstCanEditKit', 'fstCanEditLists', 'fstCanEditBugs', 'bugCanConfig'].forEach(fn => {
     const src = w.eval(fn + '.toString()');
     ok(fn + ' is off the roster, not the screen', src.indexOf('currentRole') < 0, src.slice(0, 90));
@@ -243,6 +244,64 @@ section('4. THE ONE THAT MATTERS — a phone on the defaults never seeds');
 }
 
 /* ---------------------------------------------------------------- */
+section('4b. the two trials lists — they arrive whole, and then they go quiet');
+{
+  /* THE ONE THAT MATTERS for the bill. A drawer sends a record whenever it
+     differs from what the server last said. So applying what arrived has to
+     leave NOTHING different behind -- if a single field comes back in another
+     order, or is dropped on the way in, this phone disagrees with the server
+     on every tick and the two write at each other until the day's allowance is
+     gone. That happened on 2026-08-31 and cost 4.4 million reads.
+
+     The test is simply: take what arrived, apply it, read it back, and the two
+     must be the same string through sdbJson() -- which sorts the fields,
+     because the database hands a record back alphabetically and almost nothing
+     is made in alphabetical order. */
+  const settles = (id, value) => {
+    w.eval("fstsyncApplyDoc(" + J(id) + ",{id:" + J(id) + ",v:" + J(value) + "});");
+    const back = w.eval("fstValueJson(fstGroup(" + J(id) + "))");
+    const sent = w.eval("sdbJson(" + J(value) + ")");
+    return { back, sent, same: back === sent };
+  };
+
+  const cats = ['Herbicide', 'Shade tolerance', 'Winterkill'];
+  let r = settles('trialcats', cats);
+  ok('a category list arrives whole', w.eval("TRIAL_CATS.length") === 3, w.eval("JSON.stringify(TRIAL_CATS)"));
+  ok('and the phone then has nothing left to send', r.same, r.back + ' vs ' + r.sent);
+
+  const types = [{ k: 'mow', label: 'No mow', ab: 'Mow', c: '#c0392b', stops: ['mow'] },
+                 { k: 'topdressing', label: 'No topdressing', ab: 'Topd', c: '#009e73', stops: ['mow', 'cultivate'] }];
+  r = settles('restypes', types);
+  ok('a restriction type list arrives whole', w.eval("TR_RTYPES.length") === 2, String(w.eval("TR_RTYPES.length")));
+  ok('and the phone then has nothing left to send', r.same, r.back + ' vs ' + r.sent);
+  ok('the added type carries what it stops',
+     w.eval("JSON.stringify(TR_RTYPES[1].stops)") === '["mow","cultivate"]', w.eval("JSON.stringify(TR_RTYPES[1].stops)"));
+
+  /* Nothing here may send a list sitting directly inside another list --
+     Firestore refuses those outright, which is how every map edit was silently
+     thrown away for a month. An array inside an OBJECT inside an array, which
+     is what `stops` is, is fine. */
+  const doc = JSON.parse(w.eval("JSON.stringify(fstDoc(fstGroup('restypes')))"));
+  const nestedArray = (v) => Array.isArray(v) && v.some(x => Array.isArray(x));
+  ok('and no list sits directly inside another list', !nestedArray(doc.v), J(doc.v).slice(0, 80));
+
+  /* Junk is refused rather than applied, same as the labs. */
+  const nCats = w.eval("TRIAL_CATS.length");
+  w.eval("fstsyncApplyDoc('trialcats',{id:'trialcats',v:['ok','']});");
+  ok('a list with a blank name is refused, not applied', w.eval("TRIAL_CATS.length") === nCats);
+  const nTypes = w.eval("TR_RTYPES.length");
+  w.eval("fstsyncApplyDoc('restypes',{id:'restypes',v:[{k:'x',label:'No x',c:'nope'}]});");
+  ok('a type with a bad color is refused, not applied', w.eval("TR_RTYPES.length") === nTypes);
+
+  /* And back to the built-ins travels as a value, never as a missing one. */
+  w.eval("fstsyncApplyDoc('trialcats',{id:'trialcats',v:null});");
+  ok('"back to the built-in categories" arrives as a value', w.eval("trialCatsDiff()===null"));
+  w.eval("fstsyncApplyDoc('restypes',{id:'restypes',v:null});");
+  ok('so does "back to the built-in types"', w.eval("resTypesDiff()===null"));
+  ok('and the original eight are back', w.eval("TR_RTYPES.length") === 8, String(w.eval("TR_RTYPES.length")));
+}
+
+/* ---------------------------------------------------------------- */
 section('5. what goes up says who, when, and what');
 {
   w.eval("SESSION.pid='p07';");
@@ -345,7 +404,7 @@ section('8. sharing, and the wiring');
 {
   ok('it is on from the moment the app opens', p.FSTSYNC && p.FSTSYNC.on === true);
   ok('nothing on this phone decides it', SRC.indexOf('ut_farmsettings_shared_v1') < 0);
-  ok('one collection, five documents', SRC.indexOf("FSTSYNC_COLL='farmsettings'") > 0);
+  ok('one collection, several documents', SRC.indexOf("FSTSYNC_COLL='farmsettings'") > 0);
   ok('it has a read-out on the Shared database screen', /st:FSTSYNC,\s*summary:fstsyncSummary\(\)/.test(SRC));
   ok('the read-out is in the list', /st:TRSYNC[\s\S]{0,900}st:FSTSYNC/.test(SRC));
   ok('and there is no button to turn it off', SRC.indexOf("closest('#sdb-farm')") < 0);

@@ -1133,6 +1133,111 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### A trial's size is treatments × reps × one plot, never a typed total — 2026-09-25
+**Decision:** the study form stopped asking for "Trial area (ft²)" and
+"Plot layout (rows × columns)". It asks for **number of treatments**, **number
+of reps**, the **width and length of one plot** in feet, and an optional
+**alley width between plots**. The total is worked out (`trGridFt()`,
+`trTotalFt2()` in the page) and written onto `t.area` at save time so that
+everything already reading `t.area` carries on working.
+**Why:** a square footage cannot be drawn. 25 ft² is 5 × 5 or 10 × 2.5, and a
+6-treatment, 4-rep trial comes out 45 × 49 ft one way and a completely
+different rectangle the other. The old `trFootprintFt()` split the typed area
+by the square root of the grid ratio, which is a guess dressed as a
+measurement — and that guess is the box somebody rotates on the map to say
+where their trial actually is. Asking for two measurements instead of one is
+the difference between drawing the trial and drawing a rectangle of the right
+size.
+**Don't:** don't "simplify" the form back to a single area box, and don't
+delete the fallback at the bottom of `trFootprintFt()` / `trTotalFt2()` — every
+study saved before this date has only `area` and `layout`, and that branch is
+the only thing still drawing them. They are deliberately **not** migrated:
+rewriting every stored study to a new shape would have every phone offering
+every study to the database at once, for a number nobody asked to change.
+
+### A restriction entered on the study form covers the whole study — 2026-09-25
+**Decision:** the new-study form asks about restrictions *before* it asks where
+the trial is, so a restriction entered there becomes **one record per plot**,
+tied together by a shared `gid` (`trSyncFormRes()`). A restriction added later
+from the study page has no `gid` and the form never touches it. The form's own
+rows are rebuilt from the records each time it opens (`trResDraftFrom()`) and
+`hasRes` / `resDraft` are stripped before the study is stored.
+**Why:** `r.scope` is read as a real plot name in about ten places — the farm
+map, the plot popup, the crew's job warnings, `proxTargets()`, and the mirror
+in `tools/field-position.js`. A `scope:'all'` would have meant changing all of
+them, including the one that is duplicated for testing. Expanding to one record
+per plot changes nothing downstream at all.
+**Don't:** don't rebuild a restriction record that already exists — reuse it.
+A lift is filed in `triallifts` against the restriction's own **id**, so a
+fresh id makes a restriction somebody deliberately lifted come straight back.
+And don't store `resDraft` on the study: it is a second copy of every
+restriction, and a second copy that can differ is a copy that gets sent again,
+forever. See "4.4 million reads" under Process & project.
+
+### An open-ended restriction says "until it is lifted", never "unknown" — 2026-09-25
+**Decision:** both restriction forms offer "No end date — until it is lifted"
+and store `end:''`. The study's own end date offers "End date unknown" and
+stores the same empty string. `trResState()` was already treating an empty end
+date as never ending; only the wording is new (`trResEndText()`,
+`trResRangeText()`).
+**Why:** they are two different facts and the crew have to be able to tell them
+apart. A study with no end date is a study nobody has finished planning. A
+restriction with no end date is ground that stays closed until a person opens
+it — and "end date unknown" on a no-mow plot reads as a date somebody forgot,
+which is exactly the reading that gets it ignored. "Until it is lifted" names
+the thing that ends it: Bill, or the lab, using **Lift** on the study page.
+**Don't:** don't add a default end date to make it tidy, and don't let the
+study form's "unknown" wording spread onto a restriction.
+
+### Study categories and restriction types are the farm's lists, not the code's — 2026-09-25
+**Decision:** both moved into the `farmsettings` drawer as
+`farmsettings/trialcats` and `farmsettings/restypes`, with their own screens
+under More → Farm settings. A restriction type carries `stops`, the kinds of
+work it blocks, and `jobResCfg()` folds those into `JOB_RES` as a **union**.
+The app picks a new type's color from `TR_RES_PALETTE`; a person never types
+one.
+**Why:** the succession rule. Adding a ninth restriction type or a new study
+category was a source edit, which means it stops happening the day Dillon
+leaves. Two details are load-bearing. First, `stops`: without it a type somebody
+added would draw on the map and block nothing — it would look like it was
+protecting the ground and it would not. Second, the color: every entry in
+`TR_RES_PALETTE` is registered in `CB_MAP` as mapping to itself, so it survives
+color-blind mode; a hand-picked color would be shifted a second time into
+something nobody chose.
+**Don't:** don't make `jobResCfg()` derive its list purely from `TR_RTYPES`. It
+is a union on purpose, so that a list which is empty, malformed, or simply has
+not reached this phone yet can only ever fail by leaving the original eight
+blocking what they always did. Derived outright, a bad list would silently
+**unblock** a job on ground a study has closed, and nothing on any screen would
+say so. And don't add a color to `TR_RES_PALETTE` without adding it to `CB_MAP`
+in `app-01-shell.js` in the same change.
+
+### Location asks how much ground first, how many plots second — 2026-09-25
+**Decision:** the Location section asks "entire plot or part of a plot?", and
+only then, for a whole-plot study, "does it use more than one plot?".
+`multiPlot` starts as **null** on a new study, meaning nobody has answered yet.
+Plots are chosen by typing or with a Summitt blue **Select from the map**
+button that reuses the crew's own plot picker (`pickOpen()` / `plotPickDone`).
+**Why:** it is the order somebody standing in a field answers in. The old form
+asked about multiple plots first, so a single-plot study — nearly all of them —
+had to answer a question about several plots before it could say anything. Null
+rather than false because false is an answer: an assumed "one plot" is how a
+two-plot study ends up filed on one.
+**Don't:** don't collapse `multiPlot` back to a plain boolean, and don't build a
+second plot-picking map. The one on `s-plotpick` is the map the crew already
+use for every job, and a second one would be a second set of habits and a
+second thing to keep in step with the farm's geometry.
+
+### "Treatments / products" came off the study form — 2026-09-25
+**Decision:** the form no longer asks for it. Studies that already carry
+`t.treatments` still show it, on the study page and at the bottom of the form,
+labelled as being from the old form.
+**Why:** Dillon's call. What is in a trial is usually a company's to keep quiet
+about, and the app had no business asking twenty-three phones to carry it.
+**Don't:** don't delete the field or the code that displays it. Taking the
+question off the form is the decision; wiping what people already typed is not,
+and nothing in the app should make a record disappear without being asked.
+
 ### A shift nobody clocked out of is closed at the SCHEDULED finish, or not at all — 2026-09-24
 **Decision:** after a cut-off time the farm sets itself (`farmsettings/clockcut`,
 8:00pm out of the box), `tcAutoClose()` in `app-05-tasks-clock.js` closes any

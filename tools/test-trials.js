@@ -69,6 +69,10 @@ function makeLS(store) {
            get length() { return Object.keys(store).length; } };
 }
 const EX = ['TRIALS','TR_GONE','STORE_DEFS','SESSION','PEOPLE','TRSYNC','TR_LABS',
+            'TRIAL_CATS','TR_RTYPES','TR_RES_PALETTE','TR_RES_STOPS','TR_MAX_N',
+            'trialCatsValid','trialCatsApply','resTypesValid','resTypesApply',
+            'trRows','trCols','trGridFt','trTotalFt2','trFootprintFt','trResDraftFrom',
+            'trSyncFormRes','trResEndText','jobResCfg','resTypeKey','resTypeAb','resTypeColor',
             'trEditLabs','trCanEditLab','trCanLiftAny','trSeesAll','trCanEdit','trCanLift',
             'trById','trIsGone','trMarkGone','trTrialDoc','trLiftDoc','trGoneDoc',
             'trVisible','trGrantLabs','trsyncSummary','trsyncCanPushTrial','trsyncCanPushLift',
@@ -320,6 +324,195 @@ section('8. sharing, and the wiring');
   ok('the read-out says in plain words what is being shared',
      /restrictions they put on the ground/.test(SRC));
   ok('the summary reads in plain words', typeof w.eval("trsyncSummary()") === 'string');
+}
+
+/* ---------------------------------------------------------------- */
+section('9. how big a trial is — treatments across, reps down');
+{
+  /* 6 treatments of 5 ft, 4 reps of 10 ft, 3 ft alleys between them.
+     Across:  6*5 + 5*3 = 45 ft.   Down:  4*10 + 3*3 = 49 ft.
+     The alleys are counted BETWEEN plots and not around the outside, which is
+     the whole reason this is arithmetic and not a guess. */
+  const t = { nTrt: '6', nRep: '4', plotW: '5', plotL: '10', alley: '3' };
+  const g = w.eval('trGridFt(' + J(t) + ')');
+  ok('treatments are the columns', w.eval('trCols(' + J(t) + ')') === 6);
+  ok('reps are the rows', w.eval('trRows(' + J(t) + ')') === 4);
+  ok('45 ft across', Math.round(g.w) === 45, String(g.w));
+  ok('49 ft down', Math.round(g.h) === 49, String(g.h));
+  ok('and the total is those two multiplied',
+     w.eval('trTotalFt2(' + J(t) + ')') === 45 * 49, String(w.eval('trTotalFt2(' + J(t) + ')')));
+
+  /* No alleys means no alleys — not a default somebody has to remember. */
+  const noAlley = { nTrt: '4', nRep: '3', plotW: '5', plotL: '5' };
+  ok('with no alley it is plots and nothing else',
+     w.eval('trTotalFt2(' + J(noAlley) + ')') === 4 * 5 * 3 * 5);
+
+  /* THE ONE THAT MATTERS for the map: the footprint is the real rectangle,
+     not a square root of an area. A 45 x 49 trial must not come back square. */
+  const fp = w.eval('trFootprintFt(' + J(t) + ')');
+  ok('the footprint is the real shape', Math.round(fp.w) === 45 && Math.round(fp.h) === 49,
+     Math.round(fp.w) + 'x' + Math.round(fp.h));
+
+  /* A study saved before any of this existed has a typed area and a grid and
+     nothing else. It must still draw, the old way, untouched. */
+  const legacy = { area: '1200', layout: { rows: '3', cols: '4' } };
+  ok('an old study still knows its treatments', w.eval('trCols(' + J(legacy) + ')') === 4);
+  ok('and its reps', w.eval('trRows(' + J(legacy) + ')') === 3);
+  ok('its total is the number that was typed in', w.eval('trTotalFt2(' + J(legacy) + ')') === 1200);
+  const lfp = w.eval('trFootprintFt(' + J(legacy) + ')');
+  ok('and it is still drawn from that area', Math.round(lfp.w * lfp.h) === 1200,
+     String(Math.round(lfp.w * lfp.h)));
+  ok('wider than tall, in the ratio of the grid', lfp.w > lfp.h);
+
+  ok('both counts stop at 50', p.TR_MAX_N === 50);
+  ok('and a bigger number is pulled back to it',
+     w.eval("trCols({nTrt:'999'})") === 50);
+}
+
+/* ---------------------------------------------------------------- */
+section('10. a restriction on the form covers the whole study');
+{
+  /* One row on the form becomes one record per plot. Anything added from the
+     study page has no gid and must be left completely alone. */
+  const t = { locations: [{ plot: 'B14' }, { plot: 'B15' }],
+              hasRes: true,
+              resDraft: [{ gid: 'g1', type: 'mow', start: '2026-04-01', end: '2026-06-01', noEnd: false, note: 'n' }],
+              restrictions: [{ id: 'rOld', type: 'irrigate', scope: 'B14', start: '2026-01-01', end: '2026-02-01' }] };
+  const out = w.eval('(function(){var t=' + J(t) + ';trSyncFormRes(t);return t.restrictions;})()');
+  ok('one record per plot', out.filter(r => r.gid === 'g1').length === 2, String(out.length));
+  ok('and they name real plots, never a wildcard',
+     out.filter(r => r.gid === 'g1').map(r => r.scope).sort().join(',') === 'B14,B15');
+  ok('the one added from the study page is untouched',
+     out.some(r => r.id === 'rOld' && r.type === 'irrigate' && !r.gid));
+
+  /* THE ONE THAT MATTERS: a record already there is reused, not rebuilt. A
+     lift is filed against the restriction's own id, so a fresh id would make
+     a restriction somebody deliberately lifted come back. */
+  const t2 = { locations: [{ plot: 'B14' }],
+               hasRes: true,
+               resDraft: [{ gid: 'g1', type: 'mow', start: '2026-04-01', end: '2026-07-01', noEnd: false, note: '' }],
+               restrictions: [{ id: 'rKeep', gid: 'g1', type: 'mow', scope: 'B14', start: '2026-04-01', end: '2026-06-01' }] };
+  const out2 = w.eval('(function(){var t=' + J(t2) + ';trSyncFormRes(t);return t.restrictions;})()');
+  ok('editing a restriction keeps its id', out2.length === 1 && out2[0].id === 'rKeep',
+     J(out2.map(r => r.id)));
+  ok('and takes the new date', out2[0].end === '2026-07-01');
+
+  /* Unticking "is there a restriction" takes the form's own records off, and
+     still leaves the study page's alone. */
+  const t3 = { locations: [{ plot: 'B14' }], hasRes: false,
+               resDraft: [{ gid: 'g1', type: 'mow', start: '2026-04-01', end: '2026-06-01' }],
+               restrictions: [{ id: 'rOld', type: 'irrigate', scope: 'B14' },
+                              { id: 'rForm', gid: 'g1', type: 'mow', scope: 'B14' }] };
+  const out3 = w.eval('(function(){var t=' + J(t3) + ';trSyncFormRes(t);return t.restrictions;})()');
+  ok('turning restrictions off removes the form’s own', out3.length === 1 && out3[0].id === 'rOld');
+
+  /* The rows are rebuilt from the records, so there is no second copy. */
+  const back = w.eval('trResDraftFrom(' + J({ restrictions: [
+    { id: 'r1', gid: 'gA', type: 'mow', scope: 'B14', start: '2026-04-01', end: '' },
+    { id: 'r2', gid: 'gA', type: 'mow', scope: 'B15', start: '2026-04-01', end: '' },
+    { id: 'r3', type: 'irrigate', scope: 'B14' }] }) + ')');
+  ok('two records from one row read back as one row', back.length === 1, String(back.length));
+  ok('and no end date reads back as "until it is lifted"', back[0].noEnd === true);
+  ok('a study-page restriction is not one of the form’s rows', !back.some(r => r.gid === undefined));
+}
+
+/* ---------------------------------------------------------------- */
+section('11. a restriction with no end date');
+{
+  ok('an empty end date is still live', w.eval("trResState({start:'2020-01-01',end:''})") === 'active');
+  ok('and reads as until it is lifted', w.eval("trResEndText({end:''})") === 'until it is lifted');
+  ok('a real end date still reads as a date', w.eval("trResEndText({end:'2026-06-01'})").indexOf('Jun') === 0);
+  ok('nothing on screen ever says the end date is unknown for a restriction',
+     SRC.indexOf('End date unknown') > 0 && !/restriction[^\n]{0,80}End date unknown/i.test(SRC));
+}
+
+/* ---------------------------------------------------------------- */
+section('12. THE ONE THAT MATTERS — the form’s own state never reaches the database');
+{
+  /* hasRes and resDraft are how the FORM holds its restriction rows. On a
+     stored study they would be a second copy of every restriction that nothing
+     reads -- and, because every phone compares a study with what the server
+     last said, a copy that can differ is a copy that gets sent again. */
+  const i = SRC.indexOf('function trSaveStudy(');
+  const j = SRC.indexOf('/* ========================= PIN PICKER');
+  const block = SRC.slice(i, j);
+  ok('the save block was found', i > 0 && j > i);
+  ok('the record written is a copy, not the draft itself',
+     /var rec=JSON\.parse\(JSON\.stringify\(trDraft\)\)/.test(block));
+  ok('and both form-only fields are stripped off it',
+     /delete rec\.hasRes/.test(block) && /delete rec\.resDraft/.test(block));
+  ok('the draft is never left pointing at the stored study',
+     block.indexOf('TRIALS[i]=trDraft') < 0 && block.indexOf('TRIALS.unshift(trDraft)') < 0);
+  ok('the total area is derived, never typed', /trDraft\.area=String\(trTotalFt2\(trDraft\)\)/.test(block));
+  /* And the form field that used to type it is gone. */
+  ok('there is no trial-area box on the form any more', SRC.indexOf("id=\"tre-area\"") < 0);
+  ok('nor a treatments/products box', SRC.indexOf("id=\"tre-treat\"") < 0);
+}
+
+/* ---------------------------------------------------------------- */
+section('13. the two lists the farm owns');
+{
+  ok('there are study categories', Array.isArray(p.TRIAL_CATS) && p.TRIAL_CATS.length > 0);
+  ok('and restriction types', Array.isArray(p.TR_RTYPES) && p.TR_RTYPES.length === 8);
+  ok('the original eight keep their keys',
+     p.TR_RTYPES.map(r => r.k).join(',') === 'mow,irrigate,fungicide,herbicide,insecticide,fertilizer,wetting,cultivate');
+
+  /* Junk arriving from another phone is refused, never applied. */
+  ok('an empty category list is refused', w.eval('trialCatsValid([])') === false);
+  ok('a blank category is refused', w.eval("trialCatsValid(['ok',''])") === false);
+  ok('a repeated category is refused', w.eval("trialCatsValid(['a','a'])") === false);
+  ok('a restriction type with no color is refused',
+     w.eval("resTypesValid([{k:'x',label:'No x'}])") === false);
+  ok('a restriction type with a bad color is refused',
+     w.eval("resTypesValid([{k:'x',label:'No x',c:'red'}])") === false);
+  ok('a good one is accepted',
+     w.eval("resTypesValid([{k:'x',label:'No x',c:'#123456',stops:['mow']}])") === true);
+
+  /* The color the app hands out has to be one color-blind mode leaves alone,
+     or the badge comes out a color nobody chose. */
+  const cb = w.eval('JSON.parse(JSON.stringify(CB_MAP))');
+  (p.TR_RES_PALETTE || []).forEach(c => {
+    ok('the palette color ' + c + ' maps to itself in color-blind mode', cb[c] === c, cb[c]);
+  });
+
+  ok('a new type gets a key from its name', w.eval("resTypeKey('No topdressing')") === 'topdressing');
+  ok('and never collides with one already there', w.eval("resTypeKey('No mow')") === 'mow2');
+  ok('and a four-letter badge', w.eval("resTypeAb('No topdressing')") === 'Topd');
+  ok('the color it gets is from the palette',
+     (p.TR_RES_PALETTE || []).indexOf(w.eval('resTypeColor()')) >= 0);
+}
+
+/* ---------------------------------------------------------------- */
+section('14. THE ONE THAT MATTERS — a restriction type the farm adds really stops work');
+{
+  /* A type that draws on the map and blocks nothing is the worst of both: it
+     looks like it is protecting the ground and it is not. */
+  const before = w.eval("JSON.stringify(jobResCfg('Mow','Rotary').kinds)");
+  ok('mowing is blocked by no-mow today', JSON.parse(before).indexOf('mow') >= 0, before);
+  w.eval("TR_RTYPES.push({k:'topdressing',label:'No topdressing',ab:'Topd',c:'#009e73',stops:['mow','cultivate']});");
+  const after = JSON.parse(w.eval("JSON.stringify(jobResCfg('Mow','Rotary').kinds)"));
+  ok('a new type that stops mowing now blocks a mow', after.indexOf('topdressing') >= 0, J(after));
+  ok('and the original is still there', after.indexOf('mow') >= 0);
+  const cult = JSON.parse(w.eval("JSON.stringify(jobResCfg('Aerate','Aeration').kinds)"));
+  ok('it blocks cultivation too', cult.indexOf('topdressing') >= 0, J(cult));
+  const spray = JSON.parse(w.eval("JSON.stringify(jobResCfg('Spray','Fungicide').kinds)"));
+  ok('and nothing it was not ticked for', spray.indexOf('topdressing') < 0, J(spray));
+
+  /* A type with nothing ticked changes nothing at all. */
+  w.eval("TR_RTYPES.push({k:'quiet',label:'No nothing',ab:'Quie',c:'#cc79a7',stops:[]});");
+  const still = JSON.parse(w.eval("JSON.stringify(jobResCfg('Mow','Rotary').kinds)"));
+  ok('a type that stops nothing blocks nothing', still.indexOf('quiet') < 0, J(still));
+
+  /* THE FAILURE DIRECTION. An empty or broken list must leave the eight
+     built-ins blocking exactly what they always did -- never unblock a job on
+     ground a study has closed. */
+  w.eval("TR_RTYPES.length=0;");
+  const empty = JSON.parse(w.eval("JSON.stringify(jobResCfg('Mow','Rotary').kinds)"));
+  ok('with the list wiped, no-mow still stops a mow', empty.indexOf('mow') >= 0, J(empty));
+  const emptySpray = JSON.parse(w.eval("JSON.stringify(jobResCfg('Spray','Pesticide').kinds)"));
+  ok('and no-fungicide still stops a spray', emptySpray.indexOf('fungicide') >= 0, J(emptySpray));
+  w.eval("resTypesApply(JSON.parse(JSON.stringify(TR_RTYPES_SEED)));");
+  ok('and the built-in eight go back', w.eval('TR_RTYPES.length') === 8);
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

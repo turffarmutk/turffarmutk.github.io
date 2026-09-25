@@ -223,7 +223,7 @@ var RAIL_ROLLUP={profedit:'profile',rosteredit:'roster',adminxfer:'roster',
   navtabs:'navsettings',homescreen:'navsettings',notifsettings:'navsettings',theme:'navsettings',
   powersettings:'navsettings',
   farmsettings:'more',admin:'more',spraysettings:'more',mowersettings:'more',
-  labsettings:'more',semsettings:'more',sharedb:'more'};
+  labsettings:'more',catsettings:'more',ressettings:'more',semsettings:'more',sharedb:'more'};
 
 function railIcon(l){ return (typeof TAB_EMOJI!=='undefined' && TAB_EMOJI[l]) || '•'; }
 
@@ -2080,7 +2080,13 @@ var CB_MAP={
  /* Already color-blind safe, and chosen by hand for the task board's name
     colors (see .tbp-* in the page), so they must come through unchanged. */
  '#e69f00':'#e69f00','#0072b2':'#0072b2','#8c6d00':'#8c6d00',
- '#fbf3d9':'#fbf3d9','#e8f4fc':'#e8f4fc','#fdf0e6':'#fdf0e6'
+ '#fbf3d9':'#fbf3d9','#e8f4fc':'#e8f4fc','#fdf0e6':'#fdf0e6',
+ /* The palette the app hands out to a restriction type somebody adds on the
+    Restriction types screen (TR_RES_PALETTE, in the page). Already safe, so
+    they have to come through untouched -- without these lines the generic
+    shift would move a color that was picked precisely because it did not need
+    moving. Add a color there, add it here. */
+ '#009e73':'#009e73','#56b4e9':'#56b4e9','#cc79a7':'#cc79a7'
 };
 /* which shape a status dot gets, keyed off its ORIGINAL color */
 var CB_SHAPE={'#c0392b':'cb-sq','#e8341f':'cb-sq','#9a5b00':'cb-di','#b26a00':'cb-di','#ff8200':'cb-di',
@@ -2400,7 +2406,7 @@ function show(id,push){ const el=document.getElementById('s-'+id); if(!el)return
      SESSION replaces — your role comes from who signed in, so a screen can no
      longer promote you by being opened. The attribute stays as a label, used
      below to pick which home layout to paint. */
-  if(id==='profile')fillProfile(); if(id==='profedit')renderProfEdit(); if(id==='roster')rstRender(); if(id==='rosteredit')rstEditRender(); if(id==='adminxfer')axfRender(); if(id==='spraysettings')sprRender(); if(id==='farmsettings')fstRender(); if(id==='bugreport')bugRender(); if(id==='bugsettings')bgsRender(); if(id==='clocksettings')clkRender(); if(id==='sharedb')sdbRender(); if(id==='admin')admRender(); if(id==='flfix')flxRender(); if(id==='mowersettings')mwsRender(); if(id==='labsettings')lbsRender(); if(id==='semsettings')smsRender(); if(id==='roles')authRenderAccount();
+  if(id==='profile')fillProfile(); if(id==='profedit')renderProfEdit(); if(id==='roster')rstRender(); if(id==='rosteredit')rstEditRender(); if(id==='adminxfer')axfRender(); if(id==='spraysettings')sprRender(); if(id==='farmsettings')fstRender(); if(id==='bugreport')bugRender(); if(id==='bugsettings')bgsRender(); if(id==='clocksettings')clkRender(); if(id==='sharedb')sdbRender(); if(id==='admin')admRender(); if(id==='flfix')flxRender(); if(id==='mowersettings')mwsRender(); if(id==='labsettings')lbsRender(); if(id==='catsettings')scsRender(); if(id==='ressettings')rtsRender(); if(id==='semsettings')smsRender(); if(id==='roles')authRenderAccount();
   if(id==='login')authRenderLogin(); if(id==='notifications'){try{ntfScan();renderNotifFeed();}catch(e){}setSeen(Date.now());try{ntfMarkRead();}catch(e){}setTimeout(updateBellBadges,0);} if(id==='home-manager')renderHomeNotif(); if(id==='weather')wxEnter(); if(id==='map')mapEnter(); if(id==='taskboard')boardEnter(); if(id==='templates')renderTemplates(); if(id==='assign')assignEnter(); if(id==='plotpick')renderPlotPick(); if(id==='taskwork')renderTaskWork(); if(id==='taskprep')renderTaskPrep(); if(id==='eqpick')renderEqPick(); if(id==='inventory')invEnter(); if(id==='lowstock')renderLowStock(); if(id==='additem')renderAddItem(); if(id==='invlog')renderInvLog(); if(id==='itemdetail')0; if(id==='equipment')equipEnter(); if(id==='eqreport')renderEqReport(); if(id==='eqmaint')renderEqMaint(); if(id==='eqedit')renderEqEdit(); if(id==='eqsched')renderEqSched(); if(id==='calendar')calEnter(); if(id==='caladd')renderCalAdd(); if(id==='timeclock')tcEnter(); if(id==='tcperson')tcRenderPerson(); if(id==='fieldlog')fieldlogEnter(); if(id==='flexport')renderFlExport(); if(id==='flnew')renderFlNew(); if(id==='fldetail')renderFlDetail(); if(id==='more')moreEnter(); if(id==='trial')trialsEnter(); if(id==='trialdetail')trRenderDetail(); if(id==='trialedit')trRenderEdit(); if(id==='trialres')trRenderRes(); if(id==='trialpin')trRenderPin(); if(id==='navsettings')renderPrefsHub(); if(id==='notifsettings')renderNotifSettings(); if(id==='powersettings')renderPowerSettings(); if(id==='navtabs')renderNavSettings(); if(id==='homescreen')renderHomeSettings(); if(id==='theme')renderTheme(); if(id.indexOf('home-')===0)hwApply(r||currentRole); renderTabs();
   try{csApply(el,id);}catch(e){}
   try{updateBellBadges();}catch(e){}

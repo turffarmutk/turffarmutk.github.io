@@ -388,6 +388,13 @@
   .tr-opt .ol{font:800 13px 'Public Sans';color:var(--ink)}
   .tr-opt .os{font:600 11px 'Public Sans';color:var(--muted);margin-top:2px;line-height:1.4}
   .tr-pinbtn{margin-top:2px;background:#2f3133;color:#fff;border-radius:11px;padding:12px;text-align:center;font:800 12.5px 'Public Sans';cursor:pointer}
+  /* Summitt blue, the same #489FDF as the banner option. Dillon asked for this
+     button in that color, 2026-09-25. It is a key in CB_MAP, so color-blind
+     mode has an answer for it rather than shifting it to something nobody
+     chose. Scoped to this screen — .tr- is the trials module's own prefix and
+     nothing else on the farm carries it. */
+  .tr-mapbtn{margin-top:9px;background:#489FDF;color:#fff;border-radius:11px;padding:12px;text-align:center;font:800 12.5px 'Public Sans';cursor:pointer}
+  .tr-mapbtn:active{opacity:.7}
   .tr-pinset{font:700 11.5px 'Public Sans';color:#2f7d3a;background:#e8f6ec;border-radius:9px;padding:9px 11px;margin-top:8px;line-height:1.45}
   .tr-pdf{display:flex;align-items:center;justify-content:center;text-align:center;margin:11px 14px 0;background:#fff;border:1px dashed var(--line);border-radius:12px;padding:22px 12px;font:800 25px 'Archivo';letter-spacing:-.5px;color:var(--ink);cursor:pointer;line-height:1.2}
   .tr-pdf:active{background:#fbf5ec;border-color:var(--acc)}
@@ -1891,6 +1898,14 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
 <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Labs</div></div>
 <div style="flex:1;overflow-y:auto" id="lbs-body"></div>
 </div></section>
+<section class="screen" id="s-catsettings"><div class="app field">
+<div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Study categories</div></div>
+<div style="flex:1;overflow-y:auto" id="scs-body"></div>
+</div></section>
+<section class="screen" id="s-ressettings"><div class="app field">
+<div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Restriction types</div></div>
+<div style="flex:1;overflow-y:auto" id="rts-body"></div>
+</div></section>
 <section class="screen" id="s-spraysettings"><div class="app field">
 <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Spray settings</div></div>
 <div style="flex:1;overflow-y:auto" id="spr-body"></div>
@@ -2412,6 +2427,11 @@ function mowersUnlisted(){
 /* ---- who may change what ---- */
 function mowCanEdit(){ return fstCanEditKit(); }
 function labsCanEdit(){ return fstCanEditLists(); }
+/* The two trials lists sit with the labs rather than with the sprayer: they
+   are lists about research, so the people who run research own them. Same gate
+   as the labs, which the faculty already hold. */
+function trialCatsCanEdit(){ return fstCanEditLists(); }
+function resTypesCanEdit(){ return fstCanEditLists(); }
 /* Faculty now EDIT all four, so the old currentRole==='faculty' special case
    for merely seeing the page is redundant -- fstCanEditKit() already says yes
    to them, off the roster. */
@@ -2569,6 +2589,14 @@ var FARM_CATS=[
  {go:'labsettings', t:'Labs', d:function(){
     var u=labsUnlisted().length, pi=FARM_LABS.filter(function(l){return l.pi;}).length;
     return FARM_LABS.length+' labs · '+pi+' in trials'+(u?(' · '+u+' unlisted in use'):'');
+  }},
+ {go:'catsettings', t:'Study categories', d:function(){
+    var u=trialCatsUnlisted().length;
+    return TRIAL_CATS.length+' categor'+(TRIAL_CATS.length===1?'y':'ies')+(u?(' \u00b7 '+u+' unlisted in use'):'');
+  }},
+ {go:'ressettings', t:'Restriction types', d:function(){
+    var blind=TR_RTYPES.filter(function(r){ return !((r.stops||[]).length); }).length;
+    return TR_RTYPES.length+' type'+(TR_RTYPES.length===1?'':'s')+(blind?(' \u00b7 '+blind+' stop no work'):'');
   }},
  {go:'semsettings', t:'Semester dates', d:function(){
     var n=semSorted().length, now=semForDate(new Date());
@@ -3427,6 +3455,13 @@ function fstRenameOk(kind,from){
     carrier='Map corrections';
     what=moved+' plot'+(moved===1?' is':'s are')+' booked on this machine, and plot records '
         +'travel with the map.';
+  } else if(kind==='category'){
+    moved=(typeof trialCatsCount==='function')?trialCatsCount(from):0;
+    if(!moved) return true;
+    if(typeof TRSYNC!=='undefined'&&TRSYNC.live) return true;
+    carrier='Trials and restrictions';
+    what=moved+' stud'+(moved===1?'y is':'ies are')+' filed under this category, and studies '
+        +'travel with the trials.';
   } else {
     moved=(typeof labsRecordCount==='function')?labsRecordCount(from):0;
     if(!moved) return true;
@@ -3515,6 +3550,282 @@ document.getElementById('s-labsettings').addEventListener('click',function(e){
     toast(v2+' added ✓');
   }
 });
+
+/* ---- Study categories screen ----
+   Deliberately the plainest screen in Farm settings. A category is a word and
+   nothing else, so there is nothing here but the words, and adding one is
+   typing it. Modelled on the Labs screen so the two read the same. */
+var scAdding=false;
+function scsRender(){
+  var body=document.getElementById('scs-body'); if(!body) return;
+  var edit=trialCatsCanEdit();
+
+  var rows=TRIAL_CATS.map(function(c,i){
+    var n=trialCatsCount(c), last=(i===TRIAL_CATS.length-1);
+    var head='<div style="display:flex;align-items:center;gap:9px">'
+      +'<div style="flex:1;min-width:0"><div class="rt">'+esc(c)+'</div>'
+      +'<div class="rs">'+(n?(n+' stud'+(n===1?'y':'ies')):'No studies yet')+'</div></div>'
+      +((edit&&TRIAL_CATS.length>1)?('<span class="tap" data-sc-del="'+i+'" style="color:#c0392b;font-size:15px;flex:none;padding:0 4px">✕</span>'):'')
+      +'</div>';
+    var fields = edit
+      ? '<div class="fld" style="margin-top:8px;border-bottom:none"><span class="fl">Name</span>'
+       +'<input class="inv-in" data-sc-name="'+i+'" value="'+esc(c)+'" style="max-width:190px"></div>'
+      : '';
+    return '<div class="row" style="display:block'+(last&&!edit?';border-bottom:none':'')+'">'+head+fields+'</div>';
+  }).join('');
+
+  var add='';
+  if(edit){
+    add = scAdding
+      ? '<div style="padding:11px 15px;border-top:1px solid var(--line)">'
+        +'<div class="fld" style="border-bottom:none"><span class="fl">Name</span>'
+        +'<input class="inv-in" id="sc-n-name" placeholder="e.g. Shade tolerance" style="max-width:190px"></div>'
+        +'<div style="display:flex;gap:8px;margin-top:10px">'
+        +'<div class="action tap" data-sc="addsave" style="flex:1">Add this category</div>'
+        +'<div class="action tap" data-sc="addcancel" style="flex:none;background:#e7e9e6;color:#2f3133;padding:0 16px">Cancel</div></div></div>'
+      : '<div class="row tap" data-sc="addopen" style="border-bottom:none"><div style="flex:1"><div class="rt">Add a category</div>'
+        +'<div class="rs">A new kind of study</div></div>'
+        +'<span style="color:#c2c7cd;font-size:18px;flex:none">＋</span></div>';
+  }
+
+  var un=trialCatsUnlisted(), drift='';
+  if(un.length){
+    drift='<div class="sec">In use but not on the list</div>'
+     +'<div style="font:600 11.5px \'Public Sans\';color:var(--muted);line-height:1.5;margin:0 20px 8px">'
+     +'Studies already filed under these. Until a category is on the list it cannot be picked on a new study '
+     +'or filtered for on the list.</div>'
+     +'<div class="list">'+un.map(function(u,i){
+        return '<div class="row'+(edit?' tap':'')+'"'+(edit?(' data-sc-adopt="'+esc(u.name)+'"'):'')+(i===un.length-1?' style="border-bottom:none"':'')+'>'
+          +'<div style="flex:1;min-width:0"><div class="rt">'+esc(u.name)+'</div>'
+          +'<div class="rs">'+u.n+' stud'+(u.n===1?'y':'ies')+'</div></div>'
+          +(edit?'<span style="color:#c2c7cd;font-size:18px;flex:none">＋</span>':'')+'</div>';
+      }).join('')+'</div>';
+  }
+
+  body.innerHTML=
+     '<div style="margin:14px 16px 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px">'
+    +'<div style="font:800 13px \'Archivo\';color:var(--ink)">What kind of study it is</div>'
+    +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:3px;line-height:1.45">'
+    +'Offered on every new study and used to filter the list. Kept here so a category the farm wants next '
+    +'year can be added next year, by whoever is here.</div>'
+    +(edit?'':'<div style="font:800 11.5px \'Public Sans\';color:#8a929c;margin-top:7px">Read-only for your role</div>')
+    +'</div>'
+    +'<div class="list" style="margin-top:12px">'+rows+add+'</div>'
+    +drift
+    +(trialCatsIsDefault()?'':('<div class="sec">Changed on this device</div><div class="list">'
+      +'<div class="row'+(edit?' tap':'')+'"'+(edit?' data-sc="reset"':'')+' style="border-bottom:none"><div style="flex:1">'
+      +'<div class="rt">Restore the built-in categories</div><div class="rs">Studies keep whatever category they name</div></div>'
+      +(edit?'<span style="color:#c2c7cd;font-size:16px;flex:none">↺</span>':'')+'</div></div>'))
+    +'<div style="height:24px"></div>';
+}
+document.getElementById('s-catsettings').addEventListener('change',function(e){
+  if(!trialCatsCanEdit()) return;
+  var nm=e.target.closest('[data-sc-name]'); if(!nm) return;
+  var i=+nm.getAttribute('data-sc-name'), old=TRIAL_CATS[i];
+  if(old===undefined) return;
+  var v=(nm.value||'').trim();
+  if(!v){ toast('The category needs a name'); scsRender(); return; }
+  if(v===old) return;
+  if(TRIAL_CATS.indexOf(v)>=0){ toast('There is already a category called '+v); scsRender(); return; }
+  /* Same warning the labs screen gives, and for the same reason: the studies
+     this rename moves travel in the trials drawer, not this one. */
+  if(!fstRenameOk('category',old)){ scsRender(); return; }
+  var moved=trialCatsRename(old,v);
+  TRIAL_CATS[i]=v; trialCatsScan(); scsRender();
+  toast(moved?(v+' · '+moved+' stud'+(moved===1?'y':'ies')+' moved ✓'):('Renamed to '+v+' ✓'));
+});
+document.getElementById('s-catsettings').addEventListener('click',function(e){
+  if(!trialCatsCanEdit()) return;
+  var del=e.target.closest('[data-sc-del]');
+  if(del){
+    var i=+del.getAttribute('data-sc-del'), c=TRIAL_CATS[i]; if(c===undefined) return;
+    if(TRIAL_CATS.length<2){ toast('Keep at least one category'); return; }
+    var n=trialCatsCount(c);
+    if(n&&!confirm(n+' stud'+(n===1?'y is':'ies are')+' filed under "'+c+'".\n\n'
+      +'They keep the word and carry on working, but it drops off the list and cannot be '
+      +'picked or filtered for until somebody puts it back.\n\nRemove it anyway?')) return;
+    TRIAL_CATS.splice(i,1); trialCatsScan(); scsRender();
+    toast(n?(c+' removed · still on '+n+' stud'+(n===1?'y':'ies')):(c+' removed'));
+    return;
+  }
+  var ad=e.target.closest('[data-sc-adopt]');
+  if(ad){
+    var nm2=ad.getAttribute('data-sc-adopt');
+    if(TRIAL_CATS.indexOf(nm2)<0) TRIAL_CATS.push(nm2);
+    trialCatsScan(); scsRender(); toast(nm2+' added ✓');
+    return;
+  }
+  var a=e.target.closest('[data-sc]'); if(!a) return;
+  var act=a.getAttribute('data-sc');
+  if(act==='addopen'){ scAdding=true; scsRender(); return; }
+  if(act==='addcancel'){ scAdding=false; scsRender(); return; }
+  if(act==='reset'){
+    try{ localStorage.removeItem(TRCAT_KEY); }catch(e2){}
+    _storeSeen['trialcats']=undefined;
+    toast('Categories back to the built-in list — reloading');
+    setTimeout(function(){ try{ location.reload(); }catch(e2){} },700);
+    return;
+  }
+  if(act==='addsave'){
+    var v2=((document.getElementById('sc-n-name')||{}).value||'').trim();
+    if(!v2){ toast('Name the category'); return; }
+    if(TRIAL_CATS.indexOf(v2)>=0){ toast('There is already a category called '+v2); return; }
+    TRIAL_CATS.push(v2); scAdding=false; trialCatsScan(); scsRender();
+    toast(v2+' added ✓');
+  }
+});
+
+/* ---- Restriction types screen ----
+   The one thing on this screen that is not obvious: "what work does this
+   stop?". A restriction type with nothing ticked still shows on the map and
+   still reads on the study, but the app will not warn anybody off a job
+   because of it -- so the screen says that in as many words rather than
+   letting somebody find out in a field. See jobResCfg(). */
+var rtAdding=false;
+function rtsRender(){
+  var body=document.getElementById('rts-body'); if(!body) return;
+  var edit=resTypesCanEdit();
+
+  var rows=TR_RTYPES.map(function(r,i){
+    var n=resTypesCount(r.k), last=(i===TR_RTYPES.length-1), blind=!((r.stops||[]).length);
+    var head='<div style="display:flex;align-items:center;gap:9px">'
+      +'<span class="mpin" style="background:'+esc(r.c)+';flex:none"></span>'
+      +'<div style="flex:1;min-width:0"><div class="rt">'+esc(r.label)+'</div>'
+      +'<div class="rs">badge '+esc(r.ab||'?')+' · '+esc(resTypeStopsText(r))
+      +(n?(' · '+n+' placed'):'')+'</div></div>'
+      +((edit&&TR_RTYPES.length>1)?('<span class="tap" data-rt-del="'+i+'" style="color:#c0392b;font-size:15px;flex:none;padding:0 4px">✕</span>'):'')
+      +'</div>';
+    var fields='';
+    if(edit){
+      fields='<div class="fld" style="margin-top:8px"><span class="fl">Name</span>'
+        +'<input class="inv-in" data-rt-label="'+i+'" value="'+esc(r.label)+'" style="max-width:190px"></div>'
+        +'<div class="fld"><span class="fl">Badge</span>'
+        +'<input class="inv-in" data-rt-ab="'+i+'" value="'+esc(r.ab||'')+'" maxlength="4" style="max-width:70px"></div>'
+        +'<div style="font:800 10px \'Public Sans\';color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:11px 0 2px">What work does this stop?</div>'
+        +(blind?'<div style="font:700 11px \'Public Sans\';color:#b26a00;line-height:1.45;padding-bottom:6px">'
+                +'Nothing ticked. This shows on the map but the app will not warn anybody off a job because of it.</div>':'')
+        +TR_RES_STOPS.map(function(sx,j){
+            var on=((r.stops||[]).indexOf(sx.k)>=0);
+            return '<div class="fld"'+(j===TR_RES_STOPS.length-1?' style="border-bottom:none"':'')+'>'
+              +'<span class="fl">'+esc(sx.label)+'</span>'
+              +'<span class="tgl'+(on?' on':'')+'" data-rt-stop="'+i+'|'+esc(sx.k)+'"></span></div>';
+          }).join('');
+    }
+    return '<div class="row" style="display:block'+(last&&!edit?';border-bottom:none':'')+'">'+head+fields+'</div>';
+  }).join('');
+
+  var add='';
+  if(edit){
+    add = rtAdding
+      ? '<div style="padding:11px 15px;border-top:1px solid var(--line)">'
+        +'<div class="fld" style="border-bottom:none"><span class="fl">Name</span>'
+        +'<input class="inv-in" id="rt-n-label" placeholder="e.g. No topdressing" style="max-width:190px"></div>'
+        +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:8px;line-height:1.45">'
+        +'The app gives it a color and a badge. Tick what it stops once it is added.</div>'
+        +'<div style="display:flex;gap:8px;margin-top:10px">'
+        +'<div class="action tap" data-rt="addsave" style="flex:1">Add this type</div>'
+        +'<div class="action tap" data-rt="addcancel" style="flex:none;background:#e7e9e6;color:#2f3133;padding:0 16px">Cancel</div></div></div>'
+      : '<div class="row tap" data-rt="addopen" style="border-bottom:none"><div style="flex:1"><div class="rt">Add a restriction type</div>'
+        +'<div class="rs">Something else a study can close ground to</div></div>'
+        +'<span style="color:#c2c7cd;font-size:18px;flex:none">＋</span></div>';
+  }
+
+  var un=resTypesUnlisted(), drift='';
+  if(un.length){
+    drift='<div class="sec">Placed but not on the list</div>'
+     +'<div style="font:600 11.5px \'Public Sans\';color:var(--muted);line-height:1.5;margin:0 20px 8px">'
+     +'Restrictions on the farm still name these. Until the type is back on the list they draw grey, '
+     +'read as their stored word and stop no work.</div>'
+     +'<div class="list">'+un.map(function(u,i){
+        return '<div class="row"'+(i===un.length-1?' style="border-bottom:none"':'')+'>'
+          +'<div style="flex:1;min-width:0"><div class="rt">'+esc(u.name)+'</div>'
+          +'<div class="rs">'+u.n+' restriction'+(u.n===1?'':'s')+'</div></div></div>';
+      }).join('')+'</div>';
+  }
+
+  body.innerHTML=
+     '<div style="margin:14px 16px 0;padding:11px 13px;border:1px solid var(--line);border-radius:12px">'
+    +'<div style="font:800 13px \'Archivo\';color:var(--ink)">What a study can close ground to</div>'
+    +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:3px;line-height:1.45">'
+    +'Offered whenever somebody restricts a plot, drawn on the farm map, and — where it is ticked below — '
+    +'used to warn the crew off a job. The app picks the color so it stays readable in color-blind mode.</div>'
+    +(edit?'':'<div style="font:800 11.5px \'Public Sans\';color:#8a929c;margin-top:7px">Read-only for your role</div>')
+    +'</div>'
+    +'<div class="list" style="margin-top:12px">'+rows+add+'</div>'
+    +drift
+    +(resTypesIsDefault()?'':('<div class="sec">Changed on this device</div><div class="list">'
+      +'<div class="row'+(edit?' tap':'')+'"'+(edit?' data-rt="reset"':'')+' style="border-bottom:none"><div style="flex:1">'
+      +'<div class="rt">Restore the built-in types</div><div class="rs">Restrictions already placed keep the type they name</div></div>'
+      +(edit?'<span style="color:#c2c7cd;font-size:16px;flex:none">↺</span>':'')+'</div></div>'))
+    +'<div style="height:24px"></div>';
+}
+document.getElementById('s-ressettings').addEventListener('change',function(e){
+  if(!resTypesCanEdit()) return;
+  var t=e.target, i, r;
+  var lb=t.closest('[data-rt-label]');
+  if(lb){ i=+lb.getAttribute('data-rt-label'); r=TR_RTYPES[i]; if(!r) return;
+    var v=(lb.value||'').trim();
+    if(!v){ toast('The type needs a name'); rtsRender(); return; }
+    if(v===r.label) return;
+    /* Only the label moves. The stored word (r.k) never does -- see
+       resTypeKey() -- so every restriction already on a plot keeps working. */
+    r.label=v; resTypesScan(); rtsRender(); toast('Renamed to '+v+' ✓'); return; }
+  var ab=t.closest('[data-rt-ab]');
+  if(ab){ i=+ab.getAttribute('data-rt-ab'); r=TR_RTYPES[i]; if(!r) return;
+    r.ab=(ab.value||'').trim().slice(0,4)||resTypeAb(r.label);
+    resTypesScan(); rtsRender(); try{ mapRepaintRes(); }catch(e2){} return; }
+});
+document.getElementById('s-ressettings').addEventListener('click',function(e){
+  if(!resTypesCanEdit()) return;
+  var st=e.target.closest('[data-rt-stop]');
+  if(st){
+    var parts=st.getAttribute('data-rt-stop').split('|'), r=TR_RTYPES[+parts[0]], k=parts[1];
+    if(!r) return;
+    r.stops=(r.stops||[]).slice();
+    var j=r.stops.indexOf(k);
+    if(j>=0) r.stops.splice(j,1); else r.stops.push(k);
+    resTypesScan(); rtsRender();
+    return;
+  }
+  var del=e.target.closest('[data-rt-del]');
+  if(del){
+    var di=+del.getAttribute('data-rt-del'), dr=TR_RTYPES[di]; if(!dr) return;
+    if(TR_RTYPES.length<2){ toast('Keep at least one type'); return; }
+    var n=resTypesCount(dr.k);
+    if(n&&!confirm(n+' restriction'+(n===1?' is':'s are')+' placed as "'+dr.label+'".\n\n'
+      +'They stay on their plots, but they lose their color and their badge and stop warning '
+      +'anybody off a job.\n\nRemove the type anyway?')) return;
+    var nm=dr.label;
+    TR_RTYPES.splice(di,1); resTypesScan(); rtsRender(); try{ mapRepaintRes(); }catch(e2){}
+    toast(n?(nm+' removed · '+n+' still placed'):(nm+' removed'));
+    return;
+  }
+  var a=e.target.closest('[data-rt]'); if(!a) return;
+  var act=a.getAttribute('data-rt');
+  if(act==='addopen'){ rtAdding=true; rtsRender(); return; }
+  if(act==='addcancel'){ rtAdding=false; rtsRender(); return; }
+  if(act==='reset'){
+    try{ localStorage.removeItem(TRRT_KEY); }catch(e2){}
+    _storeSeen['restypes']=undefined;
+    toast('Restriction types back to the built-in list — reloading');
+    setTimeout(function(){ try{ location.reload(); }catch(e2){} },700);
+    return;
+  }
+  if(act==='addsave'){
+    var v2=((document.getElementById('rt-n-label')||{}).value||'').trim();
+    if(!v2){ toast('Name the type'); return; }
+    var clash=false; TR_RTYPES.forEach(function(x){ if(x.label.toLowerCase()===v2.toLowerCase()) clash=true; });
+    if(clash){ toast('There is already a type called '+v2); return; }
+    TR_RTYPES.push({k:resTypeKey(v2),label:v2,ab:resTypeAb(v2),c:resTypeColor(),stops:[]});
+    rtAdding=false; resTypesScan(); rtsRender();
+    toast(v2+' added — now tick what it stops');
+  }
+});
+/* The map draws restriction badges from TR_RTYPES, so a recolor or a rename
+   has to reach it. Quiet no-op when the map has never been opened. */
+function mapRepaintRes(){
+  try{ if(typeof _appmap!=='undefined'&&_appmap){ refreshLayers(); mapLegendAuto(); } }catch(e){}
+}
 
 function _mgNorm(s){ return (''+s).replace(/\s+/g,' ').trim(); }
 function mowerColor(name){ var d=MGMT_DATA[name]; if(!d||!d.m) return null; var m=_mgNorm(d.m); for(var i=0;i<MOWER_CFG.length;i++){ if(_mgNorm(MOWER_CFG[i][0])===m) return MOWER_CFG[i][2]; } return '#8a8f98'; }
@@ -3889,18 +4200,258 @@ function mfWire(){
    ============================================================ */
 var TR_KEY='ut_trials_v1';
 var TR_LABS=labColorMap();
-var TR_RTYPES=[
-/* ab = the restriction word cut to four letters, so the map badge reads on its
-   own and needs no legend to decode. */
- {k:'mow',        label:'No mow',           ab:'Mow',  c:'#c0392b'},
- {k:'irrigate',   label:'No irrigate',      ab:'Irri', c:'#1f77b4'},
- {k:'fungicide',  label:'No fungicide',     ab:'Fung', c:'#7d3c98'},
- {k:'herbicide',  label:'No herbicide',     ab:'Herb', c:'#d68910'},
- {k:'insecticide',label:'No insecticide',   ab:'Inse', c:'#148f77'},
- {k:'fertilizer', label:'No fertilizer',    ab:'Fert', c:'#6b8e23'},
- {k:'wetting',    label:'No wetting agent', ab:'Wet',  c:'#d1478c'},
- {k:'cultivate',  label:'No cultivation',   ab:'Cult', c:'#8a5a2b'}
+/* ---- restriction types: a list the farm owns, not a list the code owns ----
+   These were eight lines written into this file, which meant adding a ninth --
+   "no topdressing", say -- was a job for whoever wrote the app. It is a row on
+   More -> Farm settings -> Restriction types now, and it travels to every phone
+   in the farmsettings drawer beside the labs and the mowers.
+
+   Five things make up a restriction type:
+     k      what it is stored under. Set once when the type is added and never
+            changed again -- rename the label instead, because every
+            restriction already placed on a plot points at this word, and
+            changing it would leave those restrictions with no type at all.
+     label  what the crew read: 'No mow'.
+     ab     the restriction word cut to four letters, so the map badge reads on
+            its own and needs no legend to decode.
+     c      its color on the map. The app picks it from TR_RES_PALETTE rather
+            than asking a person for one, because every color in that list is
+            registered in CB_MAP as mapping to itself and so comes through
+            color-blind mode unchanged. A color typed in by hand would not.
+     stops  which kinds of work this actually STOPS -- see jobResCfg(). Leave
+            it empty and the type draws on the map and blocks nothing, which is
+            the worst of both: it looks like it is protecting the ground and it
+            is not. The screen asks for it, and says so.
+
+   The original eight keep the colors they have always had, which are NOT from
+   the palette. Changing them would change what the crew see on the map for no
+   reason anybody asked for. */
+var TR_RES_STOPS=[
+ {k:'mow',        label:'Mowing'},
+ {k:'pesticide',  label:'Spraying (any pesticide)'},
+ {k:'fungicide',  label:'Fungicide'},
+ {k:'herbicide',  label:'Herbicide'},
+ {k:'insecticide',label:'Insecticide'},
+ {k:'fertilizer', label:'Fertilizing'},
+ {k:'wetting',    label:'Wetting agent'},
+ {k:'irrigate',   label:'Watering'},
+ {k:'cultivate',  label:'Cultivation and topdressing'}
 ];
+/* Every one of these is a key in CB_MAP mapping to itself. Do not add a color
+   here without adding it there too, or color-blind mode shifts it a second
+   time and the map badge comes out a color nobody chose. */
+var TR_RES_PALETTE=['#d55e00','#0072b2','#cc79a7','#e69f00','#009e73','#8c6d00','#56b4e9'];
+var TR_RTYPES_SEED=[
+ {k:'mow',        label:'No mow',           ab:'Mow',  c:'#c0392b', stops:['mow']},
+ {k:'irrigate',   label:'No irrigate',      ab:'Irri', c:'#1f77b4', stops:['irrigate']},
+ {k:'fungicide',  label:'No fungicide',     ab:'Fung', c:'#7d3c98', stops:['pesticide','fungicide']},
+ {k:'herbicide',  label:'No herbicide',     ab:'Herb', c:'#d68910', stops:['pesticide','herbicide']},
+ {k:'insecticide',label:'No insecticide',   ab:'Inse', c:'#148f77', stops:['pesticide','insecticide']},
+ {k:'fertilizer', label:'No fertilizer',    ab:'Fert', c:'#6b8e23', stops:['fertilizer']},
+ {k:'wetting',    label:'No wetting agent', ab:'Wet',  c:'#d1478c', stops:['wetting']},
+ {k:'cultivate',  label:'No cultivation',   ab:'Cult', c:'#8a5a2b', stops:['cultivate']}
+];
+var TR_RTYPES=JSON.parse(JSON.stringify(TR_RTYPES_SEED));
+
+/* ---- study categories --------------------------------------------------
+   What KIND of study this is, so the list can be filtered and a year's work
+   summarised without reading every protocol. Same arrangement as the
+   restriction types and for the same reason: a category the farm wants in
+   2031 has to be addable in 2031, by whoever is here then.
+
+   Only the names travel. A category is a word, nothing else -- no color, no
+   badge -- so there is nothing to get wrong when somebody adds one. */
+var TRIAL_CATS_SEED=[
+ 'Herbicide','Fungicide','Insecticide','Fertility',
+ 'Plant growth regulator','Cultivar evaluation','Traffic and wear',
+ 'Cultivation and topdressing','Irrigation and drought','Establishment','Other'
+];
+var TRIAL_CATS=TRIAL_CATS_SEED.slice();
+
+/* ---- keeping both lists ------------------------------------------------
+   Five jobs each, copied from the labs list because it already works and a
+   second shape here would be a second thing to get wrong:
+
+     capture  remember the built-in list, so "has the farm changed this?" is a
+              comparison rather than a flag somebody has to set by hand
+     diff     what this phone would SEND -- null while it still holds the
+              built-ins. That null is what stops a phone nobody has touched
+              from pushing the defaults over the farm's real list.
+     apply    take what arrived, whole, and refuse anything malformed
+     hydrate  this phone's own saved copy, at startup
+     scan     write to the phone when it changes. The two-second heartbeat
+              calls it; nothing here touches the network.
+   ------------------------------------------------------------------------ */
+var TRCAT_KEY='ut_trialcats_v1';
+var TRRT_KEY='ut_restypes_v1';
+var _trcatBase=null, _trrtBase=null;
+
+function trialCatsValid(list){
+  if(!Array.isArray(list)||!list.length) return false;
+  var seen={};
+  for(var i=0;i<list.length;i++){
+    var c=list[i];
+    if(typeof c!=='string'||!c.trim()) return false;
+    if(seen[c]) return false;
+    seen[c]=1;
+  }
+  return true;
+}
+function trialCatsCaptureBase(){ _trcatBase=JSON.stringify(TRIAL_CATS); }
+function trialCatsDiff(){ return (_trcatBase!==null&&JSON.stringify(TRIAL_CATS)!==_trcatBase)?TRIAL_CATS:null; }
+function trialCatsIsDefault(){ return trialCatsDiff()===null; }
+function trialCatsApply(list){
+  if(!trialCatsValid(list)) return false;
+  TRIAL_CATS.length=0;
+  list.forEach(function(c){ TRIAL_CATS.push(String(c).trim()); });
+  return true;
+}
+function trialCatsHydrate(){
+  trialCatsCaptureBase();
+  var raw=null; try{ raw=localStorage.getItem(TRCAT_KEY); }catch(e){}
+  if(raw!==null&&raw!==undefined){
+    var p=null; try{ p=JSON.parse(raw); }catch(e){ p=null; }
+    trialCatsApply(p);
+  }
+  try{ _storeSeen['trialcats']=JSON.stringify(trialCatsDiff()); }catch(e){}
+}
+function trialCatsScan(){
+  var s; try{ s=JSON.stringify(trialCatsDiff()); }catch(e){ return; }
+  if(_storeSeen['trialcats']===s) return;
+  var d=trialCatsDiff();
+  if(d===null){ try{ localStorage.removeItem(TRCAT_KEY); }catch(e){} _storeSeen['trialcats']=s; return; }
+  if(storeWriteRaw({key:TRCAT_KEY},JSON.stringify(d))) _storeSeen['trialcats']=s;
+}
+/* Categories studies already name that are not on the list. Surfaced on the
+   screen rather than hidden, for the same reason the labs screen surfaces its
+   own drift: a category off the list cannot be filtered for, so quietly
+   dropping one hides the studies that carry it. */
+function trialCatsUnlisted(){
+  var known={}, out={};
+  TRIAL_CATS.forEach(function(c){ known[c]=1; });
+  try{ TRIALS.forEach(function(t){
+    var c=t&&t.cat; if(!c||known[c]) return;
+    (out[c]=out[c]||{name:c,n:0}).n++;
+  }); }catch(e){}
+  return Object.keys(out).map(function(k){ return out[k]; });
+}
+function trialCatsCount(name){
+  var n=0; try{ TRIALS.forEach(function(t){ if(t&&t.cat===name) n++; }); }catch(e){}
+  return n;
+}
+/* A rename has to carry the studies with it, exactly as renaming a lab does --
+   otherwise every study filed under the old word drops off the list. */
+function trialCatsRename(from,to){
+  if(!from||!to||from===to) return 0;
+  var n=0;
+  try{ TRIALS.forEach(function(t){ if(t&&t.cat===from){ t.cat=to; n++; } }); }catch(e){}
+  try{ if(n&&typeof trSave==='function') trSave(); }catch(e){}
+  return n;
+}
+
+/* ---- restriction types -------------------------------------------------- */
+/* The word a restriction is stored under. Made from the label when the type is
+   added and then left alone forever: every restriction already on a plot
+   points at this word, so changing it would leave those restrictions with no
+   type, no color and no badge. Renaming the LABEL is free and is what the
+   screen offers instead. */
+function resTypeKey(label){
+  var base=String(label||'').toLowerCase().replace(/^no\s+/,'').replace(/[^a-z0-9]+/g,'').slice(0,14);
+  if(!base) base='type';
+  var k=base, n=2;
+  while(TR_RTYPES.some(function(r){ return r.k===k; })) k=base+(n++);
+  return k;
+}
+/* Four letters for the map badge: 'No topdressing' reads 'Topd'. */
+function resTypeAb(label){
+  var w=String(label||'').replace(/^no\s+/i,'').trim();
+  if(!w) return '?';
+  return w.charAt(0).toUpperCase()+w.slice(1,4);
+}
+/* The next palette color nothing is using yet, so two restrictions on the same
+   plot are never the same color. Once all seven are taken it starts round
+   again -- a farm with more than seven restriction types has a larger problem
+   than a repeated color. */
+function resTypeColor(){
+  for(var i=0;i<TR_RES_PALETTE.length;i++){
+    var c=TR_RES_PALETTE[i], used=false;
+    TR_RTYPES.forEach(function(r){ if((r.c||'').toLowerCase()===c) used=true; });
+    if(!used) return c;
+  }
+  return TR_RES_PALETTE[TR_RTYPES.length%TR_RES_PALETTE.length];
+}
+function resTypesValid(list){
+  if(!Array.isArray(list)||!list.length) return false;
+  var seen={};
+  for(var i=0;i<list.length;i++){
+    var r=list[i];
+    if(!r||typeof r!=='object') return false;
+    if(typeof r.k!=='string'||!r.k.trim()) return false;
+    if(seen[r.k]) return false;
+    seen[r.k]=1;
+    if(typeof r.label!=='string'||!r.label.trim()) return false;
+    if(typeof r.c!=='string'||!LAB_HEX.test(r.c)) return false;
+    if(r.stops!==undefined&&!Array.isArray(r.stops)) return false;
+  }
+  return true;
+}
+function resTypesCaptureBase(){ _trrtBase=JSON.stringify(TR_RTYPES); }
+function resTypesDiff(){ return (_trrtBase!==null&&JSON.stringify(TR_RTYPES)!==_trrtBase)?TR_RTYPES:null; }
+function resTypesIsDefault(){ return resTypesDiff()===null; }
+function resTypesApply(list){
+  if(!resTypesValid(list)) return false;
+  TR_RTYPES.length=0;
+  list.forEach(function(r){
+    TR_RTYPES.push({k:String(r.k).trim(), label:String(r.label).trim(),
+                    ab:(typeof r.ab==='string'&&r.ab.trim())?r.ab.trim().slice(0,4):resTypeAb(r.label),
+                    c:r.c,
+                    stops:Array.isArray(r.stops)?r.stops.filter(function(x){ return typeof x==='string'; }):[]});
+  });
+  return true;
+}
+function resTypesHydrate(){
+  resTypesCaptureBase();
+  var raw=null; try{ raw=localStorage.getItem(TRRT_KEY); }catch(e){}
+  if(raw!==null&&raw!==undefined){
+    var p=null; try{ p=JSON.parse(raw); }catch(e){ p=null; }
+    resTypesApply(p);
+  }
+  try{ _storeSeen['restypes']=JSON.stringify(resTypesDiff()); }catch(e){}
+}
+function resTypesScan(){
+  var s; try{ s=JSON.stringify(resTypesDiff()); }catch(e){ return; }
+  if(_storeSeen['restypes']===s) return;
+  var d=resTypesDiff();
+  if(d===null){ try{ localStorage.removeItem(TRRT_KEY); }catch(e){} _storeSeen['restypes']=s; return; }
+  if(storeWriteRaw({key:TRRT_KEY},JSON.stringify(d))) _storeSeen['restypes']=s;
+}
+/* How many restrictions, live or not, still point at this type. Taking a type
+   off the list does not remove them -- it leaves them with a word the app
+   cannot look up -- so the screen asks first and says how many. */
+function resTypesCount(k){
+  var n=0;
+  try{ TRIALS.forEach(function(t){ (t.restrictions||[]).forEach(function(r){ if(r&&r.type===k) n++; }); }); }catch(e){}
+  return n;
+}
+function resTypesUnlisted(){
+  var known={}, out={};
+  TR_RTYPES.forEach(function(r){ known[r.k]=1; });
+  try{ TRIALS.forEach(function(t){ (t.restrictions||[]).forEach(function(r){
+    var k=r&&r.type; if(!k||known[k]) return;
+    (out[k]=out[k]||{name:k,n:0}).n++;
+  }); }); }catch(e){}
+  return Object.keys(out).map(function(k){ return out[k]; });
+}
+/* Plain English for the map and the settings row: what this type stops. */
+function resTypeStopsText(r){
+  var s=(r&&r.stops)||[];
+  if(!s.length) return 'Shown on the map · stops no work on its own';
+  var names=s.map(function(k){
+    for(var i=0;i<TR_RES_STOPS.length;i++) if(TR_RES_STOPS[i].k===k) return TR_RES_STOPS[i].label;
+    return k;
+  });
+  return 'Stops '+names.join(', ').toLowerCase();
+}
 var TR_STAGE={
  planned:  {label:'Planned',  bg:'#eef4ff', fg:'#2456b8'},
  active:   {label:'Active',   bg:'#e8f6ec', fg:'#2f7d3a'},
@@ -4018,7 +4569,9 @@ function trFmt(iso){
   var y=+p[0], mo=+p[1]-1, d=+p[2]; if(isNaN(y)||isNaN(mo)||isNaN(d)) return iso;
   return TR_MON[mo]+' '+d+(y===new Date().getFullYear()?'':(' ’'+(''+y).slice(2)));
 }
-function trRange(t){ return trFmt(t.start)+' – '+trFmt(t.end); }
+/* A study with no end date says so in words. "—" reads as a gap somebody left;
+   "end date unknown" reads as the answer it is. Dillon's call, 2026-09-25. */
+function trRange(t){ return trFmt(t.start)+' – '+(t.end?trFmt(t.end):'end date unknown'); }
 function trPlots(t){ return (t.locations||[]).map(function(l){return l.plot;}); }
 function trPlotsLabel(t){
   var p=trPlots(t); if(!p.length) return 'No plots assigned';
@@ -4034,6 +4587,22 @@ function trResState(r){
   return 'active';
 }
 function trLiveRes(t){ return (t.restrictions||[]).filter(function(r){ return trResState(r)==='active'; }); }
+/* ---- a restriction with no end date -------------------------------------
+   Dillon's call, 2026-09-25: an open-ended restriction is worded "until it is
+   lifted", never "unknown". The difference is not cosmetic. trResState() has
+   always treated a missing end date as never ending, so a restriction saved
+   without one sits on the farm map for good -- and the crew reading "no mow,
+   end date unknown" have no idea whether that is a date somebody forgot or a
+   decision somebody made. "Until it is lifted" says which, and points at the
+   thing that ends it: Bill, or the lab, using Lift on the study page.
+
+   Nothing else changes. The record still carries end:'' and the state maths
+   is untouched; this is only what the crew read. */
+function trResEndText(r){ return (r&&r.end)?trFmt(r.end):'until it is lifted'; }
+function trResRangeText(r){
+  if(!r) return '';
+  return trFmt(r.start)+(r.end?(' – '+trFmt(r.end)):' – until lifted');
+}
 function trProgress(t){
   if(!t.start||!t.end) return null;
   var a=Date.parse(t.start),b=Date.parse(t.end),n=Date.now();
@@ -4225,7 +4794,7 @@ function trFilter(){
     if(trState.tab!=='all' && t.stage!==trState.tab) return false;
     if(trState.lab!=='all' && t.lab!==trState.lab) return false;
     if(!q) return true;
-    var hay=[t.title,t.lab,nameOf(t.pi),nameOf(t.owner),t.objective,t.treatments,trPlots(t).join(' ')].join(' ').toLowerCase();
+    var hay=[t.title,t.lab,t.cat,nameOf(t.pi),nameOf(t.owner),t.objective,t.treatments,trPlots(t).join(' ')].join(' ').toLowerCase();
     return hay.indexOf(q)>=0;
   }).sort(function(a,b){ return (a.start||'')<(b.start||'')?1:-1; });
 }
@@ -4309,12 +4878,54 @@ function trFieldRow(label,val){
     +'<div class="tr-lbl">'+label+'</div>'
     +'<div style="font:700 13.5px \'Public Sans\';color:var(--ink);line-height:1.5">'+val+'</div></div>';
 }
-/* Footprint of a trial in feet, from its area and plot grid. A 4x3 grid of square
-   sub-plots is wider than tall in the ratio cols:rows, so split the area that way. */
+/* ---- how big a trial is, and what shape ---------------------------------
+   A trial is a grid: ONE COLUMN PER TREATMENT, ONE ROW PER REP. The person
+   gives the size of a single plot and how many of each, and the app works out
+   the ground it takes up.
+
+   That is the whole reason the form asks for a plot's width and length rather
+   than its square footage. 25 ft2 could be 5 x 5 or 10 x 2.5, and those two
+   draw as completely different rectangles on the map -- a 5-treatment,
+   4-rep trial is 25 x 20 ft the first way and 50 x 10 ft the second. Asking
+   for the two measurements is the difference between drawing the real trial
+   and drawing a guess.
+
+   TR_MAX_N caps both counts at 50, which is what the form's dropdown offers.
+
+   Studies saved before any of this existed still hold a typed-in total area
+   and a rows/cols grid, and they are read through the same four functions --
+   so nothing on any old study changes until somebody edits it. */
+var TR_MAX_N=50;
+function trNum(v){ var n=parseInt(v,10); if(!(n>0)) return 0; return n>TR_MAX_N?TR_MAX_N:n; }
+function trCols(t){ return trNum(t.nTrt) || trNum((t.layout||{}).cols); }   /* treatments, across */
+function trRows(t){ return trNum(t.nRep) || trNum((t.layout||{}).rows); }   /* reps, down */
+function trAlley(t){ var a=parseFloat(t.alley); return (a>0)?a:0; }
+function trPlotSize(t){
+  var w=parseFloat(t.plotW), l=parseFloat(t.plotL);
+  return (w>0&&l>0)?{w:w,l:l}:null;
+}
+/* The whole rectangle: treatments across, reps down, with an alley between
+   every pair of plots but none around the outside. Null on a study that has
+   not been given a plot size yet. */
+function trGridFt(t){
+  var p=trPlotSize(t); if(!p) return null;
+  var c=trCols(t)||1, r=trRows(t)||1, a=trAlley(t);
+  return {w:c*p.w+(c-1)*a, h:r*p.l+(r-1)*a};
+}
+function trTotalFt2(t){
+  var g=trGridFt(t);
+  if(g) return Math.round(g.w*g.h);
+  var a=parseFloat(t.area);                      /* a study from the old form */
+  return (a>0)?Math.round(a):0;
+}
+/* Footprint of a trial in feet. Exact where the plot size is known; on an
+   older study only the total area and the grid survive, so the shape has to be
+   inferred the way it always was -- a 4x3 grid of square plots is wider than
+   tall in the ratio cols:rows, so the area splits that way. */
 function trFootprintFt(t){
+  var g=trGridFt(t); if(g) return {w:g.w, h:g.h};
   var a=parseFloat(t.area); if(!(a>0)) return null;
-  var l=t.layout||{}, r=parseInt(l.rows,10), c=parseInt(l.cols,10);
-  if(!(r>0&&c>0)){ r=1; c=1; }
+  var r=trRows(t)||1, c=trCols(t)||1;
   return {w:Math.sqrt(a*c/r), h:Math.sqrt(a*r/c)};
 }
 /* ft -> degrees at UT Turf Farm latitude (~35.9 N) */
@@ -4333,6 +4944,40 @@ function trFootprintCorners(t,lat,lng,rot){
     var xr=x*cos-y*sin, yr=x*sin+y*cos;
     out.push([lat+trFtToDeg(lat,yr,'lat'), lng+trFtToDeg(lat,xr,'lng')]);
   });
+  return out;
+}
+/* One local x/y offset in feet, turned and dropped at a point on the farm.
+   x runs across the treatments, y down the reps. */
+function trRotPt(lat,lng,x,y,th){
+  var xr=x*Math.cos(th)-y*Math.sin(th), yr=x*Math.sin(th)+y*Math.cos(th);
+  return [lat+trFtToDeg(lat,yr,'lat'), lng+trFtToDeg(lat,xr,'lng')];
+}
+/* Every individual plot in the trial, as its own four corners -- treatments
+   across, reps down, alleys showing as the gaps between them.
+
+   This is what makes the rotation slider mean something: an outline alone can
+   be turned either way and look the same, but a 6-across-by-3-down grid tells
+   you at a glance whether the trial is lying the way it actually lies in the
+   field.
+
+   TR_GRID_MAX caps it. A 50 x 50 trial is 2,500 rectangles, which is more than
+   a phone should be asked to draw for a picture nobody can read at that size;
+   past the cap the outline is drawn on its own. */
+var TR_GRID_MAX=150;
+function trFootprintPlots(t,lat,lng,rot){
+  var g=trGridFt(t), p=trPlotSize(t);
+  if(!g||!p) return null;
+  var c=trCols(t)||1, r=trRows(t)||1;
+  if(c*r>TR_GRID_MAX) return null;
+  var th=((rot===undefined?(t.rot||0):rot))*Math.PI/180, a=trAlley(t), out=[];
+  for(var i=0;i<r;i++){
+    for(var j=0;j<c;j++){
+      var x0=-g.w/2+j*(p.w+a), x1=x0+p.w;
+      var y0=-g.h/2+i*(p.l+a), y1=y0+p.l;
+      out.push([trRotPt(lat,lng,x0,y0,th),trRotPt(lat,lng,x1,y0,th),
+                trRotPt(lat,lng,x1,y1,th),trRotPt(lat,lng,x0,y1,th)]);
+    }
+  }
   return out;
 }
 function trFootprintBounds(t,lat,lng,rot){
@@ -4412,15 +5057,28 @@ function trResExtentText(t,r){
   var fp=trFootprintFt(t);
   return 'trial footprint'+(fp?(' · '+Math.round(fp.w)+' × '+Math.round(fp.h)+' ft'):'');
 }
+/* Coverage is asked first on the form now, so it is read first here too. */
 function trCoverageText(t){
+  if(t.coverage==='part') return t.pin?'Part of a plot · pin set':'Part of a plot · no pin yet';
   if(t.multiPlot) return 'Whole plots · '+(t.locations||[]).length+' plots';
-  if(t.coverage==='part') return t.pin?'Part of the plot · pin set':'Part of the plot · no pin yet';
   return 'Entire plot';
 }
 function trLayoutText(t){
-  var l=t.layout||{}, r=parseInt(l.rows,10), c=parseInt(l.cols,10);
+  var r=trRows(t), c=trCols(t);
   if(!(r>0&&c>0)) return '';
-  return r+' × '+c+' · '+(r*c)+' plot'+(r*c===1?'':'s');
+  return c+' treatment'+(c===1?'':'s')+' × '+r+' rep'+(r===1?'':'s')+' · '+(r*c)+' plot'+(r*c===1?'':'s');
+}
+/* '5 ft × 4 ft each · 3 ft alleys' — the sentence under the total. */
+function trPlotSizeText(t){
+  var p=trPlotSize(t); if(!p) return '';
+  var a=trAlley(t);
+  return trFtNum(p.w)+' ft × '+trFtNum(p.l)+' ft each'+(a?(' · '+trFtNum(a)+' ft alleys'):' · no alleys');
+}
+/* Feet without a pointless '.0' on a whole number. */
+function trFtNum(n){ return (Math.round(n*10)/10).toString(); }
+function trGridText(t){
+  var g=trGridFt(t); if(!g) return '';
+  return trFtNum(g.w)+' ft wide × '+trFtNum(g.h)+' ft long';
 }
 function trRenderDetail(){
   var t=trById(trCur), body=document.getElementById('trd-body'), ab=document.getElementById('trd-actions');
@@ -4445,7 +5103,7 @@ function trRenderDetail(){
   /* live restriction banner */
   if(live.length){
     h+='<div class="tr-banner"><div>'+live.map(function(r){
-      return esc(trRType(r.type).label)+' · '+esc(r.scope)+' ('+esc(trResExtentText(t,r))+') · through '+trFmt(r.end);
+      return esc(trRType(r.type).label)+' · '+esc(r.scope)+' ('+esc(trResExtentText(t,r))+') · '+(r.end?('through '+trFmt(r.end)):'until it is lifted');
     }).join('<br>')+'</div></div>';
   } else if(t.stage==='active'){
     h+='<div class="tr-banner soft"><div>No restrictions in force on this study today</div></div>';
@@ -4453,12 +5111,18 @@ function trRenderDetail(){
 
   /* protocol fields */
   h+='<div class="tr-sec">Protocol</div><div class="list">';
+  h+=trFieldRow('Category',esc(t.cat));
   h+=trFieldRow('Objective',esc(t.objective));
   h+=trFieldRow('Dates',trRange(t)+(trProgress(t)!=null&&t.stage==='active'?(' · '+Math.round(trProgress(t)*100)+'% elapsed'):''));
   h+=trFieldRow('Coverage',esc(trCoverageText(t))
       +(t.pin?('<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:3px">'+t.pin.lat.toFixed(5)+', '+t.pin.lng.toFixed(5)+'</div>'):''));
-  h+=trFieldRow('Trial area',t.area?((+t.area).toLocaleString()+' ft²'):'');
-  h+=trFieldRow('Plot layout',trLayoutText(t));
+  var _tot=trTotalFt2(t), _grid=trGridText(t), _psz=trPlotSizeText(t);
+  h+=trFieldRow('Trial area',_tot?(_tot.toLocaleString()+' ft²'
+      +(_grid?('<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:3px">'+esc(_grid)+'</div>'):'')):'');
+  h+=trFieldRow('Layout',trLayoutText(t)
+      +(_psz?('<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:3px">'+esc(_psz)+'</div>'):''));
+  /* Kept for studies that already carried it. The form stopped asking on
+     2026-09-25 -- see the note over the Restrictions section in trRenderEdit. */
   h+=trFieldRow('Treatments / products',esc(t.treatments));
   h+=trFieldRow('Protocol document',t.pdf?esc(t.pdf):'');
   h+=trFieldRow('Entered by',esc(t.createdBy||'—')+(t.createdAt?(' · '+trFmt(t.createdAt)):''));
@@ -4493,7 +5157,7 @@ function trRenderDetail(){
         +'<div class="tr-resic'+(st==='active'?'':' off')+'">'+esc(ty.ab)+'</div>'
         +'<div style="flex:1;min-width:0"><div class="rt">'+esc(ty.label)+' · '+esc(r.scope)+'</div>'
         +'<div class="rs" style="color:'+(trResExtent(t,r)==='pin'?'#b26a00':'#8a8f98')+'">'+esc(trResExtentText(t,r))+'</div>'
-        +'<div class="rs">'+trFmt(r.start)+' – '+trFmt(r.end)+(r.by?(' · set by '+esc(nameOf(r.by)||r.by)):'')+'</div>'
+        +'<div class="rs">'+trResRangeText(r)+(r.by?(' · set by '+esc(nameOf(r.by)||r.by)):'')+'</div>'
         +(r.note?'<div class="rs" style="color:#8a8f98">'+esc(r.note)+'</div>':'')
         +(r.lifted?'<div class="rs" style="color:#8a8f98">Lifted '+trFmt(r.lifted)+(r.liftedBy?(' by '+esc(r.liftedBy)):'')+'</div>':'')
         +'</div>'
@@ -4559,10 +5223,16 @@ var trDraft=null;
 function trNew(){
   var lab=trMyLab(); if(!TR_LABS[lab]) lab='Brosnan';
   var u=me();
+  /* multiPlot starts null, not false. Null means "nobody has said yet", which
+     is what lets the Location section ask the question rather than quietly
+     assuming the answer -- an assumed "one plot" is how a two-plot study ends
+     up filed on one. An existing study has answered it by definition. */
   trDraft={id:null,title:'',lab:lab,pi:(currentRole==='faculty'?u.n:('Dr. '+lab)),owner:trMe(),stage:'planned',
-    objective:'',start:trTodayISO(),end:'',area:'',layout:{rows:'',cols:''},
-    multiPlot:false,coverage:'whole',pin:null,rot:0,
+    cat:'',objective:'',start:trTodayISO(),end:'',noEnd:false,
+    nTrt:'',nRep:'',plotW:'',plotL:'',alley:'',area:'',
+    multiPlot:null,coverage:'',pin:null,rot:0,
     locations:[],treatments:'',pdf:'',restrictions:[],
+    hasRes:false,resDraft:[],
     createdBy:trMe(),createdAt:trTodayISO()};
   show('trialedit',true);
 }
@@ -4570,7 +5240,62 @@ function trEdit(id){
   var t=trById(id); if(!t) return;
   if(!trCanEdit(t)){ toast('View only — '+esc(t.lab)+' lab owns this study'); return; }
   trDraft=JSON.parse(JSON.stringify(t));
+  if(trDraft.multiPlot===undefined) trDraft.multiPlot=((trDraft.locations||[]).length>1);
+  if(!trDraft.coverage) trDraft.coverage=trDraft.pin?'part':'whole';
+  /* The form's restriction rows are rebuilt from the records rather than kept
+     as a second copy on the study — see trResDraftFrom(). */
+  trDraft.resDraft=trResDraftFrom(trDraft);
+  trDraft.hasRes=trDraft.resDraft.length>0;
   show('trialedit',true);
+}
+
+/* ---- the form's restriction rows ----------------------------------------
+   A restriction record names ONE plot, because the map, the plot popup, the
+   crew's job warnings and the lift record all look it up by plot. But the form
+   asks about restrictions before it asks where the trial is, and a restriction
+   entered there covers the whole study — Dillon's call, 2026-09-25.
+
+   So one row on the form becomes one record PER PLOT, tied together by a
+   shared `gid`. The gid is the only thing added to the record, and it is what
+   tells the form which records are its to manage. A restriction added later
+   from the study page has no gid and is never touched by any of this.
+
+   Nothing about the form's rows is stored. They are rebuilt from the records
+   every time the form opens, so there is no second copy to drift. */
+function trResDraftFrom(t){
+  var byGid={}, order=[];
+  (t.restrictions||[]).forEach(function(r){
+    if(!r||!r.gid||byGid[r.gid]) return;
+    byGid[r.gid]={gid:r.gid,type:r.type,start:r.start||'',end:r.end||'',noEnd:!r.end,note:r.note||''};
+    order.push(r.gid);
+  });
+  return order.map(function(g){ return byGid[g]; });
+}
+/* Make the study's records match the form's rows: one per row per plot.
+
+   A record that is already there is REUSED rather than rebuilt, because a lift
+   is filed in the database against the restriction's own id -- build a fresh
+   record and the lift stops pointing at anything, and a restriction somebody
+   deliberately lifted comes back. */
+function trSyncFormRes(t){
+  var plots=trPlots(t), out=[], had={};
+  (t.restrictions||[]).forEach(function(r){
+    if(!r) return;
+    if(!r.gid) out.push(r);                       /* added from the study page */
+    else had[r.gid+'|'+r.scope]=r;
+  });
+  ((t.hasRes&&t.resDraft)||[]).forEach(function(d){
+    if(!d||!d.type) return;
+    plots.forEach(function(pl){
+      var r=had[d.gid+'|'+pl]||{id:newId('r'),gid:d.gid,scope:pl,by:trMe()};
+      r.type=d.type;
+      r.start=d.start||trTodayISO();
+      r.end=d.noEnd?'':(d.end||'');
+      r.note=d.note||'';
+      out.push(r);
+    });
+  });
+  t.restrictions=out;
 }
 function trRenderEdit(){
   var body=document.getElementById('tre-body'); if(!body||!trDraft) return;
@@ -4596,68 +5321,199 @@ function trRenderEdit(){
     +'<div><div class="tr-lbl">PI</div><input class="tr-in" id="tre-pi" placeholder="Dr. …" value="'+esc(nameOf(d.pi)||d.pi||'')+'"></div>'
     +'<div><div class="tr-lbl">Owner</div><input class="tr-in" id="tre-owner" placeholder="Who runs it" value="'+esc(nameOf(d.owner)||d.owner||'')+'"></div>'
     +'</div></div>';
+  /* Category sits between the people and the objective because that is the
+     order the protocol itself reads in: whose study, what kind, what for.
+     The list is the farm's — More → Farm settings → Study categories — so a
+     study whose category has since been taken off the list keeps it, and the
+     dropdown carries it as an extra line rather than silently swapping it. */
+  var cats=TRIAL_CATS.slice();
+  if(d.cat&&cats.indexOf(d.cat)<0) cats.push(d.cat);
+  h+='<div class="tr-fgrp"><div class="tr-lbl">Category</div>'
+    +'<select class="tr-in" id="tre-cat"'+selStyle+'>'
+    +'<option value=""'+(d.cat?'':' selected')+'>Choose a category…</option>'
+    +cats.map(function(c){ return '<option'+(d.cat===c?' selected':'')+'>'+esc(c)+'</option>'; }).join('')
+    +'</select></div>';
   h+='<div class="tr-fgrp"><div class="tr-lbl">Objective</div><textarea class="tr-in" id="tre-obj" placeholder="The target effect or goal of the study">'+esc(d.objective)+'</textarea></div>';
-  h+='<div class="tr-fgrp"><div class="tr-2col">'
-    +'<div><div class="tr-lbl">Start</div><input type="date" class="tr-in" id="tre-start" value="'+esc(d.start)+'"></div>'
-    +'<div><div class="tr-lbl">End</div><input type="date" class="tr-in" id="tre-end" value="'+esc(d.end)+'"></div>'
+  /* End date disappears entirely when it is unknown, rather than sitting there
+     empty — an empty date box reads as something somebody forgot. */
+  h+='<div class="tr-fgrp">';
+  if(d.noEnd){
+    h+='<div class="tr-lbl">Start</div><input type="date" class="tr-in" id="tre-start" value="'+esc(d.start)+'">';
+  } else {
+    h+='<div class="tr-2col">'
+      +'<div><div class="tr-lbl">Start</div><input type="date" class="tr-in" id="tre-start" value="'+esc(d.start)+'"></div>'
+      +'<div><div class="tr-lbl">End</div><input type="date" class="tr-in" id="tre-end" value="'+esc(d.end)+'"></div>'
+      +'</div>';
+  }
+  h+='<div class="tr-opt sq'+(d.noEnd?' on':'')+'" id="tre-noend" style="margin-top:9px;margin-bottom:0"><div class="bx"></div><div style="flex:1">'
+    +'<div class="ol">End date unknown</div>'
+    +'<div class="os">The study runs on until somebody sets an end date or marks it completed.</div>'
     +'</div></div>';
-  /* Trial area is the study's own footprint, entered by hand — deliberately NOT the
-     sum of the plot records, because most trials sit inside part of one plot. */
-  h+='<div class="tr-fgrp"><div class="tr-lbl">Trial area (ft²)</div>'
-    +'<input type="number" min="0" step="1" inputmode="numeric" class="tr-in" id="tre-area" placeholder="e.g. 900" value="'+esc(d.area)+'"></div>';
-  var lay=d.layout||{};
-  h+='<div class="tr-fgrp"><div class="tr-lbl">Plot layout</div>'
+  h+='</div>';
+  h+='</div>';
+
+  /* ---- size of the trial ----
+     Treatments across, reps down, and the size of one plot. The total is
+     worked out from those three rather than typed, because a typed total
+     cannot be drawn on a map — see trGridFt(). */
+  h+='<div class="tr-sec">Size of the trial</div><div class="list">';
+  h+=trNumList('tre-nums');
+  h+='<div class="tr-fgrp"><div class="tr-lbl">Number of treatments</div>'
+    +'<input class="tr-in" id="tre-ntrt" list="tre-nums" type="number" min="1" max="'+TR_MAX_N+'" step="1" '
+    +'inputmode="numeric" placeholder="Pick or type a number" value="'+esc(d.nTrt||'')+'">'
+    +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:6px">One column of the trial per treatment.</div></div>';
+  h+='<div class="tr-fgrp"><div class="tr-lbl">Number of reps</div>'
+    +'<input class="tr-in" id="tre-nrep" list="tre-nums" type="number" min="1" max="'+TR_MAX_N+'" step="1" '
+    +'inputmode="numeric" placeholder="Pick or type a number" value="'+esc(d.nRep||'')+'">'
+    +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:6px">One row of the trial per rep.</div></div>';
+  h+='<div class="tr-fgrp"><div class="tr-lbl">Size of one plot</div>'
     +'<div style="display:flex;align-items:center;gap:9px">'
-    +'<input type="number" min="1" step="1" inputmode="numeric" class="tr-in" id="tre-rows" placeholder="Rows" style="flex:1" value="'+esc(lay.rows)+'">'
+    +'<input type="number" min="0" step="0.5" inputmode="decimal" class="tr-in" id="tre-plotw" placeholder="Width ft" style="flex:1" value="'+esc(d.plotW||'')+'">'
     +'<span style="font:800 14px \'Public Sans\';color:var(--muted);flex:none">×</span>'
-    +'<input type="number" min="1" step="1" inputmode="numeric" class="tr-in" id="tre-cols" placeholder="Columns" style="flex:1" value="'+esc(lay.cols)+'">'
-    +'</div><div id="tre-plotcount" style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:6px">'+trPlotCountText(lay.rows,lay.cols)+'</div></div>';
-  h+='<div class="tr-fgrp"><div class="tr-lbl">Treatments / products</div><textarea class="tr-in" id="tre-treat" placeholder="Products, rates, intervals, reps">'+esc(d.treatments)+'</textarea></div>';
+    +'<input type="number" min="0" step="0.5" inputmode="decimal" class="tr-in" id="tre-plotl" placeholder="Length ft" style="flex:1" value="'+esc(d.plotL||'')+'">'
+    +'</div>'
+    +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:6px">Both in feet. Square footage per plot is worked out below.</div></div>';
+  h+='<div class="tr-fgrp"><div class="tr-lbl">Alleys between plots (ft)</div>'
+    +'<input type="number" min="0" step="0.5" inputmode="decimal" class="tr-in" id="tre-alley" placeholder="Leave blank for none" value="'+esc(d.alley||'')+'">'
+    +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:6px">Walking room between plots. Counted between them, not around the outside.</div></div>';
+  h+='<div class="tr-fgrp" id="tre-total">'+trTotalHtml(d)+'</div>';
   h+='</div>';
 
-  /* Location. Most trials sit on one plot, so that is the default; the checkbox
-     opens up the multi-plot list. A single-plot trial then says whether it covers
-     the whole plot or just a spot, and a spot gets a pin dropped on the map. */
-  h+='<div class="tr-sec">Location</div>';
-  h+='<div class="list"><div class="tr-fgrp">';
-  h+='<div class="tr-opt sq'+(d.multiPlot?' on':'')+'" id="tre-multi"><div class="bx"></div><div style="flex:1">'
-    +'<div class="ol">This trial spans more than one plot</div>'
-    +'<div class="os">Leave unchecked for a single-plot trial. Multi-plot trials are taken to cover each listed plot in full.</div>'
+  /* ---- restrictions ----
+     "Treatments / products" used to sit here. It came off on 2026-09-25: the
+     products in a trial are usually a company's to keep quiet about, and the
+     app had no business asking twenty-three phones to carry them. What a
+     restriction closes is the opposite — the crew need it, on the map, today.
+     Studies saved before that date keep whatever was typed, and the study page
+     still shows it; nothing asks for it again. */
+  h+='<div class="tr-sec">Restrictions</div><div class="list">';
+  h+='<div class="tr-fgrp">';
+  h+='<div class="tr-opt sq'+(d.hasRes?' on':'')+'" id="tre-hasres" style="margin-bottom:0"><div class="bx"></div><div style="flex:1">'
+    +'<div class="ol">This trial restricts what can be done on its ground</div>'
+    +'<div class="os">No mow, no spray, and so on. It shows on the farm map and warns the crew off the job.</div>'
     +'</div></div>';
-  h+='<div id="tre-ptags" style="margin-top:9px">'+(d.locations.length?d.locations.map(function(l,i){
-      return '<span class="tr-ptag">'+esc(l.plot)+(l.sqft?(' · '+(+l.sqft).toLocaleString()+' ft²'):'')
-        +'<span class="x" data-rmloc="'+i+'">✕</span></span>'; }).join('')
-    :'<div style="font:600 12.5px \'Public Sans\';color:var(--muted);padding-bottom:8px">'+(d.multiPlot?'No plots yet — add them below':'No plot chosen yet — search for it below')+'</div>')+'</div>';
-  var full=d.multiPlot||d.locations.length===0;
-  h+='<div style="position:relative;margin-top:6px'+(full?'':';display:none')+'" id="tre-plotwrap">'
-    +'<input class="tr-in" id="tre-plotin" placeholder="'+(d.multiPlot?'Add a plot … e.g. B14, C1, NTEP, LH3':'Search for the plot … e.g. B14, C1, NTEP, LH3')+'" autocomplete="off">'
-    +'<div id="tre-plotsug" class="tr-sug" style="display:none"></div></div>';
-  h+='<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:7px">Square footage is pulled from the plot record where we have it.</div>';
+  h+='</div>';
+  if(d.hasRes){
+    var rows=d.resDraft||[];
+    if(!rows.length){
+      h+='<div class="tr-fgrp"><div style="font:600 12.5px \'Public Sans\';color:var(--muted)">No restriction added yet.</div></div>';
+    }
+    rows.forEach(function(r,i){
+      h+='<div class="tr-fgrp">';
+      h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+        +'<div class="tr-lbl" style="margin:0;flex:1">Restriction '+(i+1)+'</div>'
+        +'<span class="tap" data-rd-del="'+i+'" style="color:#c0392b;font:800 15px \'Public Sans\';flex:none;padding:0 4px">✕</span></div>';
+      h+='<select class="tr-in" data-rd-type="'+i+'"'+selStyle+'>'
+        +'<option value=""'+(r.type?'':' selected')+'>Choose a restriction…</option>'
+        +TR_RTYPES.map(function(x){ return '<option value="'+esc(x.k)+'"'+(r.type===x.k?' selected':'')+'>'+esc(x.label)+'</option>'; }).join('')
+        +'</select>';
+      if(r.noEnd){
+        h+='<div style="margin-top:9px"><div class="tr-lbl">Starts</div>'
+          +'<input type="date" class="tr-in" data-rd-start="'+i+'" value="'+esc(r.start)+'"></div>';
+      } else {
+        h+='<div class="tr-2col" style="margin-top:9px">'
+          +'<div><div class="tr-lbl">Starts</div><input type="date" class="tr-in" data-rd-start="'+i+'" value="'+esc(r.start)+'"></div>'
+          +'<div><div class="tr-lbl">Ends</div><input type="date" class="tr-in" data-rd-end="'+i+'" value="'+esc(r.end)+'"></div>'
+          +'</div>';
+      }
+      h+='<div class="tr-opt sq'+(r.noEnd?' on':'')+'" data-rd-noend="'+i+'" style="margin-top:9px;margin-bottom:0"><div class="bx"></div><div style="flex:1">'
+        +'<div class="ol">No end date — until it is lifted</div>'
+        +'<div class="os">It stays on the map until Bill or the lab lifts it from the study page.</div>'
+        +'</div></div>';
+      h+='<div style="margin-top:9px"><div class="tr-lbl">Note for the crew</div>'
+        +'<textarea class="tr-in" data-rd-note="'+i+'" placeholder="e.g. N section only — untreated check block">'+esc(r.note||'')+'</textarea></div>';
+      h+='</div>';
+    });
+    h+='<div class="tr-fgrp"><div class="tr-pinbtn tap" id="tre-addres">＋ Add another restriction</div>'
+      +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:7px">'
+      +'Every restriction here covers all of this study’s ground. To restrict one plot of a multi-plot '
+      +'study on its own, save first and use ＋ Restriction on the study page.</div></div>';
+  }
   h+='</div>';
 
-  if(!d.multiPlot){
+  /* ---- location ----
+     The order is Dillon's, 2026-09-25, and it is the order somebody standing in
+     a field answers in: how much ground first, how many plots second. The old
+     form asked "more than one plot?" first, which meant a single-plot study had
+     to answer a question about multiple plots before it could say anything.
+
+     multiPlot === null means the second question has not been answered. Null
+     rather than false, because false is an answer and "not asked yet" is not. */
+  h+='<div class="tr-sec">Location</div><div class="list">';
+  h+='<div class="tr-fgrp">';
+  h+='<div class="tr-lbl">How much of the plot does this trial use?</div>';
+  h+='<div class="tr-opt'+(d.coverage==='whole'?' on':'')+'" data-cov="whole"><div class="bx"></div><div style="flex:1">'
+    +'<div class="ol">The entire plot</div><div class="os">The trial fills the whole plot.</div></div></div>';
+  h+='<div class="tr-opt'+(d.coverage==='part'?' on':'')+'" data-cov="part" style="margin-bottom:0"><div class="bx"></div><div style="flex:1">'
+    +'<div class="ol">Part of a plot</div><div class="os">Smaller than the plot — you drop a pin to mark where it sits.</div></div></div>';
+  h+='</div>';
+
+  if(d.coverage==='whole'){
     h+='<div class="tr-fgrp">';
-    h+='<div class="tr-lbl">How much of the plot does it cover?</div>';
-    h+='<div class="tr-opt'+(d.coverage!=='part'?' on':'')+'" data-cov="whole"><div class="bx"></div><div style="flex:1">'
-      +'<div class="ol">The entire plot</div><div class="os">The trial fills the plot you selected above.</div></div></div>';
-    h+='<div class="tr-opt'+(d.coverage==='part'?' on':'')+'" data-cov="part"><div class="bx"></div><div style="flex:1">'
-      +'<div class="ol">Part of the plot</div><div class="os">Smaller than the plot — drop a pin on the map to mark where it sits.</div></div></div>';
-    if(d.coverage==='part'){
+    h+='<div class="tr-lbl">Does this trial use more than one plot?</div>';
+    h+='<div class="tr-opt'+(d.multiPlot===false?' on':'')+'" data-multi="no"><div class="bx"></div><div style="flex:1">'
+      +'<div class="ol">No — one plot</div><div class="os">The whole study sits on a single plot.</div></div></div>';
+    h+='<div class="tr-opt'+(d.multiPlot===true?' on':'')+'" data-multi="yes" style="margin-bottom:0"><div class="bx"></div><div style="flex:1">'
+      +'<div class="ol">Yes — several plots</div><div class="os">Each plot listed is taken to be covered in full.</div></div></div>';
+    h+='</div>';
+  }
+
+  /* The plot chooser appears once there is a question it can answer: a
+     part-of-a-plot study needs exactly one plot before a pin means anything,
+     and a whole-plot study needs its "how many" answered first. */
+  var wantPlots=(d.coverage==='part')||(d.coverage==='whole'&&d.multiPlot!==null&&d.multiPlot!==undefined);
+  if(wantPlots){
+    var multi=(d.coverage==='whole'&&d.multiPlot===true);
+    h+='<div class="tr-fgrp">';
+    h+='<div class="tr-lbl">'+(multi?'Which plots?':'Which plot?')+'</div>';
+    h+='<div id="tre-ptags">'+(d.locations.length?d.locations.map(function(l,i){
+        return '<span class="tr-ptag">'+esc(l.plot)+(l.sqft?(' · '+(+l.sqft).toLocaleString()+' ft²'):'')
+          +'<span class="x" data-rmloc="'+i+'">✕</span></span>'; }).join('')
+      :'<div style="font:600 12.5px \'Public Sans\';color:var(--muted);padding-bottom:8px">'+(multi?'No plots chosen yet':'No plot chosen yet')+'</div>')+'</div>';
+    h+='<div style="position:relative;margin-top:6px">'
+      +'<input class="tr-in" id="tre-plotin" placeholder="'+(multi?'Type a plot … e.g. B14, C1, NTEP, LH3':'Type the plot … e.g. B14, C1, NTEP, LH3')+'" autocomplete="off">'
+      +'<div id="tre-plotsug" class="tr-sug" style="display:none"></div></div>';
+    /* Summitt blue, the same #489FDF the banner uses. It is registered in
+       CB_MAP as mapping to itself, so it survives color-blind mode. */
+    h+='<div class="tr-mapbtn tap" id="tre-mapbtn">Select '+(multi?'plots':'the plot')+' from the map</div>';
+    h+='<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:7px">Square footage is pulled from the plot record where we have it.</div>';
+    h+='</div>';
+  }
+
+  if(d.coverage==='part'){
+    h+='<div class="tr-fgrp">';
+    h+='<div class="tr-lbl">Where in the plot?</div>';
+    if(!d.locations.length){
+      h+='<div style="font:600 11.5px \'Public Sans\';color:#b26a00;line-height:1.45">Choose the plot above first — the map has to know which plot to open.</div>';
+    } else {
       h+='<div class="tr-pinbtn tap" id="tre-pinbtn">'+(d.pin?'Move the pin on the map':'Place the pin on the map')+'</div>';
+      var fpv=trFootprintFt(d);
       if(d.pin){
-        var fpv=trFootprintFt(d);
         h+='<div class="tr-pinset">Pin set · '+d.pin.lat.toFixed(5)+', '+d.pin.lng.toFixed(5)
-          +(fpv?('<br>Footprint '+Math.round(fpv.w)+' ft × '+Math.round(fpv.h)+' ft at '+(d.rot||0)+'°'):'')+'</div>';
+          +(fpv?('<br>Footprint '+trFtNum(fpv.w)+' ft × '+trFtNum(fpv.h)+' ft at '+(d.rot||0)+'°'):'')+'</div>';
       } else {
-        h+='<div style="font:600 10.5px \'Public Sans\';color:#b26a00;margin-top:7px">No pin yet — you can still save and add it later.</div>';
+        h+='<div style="font:600 10.5px \'Public Sans\';color:#b26a00;margin-top:7px">'
+          +(fpv?('The map will draw the trial as '+trFtNum(fpv.w)+' ft × '+trFtNum(fpv.h)+' ft, and you can turn it to line up with the plot. ')
+               :'Fill in the treatments, reps and plot size above and the map can draw the real footprint. ')
+          +'You can still save and add the pin later.</div>';
       }
     }
     h+='</div>';
   }
   h+='</div>';
 
-  if(d.id) h+='<div class="tr-sec">Restrictions</div>'
-    +'<div class="tr-empty" style="padding:18px;font-weight:600">Restrictions are managed from the study page — save first, then use <strong>＋ Restriction</strong>.</div>';
+  if(d.id&&(d.restrictions||[]).some(function(r){ return r&&!r.gid; }))
+    h+='<div class="tr-sec">Also on this study</div>'
+      +'<div class="tr-empty" style="padding:18px;font-weight:600">Restrictions added from the study page are managed there, not here.</div>';
+  /* Studies from before 2026-09-25 carry a products note. Shown so nothing
+     disappears, never asked for again. */
+  if((d.treatments||'').trim())
+    h+='<div class="tr-sec">From the old form</div><div class="list"><div class="tr-fgrp">'
+      +'<div class="tr-lbl">Treatments / products</div>'
+      +'<div style="font:600 12.5px \'Public Sans\';color:var(--ink);line-height:1.5;white-space:pre-wrap">'+esc(d.treatments)+'</div>'
+      +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:7px">'
+      +'The app stopped asking for this — it is usually a company’s to keep quiet about. Kept here because it was already typed in.</div>'
+      +'</div></div>';
 
   body.innerHTML=h;
 
@@ -4691,21 +5547,68 @@ function trRenderEdit(){
   var tags=document.getElementById('tre-ptags');
   if(tags) tags.addEventListener('click',function(e){
     var x=e.target.closest('[data-rmloc]'); if(!x) return;
-    trStash(); trDraft.locations.splice(+x.getAttribute('data-rmloc'),1); trRenderEdit();
-  });
-  trWireLayout();
-  var mp=document.getElementById('tre-multi');
-  if(mp) mp.addEventListener('click',function(){
-    trStash(); trDraft.multiPlot=!trDraft.multiPlot;
-    if(!trDraft.multiPlot){
-      if(trDraft.locations.length>1) trDraft.locations=trDraft.locations.slice(0,1);
-    } else { trDraft.coverage='whole'; trDraft.pin=null; }
+    trStash(); trDraft.locations.splice(+x.getAttribute('data-rmloc'),1);
+    if(!trDraft.locations.length) trDraft.pin=null;
     trRenderEdit();
+  });
+  var mb=document.getElementById('tre-mapbtn');
+  if(mb) mb.addEventListener('click',trOpenPlotPick);
+  trWireSize();
+
+  var ne=document.getElementById('tre-noend');
+  if(ne) ne.addEventListener('click',function(){
+    trStash(); trDraft.noEnd=!trDraft.noEnd;
+    if(trDraft.noEnd) trDraft.end='';
+    trRenderEdit();
+  });
+  var hr=document.getElementById('tre-hasres');
+  if(hr) hr.addEventListener('click',function(){
+    trStash(); trDraft.hasRes=!trDraft.hasRes;
+    if(trDraft.hasRes&&!(trDraft.resDraft||[]).length) trDraft.resDraft=[trNewResRow()];
+    trRenderEdit();
+  });
+  var ar=document.getElementById('tre-addres');
+  if(ar) ar.addEventListener('click',function(){
+    trStash(); trDraft.resDraft=(trDraft.resDraft||[]).concat([trNewResRow()]); trRenderEdit();
+  });
+  body.querySelectorAll('[data-rd-del]').forEach(function(x){
+    x.addEventListener('click',function(){
+      trStash(); trDraft.resDraft.splice(+x.getAttribute('data-rd-del'),1);
+      if(!trDraft.resDraft.length) trDraft.hasRes=false;
+      trRenderEdit();
+    });
+  });
+  body.querySelectorAll('[data-rd-noend]').forEach(function(x){
+    x.addEventListener('click',function(){
+      trStash();
+      var r=trDraft.resDraft[+x.getAttribute('data-rd-noend')]; if(!r) return;
+      r.noEnd=!r.noEnd; if(r.noEnd) r.end='';
+      trRenderEdit();
+    });
   });
   body.querySelectorAll('[data-cov]').forEach(function(o){
     o.addEventListener('click',function(){
-      trStash(); trDraft.coverage=o.getAttribute('data-cov');
-      if(trDraft.coverage==='whole') trDraft.pin=null;
+      trStash();
+      var cov=o.getAttribute('data-cov');
+      if(trDraft.coverage===cov) return;
+      trDraft.coverage=cov;
+      if(cov==='part'){
+        /* A part-of-a-plot trial is one plot and one pin, by definition. */
+        trDraft.multiPlot=false;
+        if(trDraft.locations.length>1) trDraft.locations=trDraft.locations.slice(0,1);
+      } else {
+        trDraft.pin=null;
+      }
+      trRenderEdit();
+    });
+  });
+  body.querySelectorAll('[data-multi]').forEach(function(o){
+    o.addEventListener('click',function(){
+      trStash();
+      var yes=(o.getAttribute('data-multi')==='yes');
+      if(trDraft.multiPlot===yes) return;
+      trDraft.multiPlot=yes;
+      if(!yes&&trDraft.locations.length>1) trDraft.locations=trDraft.locations.slice(0,1);
       trRenderEdit();
     });
   });
@@ -4725,17 +5628,78 @@ function trRenderEdit(){
     });
   }
 }
-function trPlotCountText(r,c){
-  r=parseInt(r,10); c=parseInt(c,10);
-  if(!(r>0&&c>0)) return 'Rows × columns of the plot grid';
-  return '= '+(r*c)+' plot'+(r*c===1?'':'s');
+function trNewResRow(){
+  return {gid:newId('g'),type:'',start:(trDraft&&trDraft.start)||trTodayISO(),
+          end:(trDraft&&trDraft.end)||'',noEnd:!(trDraft&&trDraft.end),note:''};
 }
-function trWireLayout(){
-  var r=document.getElementById('tre-rows'), c=document.getElementById('tre-cols'),
-      out=document.getElementById('tre-plotcount');
-  if(!r||!c||!out) return;
-  var upd=function(){ out.textContent=trPlotCountText(r.value,c.value); };
-  r.addEventListener('input',upd); c.addEventListener('input',upd);
+/* 1 to 50, offered as a dropdown AND typable: an <input list=…> is a text box
+   with a menu attached, so somebody who knows it is 24 types 24 and somebody
+   who does not scrolls to it. A <select> would not let them type; a plain
+   number box would not offer the list. */
+function trNumList(id){
+  var o=''; for(var i=1;i<=TR_MAX_N;i++) o+='<option value="'+i+'">';
+  return '<datalist id="'+id+'">'+o+'</datalist>';
+}
+/* The total, worked out rather than typed. Reads the DRAFT, so it updates as
+   somebody types without the form being redrawn under their fingers. */
+function trTotalHtml(d){
+  var g=trGridFt(d), tot=trTotalFt2(d), n=trRows(d)*trCols(d);
+  var head='<div class="tr-lbl" style="margin-bottom:6px">Total trial area</div>';
+  if(g){
+    return head
+      +'<div style="font:800 19px \'Archivo\';color:var(--ink);letter-spacing:-.3px">'+tot.toLocaleString()+' ft²</div>'
+      +'<div style="font:700 11.5px \'Public Sans\';color:var(--ink);margin-top:5px">'+esc(trGridText(d))+'</div>'
+      +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:4px;line-height:1.45">'
+      +esc(trLayoutText(d))+'<br>'+esc(trPlotSizeText(d))+'</div>';
+  }
+  if(tot>0){
+    /* A study from the old form: a typed total and nothing to draw it with. */
+    return head
+      +'<div style="font:800 19px \'Archivo\';color:var(--ink);letter-spacing:-.3px">'+tot.toLocaleString()+' ft²</div>'
+      +'<div style="font:600 10.5px \'Public Sans\';color:#b26a00;margin-top:5px;line-height:1.45">'
+      +'Typed in on the old form. Fill in the plot size above and the app will work it out — and will be able to draw the trial on the map.</div>';
+  }
+  return head+'<div style="font:600 12.5px \'Public Sans\';color:var(--muted);line-height:1.45">'
+    +'Fill in the treatments, the reps and the size of one plot, and the app works this out.</div>';
+}
+/* Live, and without redrawing the form — a redraw on every keystroke would
+   take the keyboard away mid-number. */
+function trWireSize(){
+  var ids=['tre-ntrt','tre-nrep','tre-plotw','tre-plotl','tre-alley'];
+  var out=document.getElementById('tre-total'); if(!out) return;
+  var upd=function(){
+    if(!trDraft) return;
+    var g=function(id){ var e=document.getElementById(id); return e?e.value:''; };
+    trDraft.nTrt=g('tre-ntrt'); trDraft.nRep=g('tre-nrep');
+    trDraft.plotW=g('tre-plotw'); trDraft.plotL=g('tre-plotl'); trDraft.alley=g('tre-alley');
+    out.innerHTML=trTotalHtml(trDraft);
+  };
+  ids.forEach(function(id){
+    var e=document.getElementById(id); if(e) e.addEventListener('input',upd);
+  });
+}
+/* The same map the crew pick plots on for a job — one screen, one set of
+   habits. A single-plot study takes the first plot tapped and nothing else. */
+function trOpenPlotPick(){
+  trStash();
+  var multi=(trDraft.coverage==='whole'&&trDraft.multiPlot===true);
+  var was=(trDraft.locations[0]||{}).plot;
+  plotPickDone=function(sel){
+    if(!trDraft) return;
+    var list=multi?sel.slice():sel.slice(0,1);
+    if(!multi&&list[0]!==was) trDraft.pin=null;   /* the pin belonged to the old plot */
+    trDraft.locations=list.map(trLocFor);
+    trRenderEdit();
+  };
+  pickOpen('','',trPlots(trDraft));
+  go('plotpick');
+}
+/* One plot, with whatever square footage the farm's own plot record knows. */
+function trLocFor(plot){
+  var sq=0;
+  try{ var inf=infoObj(plot); sq=parseInt((inf['Area (sq ft)']||'').toString().replace(/[^0-9]/g,''),10)||0; }catch(e){}
+  if(!sq&&/^LH\d+$/.test(plot)) sq=64;
+  return {plot:plot,sqft:sq};
 }
 function trStash(){
   if(!trDraft) return;
@@ -4749,24 +5713,42 @@ function trStash(){
      no roster match (an outside collaborator) is kept verbatim. */
   if((v=g('tre-pi'))!==undefined) trDraft.pi=pidOf(v)||v;
   if((v=g('tre-owner'))!==undefined) trDraft.owner=pidOf(v)||v;
+  if((v=g('tre-cat'))!==undefined) trDraft.cat=v;
   if((v=g('tre-obj'))!==undefined) trDraft.objective=v;
   if((v=g('tre-start'))!==undefined) trDraft.start=v;
+  /* The End box is not on the page at all when the end date is unknown, so
+     "undefined" here means "not asked", not "cleared". */
   if((v=g('tre-end'))!==undefined) trDraft.end=v;
-  if((v=g('tre-treat'))!==undefined) trDraft.treatments=v;
-  if((v=g('tre-area'))!==undefined) trDraft.area=v;
-  var rw=g('tre-rows'), cl=g('tre-cols');
-  if(rw!==undefined||cl!==undefined) trDraft.layout={rows:(rw||''),cols:(cl||'')};
+  if((v=g('tre-ntrt'))!==undefined) trDraft.nTrt=v;
+  if((v=g('tre-nrep'))!==undefined) trDraft.nRep=v;
+  if((v=g('tre-plotw'))!==undefined) trDraft.plotW=v;
+  if((v=g('tre-plotl'))!==undefined) trDraft.plotL=v;
+  if((v=g('tre-alley'))!==undefined) trDraft.alley=v;
+  trStashRes();
+}
+/* The restriction rows, read back off the form before anything redraws it. */
+function trStashRes(){
+  if(!trDraft||!Array.isArray(trDraft.resDraft)) return;
+  var body=document.getElementById('tre-body'); if(!body) return;
+  trDraft.resDraft.forEach(function(r,i){
+    var pick=function(attr){ return body.querySelector('['+attr+'="'+i+'"]'); };
+    var ty=pick('data-rd-type'), st=pick('data-rd-start'), en=pick('data-rd-end'), nt=pick('data-rd-note');
+    if(ty) r.type=ty.value;
+    if(st) r.start=st.value;
+    if(en) r.end=en.value;
+    if(nt) r.note=nt.value;
+  });
 }
 function trAddLoc(plot){
   if(!plot||!trDraft) return;
   trStash();
   if(trDraft.locations.some(function(l){return l.plot===plot;})){ trRenderEdit(); return; }
-  /* single-plot trials hold exactly one location, and moving plots voids the pin */
-  if(!trDraft.multiPlot){ trDraft.locations=[]; trDraft.pin=null; }
-  var sq=0;
-  try{ var inf=infoObj(plot); sq=parseInt((inf['Area (sq ft)']||'').toString().replace(/[^0-9]/g,''),10)||0; }catch(e){}
-  if(!sq&&/^LH\d+$/.test(plot)) sq=64;
-  trDraft.locations.push({plot:plot,sqft:sq});
+  /* Single-plot trials hold exactly one location, and moving plots voids the
+     pin -- a pin is a point inside one particular plot and means nothing in a
+     different one. */
+  var multi=(trDraft.coverage==='whole'&&trDraft.multiPlot===true);
+  if(!multi){ trDraft.locations=[]; trDraft.pin=null; }
+  trDraft.locations.push(trLocFor(plot));
   trRenderEdit();
   var pin=document.getElementById('tre-plotin'); if(pin){ pin.value=''; pin.focus(); }
 }
@@ -4775,18 +5757,62 @@ function trSaveStudy(){
   trStash();
   if(!(trDraft.title||'').trim()){ toast('Give the study a title'); return; }
   if(!trDraft.start){ toast('Set a start date'); return; }
+  if(trDraft.noEnd) trDraft.end='';
   if(trDraft.end&&trDraft.end<trDraft.start){ toast('End date is before the start'); return; }
-  if(trDraft.id){
-    for(var i=0;i<TRIALS.length;i++){ if(TRIALS[i].id===trDraft.id){ TRIALS[i]=trDraft; break; } }
-    trSave(); trCur=trDraft.id; toast('Protocol saved ✓'); show('trialdetail',false);
+  /* Restrictions are checked before anything is written, because a half-filled
+     one would go up as a real restriction on real ground. */
+  var bad=null;
+  if(trDraft.hasRes) (trDraft.resDraft||[]).forEach(function(r,i){
+    if(bad) return;
+    if(!r.type){ bad='Choose what restriction '+(i+1)+' is'; return; }
+    if(!r.start){ bad='Restriction '+(i+1)+' needs a start date'; return; }
+    if(!r.noEnd&&!r.end){ bad='Restriction '+(i+1)+' needs an end date, or tick "until it is lifted"'; return; }
+    if(r.end&&r.end<r.start){ bad='Restriction '+(i+1)+' ends before it starts'; return; }
+  });
+  if(bad){ toast(bad); return; }
+  if(trDraft.hasRes&&(trDraft.resDraft||[]).length&&!trDraft.locations.length){
+    toast('Choose the plot first — a restriction has to sit on ground'); return;
+  }
+
+  /* The total area is written onto the study so that everything that already
+     reads t.area -- the study page, the map, the export -- carries on working
+     without knowing where the number came from. It is derived, never typed:
+     trTotalFt2() is the only thing that decides it. */
+  trDraft.area=String(trTotalFt2(trDraft));
+  /* layout is kept in step for the same reason: older code and older studies
+     both speak rows-and-columns. */
+  var rr=trRows(trDraft), cc=trCols(trDraft);
+  trDraft.layout={rows:(rr?String(rr):''),cols:(cc?String(cc):'')};
+  if(trDraft.multiPlot===null||trDraft.multiPlot===undefined) trDraft.multiPlot=(trDraft.locations.length>1);
+  if(!trDraft.coverage) trDraft.coverage='whole';
+  trDraft.restrictions=trDraft.restrictions||[];
+  trSyncFormRes(trDraft);
+
+  /* hasRes and resDraft are how the FORM holds its rows. They are not part of
+     a study, and letting them travel would put a second copy of every
+     restriction in the database -- one that nothing reads and everything would
+     have to be kept in step with. Rebuilt from the records on the way back in;
+     see trResDraftFrom(). */
+  var rec=JSON.parse(JSON.stringify(trDraft));
+  delete rec.hasRes; delete rec.resDraft;
+
+  if(rec.id){
+    for(var i=0;i<TRIALS.length;i++){ if(TRIALS[i].id===rec.id){ TRIALS[i]=rec; break; } }
+    trSave(); trCur=rec.id; toast('Protocol saved ✓'); show('trialdetail',false);
   } else {
-    trDraft.id=newId('s');
-    trDraft.restrictions=trDraft.restrictions||[];
-    TRIALS.unshift(trDraft); trSave(); trCur=trDraft.id;
+    rec.id=newId('s');
+    TRIALS.unshift(rec); trSave(); trCur=rec.id;
     toast('Study created ✓');
-    trNotifyBill('New study · '+trDraft.title,trDraft.lab+' lab · '+trPlotsLabel(trDraft)+' · '+trFmt(trDraft.start));
+    trNotifyBill('New study · '+rec.title,rec.lab+' lab · '+trPlotsLabel(rec)+' · '+trFmt(rec.start));
     show('trialdetail',false);
   }
+  /* The draft is re-made as a COPY of what was stored, never left pointing at
+     the stored study itself. The form keeps its own hasRes/resDraft on the
+     draft, and on the stored record those two would travel to every phone as
+     a second, silent copy of every restriction. */
+  trDraft=JSON.parse(JSON.stringify(rec));
+  trDraft.resDraft=trResDraftFrom(trDraft);
+  trDraft.hasRes=trDraft.resDraft.length>0;
   trRender();
 }
 
@@ -4810,11 +5836,23 @@ function trpDraw(msg){
   _trpLatLng=L.latLng(cl.lat,cl.lng);
   var pts=trFootprintCorners(trDraft,cl.lat,cl.lng,_trpRot);
   var col=cl.fits?'#ff8200':'#c0392b';
-  if(pts){ _trpBox=L.polygon(pts,{color:col,weight:2,fillColor:col,fillOpacity:.25}).addTo(_trpMap); }
+  if(pts){
+    /* The outline, and inside it the individual plots where there are few
+       enough to draw -- see trFootprintPlots(). One layer group so the whole
+       thing comes off the map in one go on the next redraw. */
+    var layers=[L.polygon(pts,{color:col,weight:2,fillColor:col,fillOpacity:.14})];
+    var cells=trFootprintPlots(trDraft,cl.lat,cl.lng,_trpRot);
+    if(cells) cells.forEach(function(ring){
+      layers.push(L.polygon(ring,{color:col,weight:1,opacity:.85,fillColor:col,fillOpacity:.35}));
+    });
+    _trpBox=L.layerGroup(layers).addTo(_trpMap);
+  }
   _trpPin=L.circleMarker(_trpLatLng,{radius:7,color:'#fff',weight:2,fillColor:col,fillOpacity:1}).addTo(_trpMap);
   if(read){
     var fp=trFootprintFt(trDraft), txt=cl.lat.toFixed(5)+', '+cl.lng.toFixed(5);
-    txt+=fp?('  ·  '+Math.round(fp.w)+' ft × '+Math.round(fp.h)+' ft at '+_trpRot+'°'):'  ·  add a trial area to draw the footprint';
+    txt+=fp?('  ·  '+trFtNum(fp.w)+' ft × '+trFtNum(fp.h)+' ft at '+_trpRot+'°'
+             +(trLayoutText(trDraft)?('  ·  '+trLayoutText(trDraft)):''))
+           :'  ·  add the treatments, reps and plot size to draw the footprint';
     if(!cl.fits) txt+='  ·  does not fit inside '+plot+' — reduce the area or rotate';
     else if(cl.clamped) txt+='  ·  moved inside '+plot;
     read.textContent=txt;
@@ -4867,7 +5905,9 @@ function trRenderPin(){
   else { try{ _trpMap.fitBounds(_plots?_plots.getBounds():[[35.88,-83.96],[35.89,-83.95]]); }catch(e){ _trpMap.setView([35.885,-83.955],17); } }
   var hint=document.getElementById('trp-hint');
   if(hint) hint.innerHTML='<div>'+(f?('Tap inside '+esc(plot)+' to drop the pin. '):'This plot has no map outline — tap the spot on the imagery. ')
-    +(trFootprintFt(trDraft)?'The box shows the footprint from the area and layout you entered.':'Add a trial area on the form to see the footprint box.')+'</div>';
+    +(trFootprintFt(trDraft)
+       ?'The box is the trial as you entered it — one column per treatment, one row per rep. Turn it to line up with the plot.'
+       :'Fill in the treatments, the reps and the plot size on the form to see the trial drawn here.')+'</div>';
   setTimeout(function(){ _trpMap.invalidateSize(); trpDraw(); },80);
 }
 (function(){
@@ -4888,8 +5928,8 @@ var trResDraft=null;
 function trResNew(studyId){
   var t=trById(studyId); if(!t) return;
   if(!trCanEdit(t)){ toast('Only '+esc(t.lab)+' lab or Bill can restrict these plots'); return; }
-  trResDraft={studyId:studyId,id:null,type:'mow',scope:(trPlots(t)[0]||''),note:'',
-    start:trTodayISO(),end:t.end||''};
+  trResDraft={studyId:studyId,id:null,type:(TR_RTYPES[0]||{}).k||'mow',scope:(trPlots(t)[0]||''),note:'',
+    start:trTodayISO(),end:t.end||'',noEnd:!t.end};
   show('trialres',true);
 }
 function trRenderRes(){
@@ -4923,10 +5963,23 @@ function trRenderRes(){
       +'</div></div>';
   }
   h+='</div>';
-  h+='<div class="tr-fgrp"><div class="tr-2col">'
-    +'<div><div class="tr-lbl">Starts</div><input type="date" class="tr-in" id="trr-start" value="'+esc(d.start)+'"></div>'
-    +'<div><div class="tr-lbl">Ends</div><input type="date" class="tr-in" id="trr-end" value="'+esc(d.end)+'"></div>'
+  /* Same two choices as the new-study form: a real end date, or no end date
+     and it comes off when somebody lifts it. The box disappears when it is
+     open-ended rather than sitting there empty. */
+  h+='<div class="tr-fgrp">';
+  if(d.noEnd){
+    h+='<div class="tr-lbl">Starts</div><input type="date" class="tr-in" id="trr-start" value="'+esc(d.start)+'">';
+  } else {
+    h+='<div class="tr-2col">'
+      +'<div><div class="tr-lbl">Starts</div><input type="date" class="tr-in" id="trr-start" value="'+esc(d.start)+'"></div>'
+      +'<div><div class="tr-lbl">Ends</div><input type="date" class="tr-in" id="trr-end" value="'+esc(d.end)+'"></div>'
+      +'</div>';
+  }
+  h+='<div class="tr-opt sq'+(d.noEnd?' on':'')+'" id="trr-noend" style="margin-top:9px;margin-bottom:0"><div class="bx"></div><div style="flex:1">'
+    +'<div class="ol">No end date — until it is lifted</div>'
+    +'<div class="os">It stays on the map until Bill or the lab lifts it from this study.</div>'
     +'</div></div>';
+  h+='</div>';
   h+='<div class="tr-fgrp"><div class="tr-lbl">Note for the crew</div><textarea class="tr-in" id="trr-note" placeholder="e.g. N section only — untreated check block">'+esc(d.note)+'</textarea></div>';
   h+='</div>';
 
@@ -4936,24 +5989,47 @@ function trRenderRes(){
       var ty=trRType(r.type);
       return '<div class="row"><span class="tr-resic">'+esc(ty.ab)+'</span><div style="flex:1">'
         +'<div class="rt">'+esc(ty.label)+' · '+esc(r.scope)+'</div>'
-        +'<div class="rs">'+trFmt(r.start)+' – '+trFmt(r.end)+'</div></div></div>';
+        +'<div class="rs">'+trResRangeText(r)+'</div></div></div>';
     }).join('')+'</div>';
   }
   body.innerHTML=h;
+  var ne=document.getElementById('trr-noend');
+  if(ne) ne.addEventListener('click',function(){
+    trResStash();
+    trResDraft.noEnd=!trResDraft.noEnd;
+    if(trResDraft.noEnd) trResDraft.end='';
+    trRenderRes();
+  });
+}
+/* Read the form back before it is redrawn, so ticking the box does not throw
+   away what was already typed. */
+function trResStash(){
+  if(!trResDraft) return;
+  var g=function(id){ var e=document.getElementById(id); return e?e.value:undefined; };
+  var v;
+  if((v=g('trr-type'))!==undefined) trResDraft.type=v;
+  if((v=g('trr-scope'))!==undefined) trResDraft.scope=v;
+  if((v=g('trr-start'))!==undefined) trResDraft.start=v;
+  if((v=g('trr-end'))!==undefined) trResDraft.end=v;
+  if((v=g('trr-note'))!==undefined) trResDraft.note=v;
 }
 function trSaveRes(){
   if(!trResDraft) return;
   var t=trById(trResDraft.studyId); if(!t) return;
   var g=function(id){ var e=document.getElementById(id); return e?e.value:''; };
-  var type=g('trr-type'), scope=g('trr-scope'), start=g('trr-start'), end=g('trr-end'), note=g('trr-note');
+  var type=g('trr-type'), scope=g('trr-scope'), start=g('trr-start'), note=g('trr-note');
+  var end=trResDraft.noEnd?'':g('trr-end');
   if(!scope){ toast('Add a plot to the study first'); return; }
-  if(!start||!end){ toast('Set both start and end dates'); return; }
-  if(end<start){ toast('End date is before the start'); return; }
+  if(!start){ toast('Set a start date'); return; }
+  if(!end&&!trResDraft.noEnd){ toast('Set an end date, or tick "until it is lifted"'); return; }
+  if(end&&end<start){ toast('End date is before the start'); return; }
   t.restrictions=t.restrictions||[];
+  /* No gid: this one was added here, on the study, so the new-study form never
+     touches it. See trSyncFormRes(). */
   t.restrictions.push({id:newId('r'),type:type,scope:scope,note:note,start:start,end:end,by:trMe()});
   trSave();
   toast('Restriction placed · Bill alerted');
-  trNotifyBill('Restriction placed · '+scope,trRType(type).label+' · '+esc(t.title)+' · through '+trFmt(end));
+  trNotifyBill('Restriction placed · '+scope,trRType(type).label+' · '+esc(t.title)+' · '+(end?('through '+trFmt(end)):'until it is lifted'));
   trCur=t.id; show('trialdetail',false); trRender();
 }
 
@@ -5032,7 +6108,7 @@ function lhPlot(id){
   var ts=trialsForPlot(id).filter(trVisible), rs=trRestrictionsForPlot(id), html='';
   if(rs.length){
     html+='<div style="background:#fdeceb;border:1px solid #f3c4bf;border-radius:10px;padding:10px 12px;margin-bottom:10px;color:#a5342a;font-size:12.5px;font-weight:700">'
-      +rs.map(function(x){ return esc(trRType(x.r.type).label)+' · '+esc(trResExtentText(x.study,x.r))+' · through '+trFmt(x.r.end); }).join('<br>')+'</div>';
+      +rs.map(function(x){ return esc(trRType(x.r.type).label)+' · '+esc(trResExtentText(x.study,x.r))+' · '+(x.r.end?('through '+trFmt(x.r.end)):'until it is lifted'); }).join('<br>')+'</div>';
   }
   if(!ts.length){
     html+='<div style="background:#fff6ec;border:1px solid #ffe0bd;border-radius:8px;padding:11px 13px;color:#8a6a3a;font-size:13px">No study assigned to '+esc(id)+' yet. Studies added in the <strong>Trials module</strong> show here automatically.</div>';
@@ -5142,7 +6218,7 @@ function trPopHtml(name){
   var h='<div style="border-top:1px solid #e6e8eb;margin-top:7px;padding-top:7px">';
   if(rs.length){
     h+='<div style="background:#fdeceb;border-radius:7px;padding:6px 8px;margin-bottom:6px;color:#a5342a;font:700 11px \'Public Sans\'">'
-      +rs.map(function(x){return esc(trRType(x.r.type).label)+' · '+esc(trResExtentText(x.study,x.r))+' · to '+trFmt(x.r.end);}).join('<br>')+'</div>';
+      +rs.map(function(x){return esc(trRType(x.r.type).label)+' · '+esc(trResExtentText(x.study,x.r))+' · '+(x.r.end?('to '+trFmt(x.r.end)):'until lifted');}).join('<br>')+'</div>';
   }
   ts.forEach(function(t){
     var st=TR_STAGE[t.stage]||TR_STAGE.planned;
@@ -6970,7 +8046,31 @@ function jobResKind(type,name){
   if(/irrigat|hand ?water|water/.test(s))      return 'irrigate';
   return '';
 }
-function jobResCfg(type,name){ return JOB_RES[jobResKind(type,name)]||null; }
+/* The eight built-in restriction types are written into JOB_RES above and can
+   never fall out of it. A type the farm ADDS on More -> Farm settings ->
+   Restriction types is folded in here, so it really stops work rather than
+   just drawing on the map.
+
+   It is a UNION and never a replacement, which is the whole point: if that
+   list is empty, broken, or has not arrived on this phone yet, the worst that
+   can happen is the eight originals carry on blocking exactly what they
+   always did. The other way round -- deriving the list entirely from
+   TR_RTYPES -- a bad list would quietly UNBLOCK a job on ground a study has
+   closed, and nothing on any screen would say so. */
+function jobResCfg(type,name){
+  var k=jobResKind(type,name), base=JOB_RES[k];
+  if(!base) return null;
+  var extra=[];
+  try{
+    TR_RTYPES.forEach(function(r){
+      if(!r||!r.k) return;
+      if(base.kinds.indexOf(r.k)>=0||extra.indexOf(r.k)>=0) return;
+      if((r.stops||[]).indexOf(k)>=0) extra.push(r.k);
+    });
+  }catch(e){}
+  if(!extra.length) return base;
+  return {kinds:base.kinds.concat(extra), ing:base.ing, stop:base.stop, around:base.around};
+}
 /* Toast copy for a blocked / partially blocked tap, worded for the job. */
 /* Add or remove a set of plots from a selection list in one go — a tap on a
    cut-height block moves the whole run, not one rectangle. */
@@ -7917,6 +9017,8 @@ function storeSaveLocal(){
   try{ sprayScan(); }catch(e){}
   try{ mowersScan(); }catch(e){}
   try{ labsScan(); }catch(e){}
+  try{ trialCatsScan(); }catch(e){}
+  try{ resTypesScan(); }catch(e){}
   try{ bugcfgScan(); }catch(e){}
   try{ clockcfgScan(); }catch(e){}
 }
@@ -7964,6 +9066,8 @@ function storeHydrate(){
   try{ sprayHydrate(); }catch(e){}
   try{ mowersHydrate(); }catch(e){}
   try{ labsHydrate(); }catch(e){}
+  try{ trialCatsHydrate(); }catch(e){}
+  try{ resTypesHydrate(); }catch(e){}
   try{ tsyncHydrate(); }catch(e){}
   try{ msyncHydrate(); }catch(e){}
   try{ csyncHydrate(); }catch(e){}

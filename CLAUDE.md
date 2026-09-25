@@ -118,6 +118,21 @@ it happens. **Only opening the app does.** The split itself proves the point:
 it introduced a crash that all 1,700 checks passed straight over, and reading
 the console is what found it.
 
+**And one thing that is not a trap but a live wire.** The app you open on
+localhost is wired to the farm's **real** database, not a practice one, and if
+that browser is still holding somebody's sign-in it will read and write as
+them. On 2026-09-25 a session faked a sign-in to test the trial form, created a
+study, and the database refused the write — which the app correctly read as
+"this study was deleted somewhere else" and tombstoned. Nothing reached the
+farm, because the rules did their job. It very easily could have.
+
+So: **never test anything that writes against the app served straight out of
+this folder.** Copy the page to a scratch folder, blank `FB_CONFIG.apiKey` in
+the copy, symlink `app-0*.js`, `farm-geo.js` and `vendor` beside it, and serve
+that. `dbConfigured()` then returns false, every drawer stays offline, and the
+app behaves exactly the same in every way that does not involve the network.
+Reading a screen is safe on the real thing; saving anything is not.
+
 Two traps when you do this:
 
 - **The browser caches the old file.** If you still see an error you have
@@ -244,6 +259,8 @@ get wrong.
 | Bottom sheets, and the four CSS rules that name them | `#donesheet`, `#partsheet`, `#restsheet` and `#asksheet` are listed **by id** in four rules in the page's stylesheet. Add a sheet without adding its id to all four and it gets no positioning and no display rule — so it never hides, sits at the top of the screen with no dark backdrop, and **nothing errors**. `#asksheet` did exactly that on 2026-09-24 and every check passed over it, because the markup and the behaviour were both right. `tools/test-notifications.js` section 18 now fails when a sheet is missing from a rule that names `#restsheet`. |
 | `tcAutoClose()` in `app-05-tasks-clock.js` | Writes a clock-out onto somebody's **payroll record**. It uses the hours they were scheduled to finish, never the cut-off time, and when there is no honest end time it writes nothing at all and asks the student instead. Only a phone `tcCanEditPunches()` allows runs it, because `canPunchFor()` in `firestore.rules` is the same test. Making it fall back to a guess, or letting any phone run it, are both changes to what the farm pays people. See `docs/DECISIONS.md`, 2026-09-24. |
 | The task fields the bell reads | `assignee`, `assignedBy`, `requestedBy`, `completedBy`, `partial`, `leftPlots`, `restAssigned` — plus `kind`, `origin`, `target` and `students`, which are what tell a labor request from an ordinary job and which way it was going. The notification feed (`ntfScan()`, `app-01-shell.js`) works out who to tell by watching these change. Rename one in the task code and the alerts stop — no error, no empty screen, just a bell that never lights up again. `tools/test-notifications.js` section 10 checks the app still writes them. **The feed is derived, not stored:** it is worked out on each phone from the task list, so there is no drawer, no rule and no row in `test-sync-settles.js` to add. Don't turn it into one without reading `docs/DECISIONS.md`, 2026-09-24. |
+| `TR_RES_PALETTE` in `UT-TurfFarm-App.html` | The seven colors the app hands to a restriction type somebody adds on the Restriction types screen. **Every one is also a key in `CB_MAP` mapping to itself.** That is what makes it survive color-blind mode — a color that is not in `CB_MAP` gets the generic shift, so it comes out something nobody chose, with no error and nothing to see. Add a color here, add it there, in the same change. The person adding a restriction type never picks a color, on purpose. |
+| `jobResCfg()` in `UT-TurfFarm-App.html` | Decides which restrictions stop a given job. It is the **union** of `JOB_RES` (the eight built-in types, written into the code) and whatever a restriction type on the farm's own list says it `stops`. Union, never replacement: a list that is empty, malformed or has not reached this phone yet can then only fail by leaving the original eight blocking what they always did. Derive it purely from `TR_RTYPES` and a bad list silently **unblocks** a job on ground a study has closed — the crew mow a trial and nothing anywhere says why. See `docs/DECISIONS.md`, 2026-09-25. |
 | `roster-emails.local.json` | The crew's email addresses. Deliberately kept out of the public repo. Never commit it. |
 
 ---

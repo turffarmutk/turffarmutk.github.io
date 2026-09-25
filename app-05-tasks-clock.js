@@ -401,13 +401,44 @@ var PICKCTX={type:'',name:''};
 function renderPlotPick(){
  var targets=PICKCTX.targets||(PICKCTX.targets=jobPickTargets(PICKCTX.type,PICKCTX.name,PICK));
  var st=jobMapEnsure('pick','ppmap');
+ /* ---- "pick one and carry on" ------------------------------------------
+    A trial that sits inside part of a plot needs ONE plot, and the moment it
+    has one the next thing to do is place the trial in it. So in this mode the
+    tap IS the answer: there is nothing left to confirm, the Done button would
+    only be a second tap saying "yes, that one", and the screen goes straight
+    on to the map zoomed into the plot that was tapped.
+
+    Everything else -- a job, a field log entry, a whole-plot study -- keeps
+    Done, because those take as many plots as they take. */
+ var one=(typeof PICKCTX.thenPin==='function');
+ var hd=document.querySelector('#s-plotpick .hdr .title');
+ if(hd) hd.textContent=one?'Which plot is the trial in?':'Choose plots';
+ var dn=document.getElementById('pp-done'); if(dn) dn.style.display=one?'none':'';
+ var hint=document.querySelector('#s-plotpick .maphint');
+ if(hint) hint.textContent=one?'Tap the plot the trial sits in \u2014 the map opens on it next'
+                             :'Tap plots to select \u00b7 red ground is closed to mowing';
  jobMapDraw(st,{mode:'pick',targets:targets,blockOn:PICKCTX.quick,sel:PICK,fitKey:'pp:'+PICKCTX.type+'|'+PICKCTX.name,jobType:PICKCTX.type,jobName:PICKCTX.name,onTap:function(n,info){
    if(info.blocked){ toast(resStopMsg(info,n)); return; }
    if(info.partial) toast(resAroundMsg(info,n));
+   /* Read the same way the find box does, for the same reason -- these two are
+      the only ways into this screen and they must not be able to disagree. */
+   if(typeof PICKCTX.thenPin==='function'){ PICKCTX.thenPin(n); return; }
    jobTapSelect(PICK,n,info);
    renderPlotPick();
  }});
  pickFindWire('pp-find','pp-find-sug',function(){return PICKCTX.targets;},function(n){
+   /* Finding a plot by name is the same answer as tapping it, so it carries on
+      the same way. Otherwise somebody who typed the plot would be left on a map
+      with no Done button and no way forward.
+
+      READ FROM PICKCTX HERE, never from a variable closed over above.
+      pickFindWire() wires this box exactly ONCE (`inp._pfWired`), so the first
+      callback ever handed to it is the one that serves every later use of the
+      picker -- a task, a field log filter, a multi-plot study. Anything
+      captured would be frozen at whatever the picker happened to be doing the
+      very first time somebody opened it, and the only symptom would be the
+      search box quietly doing nothing on the crew's own screens. */
+   if(typeof PICKCTX.thenPin==='function'){ PICKCTX.thenPin(n); return; }
    if(pickSelectByName(PICK,n,PICKCTX.type,PICKCTX.name)) renderPlotPick();
  });
  var k=document.getElementById('pp-kind'); if(k)k.textContent=jobKindLabel(PICKCTX.type,PICKCTX.name)||'Plots';

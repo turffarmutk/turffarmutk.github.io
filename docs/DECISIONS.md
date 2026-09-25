@@ -1223,10 +1223,37 @@ asked about multiple plots first, so a single-plot study — nearly all of them 
 had to answer a question about several plots before it could say anything. Null
 rather than false because false is an answer: an assumed "one plot" is how a
 two-plot study ends up filed on one.
+A part-of-a-plot study goes further: tapping the plot on that map goes
+**straight on** to the pin screen, zoomed into the plot it just took
+(`PICKCTX.thenPin`). No Done button in that mode — the tap is the answer.
 **Don't:** don't collapse `multiPlot` back to a plain boolean, and don't build a
 second plot-picking map. The one on `s-plotpick` is the map the crew already
 use for every job, and a second one would be a second set of habits and a
-second thing to keep in step with the farm's geometry.
+second thing to keep in step with the farm's geometry. And don't push the pin
+screen on top of the picker — it replaces it (`show('trialpin',false)`), so
+Back from placing the trial returns to the form, where the plot is written
+down and can be changed, rather than to the map again.
+
+### The plot picker's search box is wired ONCE, for the life of the app — 2026-09-25
+**Decision:** anything that changes how the picker behaves is read from
+`PICKCTX` at the moment of the tap, never captured in the callback handed to
+`pickFindWire()`.
+**Why:** `pickFindWire()` guards itself with `inp._pfWired`, so the **first**
+callback it is ever given is the one that serves every later use of that
+screen — a job, a field log filter, a whole-plot study, a trial. Writing
+`if(one)` against a variable from the enclosing render froze the mode at
+whatever the picker happened to be doing the first time anybody opened it.
+Caught in testing on the day it was written: after a part-of-a-plot trial, the
+search box on the crew's own task screen threw `PICKCTX.thenPin is not a
+function` and silently did nothing, while the map next to it carried on
+working perfectly.
+**Don't:** don't close over render-time state in that callback, and don't
+assume a fresh render re-wires it — only `jobMapDraw()` does that, because it
+clears and rebuilds its layers every time. `tools/test-plot-picker.js` §7b
+guards it, and it has to **replace** the input and suggestion elements with
+clones to test this: merely clearing `_pfWired` adds a second set of listeners,
+so every choice fires twice and cancels itself out, and the check passes while
+the bug sits there. The first version of that test did exactly that.
 
 ### "Treatments / products" came off the study form — 2026-09-25
 **Decision:** the form no longer asks for it. Studies that already carry

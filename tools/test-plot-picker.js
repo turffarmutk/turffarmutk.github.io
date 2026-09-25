@@ -87,6 +87,10 @@ const doc = win.document;
 const P = win.__pk || {};
 const txt = id => { const e = doc.getElementById(id); return e ? e.textContent.trim() : '(missing)'; };
 const shown = id => { const e = doc.getElementById(id); return !!e && e.style.display !== 'none'; };
+const title = () => { const e = doc.querySelector('#s-plotpick .hdr .title'); return e ? e.textContent.trim() : '(missing)'; };
+/* The app's code with the app-*.js files written back into the page, for the
+   checks below that read a line of source rather than run it. */
+const SRC = require('./_app').appText();
 const tap = id => doc.getElementById(id).dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
 const tplNamed = re => (P.TEMPLATES || []).filter(t => re.test(t.name))[0];
 
@@ -279,6 +283,83 @@ section('7. the Choose plots screen works the same way');
   win.renderPlotPick();
   ok('the button is on that screen too', shown('pp-all') && /Fairway/i.test(txt('pp-all')), txt('pp-all'));
   ok('and its count reads plainly', txt('pp-count') === '1 selected', txt('pp-count'));
+}
+
+section('7b. "pick one and carry on" must not stick to the screen');
+{
+  /* A trial that sits inside part of a plot opens this same screen in a mode
+     where the tap IS the answer: one plot, then straight on to placing the
+     trial in it. No Done button, because there is nothing left to confirm.
+
+     THE ONE THAT MATTERS. pickFindWire() wires the search box exactly once
+     (`inp._pfWired`), so the FIRST callback it is ever handed serves every
+     later use of the picker. Close over the mode and it freezes at whatever
+     the picker was doing the first time anybody opened it -- and then the
+     search box quietly stops working on the crew's own task screens, while the
+     map carries on working, which is about as hard to report as a bug gets.
+
+     So the wiring is deliberately torn down first, and the screen is rendered
+     in TRIAL mode before anything else, to make this run the way a phone
+     would where a trial happened to be the first thing opened. Without that
+     reset the box is already wired from section 7 and this proves nothing --
+     which is exactly how the first version of this check passed while the bug
+     was sitting right there. Do not remove the reset. */
+  /* Both elements are REPLACED with fresh clones rather than just clearing the
+     `_pfWired` flag. Clearing the flag alone makes pickFindWire() add a SECOND
+     set of listeners to the same element, so every choice fires twice -- once
+     selecting the plot and once unselecting it -- and the check fails for a
+     reason that has nothing to do with the thing being tested. A clone carries
+     no listeners and no expando, so this is a genuinely unwired box. */
+  const swap = id => {
+    const oldEl = win.document.getElementById(id);
+    const fresh = oldEl.cloneNode(false);
+    fresh.id = id; fresh.className = oldEl.className;
+    if (oldEl.getAttribute('placeholder')) fresh.setAttribute('placeholder', oldEl.getAttribute('placeholder'));
+    oldEl.replaceWith(fresh);
+    return fresh;
+  };
+  const findBox = swap('pp-find');
+  swap('pp-find-sug');
+
+  win.pickOpen('', '', []);
+  win.PICKCTX.thenPin = function (n) { win.__thenPin = n; };
+  win.renderPlotPick();                       /* <- the box gets wired HERE */
+  ok('in trial mode the screen asks for one plot', /which plot is the trial in/i.test(title()), title());
+  ok('and there is no Done button to press', !shown('pp-done'));
+
+  /* Now a normal job, on the very same screen and the same wired box. */
+  win.pickOpen('Mow', 'Fairway', ['B14']);
+  win.renderPlotPick();
+  ok('the Done button comes back for a job', shown('pp-done'));
+  ok('and the heading goes back to Choose plots', /choose plots/i.test(title()), title());
+
+  win.__thenPin = null;
+  const before = P.pick().slice();
+  /* Whatever plot this job can actually take and has not got -- named from the
+     live target list rather than typed in here, so the check is about the
+     search box and not about which plots the farm happens to have. */
+  const want = win.PICKCTX.targets.filter(n => before.indexOf(n) < 0
+                 && win.jobRes(n, 'Mow', 'Fairway').full.length === 0)[0];
+  ok('there is a plot left to choose', !!want, String(want));
+  findBox.value = want;
+  findBox.dispatchEvent(new win.Event('input', { bubbles: true }));
+  const sug = win.document.querySelector('#pp-find-sug [data-pfgo="' + want + '"]')
+           || win.document.querySelector('#pp-find-sug [data-pfgo]');
+  ok('the search box offers it', !!sug, 'no suggestion for ' + want);
+  if (sug) sug.click();
+  ok('choosing it selects the plot', P.pick().indexOf(want) >= 0,
+     'wanted=' + want + ' pick=' + P.pick().join(','));
+  ok('and did NOT run the trial hand-off', win.__thenPin === null, String(win.__thenPin));
+  ok('what was already picked is still picked', before.every(n => P.pick().indexOf(n) >= 0));
+
+  /* And the source rule, stated where somebody editing it will see it. The
+     check is for the ABSENCE of the captured flag, because the correct line
+     appears twice and finding one of them proves nothing about the other. */
+  ok('neither way into the screen closes over the mode',
+     SRC.indexOf('if(one){ PICKCTX.thenPin') < 0);
+  ok('and both read it from PICKCTX instead',
+     SRC.split("if(typeof PICKCTX.thenPin==='function'){ PICKCTX.thenPin(n); return; }").length - 1 === 2,
+     String(SRC.split("if(typeof PICKCTX.thenPin==='function'){ PICKCTX.thenPin(n); return; }").length - 1));
 }
 
 section('8. nothing blew up');

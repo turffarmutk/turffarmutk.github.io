@@ -5475,7 +5475,9 @@ function trRenderEdit(){
       +'<div id="tre-plotsug" class="tr-sug" style="display:none"></div></div>';
     /* Summitt blue, the same #489FDF the banner uses. It is registered in
        CB_MAP as mapping to itself, so it survives color-blind mode. */
-    h+='<div class="tr-mapbtn tap" id="tre-mapbtn">Select '+(multi?'plots':'the plot')+' from the map</div>';
+    h+='<div class="tr-mapbtn tap" id="tre-mapbtn">'
+      +(d.coverage==='part'?'Pick the plot on the map and place the trial'
+                           :('Select '+(multi?'plots':'the plot')+' from the map'))+'</div>';
     h+='<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:7px">Square footage is pulled from the plot record where we have it.</div>';
     h+='</div>';
   }
@@ -5484,7 +5486,9 @@ function trRenderEdit(){
     h+='<div class="tr-fgrp">';
     h+='<div class="tr-lbl">Where in the plot?</div>';
     if(!d.locations.length){
-      h+='<div style="font:600 11.5px \'Public Sans\';color:#b26a00;line-height:1.45">Choose the plot above first — the map has to know which plot to open.</div>';
+      h+='<div style="font:600 11.5px \'Public Sans\';color:#b26a00;line-height:1.45">'
+        +'Use <strong>Pick the plot on the map and place the trial</strong> above — tapping the plot opens the map on it '
+        +'and you place the trial there in one go. Typing the plot instead brings you back here.</div>';
     } else {
       h+='<div class="tr-pinbtn tap" id="tre-pinbtn">'+(d.pin?'Move the pin on the map':'Place the pin on the map')+'</div>';
       var fpv=trFootprintFt(d);
@@ -5679,9 +5683,16 @@ function trWireSize(){
   });
 }
 /* The same map the crew pick plots on for a job — one screen, one set of
-   habits. A single-plot study takes the first plot tapped and nothing else. */
+   habits. A single-plot study takes the first plot tapped and nothing else.
+
+   A PART-OF-A-PLOT study goes further and does the whole thing in one trip:
+   tap the plot, the map opens zoomed into that plot with the trial drawn to
+   size, place it, done. Dillon's call, 2026-09-25 — choosing which plot and
+   saying where in it are one question asked twice, and making them two trips
+   out to the map was the app's problem, not his. */
 function trOpenPlotPick(){
   trStash();
+  var part=(trDraft.coverage==='part');
   var multi=(trDraft.coverage==='whole'&&trDraft.multiPlot===true);
   var was=(trDraft.locations[0]||{}).plot;
   plotPickDone=function(sel){
@@ -5692,6 +5703,22 @@ function trOpenPlotPick(){
     trRenderEdit();
   };
   pickOpen('','',trPlots(trDraft));
+  if(part){
+    /* No Done button in this mode, so no callback for one — see
+       renderPlotPick(). The tap goes straight through instead. */
+    plotPickDone=null;
+    PICKCTX.thenPin=function(plot){
+      if(!trDraft) return;
+      /* Picking the SAME plot again keeps the pin, so "move the pin" is not a
+         trap that quietly throws the old one away. */
+      if(plot!==was) trDraft.pin=null;
+      trDraft.locations=[trLocFor(plot)];
+      /* Replaces the map rather than stacking on top of it, so Back from the
+         pin screen returns to the form — where the plot it just chose is
+         written down and can be changed — and not to the map again. */
+      show('trialpin',false);
+    };
+  }
   go('plotpick');
 }
 /* One plot, with whatever square footage the farm's own plot record knows. */

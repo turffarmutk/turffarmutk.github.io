@@ -1234,6 +1234,30 @@ screen on top of the picker — it replaces it (`show('trialpin',false)`), so
 Back from placing the trial returns to the form, where the plot is written
 down and can be changed, rather than to the map again.
 
+### Placing a trial: zoom to 21, and the pin is a draggable marker — 2026-09-25
+**Decision:** the trial-placing map's ceiling went from `maxZoom:18` to 21 with
+`zoomSnap:0.25`, the initial fit stopped padding the plot by 60%, a study that
+already has a pin opens on the **trial** rather than the whole plot, and the
+pin became an `L.marker({draggable:true})` with a 34px grab area around a 16px
+dot.
+**Why:** Dillon, on using it: "We need to map to zoom in much closer when
+putting a pin down. Also, I would like to be able to drag the pin after its
+placed." Both were the app's fault. This screen — the one place in the app
+where somebody positions a thing a few feet across — was capped **two levels
+below the farm map**, and then threw away 60% of the frame on top, so a 20 ft
+trial opened as a speck and pinching did nothing. And a `circleMarker` cannot
+be dragged at all, so a pin three feet off could only be fixed by tapping
+again and hoping.
+**Don't:** don't call `setIcon()` from the `drag` handler. It rebuilds the
+marker's element, and rebuilding the element a finger is holding ends the drag
+halfway through; `trpPinColor()` recolors the dot in place instead. Don't clamp
+during the drag either — the pin would stop at the plot edge while the finger
+carried on, which reads as the app being broken. The footprint turns red
+instead, and `dragend` is where `trClampToPlot()` pulls it back in. And don't
+tear the marker down and rebuild it on every redraw the way the circle was:
+`trpSetBox()` is separate from the pin precisely so a drag can redraw the
+footprint on every frame without touching the thing being dragged.
+
 ### The plot picker's search box is wired ONCE, for the life of the app — 2026-09-25
 **Decision:** anything that changes how the picker behaves is read from
 `PICKCTX` at the moment of the tap, never captured in the callback handed to

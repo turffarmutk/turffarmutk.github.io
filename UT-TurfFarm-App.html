@@ -388,6 +388,17 @@
   .tr-opt .ol{font:800 13px 'Public Sans';color:var(--ink)}
   .tr-opt .os{font:600 11px 'Public Sans';color:var(--muted);margin-top:2px;line-height:1.4}
   .tr-pinbtn{margin-top:2px;background:#2f3133;color:#fff;border-radius:11px;padding:12px;text-align:center;font:800 12.5px 'Public Sans';cursor:pointer}
+  /* The trial pin on the placing map. A Leaflet marker rather than a circle,
+     because only a marker can be dragged, and Dillon asked for a pin he can
+     nudge after dropping it. The dot reads at 16px; the square a thumb has to
+     find is 34, because a pin you cannot grab with a glove on is a pin you
+     cannot move. Both names are the trials module's own prefix — a short word
+     like .pin would land on things nobody was looking at. */
+  .trp-pin-wrap{background:none;border:none}
+  .trp-pin{display:block;width:16px;height:16px;margin:9px;border-radius:50%;
+    border:2px solid #fff;box-sizing:border-box;box-shadow:0 1px 5px rgba(0,0,0,.55)}
+  .leaflet-marker-draggable{cursor:grab}
+  .leaflet-marker-draggable:active{cursor:grabbing}
   /* Summitt blue, the same #489FDF as the banner option. Dillon asked for this
      button in that color, 2026-09-25. It is a key in CB_MAP, so color-blind
      mode has an answer for it rather than shifting it to something nobody
@@ -5852,41 +5863,112 @@ function trPlotFeature(name){
   try{ (PLOTS_DATA.features||[]).forEach(function(x){ if((x.properties||{}).number===name) f=x; }); }catch(e){}
   return f;
 }
+function trpPlotName(){ return (trDraft&&(trDraft.locations[0]||{}).plot)||''; }
+
+/* ---- the pin ------------------------------------------------------------
+   A Leaflet MARKER, not a circle. Dillon, 2026-09-25: a pin that landed a few
+   feet off has to be nudgeable, and only a marker can be dragged.
+
+   The dot reads at 16px; the square a thumb has to find is 34, because a pin
+   you cannot grab with a glove on in bright sun is a pin you cannot move. */
+function trpIcon(col){
+  return L.divIcon({className:'trp-pin-wrap',
+    html:'<span class="trp-pin" style="background:'+trpSafe(col)+'"></span>',
+    iconSize:[34,34], iconAnchor:[17,17]});
+}
+/* Color-blind mode rewrites the colors already on the page when it is switched
+   on. This pin is built AFTER that has run, so it has to ask for the right
+   color itself rather than wait to be rewritten. */
+function trpSafe(col){
+  try{ if(typeof THEME!=='undefined'&&THEME.cb&&typeof cbColor==='function') return cbColor(col); }catch(e){}
+  return col;
+}
+/* Recolors the dot in place. NEVER setIcon() for this: setIcon rebuilds the
+   marker's element, and rebuilding the element a finger is currently holding
+   ends the drag halfway through. */
+function trpPinColor(col){
+  try{
+    var el=_trpPin&&_trpPin.getElement();
+    var dot=el&&el.querySelector('.trp-pin');
+    if(dot) dot.style.background=trpSafe(col);
+  }catch(e){}
+}
+/* Just the footprint. Kept separate from the pin so a drag can redraw the box
+   on every frame without touching the marker being dragged. */
+function trpSetBox(lat,lng,rot,fits){
+  if(_trpBox){ _trpMap.removeLayer(_trpBox); _trpBox=null; }
+  var pts=trFootprintCorners(trDraft,lat,lng,rot); if(!pts) return;
+  var col=trpSafe(fits?'#ff8200':'#c0392b');
+  /* The outline, and inside it the individual plots where there are few enough
+     to draw -- see trFootprintPlots(). One layer group so the whole thing comes
+     off the map in one go on the next redraw. */
+  var layers=[L.polygon(pts,{color:col,weight:2,fillColor:col,fillOpacity:.14})];
+  var cells=trFootprintPlots(trDraft,lat,lng,rot);
+  if(cells) cells.forEach(function(ring){
+    layers.push(L.polygon(ring,{color:col,weight:1,opacity:.85,fillColor:col,fillOpacity:.35}));
+  });
+  _trpBox=L.layerGroup(layers).addTo(_trpMap);
+}
+function trpReadout(lat,lng,fits,clamped,dragging){
+  var read=document.getElementById('trp-read'); if(!read) return;
+  var fp=trFootprintFt(trDraft), plot=trpPlotName();
+  var txt=lat.toFixed(5)+', '+lng.toFixed(5);
+  txt+=fp?('  ·  '+trFtNum(fp.w)+' ft × '+trFtNum(fp.h)+' ft at '+_trpRot+'°'
+           +(trLayoutText(trDraft)?('  ·  '+trLayoutText(trDraft)):''))
+         :'  ·  add the treatments, reps and plot size to draw the footprint';
+  if(!fits) txt+=dragging?('  ·  outside '+plot+' — let go and it moves back in')
+                        :('  ·  does not fit inside '+plot+' — reduce the area or rotate');
+  else if(clamped) txt+='  ·  moved inside '+plot;
+  read.textContent=txt;
+}
 function trpDraw(msg){
   if(!_trpMap) return;
-  if(_trpPin){ _trpMap.removeLayer(_trpPin); _trpPin=null; }
-  if(_trpBox){ _trpMap.removeLayer(_trpBox); _trpBox=null; }
   var read=document.getElementById('trp-read');
-  if(!_trpLatLng){ if(read) read.textContent='No pin placed yet.'; return; }
-  var plot=(trDraft.locations[0]||{}).plot||'';
+  if(!_trpLatLng){
+    if(_trpPin){ _trpMap.removeLayer(_trpPin); _trpPin=null; }
+    if(_trpBox){ _trpMap.removeLayer(_trpBox); _trpBox=null; }
+    if(read) read.textContent='No pin placed yet.';
+    return;
+  }
+  var plot=trpPlotName();
   var cl=trClampToPlot(trDraft,_trpLatLng.lat,_trpLatLng.lng,_trpRot,plot);
   _trpLatLng=L.latLng(cl.lat,cl.lng);
-  var pts=trFootprintCorners(trDraft,cl.lat,cl.lng,_trpRot);
-  var col=cl.fits?'#ff8200':'#c0392b';
-  if(pts){
-    /* The outline, and inside it the individual plots where there are few
-       enough to draw -- see trFootprintPlots(). One layer group so the whole
-       thing comes off the map in one go on the next redraw. */
-    var layers=[L.polygon(pts,{color:col,weight:2,fillColor:col,fillOpacity:.14})];
-    var cells=trFootprintPlots(trDraft,cl.lat,cl.lng,_trpRot);
-    if(cells) cells.forEach(function(ring){
-      layers.push(L.polygon(ring,{color:col,weight:1,opacity:.85,fillColor:col,fillOpacity:.35}));
-    });
-    _trpBox=L.layerGroup(layers).addTo(_trpMap);
+  trpSetBox(cl.lat,cl.lng,_trpRot,cl.fits);
+  /* The marker is made once and then moved. It used to be torn down and
+     rebuilt on every redraw, which is fine for a circle and impossible for
+     something draggable. */
+  if(!_trpPin){
+    _trpPin=L.marker(_trpLatLng,{draggable:true,icon:trpIcon(cl.fits?'#ff8200':'#c0392b'),
+                                 keyboard:false,zIndexOffset:600}).addTo(_trpMap);
+    trpWireDrag();
+  } else {
+    _trpPin.setLatLng(_trpLatLng);
+    trpPinColor(cl.fits?'#ff8200':'#c0392b');
   }
-  _trpPin=L.circleMarker(_trpLatLng,{radius:7,color:'#fff',weight:2,fillColor:col,fillOpacity:1}).addTo(_trpMap);
-  if(read){
-    var fp=trFootprintFt(trDraft), txt=cl.lat.toFixed(5)+', '+cl.lng.toFixed(5);
-    txt+=fp?('  ·  '+trFtNum(fp.w)+' ft × '+trFtNum(fp.h)+' ft at '+_trpRot+'°'
-             +(trLayoutText(trDraft)?('  ·  '+trLayoutText(trDraft)):''))
-           :'  ·  add the treatments, reps and plot size to draw the footprint';
-    if(!cl.fits) txt+='  ·  does not fit inside '+plot+' — reduce the area or rotate';
-    else if(cl.clamped) txt+='  ·  moved inside '+plot;
-    read.textContent=txt;
-  }
+  trpReadout(cl.lat,cl.lng,cl.fits,cl.clamped,false);
   var rv=document.getElementById('trp-rotval'); if(rv) rv.textContent=_trpRot+'°';
   var rs=document.getElementById('trp-rot'); if(rs&&+rs.value!==_trpRot) rs.value=_trpRot;
   if(msg) toast(msg);
+}
+/* Wired on the marker itself, once, because the marker now outlives every
+   redraw. */
+function trpWireDrag(){
+  if(!_trpPin) return;
+  _trpPin.on('drag',function(){
+    /* Follow the finger exactly. Clamping mid-drag makes the pin fight the
+       thumb -- it stops where the plot ends while the finger carries on, and
+       it reads as the app being broken. Instead the footprint turns red the
+       moment it leaves the plot, so it is obvious before letting go. */
+    var ll=_trpPin.getLatLng();
+    var fits=trFits(trDraft,ll.lat,ll.lng,_trpRot,trPlotRing(trpPlotName()));
+    trpSetBox(ll.lat,ll.lng,_trpRot,fits);
+    trpPinColor(fits?'#ff8200':'#c0392b');
+    trpReadout(ll.lat,ll.lng,fits,false,true);
+  });
+  _trpPin.on('dragend',function(){
+    _trpLatLng=_trpPin.getLatLng();
+    trpDraw();           /* and THIS is where it gets pulled back inside the plot */
+  });
 }
 /* angle of the plot's longest edge, so "Align to plot" squares the box up with it */
 function trPlotAngle(name){
@@ -5909,8 +5991,17 @@ function trRenderPin(){
   _trpLatLng=trDraft.pin?L.latLng(trDraft.pin.lat,trDraft.pin.lng):null;
   _trpRot=(trDraft.rot||0);
   if(!_trpMap){
-    _trpMap=mapChrome(L.map(el,{minZoom:13,maxZoom:18,zoomControl:false,renderer:L.canvas()}));
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:18,maxNativeZoom:19}).addTo(_trpMap);
+    /* maxZoom 21, not 18. This screen is the one place in the app where
+       somebody is positioning a thing a few feet across, and it was capped two
+       levels BELOW the farm map -- so it opened so far out that a 20 ft trial
+       was a speck and no amount of pinching brought it closer. The imagery
+       itself runs out at 19 (maxNativeZoom), so the last two levels are the
+       same photo enlarged: blurry, and still the right call, because what you
+       are lining the trial up against is the plot edge, and that stays sharp
+       enough to aim at. zoomSnap lets fitBounds land between whole levels
+       instead of jumping back to the next one out. */
+    _trpMap=mapChrome(L.map(el,{minZoom:13,maxZoom:21,zoomSnap:0.25,zoomControl:false,renderer:L.canvas()}));
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:21,maxNativeZoom:19}).addTo(_trpMap);
     _trpMap.on('click',function(e){ _trpLatLng=e.latlng; trpDraw(); });
     var rs=document.getElementById('trp-rot');
     if(rs) rs.addEventListener('input',function(){ _trpRot=+this.value||0; trpDraw(); });
@@ -5927,11 +6018,30 @@ function trRenderPin(){
   var f=trPlotFeature(plot);
   if(f){
     _trpPlot=L.geoJSON(f,{style:{color:'#fff',weight:2,fillColor:'#489FDF',fillOpacity:.12}}).addTo(_trpMap);
-    try{ _trpMap.fitBounds(_trpPlot.getBounds().pad(0.6),{maxZoom:21}); }catch(e){}
-  } else if(_trpLatLng){ _trpMap.setView(_trpLatLng,20); }
+    try{
+      /* Land where the work is. A study that already has a pin opens ON the
+         trial, close, so "move the pin" starts beside the pin. A new one opens
+         on the whole plot, because you cannot decide where in a plot something
+         goes without seeing the plot -- but snugly, filling the frame.
+
+         The old fit padded the plot bounds by 60% before fitting, which threw
+         away more than half the screen, on top of the zoom ceiling above. */
+      var fit=null;
+      if(_trpLatLng){
+        var fb=trFootprintBounds(trDraft,_trpLatLng.lat,_trpLatLng.lng,_trpRot);
+        /* Padded out well past the trial so its surroundings are visible --
+           a footprint filling the screen edge to edge tells you nothing about
+           where in the plot it sits. */
+        if(fb) fit=L.latLngBounds(fb).pad(1.6);
+      }
+      _trpMap.fitBounds(fit||_trpPlot.getBounds().pad(0.06),{maxZoom:21});
+    }catch(e){}
+  } else if(_trpLatLng){ _trpMap.setView(_trpLatLng,21); }
   else { try{ _trpMap.fitBounds(_plots?_plots.getBounds():[[35.88,-83.96],[35.89,-83.95]]); }catch(e){ _trpMap.setView([35.885,-83.955],17); } }
   var hint=document.getElementById('trp-hint');
-  if(hint) hint.innerHTML='<div>'+(f?('Tap inside '+esc(plot)+' to drop the pin. '):'This plot has no map outline — tap the spot on the imagery. ')
+  if(hint) hint.innerHTML='<div>'
+    +(f?('Tap inside '+esc(plot)+' to drop the pin, then <strong>drag it</strong> to get it exactly right. ')
+       :'This plot has no map outline — tap the spot on the imagery, then drag the pin to adjust. ')
     +(trFootprintFt(trDraft)
        ?'The box is the trial as you entered it — one column per treatment, one row per rep. Turn it to line up with the plot.'
        :'Fill in the treatments, the reps and the plot size on the form to see the trial drawn here.')+'</div>';

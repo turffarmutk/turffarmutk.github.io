@@ -515,5 +515,72 @@ section('14. THE ONE THAT MATTERS — a restriction type the farm adds really st
   ok('and the built-in eight go back', w.eval('TR_RTYPES.length') === 8);
 }
 
+/* ---------------------------------------------------------------- */
+section('15. placing the pin — close enough to see, and draggable after');
+{
+  /* Leaflet is a stub in this harness, so the DRAG itself cannot be performed
+     here. What can be pinned is everything that made it impossible before:
+     the zoom ceiling, the kind of thing the pin is, and the one call that
+     would break a drag halfway through. */
+  const i = SRC.indexOf('function trRenderPin(');
+  const j = SRC.indexOf("var sv=document.getElementById('trp-save')");
+  const block = SRC.slice(i, j);
+  ok('the placing screen was found', i > 0 && j > i);
+
+  /* THE ONE THAT CAUSED IT. This map was capped at 18 while every other map in
+     the app goes to 20, so the plot opened as a small square in the middle and
+     pinching did nothing. */
+  const ceil = /maxZoom:(\d+),zoomSnap/.exec(block);
+  ok('the placing map zooms in past the farm map', ceil && +ceil[1] >= 20, ceil && ceil[1]);
+  ok('and it is no longer capped at 18', block.indexOf('maxZoom:18') < 0);
+  ok('its imagery is allowed to enlarge past what exists',
+     /maxZoom:21,maxNativeZoom:19/.test(block));
+  ok('and the old 60% padding that threw away half the screen is gone',
+     block.indexOf('pad(0.6)') < 0);
+  ok('a study that already has a pin opens on the trial, not the whole plot',
+     /trFootprintBounds\(trDraft/.test(block));
+
+  /* Draggable means a marker. A circleMarker cannot be dragged at all, which
+     is why it was the wrong thing here. */
+  ok('the pin is a marker', /_trpPin=L\.marker\(/.test(SRC));
+  ok('and it is draggable', /_trpPin=L\.marker\([\s\S]{0,60}draggable:true/.test(SRC));
+  ok('not a circle any more', SRC.indexOf('_trpPin=L.circleMarker(') < 0);
+  ok('it has a dragend that puts it back inside the plot',
+     /_trpPin\.on\('dragend'/.test(SRC) && /function trpWireDrag/.test(SRC));
+
+  /* THE ONE THAT MATTERS while a finger is on the screen. setIcon() rebuilds
+     the marker's element, and rebuilding the element being dragged ends the
+     drag halfway through -- the pin would stick and the map would carry on. */
+  const drag = SRC.slice(SRC.indexOf('function trpWireDrag'), SRC.indexOf("_trpPin.on('dragend'"));
+  ok('the drag handler was found', drag.length > 50);
+  ok('and it never calls setIcon mid-drag', drag.indexOf('setIcon') < 0);
+  ok('it recolors the dot in place instead', /trpPinColor\(/.test(drag));
+  ok('and it does not clamp while the finger is still down',
+     drag.indexOf('trClampToPlot') < 0);
+
+  /* The clamp itself, which is what dragend leans on. Pure maths, so it can
+     really be run: a point well outside the plot has to come back inside it. */
+  const t = { nTrt: '2', nRep: '2', plotW: '5', plotL: '5' };
+  const ring = w.eval("trPlotRing('B14')");
+  ok('B14 has an outline to test against', Array.isArray(ring) && ring.length > 2);
+  const mid = w.eval("trPlotCentroid('B14')");
+  ok('and a centre inside itself', w.eval('trPointInRing(' + mid[0] + ',' + mid[1] + ',trPlotRing("B14"))'));
+  /* a quarter-degree away is comfortably off the farm */
+  const out = w.eval('JSON.stringify(trClampToPlot(' + J(t) + ',' + (mid[0] + 0.002) + ',' + (mid[1] + 0.002) + ',0,"B14"))');
+  const c = JSON.parse(out);
+  ok('a pin let go outside the plot is moved back in', c.clamped === true && c.fits === true, out);
+  ok('and it lands inside the outline',
+     w.eval('trPointInRing(' + c.lat + ',' + c.lng + ',trPlotRing("B14"))'), out);
+  /* and one dropped inside is left exactly where it was put */
+  const keep = JSON.parse(w.eval('JSON.stringify(trClampToPlot(' + J(t) + ',' + mid[0] + ',' + mid[1] + ',0,"B14"))'));
+  ok('a pin let go inside is not shifted', keep.clamped === false && keep.lat === mid[0], J(keep));
+
+  /* The dot has to have a thumb-sized grab area and survive color-blind mode. */
+  ok('the pin is bigger than it looks, for a thumb', /iconSize:\[34,34\]/.test(SRC));
+  ok('and it asks for its own color-blind color', /function trpSafe/.test(SRC)
+     && /trpSafe\('#ff8200'\)|trpSafe\(col\)/.test(SRC));
+  ok('the dot is styled by a scoped name, not a bare one', HTML.indexOf('.trp-pin{') > 0);
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

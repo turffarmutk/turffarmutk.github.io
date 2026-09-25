@@ -147,8 +147,18 @@ Two traps when you do this:
   of testing. **A port the browser has never opened is the only sure way.**
   Before trusting what you see, run `typeof someNewFunction` in the page: if
   it says `undefined`, you are not looking at your change.
-- **The console keeps old messages** from before your fix. Confirm an error is
-  really still happening rather than reading history.
+- **The console keeps old messages** from before your fix — and across a
+  reload. Confirm an error is really still happening rather than reading
+  history. Counting them is how: do the thing again and see whether the count
+  moves.
+- **Don't fake taps and drags with `dispatchEvent(new MouseEvent(...))` on a
+  map.** Leaflet drives its dragging from pointer events, so a synthetic mouse
+  drag fires `dragstart` and `drag` and then simply stops — no `dragend` — and
+  it throws `Cannot read properties of undefined (reading 'baseVal')` into the
+  console while it does it. Both look exactly like a bug you just wrote. On
+  2026-09-25 that cost half an hour of hunting a bug that did not exist. Use a
+  real drag from the browser tool, and read the stack: anything with
+  `at fire (<anonymous>)` in it came from your own fake event, not the app.
 
 **4. Use the thing you changed, at BOTH widths.** Click it. If it was a bug,
 make the old problem happen again and confirm it is gone.

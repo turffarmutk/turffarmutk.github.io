@@ -82,7 +82,8 @@ const EX = ['INVENTORY','INVMOVES','invQty','invMove','invMovesFor','invSums','i
             'sprayIsBoom',
             'INVSYNC','invsyncOnMoves','invsyncOnItems','invsyncWanted','invsyncSetWanted',
             'invMoveDoc','invItemDoc','invsyncSummary','invMoveById',
-            'invIsPaintCat','renderAddItem','paintItems','paintLabel','paintFullName','go'];
+            'invIsPaintCat','renderAddItem','paintItems','paintLabel','paintFullName','go',
+            'invAiList','invAiText','invAiGroups','invAiSplit','INV_AI_MAX','mixInvMatch','catMeta'];
 
 function boot(store) {
   const vc = new VirtualConsole();
@@ -690,6 +691,193 @@ section('24. a paint carries a color, and only a paint does');
   b.win.__set('invSearch', 'orange');
   ok('and a color nothing matches comes back empty', /No products match/.test(listed()), listed().slice(0, 80));
   b.win.__set('invSearch', '');
+}
+
+/* Dillon, 2026-09-28: plenty of the farm's products are mixtures — Instrata is
+   three fungicides, Avenue South is four herbicides — and until today a product
+   had ONE ingredient box and ONE resistance-group box. The names got typed in
+   as one run-on line and the GROUPS were simply lost, which is the half that
+   matters: rotating chemistry means rotating groups.
+
+   What the checks below are really protecting:
+
+     - NOTHING IS MIGRATED. An old product keeps its single line and is read
+       through invAiList(); rewriting them on the way in would make every phone
+       disagree with the server about every product and send all of them back
+       up forever. That is the fifth trap in CLAUDE.md.
+     - THE PLAIN-TEXT FIELDS ARE STILL WRITTEN. The field log and the home
+       screen's low-stock widget read `ai` as a line of text, so `ai` and `moa`
+       are written in the same save as `ais`, from the same rows.
+     - THE COMMA IN A CHEMICAL NAME. "3, 7-dichloro-8-quinolinecarboxylicacid"
+       is ONE ingredient and splitting on the comma invents one called "3". */
+section('25. a product can be a mixture — one row per active ingredient');
+{
+  const b = boot();
+  b.p.sessionSet('p07', { quiet: true });
+  const d = b.doc;
+  const g = x => d.getElementById('ai-' + x);
+
+  /* ---- reading what is already there, with nothing rewritten ---- */
+  ok('a product with one ingredient reads as one',
+     b.p.invAiList({ ai: 'Chlorothalonil', moa: 'M05' }).length === 1);
+  ok('and keeps its group', b.p.invAiList({ ai: 'Chlorothalonil', moa: 'M05' })[0].g === 'M05');
+
+  const plus = b.p.invAiList({ ai: 'clothianidin + bifenthrin' });
+  ok('an old line joined with + reads as two', plus.length === 2, JSON.stringify(plus));
+  ok('and both names come out clean', plus[0].n === 'clothianidin' && plus[1].n === 'bifenthrin');
+  /* With two names and one old group there is no honest way to say which one it
+     belonged to, and a WRONG group is worse than a missing one when the whole
+     point of the field is rotating away from it. */
+  ok('neither is guessed a group', plus.every(a => a.g === ''), JSON.stringify(plus));
+
+  ok('commas split too',
+     b.p.invAiList({ ai: 'Prodiamine, Imazaquin, Simazine' }).length === 3);
+  ok('and a four-way premix splits',
+     b.p.invAiList({ ai: '24D+Dicamba+Penoxsulam+Sulfentrazone' }).length === 4);
+  /* 24D has a letter in it, which is exactly what tells it from a "3". */
+  ok('a short name with a letter in it survives the split',
+     b.p.invAiList({ ai: '24D+Dicamba' })[0].n === '24D');
+
+  /* THE TRAP, and it is a real row in the farm's own April list. */
+  const drive = b.p.INVENTORY.find(x => /quinolinecarboxylic/i.test(x.ai || ''));
+  ok('Drive 75 is still in the inventory, so this is a real check', !!drive, String(drive && drive.ai));
+  ok('a chemical name containing a comma is NOT split into two ingredients',
+     b.p.invAiList(drive).length === 1, JSON.stringify(b.p.invAiList(drive)));
+  ok('and it certainly does not invent an ingredient called "3"',
+     !b.p.invAiList(drive).some(a => a.n === '3'));
+  ok('the same rule holds on its own', b.p.invAiSplit('3, 7-dichloro-8-quinolinecarboxylicacid').length === 1);
+
+  ok('nothing at all reads as no ingredients', b.p.invAiList({ ai: null }).length === 0);
+  ok('and so does a product that does not exist', b.p.invAiList(null).length === 0);
+
+  /* Reading an old product must not CHANGE it — that is what would set every
+     phone arguing with the server about all two hundred of them. */
+  const before = JSON.stringify(drive);
+  b.p.invAiList(drive); b.p.invAiText(drive); b.p.invAiGroups(drive);
+  ok('reading an old product does not rewrite it', JSON.stringify(drive) === before);
+  ok('and it is given no ingredient list until somebody edits it', drive.ais === undefined);
+
+  /* ---- the form writes a real list ---- */
+  b.win.aiEdit = null;
+  b.p.renderAddItem();
+  ok('the form opens with one ingredient row', !!g('ing-n-0') && !g('ing-n-1'));
+  ok('and no remove button on a lone row', !d.querySelector('[data-aingdel]'));
+
+  d.getElementById('ai-adding').click();
+  ok('Add another ingredient adds a row', !!g('ing-n-1'));
+  ok('and now both rows can be removed', d.querySelectorAll('[data-aingdel]').length === 2);
+  d.getElementById('ai-adding').click();
+  ok('a third row too', !!g('ing-n-2'));
+
+  /* Anything half-typed has to survive the redraw that removing a row causes. */
+  g('ing-n-0').value = 'Chlorothalonil'; g('ing-g-0').value = 'M05';
+  g('ing-n-1').value = 'Propiconazole';  g('ing-g-1').value = '3';
+  g('ing-n-2').value = 'Fludioxonil';    g('ing-g-2').value = '12';
+  d.querySelectorAll('[data-aingdel]')[1].click();
+  ok('removing the middle row keeps the other two', !!g('ing-n-2') === false && !!g('ing-n-1'));
+  ok('and what was typed in them is not lost',
+     g('ing-n-0').value === 'Chlorothalonil' && g('ing-n-1').value === 'Fludioxonil',
+     g('ing-n-0').value + ' / ' + g('ing-n-1').value);
+
+  /* Changing the category relabels the group boxes, and must not eat the text. */
+  g('cat').value = 'herbicide';
+  g('cat').dispatchEvent(new b.win.Event('change', { bubbles: true }));
+  ok('changing the category keeps the ingredients', g('ing-n-0').value === 'Chlorothalonil');
+  ok('and relabels the group box for the new category',
+     g('ing-g-0').placeholder === b.p.catMeta('herbicide').res, g('ing-g-0').placeholder);
+  g('cat').value = 'fungicide';
+  g('cat').dispatchEvent(new b.win.Event('change', { bubbles: true }));
+
+  const n0 = b.p.INVENTORY.length;
+  g('name').value = 'Instrata Test';
+  g('ing-n-1').value = 'Propiconazole'; g('ing-g-1').value = '3';
+  g('csize').value = '2.5'; g('unit').value = 'gal'; g('qty').value = '5';
+  d.getElementById('ai-save').click();
+  const made = b.p.INVENTORY[b.p.INVENTORY.length - 1];
+  ok('it saves', b.p.INVENTORY.length === n0 + 1 && made.name === 'Instrata Test');
+  ok('with a real list of two ingredients', Array.isArray(made.ais) && made.ais.length === 2,
+     JSON.stringify(made.ais));
+  ok('each carrying its OWN group',
+     made.ais[0].g === 'M05' && made.ais[1].g === '3', JSON.stringify(made.ais));
+
+  /* The plain-text fields are what every screen outside the inventory page
+     reads — the field log entry, the low-stock widget, the mix picker's
+     subtitle. They are written from the same rows in the same save, so they
+     cannot drift away from the list. */
+  ok('the plain-text line is written too', made.ai === 'Chlorothalonil + Propiconazole', String(made.ai));
+  ok('and so is the plain-text group line', made.moa === 'M05 + 3', String(made.moa));
+  ok('invAiText agrees with it', b.p.invAiText(made) === made.ai);
+  ok('and invAiGroups with the other', b.p.invAiGroups(made) === made.moa);
+
+  /* An empty row is somebody who tapped Add and changed their mind. */
+  b.win.aiEdit = null;
+  b.p.renderAddItem();
+  d.getElementById('ai-adding').click();
+  g('name').value = 'One Thing Only';
+  g('ing-n-0').value = 'Glyphosate'; g('ing-g-0').value = '9';
+  g('csize').value = '1'; g('unit').value = 'gal'; g('qty').value = '1';
+  d.getElementById('ai-save').click();
+  const solo = b.p.INVENTORY[b.p.INVENTORY.length - 1];
+  ok('an ingredient row left blank is dropped rather than saved',
+     solo.ais.length === 1 && solo.ais[0].n === 'Glyphosate', JSON.stringify(solo.ais));
+  ok('and a single ingredient still writes a plain line', solo.ai === 'Glyphosate', String(solo.ai));
+
+  /* ---- editing an old product is how it gains a list ---- */
+  const legacy = b.p.INVENTORY.find(x => x.id !== made.id && /\+/.test(x.ai || ''));
+  ok('there is still an old run-on line in the April list to edit', !!legacy, String(legacy && legacy.ai));
+  b.win.aiEdit = legacy.id;
+  b.p.renderAddItem();
+  ok('the old line is broken out into a row each', !!g('ing-n-1'), g('ing-n-0').value);
+  ok('with the names already filled in', g('ing-n-0').value === b.p.invAiList(legacy)[0].n,
+     g('ing-n-0').value);
+  g('ing-g-0').value = '7';
+  d.getElementById('ai-save').click();
+  ok('saving gives the old product a proper list', Array.isArray(legacy.ais), JSON.stringify(legacy.ais));
+  ok('and the group typed in is on the right ingredient', legacy.ais[0].g === '7', JSON.stringify(legacy.ais));
+  b.win.aiEdit = null;
+
+  /* ---- everything that reads an ingredient reads all of them ---- */
+  ok('searching the SECOND ingredient of a mixture finds the product',
+     b.p.mixInvMatch('propiconazole').some(x => x.id === made.id),
+     b.p.mixInvMatch('propiconazole').map(x => x.name).join(','));
+  b.win.__set('invFilter', 'all'); b.win.__set('invSearch', 'propiconazole');
+  b.p.renderInvList();
+  ok('and so does the inventory list search',
+     d.getElementById('inv-body').textContent.indexOf('Instrata Test') >= 0);
+  b.win.__set('invSearch', '');
+
+  /* The item screen is the one place the structure is actually shown. */
+  b.p.openItem(made.id);
+  const detail = d.getElementById('itd-body') ? d.getElementById('itd-body').textContent
+               : d.getElementById('s-itemdetail').textContent;
+  ok('the item screen lists each ingredient on its own row',
+     /Active ingredient 1/.test(detail) && /Active ingredient 2/.test(detail), detail.slice(0, 200));
+  ok('and shows each ingredient its own group',
+     detail.indexOf('M05') >= 0 && detail.indexOf('FRAC 3') >= 0, detail.slice(0, 300));
+
+  b.p.openItem(solo.id);
+  const one = d.getElementById('itd-body') ? d.getElementById('itd-body').textContent
+            : d.getElementById('s-itemdetail').textContent;
+  ok('a single-ingredient product still reads as the two plain rows it always did',
+     /Active ingredient(?! 1)/.test(one) && !/Active ingredient 1/.test(one), one.slice(0, 200));
+
+  /* The form is capped, and the cap is the Add row going away rather than a
+     button that is tapped and does nothing. */
+  b.win.aiEdit = null;
+  b.p.renderAddItem();
+  for (let i = 0; i < b.p.INV_AI_MAX + 4; i++) d.getElementById('ai-adding').click();
+  ok('no more rows than the cap', !!g('ing-n-' + (b.p.INV_AI_MAX - 1)) && !g('ing-n-' + b.p.INV_AI_MAX),
+     String(b.p.INV_AI_MAX));
+  ok('and the Add row hides itself at the cap',
+     d.getElementById('ai-adding').style.display === 'none');
+
+  /* Nothing may be a list inside a list: Firestore refuses that outright, and
+     it is how every map edit was silently thrown away for a month. */
+  const doc = JSON.parse(JSON.stringify(b.p.invItemDoc(made)));
+  ok('what goes up carries the ingredient list', Array.isArray(doc.ais) && doc.ais.length === 2);
+  ok('and it is a list of records, never a list inside a list',
+     doc.ais.every(a => a && typeof a === 'object' && !Array.isArray(a)
+                     && Object.keys(a).every(k => !Array.isArray(a[k]))));
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

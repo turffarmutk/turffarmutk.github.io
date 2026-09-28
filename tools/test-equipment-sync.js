@@ -276,6 +276,195 @@ ok('the summary reads in plain words',
   ok('and a live one counts what went each way', /sent · .*received/.test(s), s);
 }
 
+/* ------------------------------------------------- 7. height of cut ------
+   Dillon, 2026-09-28: he wanted the height of cut of every mower except the
+   rotary ones written down. It lives ON THE MACHINE, because a reel unit is set
+   up once on the grinder and then cuts everything it touches at that height
+   until somebody changes the bedknife — the height belongs to the machine the
+   same way the number of reels does.
+
+   THE ROTARY MOWERS ARE LEFT OUT ON PURPOSE. A rotary deck is wound up and down
+   per job, so one number on the machine would be a lie; those heights already
+   live per PLOT in MGMT_DATA[plot].c, set on the plot's Mowing screen. If a
+   future tidy-up "completes" this by giving the Z915Es a height too, the farm
+   ends up with two answers for the same ground and no way to tell which is
+   current. That is what the first few checks here are guarding.
+
+   AND IT IS NOT A NEW DRAWER. Both the height and its history ride inside the
+   machine's own record, which already travels and already says who may write
+   it — so there is no new collection, no new permission rule and nothing for
+   Dillon to publish by hand. The settling of that shape is checked in
+   tools/test-sync-settles.js, where the machines sample now carries one. */
+section('7. Height of cut — on the mowers that hold one, and not the rotaries');
+{
+  const byName = n => EQ().find(m => m.name === n);
+  const triplex = byName('John Deere 2653');           /* Triplex reel mower */
+  const walker  = byName('Dennis G860 #1');            /* Pedestrian Reel Mower */
+  const zturn   = byName('John Deere Z915E #1');       /* Zero-Turn Rotary Mower */
+  const push    = byName('Toro Recycler #1');          /* Pedestrian Rotary Mower */
+  ok('the machines these checks name are all still on the farm',
+     !!(triplex && walker && zturn && push));
+  /* The fairway unit is checked by its TYPE rather than by its record, because
+     section 5 above deliberately hands e1 a shared copy with no `type` on it to
+     prove the drawer drops fields the server does not have. Reading that record
+     here would be reading section 5's leftovers, and the check would be about
+     the wrong thing. */
+
+  ok('a fairway reel unit carries a height of cut',
+     win.eqTakesHoc({ type: 'Fairway Reel Mower' }));
+  ok('so does a triplex', win.eqTakesHoc(triplex));
+  ok('and a walk-behind reel mower', win.eqTakesHoc(walker));
+  ok('a zero-turn rotary does NOT — its deck is set per job, per plot',
+     !win.eqTakesHoc(zturn));
+  ok('nor does a pedestrian rotary', !win.eqTakesHoc(push));
+
+  /* Everything that is not a mower is out, which is what keeps the box off the
+     fifty-odd sprayers, blowers, trailers and trucks. The spreaders matter most
+     here: three of them have the word "Rotary" in their type and are not mowers
+     at all. */
+  ['John Deere HD200', 'Kawasaki Mule 3010', 'Anderson #1', 'Dakota Turf Tender 410',
+   'Stihl #1', 'Trailer #1', 'Foley 672 Accu-Pro'].forEach(n => {
+    const m = byName(n);
+    ok(('a ' + (m ? m.type : '?') + ' does not').toLowerCase(), !!m && !win.eqTakesHoc(m));
+  });
+  /* A fraise mower says "Mower" and is an implement, not a mowing machine —
+     eqCatGuess tests implements first, and this is why. */
+  ok('a fraise mower is an implement, so it holds no cut height',
+     !win.eqTakesHoc(byName('GKB CB120')));
+  ok('and an aerifier does not either', !win.eqTakesHoc(byName('Toro ProCore 648')));
+  ok('nothing at all is not a mower', !win.eqTakesHoc(null) && !win.eqTakesHoc({}));
+
+  /* ---- setting one, and remembering that it changed ---- */
+  as(BILL);
+  delete triplex.hoc; delete triplex.hocLog;
+  ok('a change is recorded', win.eqHocSet(triplex, 0.5, BILL) === true);
+  ok('and the machine now says what it cuts at', triplex.hoc === 0.5, String(triplex.hoc));
+  ok('the history has one line', (triplex.hocLog || []).length === 1, JSON.stringify(triplex.hocLog));
+  ok('which says what, when and who',
+     triplex.hocLog[0].h === 0.5 && /^\d{4}-\d{2}-\d{2}$/.test(triplex.hocLog[0].at)
+     && triplex.hocLog[0].by === BILL, JSON.stringify(triplex.hocLog[0]));
+
+  /* Saving the machine without touching the height must not add a history line
+     saying the height stayed the same, or the history becomes noise nobody
+     reads and the record grows on every save. */
+  ok('setting the same height again changes nothing', win.eqHocSet(triplex, 0.5, BILL) === false);
+  ok('and leaves the history alone', triplex.hocLog.length === 1);
+  ok('a string of the same number is still the same number',
+     win.eqHocSet(triplex, '0.5', BILL) === false, JSON.stringify(triplex.hocLog));
+
+  ok('a real change is recorded', win.eqHocSet(triplex, 0.625, BILL) === true);
+  ok('newest first', triplex.hocLog[0].h === 0.625 && triplex.hocLog[1].h === 0.5,
+     JSON.stringify(triplex.hocLog.map(x => x.h)));
+
+  /* Taking a height off is a real event too — "nobody has written one down" and
+     "it used to be half an inch" are different things to read on the page. */
+  ok('clearing it is recorded as well', win.eqHocSet(triplex, '', BILL) === true);
+  ok('and the machine reads as having none', triplex.hoc === null, String(triplex.hoc));
+  ok('the history says it was cleared', triplex.hocLog[0].h === null);
+
+  /* The list rides inside the machine's record, and a record that grows forever
+     is a record every phone re-reads forever. */
+  for (let i = 1; i <= win.EQ_HOC_MAX + 6; i++) win.eqHocSet(triplex, i / 8, BILL);
+  ok('the history is capped', triplex.hocLog.length === win.EQ_HOC_MAX,
+     triplex.hocLog.length + ' of ' + win.EQ_HOC_MAX);
+  ok('and it is the OLDEST that falls off, not the newest',
+     triplex.hocLog[0].h === (win.EQ_HOC_MAX + 6) / 8, String(triplex.hocLog[0].h));
+
+  /* Firestore refuses a list inside a list, which is how every map edit was
+     thrown away for a month. A list of small records is fine, and that is what
+     this is. */
+  const doc = JSON.parse(JSON.stringify(win.eqMachineDoc ? win.eqMachineDoc(triplex) : triplex));
+  ok('what goes up carries the height and its history',
+     doc.hoc === triplex.hoc && Array.isArray(doc.hocLog));
+  ok('and no part of it is a list inside a list',
+     doc.hocLog.every(x => x && typeof x === 'object' && !Array.isArray(x)
+                        && Object.keys(x).every(k => !Array.isArray(x[k]))));
+
+  ok('a height reads with the inch mark', win.eqHocText(0.5) === '0.5″', win.eqHocText(0.5));
+  ok('and nothing reads as blank rather than as zero',
+     win.eqHocText(null) === '' && win.eqHocText('') === '', JSON.stringify(win.eqHocText(null)));
+
+  /* ---- the box on the edit screen follows what the machine IS ---- */
+  const row = () => win.document.getElementById('eqe-hocrow');
+  win.eqEditId = triplex.id; win.renderEqEdit();
+  ok('editing a triplex shows the height box', row() && row().style.display !== 'none');
+  ok('and it opens with the height already in it',
+     win.document.getElementById('eqe-hoc').value === String(triplex.hoc), win.document.getElementById('eqe-hoc').value);
+
+  win.eqEditId = zturn.id; win.renderEqEdit();
+  ok('editing a rotary does not show it', row() && row().style.display === 'none');
+
+  /* Both halves of "what the machine is" are editable on this screen, so the box
+     has to react to the type text AND the category dropdown. Asking one and not
+     the other is how a field goes missing for exactly the machines that need
+     it. */
+  const ty = win.document.getElementById('eqe-type');
+  ty.value = 'Triplex reel mower';
+  ty.dispatchEvent(new win.Event('input', { bubbles: true }));
+  ok('retyping the type to a reel mower brings the box back', row().style.display !== 'none');
+  ty.value = 'Zero-Turn Rotary Mower';
+  ty.dispatchEvent(new win.Event('input', { bubbles: true }));
+  ok('and typing it back to rotary takes it away again', row().style.display === 'none');
+
+  win.eqEditId = null; win.renderEqEdit();
+  const cat = win.document.getElementById('eqe-cat');
+  ok('a brand-new machine is not asked for a height yet', row().style.display === 'none');
+  cat.value = 'mower';
+  cat.dispatchEvent(new win.Event('change', { bubbles: true }));
+  ok('choosing Mowers on a new machine asks for one', row().style.display !== 'none');
+
+  /* ---- saving through the form, which is what a person actually does ---- */
+  win.eqEditId = triplex.id; win.renderEqEdit();
+  const lines = triplex.hocLog.length;
+  win.document.getElementById('eqe-hoc').value = '0.4375';
+  win.document.getElementById('eqe-save').click();
+  ok('the form saves a new height onto the machine', triplex.hoc === 0.4375, String(triplex.hoc));
+  ok('and writes one history line for it', triplex.hocLog.length === lines, String(triplex.hocLog.length));
+  ok('whose newest entry is the height just typed', triplex.hocLog[0].h === 0.4375);
+
+  /* A height typed as a word or as zero would sit on the machine page looking
+     like a real setting somebody would go to the grinder with. */
+  win.eqEditId = triplex.id; win.renderEqEdit();
+  win.document.getElementById('eqe-hoc').value = 'low';
+  win.document.getElementById('eqe-save').click();
+  ok('a height that is not a number is refused, leaving the old one', triplex.hoc === 0.4375, String(triplex.hoc));
+  win.eqEditId = triplex.id; win.renderEqEdit();
+  win.document.getElementById('eqe-hoc').value = '0';
+  win.document.getElementById('eqe-save').click();
+  ok('and so is zero', triplex.hoc === 0.4375, String(triplex.hoc));
+
+  /* A machine that never had a height must not gain an empty field — the same
+     care the category takes, and the reason is the same: a field nobody chose,
+     written onto sixty records, is sixty writes from every phone. */
+  const trailer = byName('Trailer #1');
+  delete trailer.hoc; delete trailer.hocLog;
+  win.eqEditId = trailer.id; win.renderEqEdit();
+  win.document.getElementById('eqe-save').click();
+  ok('saving a trailer gives it no height field at all',
+     !('hoc' in trailer) && !('hocLog' in trailer), JSON.stringify({ h: trailer.hoc, l: trailer.hocLog }));
+
+  /* ---- and it is readable on the machine's own page ---- */
+  win.openMachine(triplex.id);
+  const page = win.document.getElementById('eqd-body').textContent;
+  ok('the machine page says what it cuts at', /Height of cut/.test(page));
+  ok('and shows the height itself', page.indexOf('0.4375″') >= 0, page.slice(0, 400));
+  ok('with its own history section, not buried among the oil changes',
+     /Height of cut history/.test(page));
+  win.openMachine(zturn.id);
+  ok('a rotary machine page does not mention one at all',
+     !/Height of cut/.test(win.document.getElementById('eqd-body').textContent));
+  win.openMachine(walker.id);
+  ok('a reel mower with none written down says so rather than leaving the row off',
+     /Height of cut/.test(win.document.getElementById('eqd-body').textContent));
+
+  /* No new drawer means no new rule to publish. If somebody later moves this
+     into a collection of its own, this check fails and says why. */
+  ok('the height rides in the machine record, so the rules needed no change',
+     !/match \/(hoc|cutheights?)\//.test(rulesText));
+  ok('and the machine rule still only pins the id and the name',
+     /match \/equipment\/\{machineId\}/.test(rulesText));
+}
+
 /* ---------------------------------------------------------------- */
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

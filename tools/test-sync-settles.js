@@ -175,8 +175,15 @@ const DRAWERS = [
     sample: { id: 'zz1', op: 'Mow', when: '2026-08-31', ord: 20260831, loggedBy: P } },
   { name: 'stock movements',    coll: 'invmoves',   push: 'invPush',   local: () => L().INVMOVES,
     sample: { id: 'zz1', item: 'i1', qty: 2, who: P, when: '2026-08-31' } },
+  /* The sample carries a MIXTURE deliberately. A product's active ingredients
+     are a list of small records ({n, g}) since 2026-09-28, and a list is the
+     shape that broke the map drawer for a month — so this drawer has to be seen
+     settling with one, and the fake database above has to be seen accepting it
+     (a list of records is fine; only a list inside a list is refused). */
   { name: 'products',           coll: 'invitems',   push: 'invPush',   local: () => L().INVENTORY,
-    sample: { id: 'zz1', name: 'Test product', unit: 'gal', qty: 3 } },
+    sample: { id: 'zz1', name: 'Test product', unit: 'gal', qty: 3,
+              ais: [{ n: 'Chlorothalonil', g: 'M05' }, { n: 'Propiconazole', g: '3' }],
+              ai: 'Chlorothalonil + Propiconazole', moa: 'M05 + 3' } },
   { name: 'schedules',          coll: 'schedules',  push: 'schPush',   local: () => win.SCHEDULES,
     sample: { id: 'zz1', pid: P, sem: 'sem1', days: { mon: [['08:00', '12:00']] } } },
   /* The punches do not live in a list of their own -- the time clock keeps
@@ -184,8 +191,13 @@ const DRAWERS = [
      door the drawer itself reads. */
   { name: 'time clock punches', coll: 'punches',    push: 'tcPush',    local: () => win.tcPunchDocs(),
     sample: { id: 'zz1', pid: P, date: '2026-08-31', in: '08:00', out: null, note: '' } },
+  /* A non-rotary mower carries its height of cut AND the history of it changing
+     (hocLog, a list of small records) on the machine record itself rather than
+     in a drawer of its own — so the settling of that list is checked here. */
   { name: 'machines',           coll: 'equipment',  push: 'eqPush',    local: () => L().EQUIP,
-    sample: { id: 'zz1', name: 'Test mower', active: true, kind: 'mower' } },
+    sample: { id: 'zz1', name: 'Test mower', active: true, kind: 'mower',
+              type: 'Triplex reel mower', hoc: 0.5,
+              hocLog: [{ at: '2026-09-28', h: 0.5, by: P }, { at: '2026-06-01', h: 0.625, by: P }] } },
   { name: 'reported problems',  coll: 'eqproblems', push: 'eqPush',    local: () => L().EQPROBLEMS,
     sample: { id: 'zz1', eq: 'zz1', what: 'flat tyre', by: P, when: '2026-08-31' } },
   { name: 'service schedules',  coll: 'eqsched',    push: 'eqPush',    local: () => L().EQSCHED,

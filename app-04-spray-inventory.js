@@ -404,7 +404,10 @@ function mixInvMatch(q){
     var n=it.name.toLowerCase();
     if(n.indexOf(q)===0) starts.push(it);
     else if(n.indexOf(q)>=0) has.push(it);
-    else if((it.ai||'').toLowerCase().indexOf(q)>=0) ai.push(it);
+    /* invAiText, not it.ai: on a product with a proper ingredient list that is
+       where the names live now, and typing "fludioxonil" has to find the
+       three-way fungicide it is the third ingredient of. */
+    else if(invAiText(it).toLowerCase().indexOf(q)>=0) ai.push(it);
   });
   return starts.concat(has,ai).slice(0,8);
 }
@@ -420,14 +423,15 @@ function mixSugHtml(q){
   if(!list.length) return '<div class="none">Nothing in inventory matches — add it on the Inventory page first.</div>';
   return list.map(function(it){
     return '<div class="s" data-invpick="'+it.id+'"><span>'+esc(it.name)
-      +(it.ai?' <span style="font-weight:600;color:var(--muted)">· '+esc(it.ai)+'</span>':'')
+      +(function(){var a=invAiText(it);return a?(' <span style="font-weight:600;color:var(--muted)">· '+esc(a)+'</span>'):'';})()
       +'</span><span class="c">'+esc(mixInvQty(it))+'</span></div>';
   }).join('');
 }
 /* One line under the name: what was picked, or why it will not do. */
 function mixProdInfoHtml(p){
   var it=mixProdItem(p);
-  if(it) return '<span class="mx-it">'+esc((it.ai?it.ai+' · ':'')+mixInvQty(it)+' on hand'+(it.loc?' · '+it.loc:''))+'</span>';
+  if(it){var ait=invAiText(it);
+   return '<span class="mx-it">'+esc((ait?ait+' · ':'')+mixInvQty(it)+' on hand'+(it.loc?' · '+it.loc:''))+'</span>';}
   if((p&&p.name||'').trim()) return '<span class="mx-it bad">Not in inventory — pick one from the list</span>';
   return '<span class="mx-it">Type to pick a product from inventory</span>';
 }
@@ -2789,6 +2793,78 @@ var PRODREF=[
  {name:'Primo Maxx', ai:'Trinexapac-ethyl', cat:'pgr', form:'EC', moa:''},
  {name:'Revolution', ai:'Alkyl polyglucoside', cat:'wetting', form:'liquid', moa:''}
 ];
+/* ================= WHAT IS ACTUALLY IN A PRODUCT =================
+   Plenty of the farm's products are mixtures. Instrata is chlorothalonil,
+   propiconazole and fludioxonil; Avenue South is four herbicides in one jug.
+   Until 2026-09-28 a product had ONE ingredient box and ONE resistance-group
+   box, so those got typed in as one run-on line ("clothianidin + bifenthrin")
+   and the groups were simply lost -- which is the half that matters, because
+   rotating chemistry means rotating GROUPS, and a three-way fungicide hits
+   three of them.
+
+   So a product now carries `ais`: a list of {n, g} -- the ingredient's name and
+   its own FRAC/HRAC/IRAC group. Dillon's call, 2026-09-28.
+
+   THE OLD FIELDS ARE STILL WRITTEN, AND THAT IS DELIBERATE. `ai` stays as the
+   plain-text version (the names joined with " + ") and `moa` as the groups
+   joined the same way, both written in the SAME save as `ais`, from the same
+   rows, so they cannot drift apart. That is what keeps the field log, the home
+   screen's low-stock widget and the mix calculator's product list working
+   without being touched -- they all want a line of text, and a line of text is
+   what they still get. Anything that wants the real structure asks invAiList().
+
+   AND NOTHING IS MIGRATED. A product saved before today has no `ais` and is
+   left exactly as it is; invAiList() reads its old `ai` line instead. Rewriting
+   two hundred records on the way in would mean every phone deciding the server
+   is wrong about every product and sending all of them back up -- the fifth
+   trap in CLAUDE.md, and it costs the farm's whole day of database allowance.
+   A product gets its list the moment somebody edits it, and not before. */
+
+var INV_AI_MAX=8;   /* rows the form offers -- four-way premixes exist */
+
+/* Split a legacy one-line ingredient string into separate ingredients.
+
+   THE TRAP, and it is a real row in this file's own data: Drive 75's ingredient
+   is "3, 7-dichloro-8-quinolinecarboxylicacid". That is ONE chemical whose name
+   contains a comma, and splitting on commas turns it into an ingredient called
+   "3". So a split is thrown away whole if any piece of it is nothing but digits
+   and punctuation -- no real ingredient is. "24D" survives that test because it
+   has a letter in it, which is exactly the difference. */
+function invAiSplit(text){
+  var raw=String(text==null?'':text).trim();
+  if(!raw) return [];
+  var parts=raw.split(/\s*[+,]\s*/).map(function(x){return x.trim();}).filter(Boolean);
+  if(parts.length<2) return [raw];
+  var bad=parts.some(function(x){ return !/[a-z]/i.test(x); });
+  return bad?[raw]:parts;
+}
+/* THE one place anything asks "what is in this product". Always a list, and an
+   empty list means nobody has said. */
+function invAiList(it){
+  if(!it) return [];
+  if(Array.isArray(it.ais)&&it.ais.length){
+    return it.ais.filter(function(a){ return a&&String(a.n||'').trim(); })
+                 .map(function(a){ return {n:String(a.n).trim(), g:String(a.g==null?'':a.g).trim()}; });
+  }
+  var names=invAiSplit(it.ai);
+  /* The old single group belongs to the old single ingredient. With two or more
+     names there is no honest way to say which one it was for, so they are left
+     blank rather than guessed onto the first -- a wrong group is worse than a
+     missing one when the point of the field is rotating away from it. */
+  return names.map(function(n,i){ return {n:n, g:(names.length===1&&i===0)?String(it.moa||'').trim():''}; });
+}
+/* The names as one line, which is what every screen outside the inventory page
+   wants. Same shape the crew have been typing by hand for a year. */
+function invAiText(it){
+  return invAiList(it).map(function(a){return a.n;}).join(' + ');
+}
+/* The groups as one line, blanks dropped: "M05 + 3 + 12". Nothing at all when
+   no ingredient has a group, so the row can be left off rather than drawn
+   empty. */
+function invAiGroups(it){
+  return invAiList(it).map(function(a){return a.g;}).filter(Boolean).join(' + ');
+}
+
 function fmt(n){n=Math.round(n*100)/100;return (n%1===0)?String(n):String(n);}
 function plural(t,n){if(n===1)return t;if(t==='box')return 'boxes';return t+'s';}
 /* ================= THE MOVEMENT LEDGER =================
@@ -3064,7 +3140,9 @@ function renderInvList(){
    if(invFilter==='low'&&!isLow(it))return false;
    if(invFilter!=='all'&&invFilter!=='low'&&it.cat!==invFilter)return false;
    /* Searching "blue" should find the blue paint, which is not in its name. */
-   if(q){var s=(it.name+' '+(it.ai||'')+' '+(it.color||'')).toLowerCase();if(s.indexOf(q)<0)return false;}
+   /* Searching an ingredient has to reach every ingredient in a mixture, so it
+      goes through invAiText rather than reading the old single line. */
+   if(q){var s=(it.name+' '+invAiText(it)+' '+(it.color||'')).toLowerCase();if(s.indexOf(q)<0)return false;}
    return true;
  });
  if(!items.length){body.innerHTML='<div class="sec" style="text-align:center;margin-top:26px">No products match</div>';return;}
@@ -3086,8 +3164,20 @@ function openItem(id){
  rows+=fldRowI('Category', cm.label);
  /* The color a paint is, which is what the Trial Dots finish sheet calls it. */
  if(invIsPaintCat(it.cat))rows+=fldRowI('Color', esc(it.color||'—'));
- if(it.ai)rows+=fldRowI('Active ingredient', it.ai);
- if(cm.res&&it.moa)rows+=fldRowI(cm.res+' group', it.moa);
+ /* One row per ingredient, each with its own resistance group, because that is
+    what rotating chemistry is decided on. A single-ingredient product still
+    reads as the two plain rows it always did — the list is only broken out when
+    there is genuinely more than one thing in the jug. */
+ var ais=invAiList(it);
+ if(ais.length>1){
+   ais.forEach(function(a,i){
+     rows+=fldRowI('Active ingredient '+(i+1),
+       esc(a.n)+(a.g?(' <span style="font-weight:700;color:var(--muted)">· '+esc((cm.res||'Resistance')+' '+a.g)+'</span>'):''));
+   });
+ } else if(ais.length===1){
+   rows+=fldRowI('Active ingredient', esc(ais[0].n));
+   if(cm.res&&ais[0].g)rows+=fldRowI(cm.res+' group', esc(ais[0].g));
+ }
  rows+=fldRowI('Formulation', it.form);
  rows+=fldRowI('Storage', it.loc);
  rows+=fldRowI('Container', '1 '+it.ctype+' = '+fmt(it.csize)+' '+it.unit);
@@ -3325,6 +3415,62 @@ document.getElementById('il-save').addEventListener('click',function(){
 });
 
 /* ---- add item (manager) ---- */
+/* THE INGREDIENT ROWS on the add/edit form, one per active ingredient.
+
+   Held in a list here rather than read off the screen when needed, because
+   adding or removing a row redraws all of them and anything half-typed has to
+   survive that redraw. aiIngsRead() is the half that makes it survive: it pulls
+   the boxes back into the list BEFORE anything redraws. Forget that call and
+   the symptom is somebody losing a word they were in the middle of typing,
+   which looks like the app being flaky rather than like a bug. */
+var _aiIngs=[];
+function aiIngsRead(){
+  for(var i=0;i<_aiIngs.length;i++){
+    var n=document.getElementById('ai-ing-n-'+i), g=document.getElementById('ai-ing-g-'+i);
+    if(n) _aiIngs[i].n=n.value;
+    if(g) _aiIngs[i].g=g.value;
+  }
+  return _aiIngs;
+}
+/* The small group box is labelled by category — FRAC for a fungicide, HRAC for
+   a herbicide, IRAC for an insecticide — which is why changing the category
+   redraws these rows. Deliberately inline styles and a data attribute rather
+   than new classes: the page has ONE stylesheet for every screen, and a short
+   ordinary class name like `.del` written here would land on other screens too.
+   See CLAUDE.md on bare class names. */
+function aiIngsHtml(){
+  var sel=document.getElementById('ai-cat');
+  var res=catMeta(sel?sel.value:'').res||'Group';
+  var many=_aiIngs.length>1;
+  return _aiIngs.map(function(a,i){
+    /* STACKED, not the usual label-left / value-right row, and that is the
+       whole point. Active ingredients are long words -- glufosinate-ammonium,
+       chlorantraniliprole -- and squeezed into the right-hand half of a phone
+       row they clip: "Chlorothalonil" needed 110px and had 102. Measured with
+       scrollWidth > clientWidth rather than squinted at; see CLAUDE.md. So the
+       label goes on its own line and the name box takes the full width, with
+       the little group box and the remove X beside it.
+
+       text-align:left overrides .inv-in's right rail for the same reason: that
+       rail is for numbers typed at a desk, and a chemical name that overflows
+       is easier to read from its start than from its end. */
+    return '<div class="fld" style="display:block">'
+      +'<span class="fl" style="display:block;margin-bottom:7px">Active ingredient'+(many?(' '+(i+1)):'')+'</span>'
+      +'<span style="display:flex;gap:7px;align-items:center">'
+      +'<input class="inv-in" id="ai-ing-n-'+i+'" placeholder="e.g. Chlorothalonil" style="flex:1;min-width:0;max-width:none;text-align:left" value="'+esc(a.n||'')+'">'
+      +'<input class="inv-in" id="ai-ing-g-'+i+'" placeholder="'+esc(res)+'" title="'+esc(res)+' group" style="flex:none;width:78px;max-width:none;text-align:center" value="'+esc(a.g||'')+'">'
+      +(many?('<span class="tap" data-aingdel="'+i+'" title="Remove this ingredient" style="flex:none;width:22px;text-align:center;color:#c0392b;font-size:16px;line-height:1">\u2715</span>'):'')
+      +'</span></div>';
+  }).join('');
+}
+function aiIngsDraw(){
+  var box=document.getElementById('ai-ings'); if(!box) return;
+  box.innerHTML=aiIngsHtml();
+  /* The Add row goes away at the cap rather than being tapped and doing
+     nothing, which reads as the button being broken. */
+  var add=document.getElementById('ai-adding');
+  if(add) add.style.display=(_aiIngs.length>=INV_AI_MAX)?'none':'';
+}
 function catOpts(sel){return CAT.map(function(c){return '<option value="'+c.k+'"'+(c.k===sel?' selected':'')+'>'+esc(c.label)+'</option>';}).join('');}
 function renderAddItem(){
  var ed=window.aiEdit?INVENTORY.find(function(x){return x.id===window.aiEdit;}):null;
@@ -3340,8 +3486,12 @@ function renderAddItem(){
      the Inventory screen can say you are out of blue while there is still
      orange. Hidden for everything else — a fungicide has no color. */
   +'<div class="fld" id="ai-colorrow"><span class="fl">Color *</span><input class="inv-in" id="ai-color" placeholder="e.g. Blue" style="max-width:120px"></div>'
-  +'<div class="fld"><span class="fl">Active ingredient</span><input class="inv-in" id="ai-ai" placeholder="—" style="max-width:160px"></div>'
-  +'<div class="fld"><span class="fl" id="ai-reslbl">FRAC group</span><input class="inv-in" id="ai-moa" placeholder="—" style="max-width:110px"></div>'
+  /* One row per active ingredient, each with its own resistance group. Plenty of
+     the farm's products are mixtures — Instrata is three fungicides — and the
+     group is the half that matters, because rotating chemistry means rotating
+     GROUPS. See the block over invAiList(). */
+  +'<div id="ai-ings"></div>'
+  +'<div class="fld tap" id="ai-adding"><span class="fl" style="color:#ff8200;font-weight:800">\uff0b Add another ingredient</span></div>'
   +'<div class="fld" style="border-bottom:none"><span class="fl">Formulation</span><select class="inv-sel" id="ai-form">'+forms.map(function(f){return '<option'+(f==='SC'?' selected':'')+'>'+f+'</option>';}).join('')+'</select></div>'
   +'</div>'
   +'<div class="sec" style="margin:14px 18px 7px">Stock &amp; storage</div><div class="list">'
@@ -3351,18 +3501,58 @@ function renderAddItem(){
   +'<div class="fld"><span class="fl">On hand (measured)</span><input class="inv-in" id="ai-qty" inputmode="decimal" placeholder="0" style="max-width:90px"></div>'
   +'<div class="fld" style="border-bottom:none"><span class="fl">Reorder at</span><input class="inv-in" id="ai-thr" inputmode="decimal" placeholder="0" style="max-width:90px"></div>'
   +'</div>'
-  +'<div style="margin:12px 16px;background:#eef4ff;border:1px solid #cfe0ff;border-radius:12px;padding:11px 13px;font:600 11.5px;color:#2456b8">Type a known brand name to autofill ingredient, category, formulation &amp; resistance group. Everything stays editable.</div>';
- var reslbl=function(){var c=catMeta(document.getElementById('ai-cat').value);document.getElementById('ai-reslbl').textContent=(c.res||'Resistance')+' group';
-   var cr=document.getElementById('ai-colorrow'); if(cr) cr.style.display=invIsPaintCat(document.getElementById('ai-cat').value)?'':'none';};
- if(ed){var g=function(x){return document.getElementById('ai-'+x);};g('name').value=ed.name;g('ai').value=ed.ai||'';g('moa').value=ed.moa||'';g('cat').value=ed.cat;g('form').value=ed.form;g('loc').value=(ed.loc==='—'?'':ed.loc);g('ctype').value=ed.ctype;g('csize').value=ed.csize;g('unit').value=ed.unit;g('qty').value=fmt(invQty(ed));g('thr').value=ed.thr;g('color').value=ed.color||'';}
- reslbl();
- document.getElementById('ai-cat').addEventListener('change',reslbl);
+  +'<div style="margin:12px 16px;background:#eef4ff;border:1px solid #cfe0ff;border-radius:12px;padding:11px 13px;font:600 11.5px;color:#2456b8">Type a known brand name to autofill its ingredients, category, formulation &amp; resistance groups. Everything stays editable. A product that is a mixture takes one row per ingredient \u2014 each with its own group.</div>';
+ /* Colour is paint-only; see the note over the colour row above. */
+ var colorRow=function(){
+   var cr=document.getElementById('ai-colorrow');
+   if(cr) cr.style.display=invIsPaintCat(document.getElementById('ai-cat').value)?'':'none';
+ };
+ /* On a category change the ingredient rows are redrawn so their small group
+    box is relabelled FRAC / HRAC / IRAC. Read before drawing or a half-typed
+    ingredient is thrown away. */
+ var catChanged=function(){ colorRow(); aiIngsRead(); aiIngsDraw(); };
+ if(ed){var g=function(x){return document.getElementById('ai-'+x);};g('name').value=ed.name;g('cat').value=ed.cat;g('form').value=ed.form;g('loc').value=(ed.loc==='—'?'':ed.loc);g('ctype').value=ed.ctype;g('csize').value=ed.csize;g('unit').value=ed.unit;g('qty').value=fmt(invQty(ed));g('thr').value=ed.thr;g('color').value=ed.color||'';}
+ /* An old product with no ingredient list of its own comes back through
+    invAiList, which reads its single line instead — so editing one is how it
+    gains a proper list, and nothing is rewritten until somebody saves. */
+ _aiIngs=ed?invAiList(ed):[];
+ if(!_aiIngs.length) _aiIngs=[{n:'',g:''}];
+ colorRow(); aiIngsDraw();
+ document.getElementById('ai-cat').addEventListener('change',catChanged);
  if(!ed)document.getElementById('ai-name').addEventListener('input',function(){
    var v=this.value.trim().toLowerCase(); if(v.length<2)return;
    var m=PRODREF.find(function(p){return p.name.toLowerCase().indexOf(v)===0||v.indexOf(p.name.toLowerCase())===0;});
-   if(m){document.getElementById('ai-ai').value=m.ai||'';document.getElementById('ai-cat').value=m.cat;document.getElementById('ai-form').value=m.form;document.getElementById('ai-moa').value=m.moa||'';reslbl();}
+   /* Autofill REPLACES the rows, so it draws them straight rather than going
+      through catChanged() — that would read the old boxes back over the top of
+      what was just filled in and the autofill would appear to do nothing. */
+   if(m){ _aiIngs=invAiList(m); if(!_aiIngs.length) _aiIngs=[{n:'',g:''}];
+          document.getElementById('ai-cat').value=m.cat;
+          document.getElementById('ai-form').value=m.form;
+          colorRow(); aiIngsDraw(); }
  });
 }
+/* Add and remove an ingredient row. Attached to the SCREEN, once, rather than
+   to #ai-body inside renderAddItem — that runs again every time the form is
+   opened, and a listener added there would stack up and fire several times. */
+document.getElementById('s-additem').addEventListener('click',function(e){
+ var del=e.target.closest('[data-aingdel]');
+ if(del){
+   var i=+del.getAttribute('data-aingdel');
+   aiIngsRead();
+   if(_aiIngs.length>1) _aiIngs.splice(i,1);
+   aiIngsDraw(); return;
+ }
+ if(e.target.closest('#ai-adding')){
+   aiIngsRead();
+   if(_aiIngs.length<INV_AI_MAX) _aiIngs.push({n:'',g:''});
+   aiIngsDraw();
+   /* Put the cursor in the row that was just made, so the next thing typed
+      lands where the person is looking. */
+   var last=document.getElementById('ai-ing-n-'+(_aiIngs.length-1));
+   if(last) try{ last.focus(); }catch(err){}
+   return;
+ }
+});
 document.getElementById('ai-save').addEventListener('click',function(){
  var g=function(x){return document.getElementById('ai-'+x);};
  var name=g('name').value.trim(); if(!name){toast('Enter a brand name');return;}
@@ -3372,9 +3562,17 @@ document.getElementById('ai-save').addEventListener('click',function(){
     leave it blank, because the box is not even shown to them. */
  var color=invIsPaintCat(g('cat').value)?g('color').value.trim():'';
  if(invIsPaintCat(g('cat').value)&&!color){toast('Give the paint a color');return;}
+ /* ONE place builds all three, from the same rows, so the structured list and
+    the plain-text lines the rest of the app reads cannot drift apart. A row
+    with no name is dropped — an empty row is somebody who tapped Add and
+    changed their mind, not an ingredient. */
+ var ings=aiIngsRead().map(function(a){return {n:String(a.n||'').trim(),g:String(a.g||'').trim()};})
+                      .filter(function(a){return a.n;});
+ var aiTxt=ings.map(function(a){return a.n;}).join(' + ');
+ var moaTxt=ings.map(function(a){return a.g;}).filter(Boolean).join(' + ');
  var ed=window.aiEdit?INVENTORY.find(function(x){return x.id===window.aiEdit;}):null;
  if(ed){
-   ed.name=name; ed.ai=g('ai').value.trim()||null; ed.moa=g('moa').value.trim()||null; ed.cat=g('cat').value; ed.form=g('form').value; ed.color=color||null; ed.loc=g('loc').value.trim()||'—'; ed.ctype=g('ctype').value; ed.csize=csize; ed.unit=g('unit').value.trim()||'unit'; ed.thr=thr;
+   ed.name=name; ed.ais=ings.length?ings:null; ed.ai=aiTxt||null; ed.moa=moaTxt||null; ed.cat=g('cat').value; ed.form=g('form').value; ed.color=color||null; ed.loc=g('loc').value.trim()||'—'; ed.ctype=g('ctype').value; ed.csize=csize; ed.unit=g('unit').value.trim()||'unit'; ed.thr=thr;
     /* "On hand" on this form is a RECOUNT. Writing ed.qty would quietly
        rewrite the April opening balance and leave every movement since
        describing a shelf that no longer adds up. Book the difference instead,
@@ -3386,8 +3584,11 @@ document.getElementById('ai-save').addEventListener('click',function(){
    show('inventory'); stack=stack.filter(function(x){return x!=='additem'&&x!=='itemdetail';});
    return;
  }
- INVENTORY.push({id:newId('i'), name:name, ai:g('ai').value.trim()||null, moa:g('moa').value.trim()||null, cat:g('cat').value, color:color||null, form:g('form').value, loc:g('loc').value.trim()||'—', ctype:g('ctype').value, csize:csize, unit:g('unit').value.trim()||'unit', qty:qty, thr:thr});
- if(!PRODREF.some(function(p){return p.name.toLowerCase()===name.toLowerCase();}))PRODREF.push({name:name,ai:g('ai').value.trim(),cat:g('cat').value,form:g('form').value,moa:g('moa').value.trim()});
+ INVENTORY.push({id:newId('i'), name:name, ais:ings.length?ings:null, ai:aiTxt||null, moa:moaTxt||null, cat:g('cat').value, color:color||null, form:g('form').value, loc:g('loc').value.trim()||'—', ctype:g('ctype').value, csize:csize, unit:g('unit').value.trim()||'unit', qty:qty, thr:thr});
+ /* The autofill list gets the full ingredient list too, so typing this brand
+    name again next season offers back every ingredient rather than just the
+    first line of text. */
+ if(!PRODREF.some(function(p){return p.name.toLowerCase()===name.toLowerCase();}))PRODREF.push({name:name,ais:ings.slice(),ai:aiTxt,cat:g('cat').value,form:g('form').value,moa:moaTxt});
  toast('Added '+name+' ✓'); invFilter=g('cat').value; show('inventory'); stack=stack.filter(function(x){return x!=='additem';});
 });
 
@@ -3615,6 +3816,61 @@ function eqGroupByCat(list){
     return {cat:c[0],label:c[1],items:list.filter(function(m){return eqCatOf(m)===c[0];})};
   }).filter(function(g){return g.items.length;});
 }
+/* ---- height of cut ----
+   What a mower is currently set to cut at, in inches, kept ON THE MACHINE
+   rather than on the job. Dillon's call, 2026-09-28.
+
+   WHY THE MACHINE AND NOT THE JOB. A reel unit is set up once, on the grinder,
+   and then cuts everything it touches at that height until somebody changes
+   the bedknife or the cassette. So the height belongs to the machine the same
+   way the number of reels does: one number, changed when the machine is
+   changed, not retyped by whoever happens to mow that morning.
+
+   WHY THE ROTARY MOWERS ARE LEFT OUT. A rotary deck is wound up and down per
+   job — the same Z915E cuts a border at 3" and a plot at 1.5" on the same
+   afternoon — so a single number on the machine would be a lie. Rotary heights
+   already live per PLOT, in MGMT_DATA[plot].c, set on the plot's Mowing screen
+   and drawn on the map's cut-height layer. Nothing here touches that.
+
+   So: a machine takes a height when it is a mower and its type does not say
+   rotary. Getting this wrong in either direction is cheap — a machine that
+   should not have the box shows an extra empty field, and one that should have
+   it and does not simply cannot record a height — so it is a plain word test
+   against the type, not a list of machine ids that would go stale.
+   A fraise mower, an aerifier and the spreaders are all excluded already,
+   because eqCatGuess() calls them implements and spreaders, not mowers. */
+function eqTakesHoc(m){
+  if(!m) return false;
+  if(eqCatOf(m)!=='mower') return false;
+  return !/rotary/i.test(String(m.type||''));
+}
+/* Blank rather than "null in" when nothing is set: an empty row is honest, a
+   row reading 0″ is a machine somebody would go looking for on the grinder. */
+function eqHocText(h){ return (h==null||h==='')?'':(''+h)+'″'; }
+/* How many past heights a machine keeps. A height changes a handful of times a
+   season, so twenty is several years of them — and it is capped because the
+   list travels inside the machine's own record, and a record that grows
+   forever is a record every phone re-reads forever. */
+var EQ_HOC_MAX=20;
+/* Change a machine's height, and remember that it changed.
+   The history is a list on the machine ({at, h, by}, newest first) rather than
+   a drawer of its own: it needs no new collection, no new permission rule and
+   nothing published by hand, because the machine record already travels and
+   already says who may write it. Firestore refuses a list inside a list but is
+   happy with a list of small records, which is what this is.
+   Returns false when nothing moved, so a plain save does not add a history
+   line saying the height stayed the same. */
+function eqHocSet(m,h,pid){
+  if(!m) return false;
+  var was=(m.hoc==null||m.hoc==='')?null:+m.hoc;
+  var now=(h==null||h==='')?null:+h;
+  if(was===now) return false;
+  m.hoc=now;
+  var log=Array.isArray(m.hocLog)?m.hocLog:[];
+  log.unshift({at:todayISO(),h:now,by:pid||SESSION.pid||''});
+  m.hocLog=log.slice(0,EQ_HOC_MAX);
+  return true;
+}
 /* ---- who has it ----
    Worked out from the tasks, not stored on the machine. A student ticking a
    mower on the Start checklist writes it onto THEIR TASK (eqUsed, keyed by
@@ -3772,6 +4028,10 @@ function openMachine(id){
  rows+=fldRowI('Type', eqTypeLabel(m.type));
  if(m.reels!=null&&m.reels!=='')rows+=fldRowI('Number of reels', esc(''+m.reels));
  if(m.cassettes!=null&&m.cassettes!=='')rows+=fldRowI('Cassettes', esc(''+m.cassettes));
+ /* Only on the machines that carry one -- see eqTakesHoc. Shown even when it is
+    blank, because "this reel unit has no height written down" is worth noticing
+    on the machine's own page, where a missing row would say nothing at all. */
+ if(eqTakesHoc(m))rows+=fldRowI('Height of cut', m.hoc!=null?esc(eqHocText(m.hoc)):'\u2014 (set it under Edit machine)');
  if(m.fuel)rows+=fldRowI('Fuel', esc(m.fuel));
  if(m.hours!=null&&m.hours!=='')rows+=fldRowI('Engine hours', esc(''+m.hours)+' h');
  if(m.location)rows+=fldRowI('Location', esc(m.location));
@@ -3792,6 +4052,18 @@ function openMachine(id){
    var open=!l.in;
    return '<div class="row"><span class="dot" style="background:'+(open?'#489FDF':'#2f9e4f')+'"></span><div style="flex:1"><div class="rt">'+esc(l.user)+' · '+esc(l.task)+'</div><div class="rs">Out '+esc(l.out)+(l.in?' · In '+esc(l.in):' · still out')+'</div></div></div>';
  }).join('') : '<div class="row"><div class="rs" style="padding:4px 2px">No checkout history yet</div></div>';
+ /* What this machine has been set to cut at, and when it changed. Its own
+    section rather than a line in Maintenance history: a height change is a
+    setup decision, and burying it among the oil changes is how "what were we
+    cutting at in June" stops being answerable. Only drawn when there is one,
+    so a machine nobody has ever set a height on says nothing. */
+ var hocLog=(eqTakesHoc(m)&&Array.isArray(m.hocLog))?m.hocLog:[];
+ var hocHtml = hocLog.length ? ('<div class="sec">Height of cut history</div><div class="list">'
+   +hocLog.slice(0,EQ_HOC_MAX).map(function(x){
+     return '<div class="row"><span class="dot" style="background:#489FDF"></span><div style="flex:1"><div class="rt">'
+       +(x.h==null?'Height cleared':esc(eqHocText(x.h)))+'</div><div class="rs">'
+       +esc(fmtDay(x.at)||x.at||'')+' \u00b7 '+esc(nameOf(x.by))+'</div></div></div>';
+   }).join('')+'</div>') : '';
  var mnt=EQMAINT.filter(function(x){return x.eq===id;});
  var mntHtml = mnt.length ? mnt.map(function(x){
    return '<div class="row"><span class="dot" style="background:#7b828d"></span><div style="flex:1"><div class="rt">'+(EQMTL[x.type]||'Service')+(x.note?' · '+esc(x.note):'')+'</div><div class="rs">'+esc(fmtDay(x.at)||x.at||x.date||'')+' · '+esc(nameOf(x.by))+'</div></div></div>';
@@ -3814,6 +4086,7 @@ function openMachine(id){
   +statusToggle
   +probBanner
   +'<div class="sec">Details</div><div class="list">'+rows+'</div>'
+  +hocHtml
   +manualRow
   +'<div class="sec">Upcoming service</div><div class="list">'+schHtml+'</div>'+schAdd
   +'<div class="sec">Checkout log</div><div class="list">'+logHtml+'</div>'
@@ -3992,6 +4265,10 @@ function renderEqEdit(){
   +eqeInput('Fuel','eqe-fuel','e.g. Gasoline',150)
   +eqeInput('Number of reels','eqe-reels','—',80)
   +eqeInput('Cassettes','eqe-cassettes','—',80)
+  /* Inches, because that is what the rest of the farm is in: the plot Mowing
+     screen stores inches and the map's cut labels print them. Hidden on
+     anything that is not a non-rotary mower — see eqTakesHoc. */
+  +'<div class="fld" id="eqe-hocrow"><span class="fl">Height of cut (in)</span><input class="inv-in" id="eqe-hoc" inputmode="decimal" placeholder="e.g. 0.5" style="max-width:80px"></div>'
   +eqeInput('Year','eqe-year','2020',90)
   +eqeInput('Engine hours','eqe-hours','0',90)
   +eqeInput('Location','eqe-location','e.g. Shop')
@@ -4006,6 +4283,7 @@ function renderEqEdit(){
    var g=function(x){return document.getElementById('eqe-'+x);};
    g('name').value=ed.name; g('type').value=ed.type; g('cat').value=ed.cat||'';
    g('reels').value=(ed.reels==null?'':ed.reels); g('cassettes').value=(ed.cassettes==null?'':ed.cassettes);
+   g('hoc').value=(ed.hoc==null?'':ed.hoc);
    g('make').value=ed.make||''; g('model').value=ed.model||''; g('year').value=ed.year||'';
    g('fuel').value=ed.fuel||''; g('hours').value=(ed.hours==null?'':ed.hours); g('location').value=ed.location||'';
    g('oiltype').value=ed.oilType||''; g('oilfilter').value=ed.oilFilter||'';
@@ -4016,7 +4294,19 @@ function renderEqEdit(){
     machine follows its type if that is ever corrected. */
  var ty=document.getElementById('eqe-type');
  var autoLbl=function(){var o=document.getElementById('eqe-cat-auto');if(o)o.textContent='Automatic — '+eqCatLabel(eqCatGuess(ty.value));};
- autoLbl(); ty.addEventListener('input',autoLbl);
+ /* The height-of-cut box follows what the machine IS, and BOTH halves of that
+    are editable on this screen: the category dropdown and the free-text type.
+    So it is re-decided on either, through the same eqTakesHoc() the machine
+    page uses — pick Mowers, type "Triplex reel", and the box appears while the
+    form is still being filled in. Asking one and not the other is how a field
+    goes missing for exactly the machines that need it. */
+ var hocRow=function(){
+   var r=document.getElementById('eqe-hocrow'); if(!r) return;
+   r.style.display=eqTakesHoc({cat:document.getElementById('eqe-cat').value||null,type:ty.value})?'':'none';
+ };
+ autoLbl(); hocRow();
+ ty.addEventListener('input',function(){ autoLbl(); hocRow(); });
+ document.getElementById('eqe-cat').addEventListener('change',hocRow);
 }
 document.getElementById('s-eqedit').addEventListener('click',function(e){
  var c=e.target.closest('.eqjob'); if(!c)return;
@@ -4030,12 +4320,29 @@ document.getElementById('eqe-save').addEventListener('click',function(){
  var hrs=g('hours').value.trim()===''?null:(parseInt(g('hours').value)||0);
  var rl=g('reels').value.trim(); rl=(rl===''?null:(isNaN(+rl)?rl:+rl));
  var cs=g('cassettes').value.trim(); cs=(cs===''?null:(isNaN(+cs)?cs:+cs));
+ /* Refused rather than quietly rounded: a height typed as a word, or as zero,
+    would sit on the machine page looking like a real setting. Blank is fine and
+    means "nobody has written one down". */
+ var hocRaw=(g('hoc').value||'').trim();
+ var hocVal=(hocRaw===''?null:parseFloat(hocRaw));
+ if(hocRaw!==''&&(isNaN(hocVal)||hocVal<=0)){toast('Enter a height of cut in inches, or leave it blank');return;}
  var vals={name:nm,cat:g('cat').value||null,type:g('type').value.trim(),make:g('make').value.trim(),model:g('model').value.trim(),year:yr,fuel:g('fuel').value.trim(),hours:hrs,reels:rl,cassettes:cs,location:g('location').value.trim(),oilType:g('oiltype').value.trim(),oilFilter:g('oilfilter').value.trim(),manualUrl:g('manual').value.trim(),photo:g('photo').value.trim()||null,notes:g('notes').value.trim()};
  var ed=window.eqEditId?EQUIP.find(function(x){return x.id===window.eqEditId;}):null;
  if(vals.cat==null&&(!ed||!('cat' in ed))) delete vals.cat;   /* no empty field on records that never had one */
- if(ed){Object.keys(vals).forEach(function(k){ed[k]=vals[k];});toast('Saved changes ✓');window.eqEditId=null;stack=stack.filter(function(x){return x!=='eqedit';});openMachine(ed.id);return;}
+ if(ed){
+   Object.keys(vals).forEach(function(k){ed[k]=vals[k];});
+   /* The height goes through eqHocSet, which writes the history line, and it is
+      asked AFTER the new type and category have landed — so retyping a machine
+      into something that does not carry a height is answered on what it is now,
+      not on what it was when the form opened. A machine that has never had a
+      height keeps having no height field at all rather than gaining an empty
+      one, the same care the category takes above. */
+   if(eqTakesHoc(ed)||ed.hoc!=null) eqHocSet(ed,hocVal,SESSION.pid);
+   toast('Saved changes ✓');window.eqEditId=null;stack=stack.filter(function(x){return x!=='eqedit';});openMachine(ed.id);return;}
  var id=newId('e');
- EQUIP.push(Object.assign({id:id,status:'available',holder:null,task:null,flagged:false,active:true,jobs:[]},vals));
+ var made=Object.assign({id:id,status:'available',holder:null,task:null,flagged:false,active:true,jobs:[]},vals);
+ EQUIP.push(made);
+ if(hocVal!=null&&eqTakesHoc(made)) eqHocSet(made,hocVal,SESSION.pid);
  toast('Added '+nm+' ✓'); eqTab='home'; show('equipment'); stack=stack.filter(function(x){return x!=='eqedit';});
 });
 /* ---- maintenance schedule add/edit ---- */

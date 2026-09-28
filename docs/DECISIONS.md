@@ -686,6 +686,99 @@ pin this behaviour — keep them green.
 
 ## Field data & farm constants
 
+### A product can be a mixture, and each ingredient keeps its own group — 2026-09-28
+**Decision:** an inventory product carries `ais`, a list of `{n, g}` — each
+active ingredient's name and its **own** FRAC/HRAC/IRAC group. The add/edit form
+takes one row per ingredient with an "Add another ingredient" button, capped at
+`INV_AI_MAX` (8). `invAiList()` in `app-04-spray-inventory.js` is the one place
+anything asks what is in a product.
+
+The old single fields are **still written**, in the same save, from the same
+rows: `ai` becomes the names joined with `" + "` and `moa` the groups joined the
+same way. That is what keeps the Field Log entry (`app-02`, which copies
+`item.ai` onto the log), the home screen's low-stock widget and the mix
+calculator's product line working without being touched — they all want a line
+of text and they still get one.
+
+**Nothing is migrated.** A product saved before today has no `ais`; `invAiList()`
+reads its old single line instead, and it gains a real list only when somebody
+next edits and saves it.
+
+**Why:** the farm's products are full of mixtures — Instrata is chlorothalonil,
+propiconazole and fludioxonil; Avenue South is four herbicides — and they were
+being typed into one box as `"clothianidin + bifenthrin"`. The names survived
+that; the **groups did not**, and the groups are the half that matters, because
+rotating chemistry means rotating groups and a three-way fungicide hits three of
+them. Rewriting the two hundred existing products on the way in was the obvious
+alternative and it is the fifth trap in `CLAUDE.md`: every phone would decide the
+server was wrong about every product and send all of them back up, forever, for
+nothing visible on any screen.
+
+**Don't:**
+- **Don't split a legacy ingredient line on commas without the digits test.**
+  Drive 75's ingredient is `"3, 7-dichloro-8-quinolinecarboxylicacid"` — one
+  chemical whose *name* contains a comma. `invAiSplit()` throws a split away
+  whole if any piece of it has no letter in it, which is what tells that "3"
+  from the real ingredient "24D". Remove that test and the farm gains a
+  fungicide whose first ingredient is the number three.
+- **Don't fold `ai` and `moa` away as "derived, so redundant."** They are what
+  four screens in three other files read. They are only safe *because* one place
+  writes all three together; write them anywhere else and they drift.
+- **Don't attach the old single `moa` to the first of several parsed
+  ingredients.** With two names and one group there is no honest way to say
+  which it belonged to, and a wrong group is worse than a missing one when the
+  point of the field is rotating away from that group.
+- **Don't "normalize" old products inside `invsyncOnItems`.** See above; that is
+  the loop that costs the farm its day of database allowance.
+
+### Height of cut lives on the mower, and the rotaries are left out — 2026-09-28
+**Decision:** every mower that is **not** a rotary carries `hoc` — what it is
+currently set to cut at, in inches — plus `hocLog`, the last `EQ_HOC_MAX` (20)
+changes as `{at, h, by}`, newest first. Both sit **on the machine's own record**
+in `EQUIP`, set through Edit machine and shown on the machine's page with its own
+"Height of cut history" section. `eqTakesHoc()` decides which machines have one:
+it is a mower (`eqCatOf() === 'mower'`) and its type does not say *rotary*.
+Dillon's call, asked and answered 2026-09-28.
+
+**Why the machine and not the job:** a reel unit is set up once, on the grinder,
+and then cuts everything it touches at that height until somebody changes the
+bedknife or the cassette. So the height belongs to the machine the same way the
+number of reels does — one number, changed when the machine is changed, not
+retyped by whoever happens to mow that morning.
+
+**Why the rotaries are excluded:** a rotary deck is wound up and down per job —
+the same Z915E cuts a border at 3″ and a plot at 1.5″ on the same afternoon — so
+a single number on the machine would be a lie. Those heights already live **per
+plot**, in `MGMT_DATA[plot].c`, set on the plot's Mowing screen and drawn on the
+map's cut-height layer. Nothing in this change touches that.
+
+**Why not a drawer of its own:** the history rides inside the machine record,
+which already travels and already says who may write it, so this needed **no new
+collection, no new permission rule and nothing published by hand** — the app
+push alone ships it. A list of small records is a shape Firestore accepts; only a
+list *inside* a list is refused.
+
+**Don't:**
+- **Don't "complete" this by giving the rotary mowers a height too.** The farm
+  then has two answers for the same ground — one on the machine, one on the plot
+  — and no way to tell which is current. This is the trap; it is why
+  `eqTakesHoc()` tests for the word *rotary* at all.
+- **Don't uncap `hocLog`.** It travels inside the machine record, and a record
+  that grows forever is a record all twenty-three phones re-read forever.
+- **Don't let a plain save write a history line.** `eqHocSet()` returns false and
+  writes nothing when the height has not moved; without that, every edit of a
+  machine's notes adds a line saying the height stayed the same, and the history
+  becomes noise nobody reads.
+- **Don't make it fall back to a guess when the box is left blank.** Blank means
+  "nobody has written one down", which is a different thing from 0″ and reads
+  differently on the page. A zero or a word is refused outright, because a
+  height on that page is a number somebody walks to the grinder with.
+- **Note who can set it, before widening it:** Edit machine is Farm Manager,
+  Technician and Faculty (`canEditMachine()` in `firestore.rules`), so the crew
+  cannot log a height. That matches who sets up a reel unit. Letting the crew do
+  it is a **rules change**, which means `docs/PUBLISH-THE-RULES.md` and Dillon
+  publishing by hand — not just an app edit.
+
 ### Trial dots ask what paint went, and it comes off the shelf — 2026-09-23
 **Decision:** finishing a **Trial Dots** job now asks three things on the
 confirm sheet — the **type** (spray or liquid), the **color**, and **how many

@@ -268,12 +268,14 @@ Then:
 You can still reset someone from Firebase → Authentication → Users → the three
 dots → **Reset password**, if somebody's mailbox is the problem.
 
-**Tell them what they will see (since 2026-09-18).** Only Home, Tasks and the
-Farm Map are open to the crew. Every other page (Inventory, Trials, Equipment,
-Field Log, Time Clock, Calendar, Weather) shows faded, with a "Coming Soon"
-card on top, because those pages still need work. That is on purpose, not a
-fault. Undergrads still clock in and out with the clock button on their Home
-screen. Bill and you see every page as normal. To open a page to everyone once
+**Tell them what they will see (since 2026-09-18, updated 2026-09-28).** Home,
+Tasks, the Farm Map and the Time Clock are open to the crew. Every other page
+(Inventory, Trials, Equipment, Field Log, Calendar, Weather) shows faded, with a
+"Coming Soon" card on top, because those pages still need work. That is on
+purpose, not a fault. On the Time Clock an undergrad sees their own hours only —
+this period, this week, days worked — and clocks in and out either there or with
+the button on their Home screen. Only Bill can change somebody's punch, which
+has not changed. Bill and you see every page as normal. To open a page to everyone once
 it is ready, see "Every page but Home, Tasks and the Map is Coming Soon" in
 `docs/DECISIONS.md`.
 

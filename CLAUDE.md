@@ -307,10 +307,10 @@ behind More; the rest is yours to check by opening the app twice.
 
 **Most pages are covered for the crew, on purpose.** Since 2026-09-18, anyone
 who is not the Farm Manager or the App Manager sees every page except Home,
-Tasks and the Farm Map faded, under a "Coming Soon" card (`CS_LOCKED` and
-`csApply()` in `app-01-shell.js`). If you sign in as a crew member to test
-Inventory, Equipment, Time Clock and the rest, you will hit that cover. It is
-not a bug. Test those pages signed in as Bill (`p07`) or Dillon (`p01`), and
+Tasks, the Farm Map and — since 2026-09-28 — the Time Clock faded, under a
+"Coming Soon" card (`CS_LOCKED` and `csApply()` in `app-01-shell.js`). If you
+sign in as a crew member to test Inventory, Equipment, Field Log and the rest,
+you will hit that cover. It is not a bug. Test those pages signed in as Bill (`p07`) or Dillon (`p01`), and
 check the cover separately as a crew member. Take a page off `CS_LOCKED` only
 when Dillon says it is ready.
 

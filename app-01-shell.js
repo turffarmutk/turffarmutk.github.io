@@ -2350,7 +2350,12 @@ document.getElementById('s-navtabs').addEventListener('click',function(e){
    inside a page rolls up to it through SCREEN_DEST, so one word covers the
    whole page, detail screens and all. When the list is empty, delete this
    block and the csApply() call in show(). See docs/DECISIONS.md. */
-var CS_LOCKED={inventory:1,trial:1,equipment:1,fieldlog:1,timeclock:1,calendar:1,weather:1};
+/* Time Clock came off this list on 2026-09-28: Dillon said it was ready, so the
+   crew now open the full Time Clock page and their own timesheet, not just the
+   clock button on Home. Who may EDIT a punch has not changed -- that is
+   tcCanEditPunches() and canPunchFor() in firestore.rules, and it is still
+   "you, or Bill". Taking a page off this list only uncovers the screen. */
+var CS_LOCKED={inventory:1,trial:1,equipment:1,fieldlog:1,calendar:1,weather:1};
 /* trialpin is a Trials screen that SCREEN_DEST never listed, so it would slip
    past the cover without this. */
 var CS_EXTRA={trialpin:'trial'};

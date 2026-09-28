@@ -2055,10 +2055,12 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
      use it refuses to guess, and the shift stays open -- so the only person
      who knows has to be asked. That is this.
 
-     It has to be a sheet of its own rather than a row on the Time Clock
-     screen, because the Time Clock page is behind the Coming Soon cover for
-     everybody who is not Bill (CS_LOCKED, app-01-shell.js). A student cannot
-     reach that screen at all; they reach this from the bell.
+     It is a sheet of its own rather than a row on the Time Clock screen so the
+     bell can take them straight to it -- one tap on the alert and the question
+     is in front of them, with no page to find first. It was originally a sheet
+     because the Time Clock page was covered for the crew; that cover came off
+     on 2026-09-28, and the sheet stays because reaching it from the bell is
+     still the whole point.
 
      They are writing their OWN punch, which the database has always allowed
      -- canPunchFor() in firestore.rules is "you, or Bill". Nothing here needs

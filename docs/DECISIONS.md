@@ -1537,6 +1537,7 @@ a missing page looks broken, a labelled one does not. To release a page, take
 its screen name off `CS_LOCKED`; to release them all, delete the block and the
 `csApply()` line in `show()`. This is a courtesy, not security: the database
 rules are unchanged.
+**Since:** Time Clock came off the list on 2026-09-28 — see the entry below.
 
 ### A name on the Task Board is colored by where that person is in their day — 2026-09-18
 **Decision:** on the Board tab each name's text is colored (`tbPersonState()`
@@ -2615,3 +2616,21 @@ now fails the build for it. Don't fold `clear` into the `null` case. Don't
 narrow `mapWireGeom()` into a plain `JSON.stringify`, which is the loop above.
 The `mapplaces` rules did **not** change and did not need republishing: that
 block checks the record's id and who wrote it, not its fields.
+
+### The Time Clock page is open to the crew — 2026-09-28
+**Decision:** `timeclock` came off `CS_LOCKED` (`app-01-shell.js`), so the Time
+Clock page and a person's own timesheet (`tcperson`) no longer open under the
+"Coming Soon" card. Dillon said the page was ready. The other six pages —
+Inventory, Trials, Equipment, Field Log, Calendar, Weather — are still covered.
+**Why:** the crew could already clock in and out from the Home screen's clock
+widget, but they could not see their own hours for the period, their days
+worked, or the no-show and late boards. All of that was already built and
+already read-only for them (`renderWorker()`, `app-05-tasks-clock.js`), so the
+cover was hiding a finished screen rather than an unfinished one.
+**Don't:** read this as a change to who may EDIT a punch. That has never been
+the cover's job and it has not moved: `tcCanEditPunches()` (`app-02`) and
+`canPunchFor()` in `firestore.rules` both still say "your own punch, or Bill".
+Taking a page off `CS_LOCKED` only uncovers the screen — the database rules
+were not touched and did not need to be. Also don't expect grads or techs to
+see anything here: `tcEnter()` has always shown them a "limited to hourly crew,
+Bill and faculty" card, and that is unrelated to the cover.

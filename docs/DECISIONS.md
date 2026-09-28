@@ -1133,6 +1133,65 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### Favorites replaced the Assign screen's "Scheduled" tab — 2026-09-28
+**Decision:** the first tab on Assign Tasks is now **★ Favorites**, the jobs
+that one person has starred, and it is where the screen opens. A star sits on
+every row of the Task List screen and on every task-list row of the Assign
+screen, plus a **Favorite** row on the job's own add/edit form. Three things
+went with it, all Dillon's call: the **planned sprays off the calendar** came
+off the Assign screen entirely; the **"Months active"** boxes came off the task
+form; and a job's `months` are still **saved untouched** even though nothing
+now reads them.
+**Why:** which months a job repeats in turned out not to be how anybody picks
+work off that screen — Bill reaches for the same handful of jobs most days, and
+was scrolling past a monthly list to find them. Keeping `months` on the record
+costs nothing and means the old view could be put back without anybody
+re-entering a year of data; deleting the field would have made that
+irreversible for the sake of tidiness.
+**Don't:** don't "finish the job" by stripping `months` out of `openForm()`,
+`saveForm()` or the saved record — the promise made when the boxes came off
+was that an old job survives an edit with its months intact. Don't re-wire
+anything to an element id of `tn-months`: the line that used to do it had no
+guard, and putting it back against an element that no longer exists throws
+while `app-05` is loading and silently kills the time clock, the calendar and
+the weather below it. `tools/test-favorites.js` section 5 fails if it comes
+back. `commitEv()` and `openWiz('ev')` are deliberately left in place and
+simply unreachable, so calendar sprays are one section to restore, not a
+rebuild.
+
+### Favorites are per person and synced, not a setting on the phone — 2026-09-28
+**Decision:** favorites are their own shared drawer (`favorites`, `FAVSYNC` in
+`app-02-fieldlog-sync.js`), one document per person whose **id is that person's
+id**. They are not farm-wide, and they are not kept in `PREFS`.
+**Why:** Dillon chose personal-and-portable over the two cheaper options. A
+farm-wide star would mean a grad student's favorites landing in Bill's list.
+`PREFS` is localStorage, so a star set on a phone would be invisible on the
+same person's iPad and gone the day that phone's storage is cleared — which
+reads as the app losing your work. The cost is the full four pieces a drawer
+takes, and Dillon publishing the rules by hand before the app goes out.
+**Don't:** don't "simplify" this into a `fav: true` field on the task template.
+The template is one shared record, so one person's star would become
+everybody's, and `tplCanEdit()` would put it out of reach of anybody who
+cannot edit the task list. Don't let anything write a favorites document that
+is not the signed-in person's own — `favCanPush()` is what stops this phone
+offering the database twenty-two writes it will refuse every two seconds.
+
+### The favorites rules are deliberately looser than the app — 2026-09-28
+**Decision:** `favCanUse()` gives no star to undergraduates, but the
+`favorites` block in `firestore.rules` says only "your own record" and says
+nothing about roles.
+**Why:** hiding the star from undergraduates is a decision about screens — the
+Assign screen is the only place a star pays off and they never reach it — not
+a rule about safety. A starred job is a bookmark; it changes nothing for
+anybody else. A rule that is looser than the app can never cause a silent
+refusal, and it means giving undergraduates favorites later is a one-line
+change in the app with no rules to republish and no wait on Dillon.
+**Don't:** don't "tighten" the rule to match the app by adding a role check.
+That is the wrong direction: the danger this repo keeps hitting is a rule
+*stricter* than the app, which shows up as a tap that works, un-works a second
+later, and explains nothing. Looser is the safe direction, and the reasoning
+is written into the rules file itself so it is not mistaken for an oversight.
+
 ### A trial's size is treatments × reps × one plot, never a typed total — 2026-09-25
 **Decision:** the study form stopped asking for "Trial area (ft²)" and
 "Plot layout (rows × columns)". It asks for **number of treatments**, **number

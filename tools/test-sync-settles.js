@@ -197,6 +197,11 @@ const DRAWERS = [
               lab: '', active: true, grants: [], v: 2 } },
   { name: 'task templates',     coll: 'templates',  push: 'tplPush',   local: () => win.TEMPLATES,
     sample: { id: 'zz1', name: 'Test template', removed: false, mins: 30 } },
+  /* Favorites are one record per PERSON, and the id is that person's id -- so
+     the sample has to be signed-in person P, or favCanPush() correctly refuses
+     to send it and the check would pass for the wrong reason. */
+  { name: 'favorites',          coll: 'favorites',  push: 'favPush',   local: () => win.FAVS,
+    sample: { id: P, tpls: ['tpl1', 'tpl9'], updatedAt: '2026-09-28T08:00:00', updatedBy: P } },
   { name: 'studies',            coll: 'trials',     push: 'trsyncPush', local: () => L().TRIALS,
     sample: { id: 'zz1', title: 'Test study', lab: 'Sorochan', removed: false, restrictions: [] } },
   { name: 'the task list',      coll: 'tasks',      push: 'tsyncScan', local: () => L().TASKS,

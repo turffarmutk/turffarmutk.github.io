@@ -1277,6 +1277,193 @@ function schsyncSummary(){
   return SCHSYNC.up+' sent · '+SCHSYNC.down+' received'+(f?(' · '+f+' refused'):'')+sdbStuckNote();
 }
 
+/* ================= FAVORITES =================
+   One record per person, and the record's id IS the person's id -- the same
+   shape as the weekly schedules above, and copied from them deliberately.
+   That shape is what lets firestore.rules say "you may write the document
+   named after you" without a per-person query.
+
+   WHAT TRAVELS is a flat list of task-list ids: {id:'p07', tpls:['tpl3'], …}.
+   It must stay flat. Firestore cannot hold a list inside a list, and a drawer
+   that offers one has its writes thrown away before they leave the phone,
+   with nothing on any screen to say so -- see docs/DECISIONS.md, 2026-09-22.
+
+   EVERY PHONE HOLDS EVERYBODY'S FAVORITES even though the app only ever draws
+   your own. That is not an oversight: it is the same decision already made
+   for the punches, the schedules and time off, and the reason is the same --
+   refusing records that are not yours would need a different query per
+   person, which no drawer here does. If that ever changes it has to change
+   for all of them together. The cost is twenty-odd tiny documents.
+
+   The helpers live in app-05-tasks-clock.js (FAVS, favCanUse, favRec). This
+   file owns only the wire. */
+var FAVSYNC_COLL='favorites';
+var FAVSYNC_RETRY_MS=10000;
+var FAVSYNC={ on:false, live:false, ready:false, seen:{}, err:null, up:0, down:0, failed:{} };
+var _favsyncNextTry=0;
+
+/* On, always — see "SHARING IS NOT OPTIONAL" over flsyncWanted(). */
+function favsyncWanted(){ return true; }
+function favsyncHydrate(){ FAVSYNC.on=favsyncWanted(); }
+function favsyncSetWanted(on){
+  FAVSYNC.on=!!on;
+  if(on){ _favsyncNextTry=0; favsyncStart(); } else favsyncStop();
+}
+/* Safe to run twice on its own output -- that is what makes the comparison
+   below honest. Anything that is not a string is dropped rather than sent:
+   one bad entry must not cost the whole record. */
+function favDoc(r){
+  var out; try{ out=JSON.parse(JSON.stringify(r||{})); }catch(e){ return null; }
+  if(!out||!out.id) return null;
+  out.id=String(out.id);
+  if(!Array.isArray(out.tpls)) return null;
+  out.tpls=out.tpls.filter(function(x){ return typeof x==='string'||typeof x==='number'; })
+                   .map(function(x){ return String(x); });
+  return out;
+}
+/* sdbJson, never JSON.stringify: the database hands a record back with its
+   fields in alphabetical order, so a record compared as plain text reads as
+   changed purely because of the ordering, and the drawer sends it forever.
+   That is one of the two mistakes that cost 4.4 million reads in a day. */
+function favJson(r){ var d=favDoc(r); return d?sdbJson(d):null; }
+function favById(id){ for(var i=0;i<FAVS.length;i++) if(FAVS[i]&&String(FAVS[i].id)===String(id)) return FAVS[i]; return null; }
+
+function favsyncStart(){
+  if(FAVSYNC.live) return true;
+  if(Date.now()<_favsyncNextTry) return false;
+  var db=fbDb();
+  if(!db||!SESSION.pid){
+    FAVSYNC.err=db?'Nobody is signed in yet':'The database code did not load on this device';
+    _favsyncNextTry=Date.now()+FAVSYNC_RETRY_MS; return false;
+  }
+  try{
+    FAVSYNC.unsub=db.collection(FAVSYNC_COLL).onSnapshot(snapOpts(),favsyncOnSnapshot,function(e){
+      FAVSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+      FAVSYNC.live=false; FAVSYNC.ready=false; _favsyncNextTry=Date.now()+FAVSYNC_RETRY_MS;
+    });
+    FAVSYNC.live=true; FAVSYNC.err=null; return true;
+  }catch(e){
+    FAVSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+    _favsyncNextTry=Date.now()+FAVSYNC_RETRY_MS; return false;
+  }
+}
+function favsyncStop(){
+  try{ if(FAVSYNC.unsub) FAVSYNC.unsub(); }catch(e){}
+  FAVSYNC.unsub=null; FAVSYNC.live=false; FAVSYNC.ready=false;
+  FAVSYNC.seen={}; FAVSYNC.failed={};
+}
+function favsyncOnSnapshot(snap){
+  var changes; try{ changes=snap.docChanges(); }catch(e){ return; }
+  var touched=false;
+  changes.forEach(function(ch){
+    if(ch.type==='removed'){
+      delete FAVSYNC.seen[String(ch.doc.id)];
+      var had=favById(ch.doc.id);
+      if(had){ var k=FAVS.indexOf(had); if(k>=0){ FAVS.splice(k,1); touched=true; } }
+      return;
+    }
+    var data; try{ data=ch.doc.data(); }catch(e){ return; }
+    if(!data) return;
+    data.id=String(ch.doc.id);
+    FAVSYNC.seen[data.id]=sdbJson(data);
+    delete FAVSYNC.failed[data.id];
+    FAVSYNC.down++;
+    var have=favById(data.id);
+    if(have){
+      if(sdbJson(favDoc(have))!==sdbJson(data)){
+        /* APPLY IT COMPLETELY. Copying the arriving fields over the top and
+           leaving whatever the server did not send behind is the other half
+           of the 4.4-million-read day: the leftover field means the record
+           never matches, so it goes up again forever. */
+        Object.keys(have).forEach(function(k){ if(!(k in data)) delete have[k]; });
+        Object.keys(data).forEach(function(k){ have[k]=data[k]; });
+        touched=true;
+      }
+      return;
+    }
+    FAVS.push(data); touched=true;
+  });
+  var fromCache=true;
+  try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
+  if(!FAVSYNC.ready&&!fromCache){ FAVSYNC.ready=true; favsyncUploadNew(); }
+  if(touched){
+    /* storeSaveLocal(), NEVER storeTouch(). A record arriving is the thing a
+       send causes, so offering all the drawers from here closes a circle that
+       runs at network speed. See the note over storeScan(). */
+    try{ storeSaveLocal(); }catch(e){}
+    /* Starring a job on the laptop should light the star on the phone without
+       waiting for a navigation, so repaint whichever of the two screens that
+       draw stars happens to be open. */
+    try{ if(typeof renderAssignList==='function') renderAssignList(); }catch(e){}
+    try{ if(typeof renderTemplates==='function') renderTemplates(); }catch(e){}
+    try{ favsyncRepaint(); }catch(e){}
+  }
+}
+function favsyncUploadNew(){
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  FAVS.slice().forEach(function(r){
+    if(!r||!r.id) return;
+    var id=String(r.id);
+    if(FAVSYNC.seen[id]!==undefined) return;
+    if(!favCanPush(r)) return;
+    var doc=favDoc(r); if(!doc) return;
+    if(!sdbMaySend('favorites/'+id,'favorites')) return;   /* the brake — see sdbMaySend() */
+    FAVSYNC.seen[id]=sdbJson(doc);
+    n++; FAVSYNC.up++;
+    try{ db.collection(FAVSYNC_COLL).doc(id).set(doc).catch(function(e){ favsyncFail(id,e); }); }
+    catch(e){ favsyncFail(id,e); }
+  });
+  return n;
+}
+/* Never offer the database a write it is going to refuse. This phone holds
+   everybody's favorites, and every one of them except my own would be turned
+   away -- which would put a refusal on the Shared database screen every tick
+   for something nobody did wrong. Mirrors the favorites block in
+   firestore.rules: your own record, and no other. */
+function favCanPush(r){
+  if(!r||!SESSION.pid) return false;
+  if(String(r.id)!==String(SESSION.pid)) return false;
+  return (typeof favCanUse!=='function')||favCanUse();
+}
+function favsyncFail(id,e){
+  FAVSYNC.failed[id]=(typeof sdbError==='function')?sdbError(e):String((e&&e.message)||e);
+}
+function favPush(){
+  if(!FAVSYNC.on||!FAVSYNC.live||!FAVSYNC.ready) return 0;
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  FAVS.forEach(function(r){
+    if(!r||!r.id||!favCanPush(r)) return;
+    var id=String(r.id), json=favJson(r);
+    if(json===null||FAVSYNC.seen[id]===json) return;
+    if(!sdbMaySend('favorites/'+id,'favorites')) return;   /* the brake — see sdbMaySend() */
+    FAVSYNC.seen[id]=json; n++; FAVSYNC.up++;
+    try{ db.collection(FAVSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ favsyncFail(id,e); }); }
+    catch(e){ favsyncFail(id,e); }
+  });
+  return n;
+}
+function favsyncTick(){
+  if(!FAVSYNC.on) return;
+  if(!FAVSYNC.live){ favsyncStart(); return; }
+  favPush();
+}
+function favsyncRepaint(){
+  try{
+    var d=document.getElementById('s-sharedb');
+    if(d&&d.classList.contains('active')&&typeof sdbRender==='function') sdbRender();
+  }catch(e){}
+}
+function favsyncSummary(){
+  if(!FAVSYNC.on) return 'Off — favorites starred on this phone stay on it';
+  if(FAVSYNC.err) return FAVSYNC.err;
+  if(!FAVSYNC.live) return 'Connecting…';
+  if(!FAVSYNC.ready) return 'Connected — waiting for the shared copy';
+  var f=Object.keys(FAVSYNC.failed).length;
+  return FAVSYNC.up+' sent · '+FAVSYNC.down+' received'+(f?(' · '+f+' refused'):'')+sdbStuckNote();
+}
+
 /* ================= TIME CLOCK ================= */
 /* The punches live inside the Time Clock's own closure, so this module talks
    to them through the three doors it opens: tcPunchDocs(), tcApplyRemote()

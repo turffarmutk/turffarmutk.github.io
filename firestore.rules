@@ -696,6 +696,45 @@ service cloud.firestore {
     }
 
     /* ------------------------------------------------------------------
+       FAVORITES — the jobs one person stars, so the Assign screen opens on
+       the handful they reach for rather than the whole task list.
+
+       ONE DOCUMENT PER PERSON, NAMED AFTER THAT PERSON. That is what makes
+       this the simplest block in the file: "you may write the document that
+       is named after you" is one comparison and needs no lookup of anything.
+
+       ON READING. Open to anybody signed in, exactly like the punches, the
+       weekly schedules and time off above, and for the identical reason
+       spelled out there: a phone HOLDS everybody's favorites even though the
+       app only ever DRAWS your own, because refusing records that are not
+       yours would need a different query per person and no drawer here does
+       that. If that ever changes it changes for all of them together.
+
+       ON WRITING. Deliberately ONE NOTCH LOOSER than the app. favCanUse() in
+       app-05-tasks-clock.js does not offer a star to undergraduates, because
+       the Assign screen is the only place a star pays off and they never
+       reach it. That is a decision about screens, not a rule about safety --
+       a starred job is a bookmark and changes nothing for anybody else. So
+       the rule stays at "your own record", which cannot cause a refusal
+       nobody caused, and giving undergraduates favorites later is a change in
+       the app alone with no rules to republish.
+
+       Transcribed from favCanPush() in app-02-fieldlog-sync.js.
+       ------------------------------------------------------------------ */
+    match /favorites/{favId} {
+      allow read: if actor();
+
+      allow create, update: if actor()
+        && favId == me()
+        && request.resource.data.id == favId
+        && request.resource.data.tpls is list;
+
+      /* Taking every star off is an empty list, not a missing record --
+         the same reasoning as the schedules above. */
+      allow delete: if false;
+    }
+
+    /* ------------------------------------------------------------------
        TIME CLOCK — drawer 6
 
        One document per punch. NOT append-only, and that is deliberate rather
@@ -1133,8 +1172,8 @@ service cloud.firestore {
        EVERYTHING ELSE IS CLOSED.
 
        Every drawer now has one: tasks, the map, crew claims, alley paint, the field log,
-       inventory, the weekly schedules, the time clock, the task list, the
-       trials, farm settings, equipment and the calendar. Anything NOT listed
+       inventory, the weekly schedules, the time clock, the task list, favorites,
+       the trials, farm settings, equipment and the calendar. Anything NOT listed
        above is still refused, which is what we want and what should stay true
        -- a new collection gets a block here, written from a function in the
        app, or it does not get written to at all. An empty drawer nobody can

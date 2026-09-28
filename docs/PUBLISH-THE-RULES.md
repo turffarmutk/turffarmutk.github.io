@@ -458,3 +458,47 @@ the job looks finished on the student's phone and then comes back open. Publish
 this file before the app goes out, as before. Bill's side (assigning the rest)
 needs nothing new — he could already create and edit jobs.
 
+
+---
+
+## And again on 2026-09-28 — favorites
+
+The Assign screen's first tab is now **★ Favorites** instead of "Scheduled":
+the handful of jobs each person has starred, rather than everything that
+repeats this month. Starring happens on the Task List screen, on the Assign
+screen, and on a job's own add/edit form.
+
+A star is **personal and portable**, which is the whole reason this needs a
+rules section at all. Your favorites are yours — starring a job changes
+nothing for anybody else — and they follow you, so signing in on a different
+phone brings your list with you. That means they have to leave the phone, and
+anything that leaves the phone needs the database's permission.
+
+**One record per person, named after that person.** `favorites/p07` is Bill's.
+That is what makes this the simplest section in the file: "you may write the
+document that is named after you" is a single comparison and needs no lookup.
+
+**Everybody may read them.** The same as the punches, the weekly schedules and
+time off — a phone holds everybody's records even though the app only ever
+draws your own, because refusing the ones that are not yours would need a
+different query per person, which no drawer does. Twenty-odd tiny documents.
+
+**Everybody writes their own and nobody else's.**
+
+**Nothing is ever deleted.** Taking every star off leaves an empty list, not a
+missing record — same reasoning as the schedules.
+
+**One thing is deliberately looser than the app**, and it is written into the
+rules file so it is not mistaken for a mistake: the app does not offer a star
+to undergraduates, because the Assign screen is the only place a star is any
+use and they never reach it. The *rule* says nothing about roles. A bookmark
+is not a safety question, and a rule that is looser than the app can never
+refuse something somebody was allowed to do. It also means giving the
+undergraduates favorites later would be a change in the app alone, with no
+rules to publish and no waiting on you.
+
+**Until you publish, starring appears to work and then quietly stops
+travelling.** The star lights up and stays lit on that phone — it is saved
+there like everything else — but it never reaches the person's other phone,
+and the Shared database screen shows `· 1 refused` against Favorites. Publish
+this file before the app goes out.

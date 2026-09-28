@@ -161,6 +161,100 @@ function tplRestore(id){
   saveTemplates(); return true;
 }
 function tplRemovedList(){ return TEMPLATES.filter(function(t){ return t&&t.removed; }); }
+
+/* ================= FAVORITES =================
+   The jobs one person reaches for most, kept as a star on the task list and
+   on the Assign screen. Replaced the old "Scheduled" tab on 2026-09-28 —
+   Dillon's call — because which months a job repeats in turned out not to be
+   how anybody actually picks work off that screen.
+
+   FAVORITES ARE PER PERSON, AND THEY FOLLOW THE PERSON. Bill's starred list
+   is not the same as a grad student's, and signing in on a different phone
+   brings your own list with you. That is why this is a shared drawer
+   (FAVSYNC in app-02-fieldlog-sync.js) rather than a setting on the phone:
+   a favorite kept in PREFS would live on one handset and quietly disagree
+   with the same person's iPad.
+
+   ONE RECORD PER PERSON, and the record's id IS their person id:
+     { id:'p07', tpls:['tpl3','tpl9'], updatedAt:'…', updatedBy:'p07' }
+   That shape is what lets firestore.rules say "you may write the favorites
+   document that is named after you, and no other" without a query — see the
+   favorites block there.
+
+   `tpls` is a flat list of strings. It must STAY flat: Firestore cannot hold
+   a list inside a list, and a drawer that offers one has its writes thrown
+   away before they leave the phone with nothing on screen to say so. That is
+   the fourth trap in CLAUDE.md, and it cost the map feature a month. */
+var FAVS=[];
+
+/* Who gets a star. Everybody but the undergraduates, matching tplCanEdit() --
+   not because a bookmark is dangerous, but because the Assign screen is the
+   only place a favorite pays off and undergraduates never reach it. Read off
+   the ROSTER, never currentRole, for the same reason tplCanEdit() does: the
+   database cannot see currentRole, so reading it here would guarantee the app
+   and the rules drift apart.
+
+   NOTE the rules are deliberately one notch looser than this: they say "your
+   own record", and say nothing about roles. A looser rule cannot cause a
+   silent refusal, and it means giving undergraduates favorites later would be
+   a change here only, with no rules to republish. */
+function favCanUse(){
+  if(!SESSION.pid) return false;
+  if(typeof personActive==='function'&&!personActive(SESSION.pid)) return false;
+  return (typeof personRole==='function')&&personRole(SESSION.pid)!=='Undergraduate Student';
+}
+function favRec(pid){
+  var id=String(pid||'');
+  for(var i=0;i<FAVS.length;i++) if(FAVS[i]&&String(FAVS[i].id)===id) return FAVS[i];
+  return null;
+}
+/* The raw ids this person has starred -- a fresh array, so a caller cannot
+   edit the record by accident. It is NOT filtered: a star on a job somebody
+   later took off the list stays in the record, so putting the job back brings
+   the star back with it rather than making everybody star it again.
+   favTemplates() below is what does the filtering, and it is what the screens
+   use, so a removed job never shows up as a row that cannot be assigned. */
+function favIds(pid){
+  var r=favRec(pid||SESSION.pid);
+  return (r&&Array.isArray(r.tpls))?r.tpls.slice():[];
+}
+function favHas(tplId,pid){ return favIds(pid).indexOf(String(tplId))>=0; }
+/* The starred jobs, in the order the task list shows them rather than the
+   order they were starred in, so the tab reads the same way as every other
+   list of jobs on the farm. */
+function favTemplates(pid){
+  var ids=favIds(pid);
+  if(!ids.length) return [];
+  return tplLive().filter(function(t){ return t&&ids.indexOf(String(t.id))>=0; });
+}
+/* Star or unstar, on my own record only. Saves to the phone and stops there:
+   sending is the two-second heartbeat's job and nobody else's. See the note
+   over storeScan() for what calling storeTouch() from the wrong place costs. */
+function favToggle(tplId){
+  if(!favCanUse()) return false;
+  var id=String(tplId||''); if(!id) return false;
+  var me=String(SESSION.pid);
+  var r=favRec(me);
+  if(!r){ r={id:me,tpls:[]}; FAVS.push(r); }
+  if(!Array.isArray(r.tpls)) r.tpls=[];
+  var i=r.tpls.indexOf(id);
+  if(i>=0) r.tpls.splice(i,1); else r.tpls.push(id);
+  r.updatedAt=isoLocal(new Date(),true);
+  r.updatedBy=me;
+  try{ storeSaveLocal(); }catch(e){}
+  return true;
+}
+/* The star itself, as one tappable span. `on` is filled, `off` is an outline,
+   because a filled and an unfilled star of the same color are the one pair
+   that colour-blind mode cannot help with -- the shape is doing the work.
+   data-fav is what the two click handlers look for. */
+function favStar(tplId){
+  if(!favCanUse()) return '';
+  var on=favHas(tplId);
+  return '<span class="favstar'+(on?' on':'')+'" data-fav="'+esc(String(tplId))+'"'
+        +' title="'+(on?'Starred — tap to take it off your favorites':'Tap to add to your favorites')+'"'
+        +' role="button" aria-pressed="'+(on?'true':'false')+'">'+(on?'★':'☆')+'</span>';
+}
 /* Machines allowed for a task; falls back to the whole active roster. */
 function tplMachineList(list){
  var all=(typeof EQUIP!=='undefined'?EQUIP:[]).filter(function(e){return e.active;});
@@ -199,8 +293,6 @@ function wantsMachineRow(){
 function initFormChrome(){
  var cat=document.getElementById('tn-cat');
  if(cat&&!cat.options.length)cat.innerHTML=CATEGORIES.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join('');
- var mg=document.getElementById('tn-months');
- if(mg)mg.innerHTML=MONTHS.map(function(m){return '<span class="mchip" data-month="'+m+'">'+m+'</span>';}).join('');
  var fr=document.getElementById('tn-freq');
  if(fr)fr.innerHTML=FREQS.map(function(n){return '<span class="fchip" data-freq="'+n+'">'+n+'× / wk</span>';}).join('');
 }
@@ -261,7 +353,17 @@ function syncForm(){
  document.getElementById('tn-custom-sec').style.display=custom?'':'none';
  document.getElementById('tn-freq').style.display=custom?'':'none';
  document.querySelectorAll('#tn-freq .fchip').forEach(function(c){c.classList.toggle('on',+c.getAttribute('data-freq')===+FORM.freq);});
- document.querySelectorAll('#tn-months .mchip').forEach(function(c){c.classList.toggle('on',FORM.months.indexOf(c.getAttribute('data-month'))>=0);});
+ /* Favorite: a job's own row only. A request, an assignment or a one-off edit
+    has no template behind it, so there is nothing to star -- and it is hidden
+    from undergraduates for the same reason the star is, which favCanUse()
+    decides in one place for all three screens. */
+ var favSec=document.getElementById('tn-fav-sec'), favWrap=document.getElementById('tn-fav-wrap'),
+     favNote=document.getElementById('tn-fav-note'), favVal=document.getElementById('tn-fav');
+ var showFav=(FORM.mode==='template')&&(typeof favCanUse!=='function'||favCanUse());
+ if(favSec) favSec.style.display=showFav?'':'none';
+ if(favWrap) favWrap.style.display=showFav?'':'none';
+ if(favNote) favNote.style.display=showFav?'':'none';
+ if(favVal){ var fv=!!FORM.fav; favVal.textContent=(fv?'★ Yes':'☆ No')+' ›'; favVal.style.color=fv?'#b07800':'var(--muted)'; }
  document.getElementById('tn-title').textContent=req?(FORM.reqType==='toCrew'?'Request grad / tech':(FORM.showStudents?'Request an undergrad':'Request a task')):(asg?(FORM.scope==='self'?'Assign task to me':'Assign to my lab'):(edt?'Edit task':(FORM.id?'Edit this job':'Add to the task list')));
  document.getElementById('tn-save').textContent=(req?'Submit request':(asg?'Assign task':(edt?'Save changes':'Save Task')));
 }
@@ -272,8 +374,11 @@ function openEditTask(id){
  syncForm(); go('tasknew');
 }
 function openForm(tpl){
- if(tpl){FORM={id:tpl.id,mode:'template',students:1,name:tpl.name,category:tpl.category,plots:(tpl.plots||[]).slice(),repeat:tpl.repeat,freq:tpl.freq||3,months:(tpl.months||[]).slice(),machine:tpl.machine||'',machines:(tpl.machines||[]).slice(),eqNote:tpl.eqNote||'',logField:tpl.logField!==false};}
- else{FORM={id:null,mode:'template',students:1,name:'',category:CATEGORIES[0],plots:[],repeat:'As needed',freq:3,months:[],machines:[],eqNote:'',logField:true};}
+ /* fav is read off MY favorites record, not off the job -- the star is per
+    person, so two people opening the same job see different answers here.
+    A brand-new job starts unstarred. */
+ if(tpl){FORM={id:tpl.id,mode:'template',students:1,name:tpl.name,category:tpl.category,plots:(tpl.plots||[]).slice(),repeat:tpl.repeat,freq:tpl.freq||3,months:(tpl.months||[]).slice(),machine:tpl.machine||'',machines:(tpl.machines||[]).slice(),eqNote:tpl.eqNote||'',logField:tpl.logField!==false,fav:favHas(tpl.id)};}
+ else{FORM={id:null,mode:'template',students:1,name:'',category:CATEGORIES[0],plots:[],repeat:'As needed',freq:3,months:[],machines:[],eqNote:'',logField:true,fav:false};}
  syncForm(); go('tasknew');
 }
 function openReqForm(withStudents){
@@ -336,6 +441,11 @@ function saveForm(){
  var idx=TEMPLATES.findIndex(function(x){return x.id===t.id;});
  if(idx>=0)TEMPLATES[idx]=t; else TEMPLATES.push(t);
  saveTemplates();
+ /* The star goes on MY favorites record, never on the job, so saving a job
+    cannot put it on anybody else's list. Only called when the form actually
+    disagrees with what is already starred, so re-saving a job that was
+    already a favorite writes nothing and the drawer stays quiet. */
+ if(typeof FORM.fav==='boolean' && favCanUse() && FORM.fav!==favHas(t.id)) favToggle(t.id);
  toast(editing?'Task updated ✓':'Task saved ✓');
  back();
 }
@@ -349,7 +459,18 @@ document.getElementById('s-tasknew').addEventListener('click',function(e){
 document.getElementById('tn-when')&&document.getElementById('tn-when').addEventListener('change',function(e){FORM.dueOrd=parseInt(e.target.value,10)||FORM.dueOrd;});
 document.getElementById('tn-repeat').addEventListener('change',function(e){FORM.repeat=e.target.value;syncForm();});
 document.getElementById('tn-freq').addEventListener('click',function(e){var c=e.target.closest('[data-freq]');if(!c)return;FORM.freq=+c.getAttribute('data-freq');syncForm();});
-document.getElementById('tn-months').addEventListener('click',function(e){var c=e.target.closest('[data-month]');if(!c)return;var m=c.getAttribute('data-month');var i=FORM.months.indexOf(m);if(i>=0)FORM.months.splice(i,1);else FORM.months.push(m);syncForm();});
+/* The "Months active" boxes used to be wired up here. They came off the form
+   on 2026-09-28 -- the Assign screen's Scheduled tab was the only thing that
+   ever read them. FORM.months is still loaded and saved untouched, so a job's
+   existing months survive an edit and the old view could be put back.
+   NOTE the line that stood here reached for the month grid by id and wired a
+   click to it with NO GUARD. Taking the element out of the page and leaving
+   that line behind would have thrown while app-05 was still loading and
+   killed everything below it in this file -- the time clock, the weather,
+   the calendar -- with the page still drawing normally and nothing to see.
+   That is the trap CLAUDE.md opens with, and tools/test-favorites.js section
+   5 now fails if any reference to that element comes back. */
+document.getElementById('tn-fav-row')&&document.getElementById('tn-fav-row').addEventListener('click',function(){FORM.fav=!FORM.fav;syncForm();});
 document.getElementById('tn-plots-row').addEventListener('click',function(){openPlotPick();});
 /* ---- Equipment needed: the list behind the Start checklist ----
    Every active machine as a tile, grouped by category; tap to add it to this
@@ -539,9 +660,11 @@ function renderTemplates(){
         front of you -- rather than a small red cross a thumb can catch while
         scrolling past forty of them. */
      var chev=edit?'<span style="color:#c2c7cd;font-size:17px;flex:none">›</span>':'';
+     /* The star comes BEFORE the chevron, so the thing that changes something
+        is not the thing sitting under the arrow that means "opens". */
      return '<div class="row'+(edit?' tap':'')+'" data-tpl="'+esc(t.id)+'">'
        +'<div style="flex:1;min-width:0"><div class="rt">'+esc(t.name)+'</div>'
-       +'<div class="rs">'+tplSummary(t)+'</div></div>'+chev+'</div>';
+       +'<div class="rs">'+tplSummary(t)+'</div></div>'+favStar(t.id)+chev+'</div>';
    }).join('')+'</div>';
  }).join('')
  /* Removed jobs are kept, not destroyed, so somebody who takes one off by
@@ -562,6 +685,13 @@ function renderTemplates(){
 }
 document.getElementById('tpl-add').addEventListener('click',function(){ if(tplCanEdit()) openForm(null); });
 document.getElementById('tpl-list').addEventListener('click',function(e){
+ /* Same reason as the assign screen: the star is inside a row that opens the
+    job for editing, so it has to take the tap and stop it going further. */
+ var fv=e.target.closest('[data-fav]');
+ if(fv){ e.stopPropagation();
+   var fid=fv.getAttribute('data-fav');
+   if(favToggle(fid)) toast(favHas(fid)?'Added to your favorites ★':'Taken off your favorites');
+   renderTemplates(); return; }
  var bk=e.target.closest('[data-tplback]');
  if(bk){ e.stopPropagation(); if(tplRestore(bk.getAttribute('data-tplback'))){ toast('Back on the list ✓'); renderTemplates(); } return; }
  var r=e.target.closest('[data-tpl]');
@@ -570,11 +700,15 @@ document.getElementById('tpl-list').addEventListener('click',function(e){
  if(t)openForm(t);
 });
 document.getElementById('tpl-search').addEventListener('input',renderTemplates);
+/* These two lost their only reader on 2026-09-28, when the Assign screen's
+   "Repeating in September" tab became Favorites. Left here on purpose rather
+   than tidied away: they are two lines, and they are half of what putting that
+   view back would need. See docs/DECISIONS.md, 2026-09-28. */
 const FULLMONTH={Jan:'January',Feb:'February',Mar:'March',Apr:'April',May:'May',Jun:'June',Jul:'July',Aug:'August',Sep:'September',Oct:'October',Nov:'November',Dec:'December'};
 function curMonth(){return MONTHS[new Date().getMonth()];}
 const OPEN='__OPEN__';
 const SELF='__SELF__';
-let asTab='scheduled', asPerson=null, PICKS=[];
+let asTab='fav', asPerson=null, PICKS=[];
 /* ---- assign scheduling (days in advance) ---- */
 var ASMON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 var ASDOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -710,25 +844,41 @@ function assignRow(kind,id,title,sub){
    ? '<span class="rankpill tap" data-unpick="'+kind+':'+id+'" title="Remove">'+r+'</span>'
    : '<span class="pill tap" data-unpick="'+kind+':'+id+'" title="Remove" style="background:#489FDF;color:#fff;flex:none">✓ Added</span>'; }
  else { pill='<span class="pill" style="background:#489FDF;color:#fff;flex:none">+ Add</span>'; }
- return '<div class="row tap" data-assign-'+kind+'="'+id+'"><div style="flex:1;min-width:0"><div class="rt">'+title+'</div><div class="rs">'+sub+'</div></div>'+pill+'</div>';
+ /* Only a job on the task list can be starred. A one-off task off the Recent
+    tab has no template behind it, so there is nothing for the star to point
+    at and it is left off that row rather than drawn and made to do nothing. */
+ var star=(kind==='tpl')?favStar(id):'';
+ return '<div class="row tap" data-assign-'+kind+'="'+id+'"><div style="flex:1;min-width:0"><div class="rt">'+title+'</div><div class="rs">'+sub+'</div></div>'+pill+star+'</div>';
 }
 function renderAssignList(){
  var el=document.getElementById('as-list'); if(!el)return;
  var q=(document.getElementById('as-search').value||'').trim().toLowerCase();
  var html='';
- if(asTab==='scheduled'){
-   var m=curMonth();
-   var items=tplLive().filter(function(t){return (t.months||[]).indexOf(m)>=0;})
+ /* THE FIRST TAB IS THE PERSON'S OWN STARRED JOBS. It replaced "Repeating
+    this month" on 2026-09-28 — see the FAVORITES block above, and note that
+    the planned sprays off the calendar that used to sit under that tab came
+    off the Assign screen in the same change, Dillon's call. commitEv() and
+    openWiz('ev') below are left in place and are simply no longer reached:
+    putting calendar sprays back is one section here, not a rebuild. */
+ if(asTab==='fav'){
+   var items=favTemplates()
      .filter(function(t){return !q||(t.name+' '+t.category+' '+(t.plots||[]).join(' ')).toLowerCase().indexOf(q)>=0;});
-   html+='<div class="sec">Repeating in '+(FULLMONTH[m]||m)+'</div>';
-   html+= items.length? '<div class="list">'+items.map(function(t){return assignRow('tpl',t.id,t.name,t.category+' · '+(t.plots&&t.plots.length?areaLabel(t.plots):'—')+' · '+asRepeatLabel(t));}).join('')+'</div>'
-        : '<div class="sec" style="text-align:center;margin-top:20px">'+(q?'No matches':'Nothing scheduled this month')+'</div>';
-   var sprays=EVENTS.filter(function(e){return e.type==='spray';})
-     .filter(function(e){return !q||(e.title+' '+(e.sub||'')).toLowerCase().indexOf(q)>=0;})
-     .sort(function(a,b){return a.d-b.d;});
-   if(sprays.length){
-     html+='<div class="sec">Sprays from the calendar</div><div class="list">'+sprays.map(function(e){return assignRow('ev',e.id,e.title,(e.sub||'Spray')+' · '+asDateLabel(evSprayOrd(e)));}).join('')+'</div>';
-   }
+   html+='<div class="sec">★ Your favorites</div>';
+   /* An empty first tab is the first thing a new person sees, so it has to
+      say what to do about it rather than just reading as "nothing here". */
+   html+= items.length
+     ? '<div class="list">'+items.map(function(t){
+         var mn=tplMachineList(t.machines&&t.machines.length?t.machines:null);
+         var sub=(t.machines&&t.machines.length)?mn.map(function(e){return e.name;}).join(' · '):(t.eqNote||t.category);
+         return assignRow('tpl',t.id,t.name,sub);
+       }).join('')+'</div>'
+     : (q? '<div class="sec" style="text-align:center;margin-top:20px">No matches in your favorites</div>'
+         : '<div style="margin:16px 16px 0;padding:22px 18px;text-align:center;background:var(--card);border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,.07)">'
+           +'<div style="font-size:30px;line-height:1">☆</div>'
+           +'<div style="font:800 14px \'Archivo\';color:var(--ink);margin-top:7px">No favorites yet</div>'
+           +'<div style="font:600 12px \'Public Sans\';color:var(--muted);line-height:1.5;margin-top:6px">'
+           +'Tap the ☆ beside any job — on the All tasks tab here, or on the Task List screen — and it lands on this tab. '
+           +'They are yours alone, and they follow you to whatever phone you sign in on.</div></div>');
  } else if(asTab==='all'){
    var byCat={};
    tplLive().filter(function(t){return !q||(t.name+' '+t.category+' '+(t.plots||[]).join(' ')).toLowerCase().indexOf(q)>=0;})
@@ -755,8 +905,8 @@ function renderAssignList(){
 function updateSaveBtn(){var b=document.getElementById('as-save');if(!b)return;b.textContent=PICKS.length?('Save · '+PICKS.length+' task'+(PICKS.length>1?'s':'')):'Save assignments';}
 function assignEnter(){
  var mgr=currentRole==='manager';
- asTab='scheduled'; asPerson=mgr?null:SELF; PICKS=[]; asDay=boardDefaultDay();
- var seg=document.getElementById('as-seg'); if(seg)seg.querySelectorAll('span').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-atab')==='scheduled');});
+ asTab='fav'; asPerson=mgr?null:SELF; PICKS=[]; asDay=boardDefaultDay();
+ var seg=document.getElementById('as-seg'); if(seg)seg.querySelectorAll('span').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-atab')==='fav');});
  var sr=document.getElementById('as-search'); if(sr)sr.value='';
  var ttl=document.querySelector('#s-assign .hdr .title'); if(ttl)ttl.textContent=mgr?'Assign Tasks':'Assign task to me';
  closeWiz(); renderAssignPeople(); renderAssignList(); updateSaveBtn();
@@ -925,14 +1075,22 @@ function saveAssignments(){
  if(!PICKS.length){toast('Add tasks first');return;}
  var who=asPerson, n=PICKS.length;
  PICKS.forEach(function(p){ if(p.kind==='tpl')commitTpl(p.id,p.note,p.plots,p.dueOrd,p); else if(p.kind==='ev')commitEv(p.id,p.note,p.plots,p.dueOrd,p); else commitTask(p.id,p.note,p.plots,p.dueOrd,p); });
- asPerson=(currentRole==='manager')?null:SELF; PICKS=[]; asTab='scheduled';
- var seg=document.getElementById('as-seg'); if(seg)seg.querySelectorAll('span').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-atab')==='scheduled');});
+ asPerson=(currentRole==='manager')?null:SELF; PICKS=[]; asTab='fav';
+ var seg=document.getElementById('as-seg'); if(seg)seg.querySelectorAll('span').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-atab')==='fav');});
  var sr=document.getElementById('as-search'); if(sr)sr.value='';
  renderAssignPeople(); renderAssignList(); updateSaveBtn();
  toast(who===OPEN?('Posted '+n+' task'+(n>1?'s':'')+' to the open board ✓'):(who===SELF?('Assigned '+n+' task'+(n>1?'s':'')+' to yourself ✓'):(isCrew(who)?('Requested '+nameOf(who)+' for '+n+' task'+(n>1?'s':'')+' ✓'):('Assigned '+n+' task'+(n>1?'s':'')+' to '+nameOf(who)+' ✓'))));
 }
 document.getElementById('s-assign').addEventListener('click',function(e){
  if(e.target.closest('#as-save')){saveAssignments();return;}
+ /* The star sits INSIDE a row that opens the assign wizard when tapped, so
+    this has to run before the row handler below and swallow the tap --
+    otherwise starring a job also starts assigning it. */
+ var fv=e.target.closest('[data-fav]');
+ if(fv){ e.stopPropagation();
+   var fid=fv.getAttribute('data-fav');
+   if(favToggle(fid)) toast(favHas(fid)?'Added to your favorites ★':'Taken off your favorites');
+   renderAssignList(); return; }
  var dd=e.target.closest('[data-asday]'); if(dd){asDay=parseInt(dd.getAttribute('data-asday'),10);renderAssignPeople();return;}
  var p=e.target.closest('[data-person]'); if(p){var n=p.getAttribute('data-person');var prev=asPerson;asPerson=asPerson===n?null:n;if(asPerson!==prev)PICKS=[];renderAssignPeople();renderAssignList();updateSaveBtn();return;}
  var at=e.target.closest('span[data-atab]'); if(at){asTab=at.getAttribute('data-atab');renderAssignList();return;}

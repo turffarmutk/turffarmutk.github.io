@@ -137,6 +137,28 @@
   .seg{display:flex;background:#e7e9e6;border-radius:11px;padding:3px;margin:12px 14px}
   .seg span{flex:1;text-align:center;font:700 12px 'Public Sans';padding:8px;border-radius:8px;color:var(--muted)}
   .seg span.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+  /* The Assign screen's Scheduled / All tasks / Recent switch. The shared .seg
+     track above is #e7e9e6, and the page behind it on the Field theme is
+     #e9ebe7 -- near enough the same color that the switch read as three words
+     floating loose rather than one control with three positions. This gives it
+     the same gray track the on/off switches already use, a hairline edge, and a
+     deeper shadow under the chosen one, so which of the three is on is obvious
+     at arm's length in sunlight.
+     Scoped by id on purpose: .seg is shared by several other screens, so
+     changing .seg itself would land on all of them. */
+  #as-seg{background:#cfd3d8;border:1px solid #c9ced4}
+  #as-seg span.on{background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.22)}
+  /* The favorites star, on a task list row and on an assign row. 40px square
+     because it sits right next to a row that opens the job when tapped, and a
+     thumb in a glove needs a target it cannot miss by two pixels.
+     The filled and the hollow star are DIFFERENT SHAPES, not two shades of
+     one color, so this still reads for somebody who cannot tell gold from
+     grey -- colour-blind mode rewrites the colors here like any other, and
+     the shape is what carries the meaning through it. */
+  .favstar{flex:none;width:40px;height:40px;margin:-8px -6px -8px 0;display:flex;align-items:center;
+    justify-content:center;font-size:20px;line-height:1;color:#b9bec5;cursor:pointer;user-select:none}
+  .favstar.on{color:#e8a317}
+  .favstar:active{opacity:.55}
 
   /* ---- hourly forecast ----
      A day of weather does not fit on a phone screen, and the crew does not read
@@ -1724,8 +1746,17 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
             </div>
             <div class="sec" id="tn-custom-sec" style="display:none">How often (per week)</div>
             <div class="chiprow" id="tn-freq" style="display:none"></div>
-            <div class="sec">Months active</div>
-            <div class="monthgrid" id="tn-months"></div>
+            <!-- "Months active" used to be here. It came off on 2026-09-28 when
+                 the Assign screen's Scheduled tab became Favorites: that tab was
+                 the only thing that ever read the months, so the boxes had
+                 stopped meaning anything. Whatever months a job already had are
+                 still saved on it, untouched, in case the Scheduled view is ever
+                 wanted back -- see tplSave() in app-05-tasks-clock.js. -->
+            <div class="sec" id="tn-fav-sec">Favorite</div>
+            <div class="list" id="tn-fav-wrap">
+              <div class="fld tap" id="tn-fav-row" style="border-bottom:none"><span class="fl">On your favorites</span><span class="fv" id="tn-fav">☆ No ›</span></div>
+            </div>
+            <div id="tn-fav-note" style="font:600 11px 'Public Sans';color:var(--muted);line-height:1.45;margin:7px 18px 0">Favorites are yours alone — they are the first tab on the Assign screen, and they follow you to any phone you sign in on.</div>
             </div>
             <div id="tn-delwrap" style="display:none;margin:18px 16px 0"><div class="tap" id="tn-del" style="border:1px solid #e6c6c2;border-radius:12px;padding:13px;text-align:center;font:800 13px 'Archivo';color:#c0392b;background:#fdf3f2">Delete task</div><div style="font:600 11px 'Public Sans';color:var(--muted);line-height:1.45;margin:7px 2px 0;text-align:center">It stops showing when anybody assigns work. You can put it back from the bottom of the task list.</div></div>
             <div style="height:16px"></div>
@@ -1805,7 +1836,7 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
             <div style="flex:1;overflow:auto">
               <div id="as-people"></div>
               <div class="searchbar"><span class="si">🔍</span><input id="as-search" type="text" placeholder="Search saved tasks"></div>
-              <div class="seg" id="as-seg"><span class="on" data-atab="scheduled">Scheduled</span><span data-atab="all">All tasks</span><span data-atab="recent">Recent</span></div>
+              <div class="seg" id="as-seg"><span class="on" data-atab="fav">★ Favorites</span><span data-atab="all">All tasks</span><span data-atab="recent">Recent</span></div>
               <div id="as-list"></div>
             </div>
             <div class="actionbar"><div class="action tap" id="as-save">Save assignments</div></div>
@@ -2942,6 +2973,12 @@ function sdbShareBlocks_raw(){
    {st:TPLSYNC, summary:tplsyncSummary(), title:'The task list',
     what:'The jobs the farm does — the list the assign screen is built from. Everybody '
         +'but the undergraduates can add to it and change it; they can read it.'},
+   {st:FAVSYNC, summary:favsyncSummary(), title:'Favorites',
+    what:'The jobs each person stars, so the Assign screen opens on the handful they '
+        +'actually reach for instead of the whole list. These are personal, not the '
+        +'farm\'s: your stars are yours, and starring something does not change it for '
+        +'anybody else. They follow you — sign in on a different phone and your list is '
+        +'there. Everybody writes their own and nobody else\'s.'},
    {st:TRSYNC,  summary:trsyncSummary(),  title:'Trials and restrictions',
     what:'The studies running on the farm and the no-mow, no-spray and no-irrigate '
         +'restrictions they put on the ground, so a restriction is visible to whoever turns '
@@ -9103,7 +9140,12 @@ var STORE_DEFS=[
   /* Studies that were removed. Kept as a short list of ids rather than a flag
      on the study, so every screen that reads TRIALS carries on seeing exactly
      what it sees today. See trMarkGone(). */
-  {name:'trialsgone', key:'ut_trials_gone_v1',label:'Removed trials',     get:function(){return TR_GONE;}}
+  {name:'trialsgone', key:'ut_trials_gone_v1',label:'Removed trials',     get:function(){return TR_GONE;}},
+  /* One record per person: the jobs they starred. Registered here like every
+     other list so it is saved to the phone, rides along in a backup export,
+     and is there with no signal -- a favorite that only existed on the server
+     would be an empty first tab every time the shed's wifi drops. */
+  {name:'favorites',  key:'ut_favorites_v1',  label:'Favorites',          get:function(){return FAVS;}}
 ];
 var STORE_LAST_EXPORT_KEY='ut_last_export';
 var STORE_SCAN_MS=2000;
@@ -9179,6 +9221,7 @@ function storeScan(){
   try{ eqsyncTick(); }catch(e){}
   try{ evsyncTick(); }catch(e){}
   try{ rstsyncTick(); }catch(e){}
+  try{ favsyncTick(); }catch(e){}
 }
 function storeFlush(){ storeScan(); }
 function storeTouch(){ storeScan(); }   /* callers that want an immediate write */
@@ -9219,6 +9262,7 @@ function storeHydrate(){
   try{ eqsyncHydrate(); }catch(e){}
   try{ evsyncHydrate(); }catch(e){}
   try{ rstsyncHydrate(); }catch(e){}
+  try{ favsyncHydrate(); }catch(e){}
   _storeOn=true;
   try{ setInterval(storeScan,STORE_SCAN_MS); }catch(e){}
 }

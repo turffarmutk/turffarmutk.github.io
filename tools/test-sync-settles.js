@@ -171,8 +171,13 @@ try { win.currentRole = 'manager'; } catch (e) {}
    through. Add a drawer to the app, add its row here. */
 const P = 'p07';                                  /* Bill: allowed to push the most */
 const DRAWERS = [
+  /* The sample carries the PLOT LIST deliberately. An entry is one job naming
+     every plot it covered since 2026-09-29, and a list is the shape that broke
+     the map drawer for a month — so this drawer has to be seen settling with
+     one. `plot` rides along beside it, as the app writes it. */
   { name: 'the field log',      coll: 'fieldlog',   push: 'flPush',    local: () => L().FIELDLOG,
-    sample: { id: 'zz1', op: 'Mow', when: '2026-08-31', ord: 20260831, loggedBy: P } },
+    sample: { id: 'zz1', op: 'Mow', when: '2026-08-31', ord: 20260831, loggedBy: P,
+              plots: ['11', '12', '13'], plot: '11' } },
   { name: 'stock movements',    coll: 'invmoves',   push: 'invPush',   local: () => L().INVMOVES,
     sample: { id: 'zz1', item: 'i1', qty: 2, who: P, when: '2026-08-31' } },
   /* The sample carries a MIXTURE deliberately. A product's active ingredients

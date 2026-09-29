@@ -85,13 +85,16 @@ Object.defineProperty(win, 'localStorage', {
   value: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); },
            removeItem: k => { delete store[k]; }, clear: () => { store = {}; } }, configurable: true });
 win.navigator.geolocation = { watchPosition: () => 1, clearWatch: noop, getCurrentPosition: noop };
-/* FIELDLOG is `let`, so it is not on window; it is never reassigned after boot. */
-try { win.eval(appSource(win.document) + '\n;window.__FL = FIELDLOG; window.__FLCAP = FL_CAP; window.__FLCUR = function(v){ if(v!==undefined) flCur = v; return flCur; };'); }
+/* FIELDLOG is `let`, so it is not on window; it is never reassigned after boot.
+   flState IS reassigned (flSave clears the filters), so it is reached through a
+   function rather than copied out once. */
+try { win.eval(appSource(win.document) + '\n;window.__FL = FIELDLOG; window.__FLCAP = FL_CAP; window.__FLCUR = function(v){ if(v!==undefined) flCur = v; return flCur; }; window.__FLSTATE = function(){ return flState; };'); }
 catch (e) { console.log('app script threw: ' + e.message); fail++; }
 
 const appText = require('./_app').appText();   /* the page WITH the app-*.js files written back in — see tools/_app.js */
 const rulesText = fs.readFileSync(RULES, 'utf8');
 const FL = () => win.__FL;
+const FLSTATE = () => win.__FLSTATE();
 const clearLog = () => { FL().length = 0; };
 const entry = (over) => Object.assign({
   id: win.newId('fl'), plot: 'B12', type: 'mow', title: 'Mow B12', detail: 'Mowing',
@@ -168,7 +171,12 @@ ok('there is a field log block', /match \/fieldlog\/\{entryId\}/.test(rulesText)
 ok('delete now follows the same rule as edit, not `if false`',
    /allow delete: if actor\(\) && canEditLog\(\);/.test(rulesText));
 ok('update allows the entry\'s real fields, not just the old supersede fields',
-   /hasOnly\(\['plot', 'type', 'op', 'title', 'date', 'ord', 'time',[\s\S]*?'amount', 'target', 'notes', 'detail'\]\)/.test(rulesText));
+   /hasOnly\(\['plot', 'plots', 'type', 'op', 'title', 'date', 'ord',[\s\S]*?'amount', 'target', 'notes', 'detail'\]\)/.test(rulesText));
+/* An entry names every plot the job covered (2026-09-29). The edit form writes
+   that list, so a rules file without it means nobody but Bill can move an entry
+   onto the right ground -- and the app would look like it worked. */
+ok('and it allows the plot LIST, which is what the edit form actually writes',
+   /'plot', 'plots',/.test(rulesText));
 ok('the old supersede-only update rule is gone',
    !/hasOnly\(\['correctedBy', 'correctedAt', 'correctedWho'\]\)/.test(rulesText));
 ok('the app records who wrote every entry down', /loggedBy:SESSION\.pid|loggedBy:whoId/.test(appText));
@@ -273,7 +281,8 @@ win.sessionSet('p07');
   const html = win.document.getElementById('flx-body').innerHTML;
   ok('it warns that saving replaces the record, with no old value kept',
      /old value is not kept/i.test(html));
-  ok('it offers the plot', /id="flx-plot"/.test(html));
+  ok('it offers the ground as chips you can take off', /data-flxrm="B12"/.test(html));
+  ok('and a way to add another plot', /id="flx-addplot"/.test(html));
   ok('and the date', /id="flx-date"/.test(html));
   ok('a chemical entry can fix the product', /id="flx-product"/.test(html));
   ok('it offers Notes, pre-filled', /id="flx-notes"/.test(html) && html.indexOf('first pass') >= 0);
@@ -285,9 +294,12 @@ win.sessionSet('p07');
   win.flxSave();
   ok('saving with nothing changed does nothing, and does not error', FL().length === before);
 
-  win.document.getElementById('flx-plot').value = 'C1';
+  /* Changing the ground: take B12 off, put C1 on — the same two taps the
+     screen offers. */
+  win.FLX.plots = ['C1'];
   win.flxSave();
   ok('an actual change saves onto the SAME entry', win.flById(a.id).plot === 'C1' && FL().length === before);
+  ok('and the plot LIST is what was written', String(win.flById(a.id).plots) === 'C1');
 }
 {
   const a = win.flById(win.__FLCUR());
@@ -324,6 +336,74 @@ section('7. Ten read-outs, one screen, no switches');
      (html.match(/class="action tap"/g) || []).length === 3);
   ok('the log read-out now says who may edit or delete an entry',
      /edited or deleted/i.test(html));
+}
+
+/* ---------------------------- 8. one entry, several plots, several tiles -- */
+/* Two changes on 2026-09-29, and they lean on each other: an entry is one JOB
+   naming all the ground it covered, and the category tiles at the top are a
+   multi-select. Both are things a future tidy-up could quietly undo -- the
+   first by going back to one row per plot, the second by making `types` a
+   single string again -- and neither would error if it did. See
+   docs/DECISIONS.md, 2026-09-29. */
+section('8. One entry is one job, and the tiles are a multi-select');
+clearLog();
+win.sessionSet('p07');
+{
+  /* What the reading helper has to cope with: a job over six plots, a job over
+     one, and an entry written before today that only has `plot`. */
+  const wide = entry({ id: 'fl-wide', type: 'mow', title: 'Reel mow',
+                       plots: ['11', '12', '13', '14', '15', '16'], plot: '11', ord: 20260901 });
+  const one  = entry({ id: 'fl-one', type: 'spray', title: 'Barricade',
+                       plots: ['14'], plot: '14', ord: 20260902 });
+  const legacy = entry({ id: 'fl-legacy', type: 'fert', title: 'Urea', plot: '18', ord: 20260903 });
+  delete legacy.plots;
+  FL().push(wide, one, legacy); win.flCommit();
+
+  ok('the list is what gets read off an entry',
+     String(win.flEntryPlots(wide)) === '11,12,13,14,15,16', String(win.flEntryPlots(wide)));
+  ok('an entry from before today still reads, off its single plot',
+     String(win.flEntryPlots(legacy)) === '18', String(win.flEntryPlots(legacy)));
+  ok('a feed row names up to three plots', win.flPlotsLabel(one) === 'Plot 14', win.flPlotsLabel(one));
+  ok('and counts them past that, rather than wrapping to three lines',
+     win.flPlotsLabel(wide) === '6 plots', win.flPlotsLabel(wide));
+  ok('the detail page and the export still name every one of them',
+     win.flPlotsFull(wide).indexOf('Plot 16') >= 0, win.flPlotsFull(wide));
+
+  /* Searching a plot is the whole reason the list has to be what is read. */
+  FLSTATE().types = []; FLSTATE().plots = ['14'];
+  win.flRender();
+  let feed = win.document.getElementById('fl-feed').innerHTML;
+  ok('searching plot 14 finds the six-plot mow that covered it',
+     feed.indexOf('data-flog="fl-wide"') >= 0);
+  ok('and the spray that was only on 14', feed.indexOf('data-flog="fl-one"') >= 0);
+  ok('but not the job on plot 18', feed.indexOf('data-flog="fl-legacy"') < 0);
+  ok('a plot\'s own count asks the list too', win.flPlotCount('14') === 2, win.flPlotCount('14'));
+
+  /* The tiles: more than one at a time, and the number on one is jobs. */
+  FLSTATE().plots = [];
+  FLSTATE().types = ['mow', 'spray'];
+  win.flRender();
+  feed = win.document.getElementById('fl-feed').innerHTML;
+  ok('two categories at once shows both', feed.indexOf('data-flog="fl-wide"') >= 0
+     && feed.indexOf('data-flog="fl-one"') >= 0);
+  ok('and leaves the third out', feed.indexOf('data-flog="fl-legacy"') < 0);
+  const sum = win.document.getElementById('fl-sum').innerHTML;
+  ok('both tiles are lit, not just the last one tapped',
+     (sum.match(/class="k on"/g) || []).length === 2,
+     String((sum.match(/class="k on"/g) || []).length));
+  ok('the Mow tile counts one job, not the six plots it covered',
+     sum.indexOf('data-cat="mow"><div class="n">1<') >= 0, sum);
+  ok('the line above the feed says which categories are showing',
+     /Mow \+ Spray/.test(win.document.getElementById('fl-feedhead').textContent),
+     win.document.getElementById('fl-feedhead').textContent);
+
+  /* Tapping a lit tile is the way back out. */
+  FLSTATE().types = [];
+  win.flRender();
+  ok('no category chosen means every category',
+     (win.document.getElementById('fl-feed').innerHTML.match(/data-flog=/g) || []).length === 3);
+  ok('and nothing is dimmed', win.document.getElementById('fl-sum').className === 'fl-sum',
+     win.document.getElementById('fl-sum').className);
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

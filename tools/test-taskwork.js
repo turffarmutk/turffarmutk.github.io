@@ -289,7 +289,11 @@ section('5. finishing your part when somebody else still holds the rest');
   const before = FIELDLOG.length;
   doc.getElementById('tw-complete').dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
   const added = FIELDLOG.slice(before);
-  ok('their two pieces go on the Field Log', added.length === 2, added.length + ' entries');
+  /* One entry for their share, naming both zones -- per task, not per plot,
+     since 2026-09-29. */
+  ok('their share goes on the Field Log as one entry', added.length === 1, added.length + ' entries');
+  ok('naming both pieces they did', (added[0].plots || []).length === 2,
+     JSON.stringify(added[0].plots));
   ok('credited to them', added.every(e => e.person === me),
      added.map(e => e.person).join(','));
   ok('and marked as one person\'s share, not the whole job',
@@ -311,12 +315,11 @@ section('5. finishing your part when somebody else still holds the rest');
   const before2 = FIELDLOG.length;
   win.flAddFromTask(t);
   const added2 = FIELDLOG.slice(before2);
+  const left2 = added2.reduce((all, e) => all.concat(win.flEntryPlots(e)), []);
   ok('closing the job later does not log the same zones again',
-     added2.every(e => handedIn.indexOf(e.plot) < 0),
-     added2.map(e => e.plot).join(','));
-  ok('and it lists the ground that is left, not one summary row over all of it',
-     added2.length > 0 && added2.every(e => e.plot !== t.area),
-     added2.map(e => e.plot).join(','));
+     left2.every(p => handedIn.indexOf(p) < 0), left2.join(','));
+  ok('and it names the ground that is left, not one summary row over all of it',
+     left2.length > 0 && left2.every(p => p !== t.area), left2.join(','));
 
   /* The fragile version of this guard lived on the task. Prove the log-based
      one survives a task arriving fresh from the database with no memory. */

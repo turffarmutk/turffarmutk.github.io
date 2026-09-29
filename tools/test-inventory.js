@@ -329,7 +329,12 @@ section('12. three plots, one tank — the shelf is charged ONCE');
   });
   b.p.flSave();
 
-  ok('three entries are written', b.p.FIELDLOG.length === logged + 3, b.p.FIELDLOG.length - logged);
+  /* Since 2026-09-29 the three plots are ONE entry, so "one tank, one
+     movement" no longer has to be argued against three log rows — but the
+     movement still has to be one, which is what this section is really for. */
+  ok('one entry is written for the whole job', b.p.FIELDLOG.length === logged + 1, b.p.FIELDLOG.length - logged);
+  ok('naming all three plots', String(b.p.FIELDLOG[b.p.FIELDLOG.length - 1].plots) === '14,15,16',
+     String(b.p.FIELDLOG[b.p.FIELDLOG.length - 1].plots));
   ok('but only one movement', b.p.invMovesFor(it.id).length === 1);
   ok('and only one amount came off', near(b.p.invQty(it), before - 10), b.p.invQty(it));
 }
@@ -444,7 +449,7 @@ section('15. the edit screen really does call the reconciler');
   ok('flxSave exists', i > 0);
   ok('and reconciles stock after editing', src.indexOf('invReconcileFromLog') >= 0);
   const j = SRC.indexOf('function flSave()');
-  ok('flSave asks how much to take off', SRC.slice(j, j + 3000).indexOf('mixInvDecrement') >= 0);
+  ok('flSave asks how much to take off', SRC.slice(j, j + 3600).indexOf('mixInvDecrement') >= 0);
 }
 
 /* A Firestore snapshot, near enough. fromCache:true keeps the handler from

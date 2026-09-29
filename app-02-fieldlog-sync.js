@@ -108,7 +108,7 @@ function flCan(actor,action,entry){
    entry, when, and where it came from (a task, say) stay put — this is still
    the record of who logged what, even though the record itself can now
    change under it. */
-var FL_EDITABLE=['plot','type','op','title','date','ord','time','person',
+var FL_EDITABLE=['plot','plots','type','op','title','date','ord','time','person',
                     'equipment','product','ai','rate','amount','target','notes','detail'];
 
 /* Kept for any entry a correction made before 2026-08-31 — flLive() still
@@ -147,28 +147,78 @@ function flDelete(id){
   return true;
 }
 
-let flState={type:'all',plots:[]};
-function flPlotMatch(p){return flState.plots.length===0||flState.plots.indexOf(p)>=0;}
+/* ---- ONE ENTRY IS ONE JOB, AND IT NAMES EVERY PLOT IT COVERED -----------
+   Until 2026-09-29 a job that covered six plots wrote six log entries, one per
+   plot. That read badly and it counted wrongly: the log was six near-identical
+   rows for one afternoon's work, and the category tiles at the top said "6
+   mows" when the farm had mowed once. So an entry is now one job, and the
+   ground it covered is the list `plots` on that record.
+
+   Nothing is lost by it. Searching a plot still finds every job on that plot,
+   because the search asks the list, not a single field -- flEntryPlots() below
+   is the only thing anything should read the ground off.
+
+   `plot` IS STILL WRITTEN, set to the first plot of the list, and it is not
+   what anything here reads. It stays for two reasons: an entry written before
+   today only has `plot`, and a phone still running yesterday's copy of the app
+   would otherwise show a blank where the ground should be. One place writes
+   both, in the same statement, every time -- that is what keeps them from
+   drifting apart. See docs/DECISIONS.md, 2026-09-29.                       */
+function flEntryPlots(a){
+  if(!a) return [];
+  if(a.plots&&a.plots.length) return a.plots.slice();
+  return a.plot?[a.plot]:[];
+}
+/* Every plot named -- the detail page and the export, where there is room. */
+function flPlotsFull(a){ var p=flEntryPlots(a); return p.length?p.map(flRowPlot).join(', '):''; }
+/* Short enough for a feed row on a phone: three plots by name, more than that
+   by the count, because "Plot 11, Plot 12, Plot 13, Plot 14, Plot 15, Plot 16"
+   wraps to three lines and says nothing the number does not. */
+function flPlotsLabel(a){
+  var p=flEntryPlots(a);
+  if(!p.length) return '\u2014';
+  if(p.length<=3) return p.map(flRowPlot).join(', ');
+  return p.length+' plots';
+}
+
+/* THE CATEGORY TILES ARE A MULTI-SELECT, since 2026-09-29. `types` empty means
+   every category; tapping a tile adds or takes away that one. It used to be a
+   single choice, which made "show me the spraying and the fertilizing" two
+   trips through the log. */
+let flState={types:[],plots:[]};
+function flTypeMatch(a){return flState.types.length===0||flState.types.indexOf(a.type)>=0;}
+/* An entry matches the plot filter if ANY of its ground is picked -- a mow that
+   covered 11 through 16 belongs in a search for plot 14. */
+function flPlotMatch(a){
+  if(!flState.plots.length) return true;
+  var p=flEntryPlots(a);
+  for(var i=0;i<p.length;i++) if(flState.plots.indexOf(p[i])>=0) return true;
+  return false;
+}
 function flRender(){
  const feed=document.getElementById('fl-feed'); if(!feed)return;
  /* flLive(): a corrected entry is replaced by its correction, never counted
     twice and never left sitting in the totals. It is still reachable from
     the correction that replaced it. */
- let items=flLive().filter(a=>(flState.type==='all'||a.type===flState.type)&&flPlotMatch(a.plot));
+ let items=flLive().filter(a=>flTypeMatch(a)&&flPlotMatch(a));
  items.sort((a,b)=>b.ord-a.ord);
  const sum=document.getElementById('fl-sum');
- if(sum){const base=flLive().filter(a=>flPlotMatch(a.plot));const c={};FL_CATS.forEach(k=>c[k]=0);base.forEach(a=>{if(c[a.type]!=null)c[a.type]++;});
-  sum.className='fl-sum'+(flState.type==='all'?'':' dim');
-  sum.innerHTML=FL_CATS.map(k=>{const t=FL_TYPES[k];return '<div class="k'+(flState.type===k?' on':'')+'" data-cat="'+k+'"><div class="n">'+c[k]+'</div><div class="l">'+esc(t.label)+'</div></div>';}).join('');}
+ /* The number on a tile is how many JOBS were of that kind, not how many
+    plots they touched -- one mow of six plots is one mow. */
+ if(sum){const base=flLive().filter(a=>flPlotMatch(a));const c={};FL_CATS.forEach(k=>c[k]=0);base.forEach(a=>{if(c[a.type]!=null)c[a.type]++;});
+  sum.className='fl-sum'+(flState.types.length?' dim':'');
+  sum.innerHTML=FL_CATS.map(k=>{const t=FL_TYPES[k];return '<div class="k'+(flState.types.indexOf(k)>=0?' on':'')+'" data-cat="'+k+'"><div class="n">'+c[k]+'</div><div class="l">'+esc(t.label)+'</div></div>';}).join('');}
  const head=document.getElementById('fl-feedhead');
- if(head){const pl=flState.plots.length; const scope=pl===0?'':(pl===1?flPlotLabel(flState.plots[0]):pl+' plots')+' · '; head.textContent=scope+items.length+' '+(items.length===1?'activity':'activities');}
+ if(head){const pl=flState.plots.length; const scope=pl===0?'':(pl===1?flPlotLabel(flState.plots[0]):pl+' plots')+' · ';
+  const cats=flState.types.length?flState.types.map(k=>(FL_TYPES[k]||FL_TYPES.misc).label).join(' + ')+' · ':'';
+  head.textContent=scope+cats+items.length+' '+(items.length===1?'activity':'activities');}
  if(!items.length){feed.innerHTML='<div class="fl-empty">No activities logged for this filter yet.</div>';return;}
- feed.innerHTML='<div class="list">'+items.map(a=>{const t=FL_TYPES[a.type];return '<div class="row tap" data-flog="'+a.id+'"><span class="dot" style="background:'+t.dot+'"></span><div style="flex:1"><div class="rt">'+esc(a.title)+'</div><div class="rs">'+flRowPlot(a.plot)+' · '+esc(a.detail)+'</div></div><div style="text-align:right;flex:none"><span class="pill" style="background:'+t.bg+';color:'+t.fg+'">'+esc(t.label)+'</span><div class="rs" style="margin-top:5px">'+a.date+(a.time?(' · '+a.time):'')+'</div></div></div>';}).join('')+'</div>';
+ feed.innerHTML='<div class="list">'+items.map(a=>{const t=FL_TYPES[a.type];return '<div class="row tap" data-flog="'+a.id+'"><span class="dot" style="background:'+t.dot+'"></span><div style="flex:1"><div class="rt">'+esc(a.title)+'</div><div class="rs">'+esc(flPlotsLabel(a))+' · '+esc(a.detail)+'</div></div><div style="text-align:right;flex:none"><span class="pill" style="background:'+t.bg+';color:'+t.fg+'">'+esc(t.label)+'</span><div class="rs" style="margin-top:5px">'+a.date+(a.time?(' · '+a.time):'')+'</div></div></div>';}).join('')+'</div>';
 }
 const FL_PLOTS=['11','12','13','14','15','16','17','18','GH'];
 function flPlotLabel(id){return id==='all'?'All plots':(id==='GH'?'Greenhouse':(/^\d+$/.test(id)?'Plot '+id:id));}
 function flRowPlot(id){return id==='GH'?'Greenhouse':(/^\d+$/.test(id)?'Plot '+id:id);}
-function flPlotCount(id){return flLive().filter(a=>a.plot===id).length;}
+function flPlotCount(id){return flLive().filter(a=>flEntryPlots(a).indexOf(id)>=0).length;}
 /* ---- Field Log: one logged operation ------------------------------------
    Entries arrive two ways — typed into the log form, or written automatically
    when a task board job is finished. Both land here. Anything the record does
@@ -183,8 +233,9 @@ function renderFlDetail(){
  if(!a){body.innerHTML='';if(ab)ab.innerHTML='';return;}
  var t=FL_TYPES[a.type]||FL_TYPES.misc;
  var task=(a.taskId&&typeof TASKS!=='undefined')?TASKS.filter(function(x){return x.id===a.taskId;})[0]:null;
+ var plots=flEntryPlots(a);
  var rows=flDetRow('Operation',a.op||t.label)
-  +flDetRow('Plot',flRowPlot(a.plot))
+  +flDetRow(plots.length>1?'Plots':'Plot',flPlotsFull(a))
   +flDetRow('Area',a.area)
   +flDetRow('Date',a.date)
   +flDetRow('Time',a.time)
@@ -203,7 +254,7 @@ function renderFlDetail(){
  body.innerHTML=
    '<div class="hdr" style="background:#2f3133;padding:15px 16px;gap:10px">'
    +'<div style="flex:1;min-width:0"><div class="title" style="color:#fff;font-size:17px;line-height:1.15">'+esc(a.title)+'</div>'
-   +'<div style="font:700 11px \'Public Sans\';color:#b9bfc6;margin-top:3px">'+esc(flRowPlot(a.plot))+' · '+esc(a.date)+'</div></div>'
+   +'<div style="font:700 11px \'Public Sans\';color:#b9bfc6;margin-top:3px">'+esc(flPlotsLabel(a))+' · '+esc(a.date)+'</div></div>'
    +'<span class="pill" style="background:'+t.bg+';color:'+t.fg+';flex:none">'+esc(t.label)+'</span></div>'
   +'<div class="sec">Details</div><div class="list">'+(rows||'<div class="fld"><span class="fl">Summary</span><span class="fv">'+esc(a.detail||'')+'</span></div>')+'</div>'
   +(chem?'<div class="sec">Application</div><div class="list">'+chem+'</div>':'')
@@ -3185,14 +3236,44 @@ function fstsyncSummary(){
    and it insists on a sentence saying what was wrong. A correction with no
    reason is only half a record, and the reason is the part somebody reading
    this in three years will actually need. */
-function flxPlotOptions(sel){
+function flxPlotOptions(omit){
   var src=[];
   try{ src=(typeof jobAllPlots==='function')?jobAllPlots().concat(['GH']):[]; }catch(e){ src=[]; }
   if(!src.length) src=FL_PLOTS.slice();
-  if(sel&&src.indexOf(sel)<0) src.unshift(sel);
-  return src.map(function(p){
-    return '<option value="'+esc(p)+'"'+(p===sel?' selected':'')+'>'+esc(flPlotLabel(p))+'</option>';
+  return src.filter(function(p){ return (omit||[]).indexOf(p)<0; }).map(function(p){
+    return '<option value="'+esc(p)+'">'+esc(flPlotLabel(p))+'</option>';
   }).join('');
+}
+/* THE GROUND BEING EDITED, held here rather than read off the record each
+   time. An entry covers several plots now, so this screen has to let you take
+   one off and put another on -- and a chip tapped off has to stay off until
+   Save, while flxRender() runs again on every tap. Reset whenever the screen
+   opens on a different entry. */
+var FLX={id:null,plots:[],draft:{}};
+/* Every other box on this screen, remembered across a redraw. Taking a plot
+   off redraws the whole form, and losing a half-typed note to that would be a
+   nasty little surprise in a field. */
+var FLX_BOXES=['date','time','product','amount','rate','target','notes'];
+function flxCapture(){
+  FLX_BOXES.forEach(function(k){
+    var el=document.getElementById('flx-'+k);
+    if(el) FLX.draft[k]=el.value;
+  });
+}
+/* What a box should show: whatever was typed into it before the redraw, or the
+   value on the record if nothing has been. */
+function flxVal(k,fallback){ return (k in FLX.draft)?FLX.draft[k]:fallback; }
+function flxPlotsHtml(a){
+  var chips=FLX.plots.length
+   ? FLX.plots.map(function(p){
+       return '<span class="fl-tag">'+esc(flPlotLabel(p))+'<span class="x tap" data-flxrm="'+esc(p)+'">✕</span></span>';
+     }).join('')
+   : '<span style="font:700 11px \'Public Sans\';color:#c0392b">No ground on this entry — add at least one plot.</span>';
+  return '<div id="flx-plots" style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:9px 16px 0">'+chips+'</div>'
+    +'<div class="list" style="margin-top:9px"><div class="fld" style="border-bottom:none">'
+    +'<span class="fl">Add a plot</span>'
+    +'<select class="inv-in" id="flx-addplot" style="max-width:210px">'
+    +'<option value="">— pick one —</option>'+flxPlotOptions(FLX.plots)+'</select></div></div>';
 }
 /* ord is YYYYMMDD as an integer; the date input speaks YYYY-MM-DD. */
 function flxOrdToInput(o){
@@ -3214,6 +3295,9 @@ function flxRender(){
   var body=document.getElementById('flx-body'); if(!body) return;
   var a=flById(flCur);
   if(!a){ body.innerHTML='<div class="fl-empty">That entry is gone.</div>'; return; }
+  /* A different entry means a fresh form; the same one means a redraw, and a
+     redraw keeps what is already typed in. */
+  if(FLX.id!==a.id){ FLX.id=a.id; FLX.plots=flEntryPlots(a); FLX.draft={}; }
 
   var t=FL_TYPES[a.type]||{label:a.type||''};
   var chem=!!(a.product||a.amount||a.rate||a.target);
@@ -3232,16 +3316,18 @@ function flxRender(){
     +'Saving replaces what is below on this record, everywhere. The old value is not kept anywhere once you save.'
     +'</div></div>'
 
+    +'<div class="sec">Where this happened</div>'
+    +flxPlotsHtml(a)
+
     +'<div class="sec">Edit</div><div class="list">'
-    +fld('Where','<select class="inv-in" id="flx-plot" style="max-width:210px">'+flxPlotOptions(a.plot)+'</select>')
-    +fld('Date','<input class="inv-in" type="date" id="flx-date" value="'+esc(flxOrdToInput(a.ord))+'" style="max-width:170px">')
-    +fld('Time',inp('flx-time',a.time,'7:20 AM'))
-    +(chem?(fld('Product',inp('flx-product',a.product))
-           +fld('Amount used',inp('flx-amount',a.amount))
-           +fld('Rate',inp('flx-rate',a.rate))
-           +fld('Target',inp('flx-target',a.target))):'')
+    +fld('Date','<input class="inv-in" type="date" id="flx-date" value="'+esc(flxVal('date',flxOrdToInput(a.ord)))+'" style="max-width:170px">')
+    +fld('Time',inp('flx-time',flxVal('time',a.time),'7:20 AM'))
+    +(chem?(fld('Product',inp('flx-product',flxVal('product',a.product)))
+           +fld('Amount used',inp('flx-amount',flxVal('amount',a.amount)))
+           +fld('Rate',inp('flx-rate',flxVal('rate',a.rate)))
+           +fld('Target',inp('flx-target',flxVal('target',a.target)))):'')
     +'<div class="fld" style="border-bottom:none;align-items:flex-start"><span class="fl">Notes</span>'
-    +'<textarea class="inv-in" id="flx-notes" rows="3" style="max-width:210px;resize:vertical">'+esc(a.notes||'')+'</textarea></div>'
+    +'<textarea class="inv-in" id="flx-notes" rows="3" style="max-width:210px;resize:vertical">'+esc(flxVal('notes',a.notes||''))+'</textarea></div>'
     +'</div>'
     +'<div style="height:22px"></div>';
 }
@@ -3253,7 +3339,13 @@ function flxSave(){
   var changes={}, v;
   var g=function(id){ var el=document.getElementById(id); return el?(el.value||'').trim():null; };
 
-  v=g('flx-plot'); if(v&&v!==a.plot) changes.plot=v;
+  /* The plot list is the record now; `plot` goes up with it, set to the first
+     of them, for the reasons in the note over flEntryPlots(). */
+  var was=flEntryPlots(a), now=FLX.plots.slice();
+  if(!now.length){ toast('An entry needs at least one plot'); return; }
+  if(now.length!==was.length||now.some(function(p,i){return p!==was[i];})){
+    changes.plots=now; changes.plot=now[0];
+  }
   v=flxInputToOrd(g('flx-date'));
   if(v&&v!==a.ord){ changes.ord=v; changes.date=flxOrdLabel(v); }
   v=g('flx-time'); if(v!==null&&v!==(a.time||'')) changes.time=v;
@@ -3279,11 +3371,25 @@ function flxSave(){
     try{ invReconcileFromLog(before,made); }catch(e){}
   }
   toast('Saved ✓');
+  FLX={id:null,plots:[],draft:{}};       /* next open of this screen starts clean */
   back(); renderFlDetail(); flRender();
 }
 (function(){
   var b=document.getElementById('flx-save');
   if(b) b.addEventListener('click',flxSave);
+  var sc=document.getElementById('s-flfix');
+  if(sc){
+    sc.addEventListener('click',function(e){
+      var rm=e.target.closest('[data-flxrm]'); if(!rm) return;
+      var p=rm.getAttribute('data-flxrm'), i=FLX.plots.indexOf(p);
+      if(i>=0){ flxCapture(); FLX.plots.splice(i,1); flxRender(); }
+    });
+    sc.addEventListener('change',function(e){
+      if(e.target.id!=='flx-addplot') return;
+      var p=e.target.value;
+      if(p&&FLX.plots.indexOf(p)<0){ flxCapture(); FLX.plots.push(p); flxRender(); }
+    });
+  }
 })();
 
 let flSugIdx=-1;
@@ -3365,11 +3471,14 @@ function flAddFromTask(t){
     product and amount columns, so "what went out and how much" reads the same
     way on the log whether it came out of a tank or a spray can. */
  var pnt=(typeof taskPaintSummary==='function')?taskPaintSummary(t):null;
- /* Carry the whole job over, not just a one-line summary. The detail page reads
+ /* ONE ENTRY FOR THE WHOLE JOB, naming all the ground it covered. It used to
+    be one entry per plot -- see the note over flEntryPlots() for why that
+    changed and what `plot` is still doing here.
+    Carry the whole job over, not just a one-line summary. The detail page reads
     these straight off the task that produced the entry, so the log record and
     the work order never drift apart. */
- plots.forEach(function(p){FIELDLOG.push({
-   id:flNewId(),plot:p,type:type,title:t.title,
+ FIELDLOG.push({
+   id:flNewId(),plots:plots.slice(),plot:plots[0],type:type,title:t.title,
    detail:(t.type||'Field practice')+' · '+by+' · '+at,
    date:flTodayLabel(),ord:flTodayOrd(),fromTask:true,source:'task',
    taskId:t.id,op:t.type||'Field practice',person:byId,loggedBy:SESSION.pid,time:at,
@@ -3377,9 +3486,9 @@ function flAddFromTask(t){
    dueAt:t.dueAt||null,due:dueLabel(t)||null,repeat:(t.repeat&&t.repeat!=='None')?t.repeat:null,
    product:mx?mx.productName:(pnt?pnt.name:null),rate:mx?mx.rateText:null,amount:mx?mx.productText:(pnt?pnt.text:null),
    closedBy:(t.closedBy&&t.closedBy!==by)?t.closedBy:null,
-   notes:[t.desc||'',mx?('Mix: '+mx.line):'',(alleyNote&&p===ALLEY_UNIT)?alleyNote:'',
+   notes:[t.desc||'',mx?('Mix: '+mx.line):'',alleyNote,
           t.partial?('Part of the job: '+plots.length+' done, '+(t.leftPlots||[]).length+' handed back'+(t.completedNote?(' — '+t.completedNote):'')):''].filter(Boolean).join('\n')
- });});
+ });
  t._logged=true; flCommit(); return true;
 }
 
@@ -3408,7 +3517,8 @@ function flPartUnits(t){
  var out=[];
  if(!t) return out;
  FIELDLOG.forEach(function(e){
-   if(e && e.part && e.taskId===t.id && e.plot && out.indexOf(e.plot)<0) out.push(e.plot);
+   if(!e || !e.part || e.taskId!==t.id) return;
+   flEntryPlots(e).forEach(function(p){ if(p && out.indexOf(p)<0) out.push(p); });
  });
  return out;
 }
@@ -3421,11 +3531,11 @@ function flAddPartFromTask(t,units){
  if(!fresh.length) return 0;
  var byId=SESSION.pid, by=nameOf(byId)||meName(), at=nowTime();
  var mx=(typeof mixSummaryFor==='function')?mixSummaryFor(t):null;
- fresh.forEach(function(p){FIELDLOG.push({
-   id:flNewId(),plot:p,type:type,title:t.title,
+ FIELDLOG.push({
+   id:flNewId(),plots:fresh.slice(),plot:fresh[0],type:type,title:t.title,
    detail:(t.type||'Field practice')+' · '+by+' · '+at,
    date:flTodayLabel(),ord:flTodayOrd(),fromTask:true,source:'task',
-   /* part:true says this row is one person's share of a job that was still
+   /* part:true says this entry is one person's share of a job that was still
       running when they logged it, not the whole job. */
    part:true,
    taskId:t.id,op:t.type||'Field practice',person:byId,loggedBy:SESSION.pid,time:at,
@@ -3433,7 +3543,7 @@ function flAddPartFromTask(t,units){
    dueAt:t.dueAt||null,due:dueLabel(t)||null,repeat:(t.repeat&&t.repeat!=='None')?t.repeat:null,
    product:mx?mx.productName:null,rate:mx?mx.rateText:null,amount:mx?mx.productText:null,
    notes:(t.desc||'')+(mx?((t.desc?'\n':'')+'Mix: '+mx.line):'')
- });});
+ });
  flCommit();
  return fresh.length;
 }
@@ -3445,7 +3555,10 @@ function flEqName(id){
 }
 function fieldlogEnter(){
  const sm=document.getElementById('fl-sum'),inp=document.getElementById('fl-plotsearch'),sug=document.getElementById('fl-plotsug'),tag=document.getElementById('fl-plottag'),mb=document.getElementById('fl-mapbtn');
- if(sm&&!sm._wired){sm._wired=1;sm.addEventListener('click',e=>{const k=e.target.closest('[data-cat]');if(!k)return;const cat=k.getAttribute('data-cat');flState.type=(flState.type===cat?'all':cat);flRender();});}
+ if(sm&&!sm._wired){sm._wired=1;sm.addEventListener('click',e=>{const k=e.target.closest('[data-cat]');if(!k)return;const cat=k.getAttribute('data-cat');
+  /* Tapping a tile that is already on takes it off again, so the way back to
+     "show me everything" is to tap off whatever you tapped on. */
+  const i=flState.types.indexOf(cat);if(i>=0)flState.types.splice(i,1);else flState.types.push(cat);flRender();});}
  if(mb&&!mb._wired){mb._wired=1;mb.addEventListener('click',openFlFilterPick);}
  if(tag&&!tag._wired){tag._wired=1;tag.addEventListener('click',e=>{const x=e.target.closest('[data-clr]');if(x){flRemovePlot(x.getAttribute('data-clr'));return;}if(e.target.closest('#fl-clrall'))flClearPlots();});}
  if(inp&&!inp._wired){inp._wired=1;
@@ -3559,7 +3672,7 @@ function flExportRows(){
   var rows=FIELDLOG.filter(function(a){
     if(!(a.ord>=b[0]&&a.ord<=b[1])) return false;
     if(!FXFORM.useFilter) return true;
-    return (flState.type==='all'||a.type===flState.type)&&flPlotMatch(a.plot);
+    return flTypeMatch(a)&&flPlotMatch(a);
   });
   return rows.sort(function(x,y){ return (y.ord-x.ord)||(''+(x.title||'')).localeCompare(''+(y.title||'')); });
 }
@@ -3568,7 +3681,8 @@ var FX_COLS=[
  ['Time',       function(a){ return a.time||''; }],
  ['Person',     function(a){ return nameOf(a.person)||a.person||''; }],
  ['Closed by',  function(a){ return nameOf(a.closedBy)||a.closedBy||''; }],
- ['Plot',       function(a){ return flRowPlot(a.plot); }],
+ ['Plots',      function(a){ return flPlotsFull(a); }],
+ ['Plot count', function(a){ return flEntryPlots(a).length||''; }],
  ['Area',       function(a){ return a.area||''; }],
  ['Category',   function(a){ return (FL_TYPES[a.type]||FL_TYPES.misc).label; }],
  ['Operation',  function(a){ return a.op||''; }],
@@ -3695,9 +3809,9 @@ function renderFlExport(){
    ? '<div class="list"><div class="fld"><span class="fl">From</span><input class="inv-in" type="date" id="fx-from" value="'+esc(FXFORM.from)+'" style="max-width:170px"></div>'
      +'<div class="fld" style="border-bottom:none"><span class="fl">To</span><input class="inv-in" type="date" id="fx-to" value="'+esc(FXFORM.to)+'" style="max-width:170px"></div></div>'
    : '';
-  var filtOn=(flState.type!=='all')||flState.plots.length>0;
+  var filtOn=flState.types.length>0||flState.plots.length>0;
   var filtWhat=[];
-  if(flState.type!=='all') filtWhat.push((FL_TYPES[flState.type]||FL_TYPES.misc).label+' only');
+  if(flState.types.length) filtWhat.push(flState.types.map(function(k){return (FL_TYPES[k]||FL_TYPES.misc).label;}).join(' + ')+' only');
   if(flState.plots.length) filtWhat.push(flState.plots.length===1?flPlotLabel(flState.plots[0]):flState.plots.length+' plots');
   body.innerHTML=
     '<div class="sec">Date range</div>'
@@ -4065,23 +4179,23 @@ function flSave(){
  var date=MON[d.getMonth()]+' '+d.getDate();
  var ord=asOrd(d);
  var time=nowTime();
- FLFORM.plots.forEach(function(p){
-   FIELDLOG.push({plot:p,type:cat,title:title,detail:detail,date:date,ord:ord,op:tpl.name,product:summary?summary.productName:null,ai:summary?(summary.ai||null):null,amount:summary?summary.amountText:null,rate:summary?(summary.rateText||null):null,target:null,equipment:equipmentStr||null,notes:FLFORM.notes||'',person:personId,loggedBy:loggedBy,time:time,source:'manual'});
- });
- flCommit();                                    /* stamps the ids we need below */
+ /* One entry for the whole operation, naming every plot it covered -- see
+    the note over flEntryPlots(). Three plots sprayed out of one tank is one
+    thing that happened, and it now reads as one line on the log. */
+ FIELDLOG.push({plots:FLFORM.plots.slice(),plot:FLFORM.plots[0],type:cat,title:title,detail:detail,date:date,ord:ord,op:tpl.name,product:summary?summary.productName:null,ai:summary?(summary.ai||null):null,amount:summary?summary.amountText:null,rate:summary?(summary.rateText||null):null,target:null,equipment:equipmentStr||null,notes:FLFORM.notes||'',person:personId,loggedBy:loggedBy,time:time,source:'manual'});
+ flCommit();                                    /* stamps the id we need below */
 
- /* ONE movement per PRODUCT per save, not one per plot — extending the
-    field log's existing "one movement per save" rule (spraying three plots
-    is three entries, but one tank) to cover a tank with more than one
-    product in it. The movement hangs off the FIRST entry's id, same as
-    before. Nothing here can stop the save: the entries are already
-    committed above, and mixInvDecrement() skips anything unmatched or
-    unconvertible rather than guessing. */
+ /* ONE movement per PRODUCT per save. That used to need saying twice over,
+    because spraying three plots wrote three log entries out of one tank; it
+    is now one entry, so the movement simply hangs off it. Nothing here can
+    stop the save: the entry is already committed above, and
+    mixInvDecrement() skips anything unmatched or unconvertible rather than
+    guessing. */
  var _msg=isChem?'Logged ✓ · chemical record saved':'Operation logged ✓';
  if(isChem&&FLFORM.takeStock){
    try{
-     var _made=FIELDLOG.slice(-FLFORM.plots.length);
-     var _res=mixInvDecrement(flMixItems(mixTask),(_made[0]&&_made[0].id)||null,'Field log · '+tpl.name);
+     var _made=FIELDLOG[FIELDLOG.length-1];
+     var _res=mixInvDecrement(flMixItems(mixTask),(_made&&_made.id)||null,'Field log · '+tpl.name);
      if(_res.moved.length){
        flCommit();                               /* the ref may have stamped an id */
        _msg+=' · '+_res.moved.map(function(m){return fmt(m.qty)+' '+m.unit;}).join(', ')+' off the shelf';
@@ -4090,7 +4204,7 @@ function flSave(){
    }catch(e){}
  }
  toast(_msg);
- flState={type:'all',plots:[]};
+ flState={types:[],plots:[]};
  back(); flRender();
 }
 document.getElementById('fln-save').addEventListener('click',flSave);

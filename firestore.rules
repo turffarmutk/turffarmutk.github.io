@@ -591,12 +591,18 @@ service cloud.firestore {
 
       /* Edit changes the entry directly, and only the fields the app's own
          edit form exposes — who wrote it, when, and what task made it stay
-         put. Mirrors FL_EDITABLE in app-02-fieldlog-sync.js exactly. */
+         put. Mirrors FL_EDITABLE in app-02-fieldlog-sync.js exactly.
+
+         `plots` is the ground the job covered, a list, since 2026-09-29 — one
+         entry is one job now rather than one per plot. `plot` is still written
+         beside it (the first of the list) so a phone running an older copy of
+         the app still shows the ground; both have to be allowed here or the
+         edit form silently stops working for everybody but Bill. */
       allow update: if actor()
         && canEditLog()
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['plot', 'type', 'op', 'title', 'date', 'ord', 'time',
-                       'person', 'equipment', 'product', 'ai', 'rate',
+             .hasOnly(['plot', 'plots', 'type', 'op', 'title', 'date', 'ord',
+                       'time', 'person', 'equipment', 'product', 'ai', 'rate',
                        'amount', 'target', 'notes', 'detail']);
 
       allow delete: if actor() && canEditLog();

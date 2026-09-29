@@ -686,6 +686,56 @@ pin this behaviour — keep them green.
 
 ## Field data & farm constants
 
+### The Field Log is one entry per job, not one per plot — 2026-09-29
+**Decision:** a Field Log entry is now **one operation**, and the ground it
+covered is a list, `plots`, on that record. A mow across six plots writes one
+entry naming all six; it wrote six near-identical entries before. The three
+places that write the log all changed together — `flAddFromTask()` (a task being
+finished), `flAddPartFromTask()` (one person handing in their share), and
+`flSave()` (the manual form) in `app-02-fieldlog-sync.js`, plus the mowing-setup
+line in `UT-TurfFarm-App.html`.
+
+**Nothing about searching a plot changed, and that is the point.** Everything
+that asks what ground an entry covered goes through **`flEntryPlots()`**, which
+reads the list and falls back to the old single `plot` on an entry written
+before today. Searching plot 14 still finds every job that touched plot 14,
+including the six-plot mow above, and a plot's "N logged" count still counts
+jobs that named it. The `plots` list also travels as a **list of plain strings**,
+which Firestore is happy with — it is a list *inside a list* that gets thrown out
+(see the fourth trap in `CLAUDE.md`).
+
+**`plot` is still written**, set to the first plot of the list, by the same
+statement that writes `plots`. It is not what anything in the app reads.
+**Why:** this reverses a decision that `tools/test-task-mutation.js` had pinned
+in place with a comment saying the per-plot shape was "the unit the farm reports
+and bills work in." Dillon reversed it because it read badly and counted wrongly:
+the log was six rows of the same sentence for one afternoon's work, and the
+category tiles at the top of the screen said "6 mows" when the farm had mowed
+once. The reportable detail is not lost — the `.csv` export now has a **Plots**
+column naming each one and a **Plot count** column beside it, so a spreadsheet
+can still total by plot.
+
+`plot` stays because of the rollout, not because anything needs it: the app's
+offline copy reaches twenty-three phones over hours, not instantly, and a phone
+still running yesterday's copy would otherwise show a blank where the ground
+should be. Writing both in one statement is the same discipline `ais`/`ai` uses
+on an inventory product (2026-09-28) — one place writes them, so they cannot
+drift.
+
+`firestore.rules` gained `'plots'` to the field log's `allow update` list
+alongside `'plot'`, and `tools/test-sync-settles.js`'s field log sample now
+carries the list so the drawer is seen settling with one. **The rules had to be
+published by hand before the app was pushed** — until they were, the database
+refused every edit that moved an entry onto different ground, for everybody but
+Bill, with nothing on screen to say why.
+**Don't:** don't read `a.plot` anywhere. It is the first of several and will
+silently under-report — use `flEntryPlots()`, or `flPlotsLabel()` / `flPlotsFull()`
+for something to show. Don't drop `plot` from the writers or from the rules'
+update list until every phone has been on the new app for a season. Don't
+"restore" one entry per plot without reading this and the two tests that now
+pin the new shape (`test-task-mutation.js` section 3, `test-fieldlog-sync.js`
+section 8).
+
 ### A product can be a mixture, and each ingredient keeps its own group — 2026-09-28
 **Decision:** an inventory product carries `ais`, a list of `{n, g}` — each
 active ingredient's name and its **own** FRAC/HRAC/IRAC group. The add/edit form
@@ -1225,6 +1275,27 @@ always offer the bake-in after map editing.
 ---
 
 ## Interface
+
+### The Field Log's category tiles are a multi-select — 2026-09-29
+**Decision:** the six tiles at the top of the Field Log filter on **any number
+of categories at once**. `flState.types` is a list; empty means every category,
+tapping a tile adds it, tapping a lit tile takes it off again. It was
+`flState.type`, one string, with `'all'` as the word for no filter.
+**Why:** "show me the spraying and the fertilizing" — every chemical thing that
+went on the farm this month — was two trips through the log, and there is no
+seventh tile for "chemicals" to add without inventing a category the farm does
+not use. The tiles were already the obvious place to ask it.
+
+Three things moved with it: the line above the feed names the categories that
+are showing, the Export screen's "apply the Field Log filter" row lists them
+all, and the `fltype=` deep link takes a comma-separated list (one name still
+works and still means just that one). The number on a tile counts **jobs**, not
+plots — which only became true the same day, when an entry became one job (see
+Field data & farm constants).
+**Don't:** don't turn `types` back into a single string, and don't reach for a
+"Clear all" button — tapping a lit tile off is the way back, which is how the
+plot chips below already work. Don't use `'all'` as a value in the list; empty
+is what means everything, and a stray `'all'` would match nothing at all.
 
 ### Favorites replaced the Assign screen's "Scheduled" tab — 2026-09-28
 **Decision:** the first tab on Assign Tasks is now **★ Favorites**, the jobs

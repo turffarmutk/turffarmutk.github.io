@@ -152,10 +152,18 @@ section('3. completing writes to the Field Log, once');
   const t = addTask(b.p, { assignee: 'p18', type: 'Mowing', title: 'Rotary Mow', area: 'Plots 1-3' });
   b.p.completeTask(t.id, '');
   const after = b.p.FIELDLOG.length;
-  /* The log is per PLOT, not per task: a mow across three plots is three
-     records, because that is the unit the farm reports and bills work in.
-     Pinning it here so a database port cannot quietly collapse them into one. */
-  ok('a mow reaches the field log once per plot covered', after === before + 3, before + ' -> ' + after);
+  /* THE LOG IS PER TASK, not per plot, since 2026-09-29 -- a mow across three
+     plots is ONE record naming all three. It was three records until then, and
+     the comment here said so; Dillon reversed it because six near-identical
+     rows for one afternoon's work read badly and made the category tiles count
+     plots instead of jobs. The ground is not lost, it is the `plots` list, and
+     searching a plot still finds this job. See docs/DECISIONS.md, 2026-09-29. */
+  ok('a mow reaches the field log once for the whole job', after === before + 1, before + ' -> ' + after);
+  const mow = b.p.FIELDLOG[b.p.FIELDLOG.length - 1];
+  ok('and that one entry names every plot it covered', (mow.plots || []).length === 3,
+     JSON.stringify(mow.plots));
+  ok('with `plot` still set to the first of them, for a phone on the old app',
+     mow.plot === mow.plots[0], mow.plot);
   /* Completing twice must not double-log — the guard is t._logged. */
   b.p.flAddFromTask(t);
   ok('and completing again does not log it twice', b.p.FIELDLOG.length === after, String(b.p.FIELDLOG.length));

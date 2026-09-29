@@ -1270,8 +1270,10 @@ function hwGoScoped(spec){
   if(k==='board'&&typeof tbTab!=='undefined'){ tbTab=v; if(typeof renderBoard==='function')renderBoard(); }
   else if(k==='eqtab'&&typeof eqTab!=='undefined'){ eqTab=v; if(typeof equipEnter==='function')equipEnter(); }
   else if(k==='trlab'&&typeof trState!=='undefined'){ trState.tab='active'; trState.lab=v; if(typeof trRender==='function')trRender(); }
-  else if(k==='flplots'&&typeof flState!=='undefined'){ flState.type='all'; flState.plots=v?v.split(','):[]; if(typeof flSyncPlotUI==='function')flSyncPlotUI(); if(typeof flRender==='function')flRender(); }
-  else if(k==='fltype'&&typeof flState!=='undefined'){ flState.type=v; flState.plots=[]; if(typeof flSyncPlotUI==='function')flSyncPlotUI(); if(typeof flRender==='function')flRender(); }
+  else if(k==='flplots'&&typeof flState!=='undefined'){ flState.types=[]; flState.plots=v?v.split(','):[]; if(typeof flSyncPlotUI==='function')flSyncPlotUI(); if(typeof flRender==='function')flRender(); }
+  /* Comma-separated, because the Field Log's category tiles are a multi-select
+     since 2026-09-29 -- one name still works and means just that one. */
+  else if(k==='fltype'&&typeof flState!=='undefined'){ flState.types=v?v.split(','):[]; flState.plots=[]; if(typeof flSyncPlotUI==='function')flSyncPlotUI(); if(typeof flRender==='function')flRender(); }
  }catch(e){}
 }
 ['s-home-manager','s-home-undergrad','s-home-grad','s-home-faculty','s-home-tech'].forEach(function(sid){
@@ -1346,7 +1348,7 @@ function hwMgrField(){
  if(typeof FIELDLOG==='undefined')return;
  var recent=FIELDLOG.slice().sort(function(a,b){return b.ord-a.ord;}).slice(0,hwRows('field'));
  var rows=recent.map(function(a,i){var t=FL_TYPES[a.type]||FL_TYPES.misc;
-   return hwRow(hwName(a.title,flRowPlot(a.plot)+' · '+a.detail),
+   return hwRow(hwName(a.title,flPlotsLabel(a)+' · '+a.detail),
      '<div style="text-align:right;flex:none">'+hwPill(t.label,t.bg,t.fg)
       +'<div class="rs" style="margin-top:4px">'+a.date+'</div></div>',i===recent.length-1,'flog:'+a.id);
  }).join('');
@@ -1597,14 +1599,14 @@ function hwFieldCard(id,role,mode){
  var all=FIELDLOG.slice().sort(function(a,b){return b.ord-a.ord;}),list=all,fell=false;
  if(mode==='me')  list=all.filter(function(a){return (a.detail||'').indexOf(me)>=0;});
  if(mode==='lab'){
-   list=all.filter(function(a){return mine.indexOf(a.plot)>=0||mine.indexOf('B'+a.plot)>=0;});
+   list=all.filter(function(a){return flEntryPlots(a).some(function(p){return mine.indexOf(p)>=0||mine.indexOf('B'+p)>=0;});});
    /* A lab with quiet plots would otherwise get a dead card — show the farm
       feed instead and say so, rather than an empty box. */
    if(!list.length){list=all;fell=true;}
  }
  var show=list.slice(0,hwRows(hwWid(id)));
  var rows=show.map(function(a,i){var t=FL_TYPES[a.type]||FL_TYPES.misc;
-   return hwRow(hwName(a.title,flRowPlot(a.plot)+' · '+a.detail),
+   return hwRow(hwName(a.title,flPlotsLabel(a)+' · '+a.detail),
      '<div style="text-align:right;flex:none">'+hwPill(t.label,t.bg,t.fg)
       +'<div class="rs" style="margin-top:4px">'+a.date+'</div></div>',i===show.length-1,'flog:'+a.id);
  }).join('');

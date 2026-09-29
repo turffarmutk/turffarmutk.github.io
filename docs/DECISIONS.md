@@ -1334,6 +1334,25 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### The remove-a-product cross sits on the LEFT of a mix card — 2026-09-29
+**Decision:** on a product card in the spray mix — the assign wizard, the
+mix sheet on a job, and the Field Log's manual entry, all three drawn by
+`mixProductRowsHtml()` — the ✕ that drops a product sits next to the
+"Product 2" label on the left, not out at the right-hand edge where it started.
+**Why:** every box on that card lines up on one right-hand rail: the product
+name, the spray rate, the rate unit. The cross only appears once there is more
+than one product, and on the right it took 31px of that rail away from the name
+box **and nothing else** — so the moment Bill added a second product, the
+name box on every card stepped in from the two boxes directly beneath it and
+the card looked crooked, with nothing to explain why. The alternative, holding
+an empty 31px gutter on a single-product card too, just moves the misalignment
+onto the one-product case and pushes every name box in for no reason.
+**Don't:** move it back to the right because that is where a remove button
+usually goes, and don't reach for `position:absolute` to float it over the
+right edge — it would sit on top of the name the person is typing. The
+cross is found by its `data-*rm` attribute, never by where it sits, so moving
+it broke no handler; that is not a licence to move it back.
+
 ### The Field Log's category tiles are a multi-select — 2026-09-29
 **Decision:** the six tiles at the top of the Field Log filter on **any number
 of categories at once**. `flState.types` is a list; empty means every category,

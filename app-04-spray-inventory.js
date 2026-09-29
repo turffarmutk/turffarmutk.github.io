@@ -682,13 +682,23 @@ function mixUnitOptions(sel){
 function mixProductRowsHtml(list,pfx){
   return list.map(function(p,i){
     var many=list.length>1;
+    /* THE REMOVE CROSS SITS ON THE LEFT, beside the label, and that is on
+       purpose. Every box on this card lines up on one right-hand rail -- the
+       name, the spray rate, the unit -- and a cross on the right takes 31px of
+       that rail away from the name box only. So the moment a second product
+       was added, the name box on every card stepped 31px in from the boxes
+       directly under it and the card looked crooked, for no reason the person
+       could see. Nothing else changes: the cross is still found by its data
+       attribute, not by where it sits. */
     return '<div class="list mx-card" style="margin-bottom:8px">'
-     +'<div class="fld" style="border-bottom:none;padding-bottom:4px"><span class="fl">Product'+(many?' '+(i+1):'')+'</span>'
+     +'<div class="fld" style="border-bottom:none;padding-bottom:4px">'
+       +'<span class="mx-lw"><span class="fl">Product'+(many?' '+(i+1):'')+'</span>'
+         +(many?'<span class="mx-rm tap" data-'+pfx+'rm="'+i+'" title="Remove this product">✕</span>':'')
+       +'</span>'
        +'<span class="mx-pw">'
          +'<input class="inv-in" autocomplete="off" data-'+pfx+'name="'+i+'" value="'+esc(p.name||'')+'" placeholder="Search inventory…">'
          +'<div class="fl-sug mx-sug" data-'+pfx+'sug="'+i+'" style="display:none"></div>'
        +'</span>'
-       +(many?'<span class="mx-rm tap" data-'+pfx+'rm="'+i+'" title="Remove this product">✕</span>':'')
      +'</div>'
      +'<div class="fld" style="padding-top:0;justify-content:flex-end" data-'+pfx+'inforow="'+i+'">'+mixProdInfoHtml(p)+'</div>'
      +'<div class="fld"><span class="fl">Spray rate</span>'

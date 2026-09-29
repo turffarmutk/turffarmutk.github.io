@@ -520,12 +520,26 @@
   /* ---- pan/zoom aerial map ---- */
   .hdrbtn{font:800 12px 'Public Sans';color:#fff;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.45);border-radius:8px;padding:6px 11px;flex:none;white-space:nowrap}
   .hdrbtn.on{background:#fff;color:var(--acc);border-color:#fff}
-  .pebar{display:flex;gap:7px;align-items:center;padding:10px 14px;background:#fff7ef;border-bottom:1px solid #f0d9c2}
+  /* The banner theme paints every .tap inside a header white and marks it
+     !important. That is right for a see-through button on a dark bar and wrong
+     the moment one turns solid white: the "Editing" button went white text on
+     a white box and disappeared, so there was nothing to press to stop editing.
+     Reported 2026-09-29. */
+  .field .hdr .hdrbtn.on{color:var(--acc)!important;background:#fff;border-color:#fff}
+  /* The eight editing chips are wider than a phone screen, so the row ran off
+     the right edge and Export, Import and Reset all could not be reached --
+     the row does not scroll. They wrap onto a second line instead, the same way
+     the map's own filter chips right below them do, so everything is reachable
+     with no swiping. The spacer that pushes the right-hand group over only
+     makes sense on one line; left in while wrapping it leaves a hole mid-row,
+     so it only exists on the wide layout. */
+  .pebar{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:10px 14px;background:#fff7ef;border-bottom:1px solid #f0d9c2}
   .pechip{font:800 11px 'Public Sans';padding:6px 11px;border-radius:8px;background:#fff;border:1px solid #e6c9aa;color:#9a5b00;cursor:pointer;white-space:nowrap}
   .pechip.on{background:var(--acc);border-color:var(--acc);color:#fff}
   .pechip.done{background:#2f7d3a;border-color:#2f7d3a;color:#fff}
   .pechip.ghost{background:transparent;border-color:#e0d3c4;color:#a08a72}
-  .pespacer{flex:1}
+  .pespacer{display:none}
+  html[data-size="tablet"] .pespacer{display:block;flex:1}
   .mapchips{display:flex;gap:7px;padding:11px 14px;flex-wrap:wrap;background:#fff;border-bottom:1px solid var(--line)}
   .mapchips span{font:700 11px 'Public Sans';padding:6px 11px;border-radius:8px;background:#f1f2f4;color:#6b7280}
   .mapchips span.on{background:var(--acc);color:#fff}

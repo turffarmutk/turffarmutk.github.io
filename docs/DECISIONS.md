@@ -1334,6 +1334,28 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### The map editor's chips wrap, and its "Editing" button fights the banner — 2026-09-29
+**Decision:** the row of editing chips on the Farm Map (`.pebar`) wraps onto a
+second line instead of running off the side of a phone, and `.pespacer` — the
+gap that pushes Export/Import/Reset all/Done over to the right — only exists on
+the wide layout. Separately, `.field .hdr .hdrbtn.on` re-states its orange text
+with `!important`.
+**Why:** Dillon reported both from a phone in the field. Eight chips are wider
+than 375px and the row has no scrolling of any kind, so Export, Import and
+Reset all were simply unreachable — there was nothing to swipe. Wrapping matches
+the map's own filter chips directly below and costs one row of map while
+editing, which is only ever a manager standing still. The button is the other
+half: `.field .hdr .tap` paints every header button white and marks it
+`!important`, which is right for a see-through button on the dark banner and
+wrong the second one turns solid white — "Editing" was white text on a white
+box, so the only way out of edit mode was invisible.
+**Don't:** don't drop the `!important` on `.field .hdr .hdrbtn.on` because it
+looks redundant next to `.hdrbtn.on` four lines above it — the banner rule wins
+without it and the button goes blank again. Don't give `.pespacer` its `flex:1`
+back outside the `html[data-size="tablet"]` rule either: on a wrapping row it
+grows to fill whatever line it lands on and tears a hole through the middle of
+the chips.
+
 ### The remove-a-product cross sits on the LEFT of a mix card — 2026-09-29
 **Decision:** on a product card in the spray mix — the assign wizard, the
 mix sheet on a job, and the Field Log's manual entry, all three drawn by

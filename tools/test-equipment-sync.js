@@ -170,14 +170,16 @@ ok('and one for the service schedules', /match \/eqsched\/\{schedId\}/.test(rule
 ok('reading is open to everyone signed in',
    (rulesText.match(/allow read: if actor\(\);/g) || []).length >= 4);
 ok('reporting a problem is open to everybody, undergraduates included',
-   /function canReportProblem\(\)\s*\{\s*return actor\(\);/.test(rulesText.replace(/\s+/g, ' ').replace(/\{ /g, '{').replace(/ \}/g, '}'))
-   || /function canReportProblem\(\)[\s\S]{0,60}return actor\(\);/.test(rulesText));
+   /function canReportProblem\(\)[\s\S]{0,220}\(actor\(\)\);/.test(rulesText));
+/* Every permission in the rules now opens `appAdmin() ||` -- the App Manager
+   has no restrictions, 2026-09-29. That is why the windows below are wider
+   than they were; the farm's own line is unchanged and still what is checked. */
 ok('taking one down is the manager and the technicians',
-   /function canTakeDownMachine\(\)[\s\S]{0,120}'Farm Manager', 'Technician'\]/.test(rulesText));
+   /function canTakeDownMachine\(\)[\s\S]{0,260}'Farm Manager', 'Technician'\]/.test(rulesText));
 ok('so is the service record',
-   /function canMaintainEquip\(\)[\s\S]{0,120}'Farm Manager', 'Technician'\]/.test(rulesText));
+   /function canMaintainEquip\(\)[\s\S]{0,260}'Farm Manager', 'Technician'\]/.test(rulesText));
 ok('faculty are in for describing a machine, not for servicing it',
-   /function canEditMachine\(\)[\s\S]{0,140}'Faculty'\]/.test(rulesText));
+   /function canEditMachine\(\)[\s\S]{0,280}'Faculty'\]/.test(rulesText));
 ok('marking one down is checked even on a write that may otherwise edit it',
    /status', ''\) != 'down' \|\| canTakeDownMachine\(\)/.test(rulesText));
 ok('the service history has no update rule at all — it is write-once',

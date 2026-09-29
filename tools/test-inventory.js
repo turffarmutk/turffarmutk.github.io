@@ -562,8 +562,11 @@ section('20. the rules and the app say the same thing');
   /* invCanMove() is true for everybody; invCanEdit() is not. The rules have
      to draw the same line or the app offers a button the database refuses. */
   const canMove = rules.slice(rules.indexOf('function canMoveStock()'), rules.indexOf('function canEditProduct()'));
+  /* `appAdmin() || (actor())` since 2026-09-29 -- the App Manager has no
+     restrictions. What matters here is unchanged: the gate is actor() and
+     nothing about it mentions undergraduates. */
   ok('the rules let anybody move stock, as the app does',
-     /return actor\(\);/.test(canMove) && canMove.indexOf('Undergraduate') < 0, canMove.slice(-90));
+     /\(actor\(\)\);/.test(canMove) && canMove.indexOf('Undergraduate') < 0, canMove.slice(-90));
   const canEdit = rules.slice(rules.indexOf('function canEditProduct()'), rules.indexOf('function canEditProduct()') + 220);
   ok('but not anybody to redefine a product', canEdit.indexOf('Undergraduate Student') >= 0);
 

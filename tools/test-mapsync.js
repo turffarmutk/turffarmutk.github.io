@@ -141,7 +141,7 @@ ok('nor for plot information', win.mapCan('p18', 'info') === false);
 ok('nor for the mowing setup', win.mapCan('p18', 'mowing') === false);
 ok('an unknown action is refused', win.mapCan('p07', 'whatever') === false);
 ok('somebody not on the roster is refused', win.mapCan('p00', 'shape') === false);
-ok('the shape editor asks the same function', /function peCanEdit\(\)\{ return mapCan\(/.test(appText));
+ok('the shape editor asks the same function', /function peCanEdit\(\)\{[\s\S]{0,140}return mapCan\(/.test(appText));
 ok('the database has the same rule', /roleOf\(me\(\)\) != 'Undergraduate Student'/.test(rulesText)
    && /match \/mapplaces\/\{placeId\}/.test(rulesText));
 

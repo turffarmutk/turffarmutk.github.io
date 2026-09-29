@@ -28,6 +28,64 @@ down.
 
 ## Process & project
 
+### The App Manager has no restrictions — 2026-09-29
+**Decision:** whoever holds the App Manager post answers **yes to every
+permission in the app**. Dillon asked for it in those words, starting from one
+case — he could not write a study for a lab that was not his own — and widened
+it to everything. One function each side: `appAdminAll()` in
+`app-01-shell.js`, opening every permission function in the app, and
+`appAdmin() ||` opening every one in `firestore.rules`. Both read the **same**
+`app_admin` claim on the sign-in token. He also gets **Bill's view of the Task
+Board** (`actsAsManager()`), the Assign screen, the Time Clock, and no "Coming
+Soon" cover on any page.
+
+Three things it deliberately does not do:
+
+- **Not the home screen.** The post is a hat on top of a farm job. Sending him
+  to Bill's home is exactly what broke in 2026-08-25 (he holds the post *and*
+  is a technician in the Sorochan lab, and landed somewhere he could not reach
+  his own work from). `actsAsManager()` is for the Task Board, not for
+  `HOME_DEST`.
+- **No hard delete anywhere.** Dillon's call, asked and answered on the day:
+  the stock ledger and the service history are append only, and removal
+  elsewhere is a tombstone. That is the shape of a record, not a permission —
+  a genuinely deleted document comes straight back off the next phone that
+  reconnects still holding its own copy, and deleting a stock movement changes
+  past totals with nothing recording that it happened.
+- **Not `favorites`, and not any `id == <document name>` check.** A favorites
+  record is named after the person whose stars it holds; that says which record
+  a phone owns, not who is allowed what. Overriding it would send up a write
+  the database refuses. Same for a record filed under the wrong name, or a
+  study filed under no lab at all.
+
+**Why:** the App Manager is the person who has to be able to fix anything, from
+any phone, without asking the farm's chain of command for a key. Before this it
+was a scatter of individual exceptions — `rstIsAdmin()` appeared in three
+functions out of fifty — so the answer to "may the App Manager do X" depended
+entirely on whether somebody had thought of X. The alternative, leaving it as a
+list, costs exactly what it cost here: a post that is supposed to have every
+key, holding three.
+
+The token is what makes it safe to write once. The claim cannot be edited by
+the account holder, the database can read it for itself, and `||`
+short-circuits — so an App Manager request costs no roster lookups at all.
+**Both copies must move together.** A permission the app grants and the
+database refuses is a tap that quietly undoes itself a second later; that is
+the third trap in `CLAUDE.md` and it went unnoticed on this farm for a month.
+The rules must be published by hand before the app is pushed
+(`docs/PUBLISH-THE-RULES.md`).
+
+**Don't:** don't add a permission function without `if(appAdminAll(...))return
+true;` as its first line and `appAdmin() ||` on its rule —
+`tools/test-app-admin.js` walks both files and fails if you do, and that guard
+is the only reason this will still be true in 2030. Don't drop the **actor**
+argument where a function takes one: `appAdminAll(actor)` is false even for the
+App Manager when the question is about somebody else, and plenty of places ask
+(`tools/test-rules.js` runs every person against every person). Don't put the
+override above a guard that rejects a **missing record** — there is nothing to
+permit on a record that is not there. Don't widen it into the three exclusions
+above without reading why they are there.
+
 ### A task nobody could delete, and the two holes that made it — 2026-08-31
 **Decision:** three changes, made together because on their own none of them
 fixes it. (1) The task's own screen gained a **Delete**, gated by `taskCan()`,

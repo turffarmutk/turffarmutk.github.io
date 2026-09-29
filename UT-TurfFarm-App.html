@@ -2032,7 +2032,8 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
    in farm-geo.js, loaded by the <script src> in <head>. They are still plain
    globals and are still read exactly the same way — only the file changed.
    See farm-geo.js for what each one holds. */
-function canEdit(){ return (typeof currentRole==='undefined')||currentRole!=='undergrad'; }
+function canEdit(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
+  return (typeof currentRole==='undefined')||currentRole!=='undergrad'; }
 
 /* ============================================================
    MAP POPUP ACTIONS · delegated, not string-built
@@ -2467,17 +2468,17 @@ function mowersUnlisted(){
 }
 
 /* ---- who may change what ---- */
-function mowCanEdit(){ return fstCanEditKit(); }
-function labsCanEdit(){ return fstCanEditLists(); }
+function mowCanEdit(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */ return fstCanEditKit(); }
+function labsCanEdit(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */ return fstCanEditLists(); }
 /* The two trials lists sit with the labs rather than with the sprayer: they
    are lists about research, so the people who run research own them. Same gate
    as the labs, which the faculty already hold. */
-function trialCatsCanEdit(){ return fstCanEditLists(); }
-function resTypesCanEdit(){ return fstCanEditLists(); }
+function trialCatsCanEdit(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */ return fstCanEditLists(); }
+function resTypesCanEdit(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */ return fstCanEditLists(); }
 /* Faculty now EDIT all four, so the old currentRole==='faculty' special case
    for merely seeing the page is redundant -- fstCanEditKit() already says yes
    to them, off the roster. */
-function farmCanSee(){ return fstCanEditKit()||fstCanEditLists(); }
+function farmCanSee(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */ return fstCanEditKit()||fstCanEditLists(); }
 
 
 /* ========================= SEMESTER DATES =========================
@@ -2491,7 +2492,7 @@ function farmCanSee(){ return fstCanEditKit()||fstCanEditLists(); }
    show up on Bill's board -- and a date range that covers a break is a crew
    that shows up for days the farm is shut.
    ================================================================== */
-function semCanEdit(){ return fstCanEditLists(); }
+function semCanEdit(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */ return fstCanEditLists(); }
 
 /* Two terms covering the same day would make "which term is it" a coin toss.
    Report it rather than picking one silently. */
@@ -4739,6 +4740,14 @@ function trEditLabs(pid){
      not because it is a research group -- without this line that pool would
      read as a lab he could file studies under. */
   if(role==='Farm Manager') return [];
+  /* The App Manager files a study under ANY lab -- Dillon, 2026-09-29. This is
+     the list, not the permission: trCanEditLab() above already says yes. It is
+     here so the new-study form opens on a real lab and the ＋ button appears.
+     Only the labs with a PI, because those are the ones a study can belong to
+     (TR_LABS, which is what the form's Lab dropdown offers). */
+  if(appAdminAll(pid)) return (typeof FARM_LABS!=='undefined')
+    ? FARM_LABS.filter(function(l){return l.pi;}).map(function(l){return l.name;})
+    : [];
   var out=[];
   var lab=(typeof personLab==='function')?personLab(pid):null;
   if(lab) out.push(lab);
@@ -4746,7 +4755,9 @@ function trEditLabs(pid){
   return out;
 }
 function trCanEditLab(lab,pid){
-  return !!lab && lab!=='\u2014' && trEditLabs(pid).indexOf(lab)>=0;
+  if(!lab || lab==='\u2014') return false;    /* a blank lab is not a lab, for anybody */
+  if(appAdminAll(pid))return true;   /* the App Manager has no restrictions -- app-01 */
+  return trEditLabs(pid).indexOf(lab)>=0;
 }
 /* ---- lifting -------------------------------------------------------------
    Dillon, 2026-08-26: Bill can take a restriction off anybody's study, and can
@@ -4761,6 +4772,7 @@ function trCanEditLab(lab,pid){
 function trCanLiftAny(pid){
   if(pid===undefined) pid=SESSION.pid;
   if(!pid) return false;
+  if(appAdminAll(pid))return true;   /* the App Manager has no restrictions -- app-01 */
   if(typeof personActive==='function'&&!personActive(pid)) return false;
   if((typeof personRole==='function')&&personRole(pid)==='Farm Manager') return true;
   return (typeof personHas==='function')&&personHas(pid,'lift_restrictions');
@@ -4772,6 +4784,7 @@ function trCanLiftAny(pid){
 function trSeesAll(pid){
   if(pid===undefined) pid=SESSION.pid;
   if(!pid) return false;
+  if(appAdminAll(pid))return true;   /* the App Manager has no restrictions -- app-01 */
   if(typeof personActive==='function'&&!personActive(pid)) return false;
   return ((typeof personRole==='function')&&personRole(pid)==='Farm Manager')||trCanLiftAny(pid);
 }
@@ -4779,7 +4792,7 @@ function trAccess(){ return {seeAll:trSeesAll(), editLabs:trEditLabs()}; }
 function trMe(){ return me().n||'Someone'; }
 function trMyLabs(){ return trEditLabs(); }
 function trMyLab(){ return trMyLabs()[0]||''; }
-function trCanCreate(){ return trMyLabs().length>0; }
+function trCanCreate(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */ return trMyLabs().length>0; }
 function trCanEdit(t){ return !!t && trCanEditLab(t.lab); }
 function trTrialOfRes(r){
   var t=null;
@@ -4792,6 +4805,7 @@ function trTrialOfRes(r){
 function trCanLift(r){
   var t=trTrialOfRes(r);
   if(!t) return false;
+  if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
   return trCanEdit(t) || trCanLiftAny();
 }
 /* Everyone sees active studies. Own-lab and the manager see every stage. */
@@ -8788,7 +8802,7 @@ function peRemovePlace(number){
   else if(PE_STORE.deleted.indexOf(number)<0) PE_STORE.deleted.push(number);
   delete PE_STORE.geom[number];
 }
-function peCanEdit(){ return mapCan(SESSION.pid,'shape'); }
+function peCanEdit(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */ return mapCan(SESSION.pid,'shape'); }
 function peDirty(){ return Object.keys(PE_STORE.geom).length>0||PE_STORE.added.length>0||PE_STORE.deleted.length>0
   ||Object.keys(PE_STORE.cleared||{}).length>0
   ||(typeof DUMP_NOTES!=='undefined'&&Object.keys(DUMP_NOTES).length>0); }
@@ -10553,7 +10567,7 @@ function bugConfigured(){ return !!bugKey(); }
 /* Off the roster, not off currentRole -- see fstCanEditBugs() in app-03. The
    database has to be able to ask the same question, and it cannot see which
    screen anybody is looking at. */
-function bugCanConfig(){
+function bugCanConfig(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
   return (typeof fstCanEditBugs==='function')
     ? fstCanEditBugs()
     : ((typeof rstIsAdmin==='function')&&rstIsAdmin());
@@ -11132,6 +11146,7 @@ var DB_BOOTSTRAP_PIDS=['p01','p07'];
 function rosterCanPush(who){
   var pid=pidOf(who)||SESSION.pid;
   if(!pid) return false;
+  if(appAdminAll(who))return true;   /* the App Manager has no restrictions -- app-01 */
   return DB_BOOTSTRAP_PIDS.indexOf(pid)>=0 || assignsUndergrads(pid);
 }
 
@@ -11157,7 +11172,7 @@ function rosterCanPush(who){
 function rosterCanWrite(target,who){
   var pid=pidOf(who)||SESSION.pid;
   if(!pid||!target) return false;
-  if(rstIsAdmin()) return true;                     /* the App Manager holds every record */
+  if(appAdminAll(who))return true;   /* the App Manager has no restrictions -- app-01 */
   if(rosterCanPush(pid)) return true;               /* Bill, and whoever holds the job */
   var mine=rstFind(pid);
   if(!mine||mine.role!=='Faculty') return false;

@@ -138,7 +138,7 @@ function sprayResetDefaults(){
 var sprAdding=false;
 /* Was flCanChem()||admin, which read currentRole. flCanChem() still governs
    logging a CHEMICAL in the field log -- a different question, left alone. */
-function sprCanEdit(){ return fstCanEditKit(); }
+function sprCanEdit(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */ return fstCanEditKit(); }
 function sprNum(v){ var n=parseFloat(String(v==null?'':v).trim()); return isFinite(n)?n:null; }
 
 function sprRender(){
@@ -904,7 +904,7 @@ function openTask(id){
  act.style.display='flex'; act.style.gap='8px';
  act.innerHTML=main+del;
  var edtBtn=document.getElementById('td-edit');
- if(edtBtn) edtBtn.style.display=(currentRole==='manager'&&!isReq)?'inline-flex':'none';
+ if(edtBtn) edtBtn.style.display=(actsAsManager()&&!isReq)?'inline-flex':'none';
  show('taskdetail',true);
  /* read-only preview of the ground this task covers */
  if(document.getElementById('tdmap')){
@@ -3114,8 +3114,8 @@ function buildChips(){
    invCanEdit  - change what a PRODUCT IS: its name, its container size, its
                  reorder point. That is a decision about the shelf rather than
                  a record of what happened on it, so it stays where it was. */
-function invCanMove(){return true;}
-function invCanEdit(){return currentRole!=='undergrad';}
+function invCanMove(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */return true;}
+function invCanEdit(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */return currentRole!=='undergrad';}
 function invEnter(){
  var u=document.getElementById('inv-units'); if(u)u.querySelectorAll('span').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-u')===invUnit);});
  document.getElementById('inv-addbtn').style.display=invCanEdit()?'block':'none';
@@ -3753,21 +3753,21 @@ let EQSCHED=[
 
    The fallbacks are the old behaviour, and they are only reached if this file
    somehow loads without app-02. Any real change goes in app-02. */
-function eqCanReport(){
+function eqCanReport(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
   return (typeof eqCanReportProblem==='function') ? eqCanReportProblem()
-       : (currentRole==='manager'||currentRole==='tech'||currentRole==='grad');
+       : (actsAsManager()||currentRole==='tech'||currentRole==='grad');
 }
-function eqCanDown(){
+function eqCanDown(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
   return (typeof eqCanTakeDown==='function') ? eqCanTakeDown()
-       : (currentRole==='manager'||currentRole==='tech');
+       : (actsAsManager()||currentRole==='tech');
 }
-function eqCanEdit(){
+function eqCanEdit(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
   return (typeof eqCanEditMachine==='function') ? eqCanEditMachine()
        : (currentRole!=='grad'&&currentRole!=='undergrad');
 }
-function eqCanMaint(){
+function eqCanMaint(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
   return (typeof eqCanMaintain==='function') ? eqCanMaintain()
-       : (currentRole==='manager'||currentRole==='tech');
+       : (actsAsManager()||currentRole==='tech');
 }
 function eqStat(s){
  if(s==='down')return {lbl:'Down',dot:'#c0392b',bg:'#fdeceb',fg:'#c0392b'};

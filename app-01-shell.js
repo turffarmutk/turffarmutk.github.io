@@ -2357,6 +2357,72 @@ document.getElementById('s-navtabs').addEventListener('click',function(e){
    clock button on Home. Who may EDIT a punch has not changed -- that is
    tcCanEditPunches() and canPunchFor() in firestore.rules, and it is still
    "you, or Bill". Taking a page off this list only uncovers the screen. */
+/* ============================================================
+   THE APP MANAGER HAS NO RESTRICTIONS      (Dillon, 2026-09-29)
+   ------------------------------------------------------------
+   Whoever holds the App Manager post answers YES to every permission in the
+   app. Not "most of them", not "the ones somebody remembered": every one. The
+   post is the person who has to be able to fix anything, from any phone,
+   without asking the farm's chain of command for a key -- writing a study for
+   a lab that is not theirs, correcting somebody else's record, changing a
+   setting that is normally Bill's. Dillon asked for it in those words.
+
+   TWO THINGS MAKE THIS SAFE TO WRITE ONCE AND TRUST.
+
+   First, IT IS THE TOKEN, NEVER THE ROSTER. rstIsAdmin() reads the `app_admin`
+   claim off the sign-in token, stamped by tools/create-accounts.js on a
+   laptop. `appAdmin()` in firestore.rules reads THE SAME CLAIM, so the app and
+   the database answer this question identically and there is no way to be told
+   yes by one and no by the other. That matters more here than anywhere: a
+   permission the app grants and the database refuses is a tap that quietly
+   undoes itself a second later, which is the third trap in CLAUDE.md and it
+   went unnoticed on this farm for a month.
+
+   Second, IT ONLY EVER LIFTS A RESTRICTION FOR THE PERSON WEARING THE HAT.
+   Most permission functions take the actor as an argument, and plenty of
+   places ask them about OTHER people -- the roster screen does, and
+   tools/test-rules.js runs every person against every person. So pass the
+   actor in: appAdminAll(someoneElse) is false even for the App Manager. Only
+   appAdminAll() with nothing, or with their own id, is true.
+
+   WHAT IT DOES NOT TOUCH, and neither should you:
+
+   - The handful of places the database refuses a hard delete from EVERYBODY:
+     the stock movement ledger (a correction is another movement), the
+     maintenance log, and anything removed by tombstone rather than deleted.
+     Those are not permission checks, they are the shape of the record -- a
+     genuinely deleted document comes straight back off the next phone that
+     reconnects still holding its own copy. Dillon's call, 2026-09-29.
+   - Which home screen he lands on. The post is a hat worn on top of a farm
+     job (see the note over rstIsAdmin() in app-03), and taking that back would
+     undo 2026-08-25: he holds the post AND is a technician in the Sorochan
+     lab, and being sent to Bill's home screen is exactly what left him unable
+     to reach his own work last time.
+
+   ADDING A NEW PERMISSION FUNCTION? Its first line is
+   `if(appAdminAll(...))return true;`. tools/test-app-admin.js walks the source
+   and FAILS if a function named like a permission does not have one, so this
+   cannot be forgotten quietly -- which is the only way it would ever be
+   forgotten. See docs/DECISIONS.md, 2026-09-29.
+   ============================================================ */
+function appAdminAll(pid){
+  var on=false;
+  try{ on=(typeof rstIsAdmin==='function')&&rstIsAdmin()===true; }catch(e){}
+  if(!on) return false;
+  /* Asking about nobody in particular means asking about whoever is signed in,
+     which is the App Manager, so yes. */
+  if(pid===undefined||pid===null||pid==='') return true;
+  var who=pid;
+  try{ if(typeof pidOf==='function') who=pidOf(pid)||pid; }catch(e){}
+  return who===SESSION.pid;
+}
+/* The manager's VIEW of a screen, as opposed to permission to change
+   something: Bill's tabs on the Task Board, his Assign screen, his Time Clock.
+   Dillon asked for Bill's task board specifically, and the rest follows from
+   "no restrictions". Deliberately NOT used for which home screen anybody
+   lands on -- see the note above. */
+function actsAsManager(){ return currentRole==='manager'||appAdminAll(); }
+
 var CS_LOCKED={inventory:1,trial:1,equipment:1,fieldlog:1,calendar:1,weather:1};
 /* trialpin is a Trials screen that SCREEN_DEST never listed, so it would slip
    past the cover without this. */

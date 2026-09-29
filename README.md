@@ -10,6 +10,12 @@ signal.
 the Farm Map; every other page shows faded under a "Coming Soon" card for
 everyone except the Farm Manager and the App Manager. See `docs/DECISIONS.md`.
 
+**The App Manager has no restrictions.** Since 2026-09-29 whoever holds that
+post answers yes to every permission in the app and in the database — any lab's
+study, anybody's record, Bill's view of the Task Board. It rides on the sign-in
+token, so the app and the database read the same thing. It does not replace
+their farm role. See `docs/DECISIONS.md`, 2026-09-29.
+
 New here? Read [`docs/SUCCESSION.md`](docs/SUCCESSION.md) first. It explains why
 the app is built the way it is and what has to stay true for it to outlive the
 person who wrote it.

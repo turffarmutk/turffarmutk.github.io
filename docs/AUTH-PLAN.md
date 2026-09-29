@@ -81,6 +81,16 @@ not a person. It becomes a **flag in user metadata** (`is_app_admin`) on the
 real person who currently holds it. Handing the app over then means moving one
 flag, which fits how the hand-off screen already works.
 
+**Done, and it now carries every permission on the farm.** The flag arrives as
+the `app_admin` claim on the token. Since 2026-09-29 whoever holds it answers
+yes to every permission in the app and in `firestore.rules` — writing a study
+for any lab, correcting anybody's record, fixing anybody's punch, Bill's view of
+the Task Board — because the App Manager is the person who has to be able to fix
+anything without asking the farm's chain of command for a key. It does **not**
+replace their farm role or their home screen: it is a hat worn on top of one.
+See `docs/DECISIONS.md`, 2026-09-29, for the three things it deliberately does
+not lift.
+
 ---
 
 ## Offline: the constraint that shapes everything

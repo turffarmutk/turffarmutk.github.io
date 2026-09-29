@@ -548,10 +548,10 @@ function rstSync(){
    ever leaves, the faculty can still hand the job to someone. A PI cannot edit
    another PI or another lab's grads and techs. */
 function rstMe(){ return sessionPerson(); }
-function rstCanOpen(){return currentRole==='manager'||currentRole==='faculty'||rstIsAdmin();}
+function rstCanOpen(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */return currentRole==='manager'||currentRole==='faculty'||rstIsAdmin();}
 function rstCanEdit(p){
   if(!p)return false;
-  if(rstIsAdmin())return true;                     /* the App Manager holds every record */
+  if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
   if(p.role==='Faculty')return false;              /* a PI is appointed, not hired — App Manager only */
   if(currentRole==='manager')return true;
   if(currentRole!=='faculty')return false;
@@ -1319,12 +1319,12 @@ function fstRole(){
   if(typeof personActive==='function'&&!personActive(SESSION.pid)) return null;
   return (typeof personRole==='function')?personRole(SESSION.pid):null;
 }
-function fstCanEditKit(){
+function fstCanEditKit(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
   if((typeof rstIsAdmin==='function')&&rstIsAdmin()) return true;
   var r=fstRole();
   return !!r && r!=='Undergraduate Student';
 }
-function fstCanEditLists(){
+function fstCanEditLists(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
   if((typeof rstIsAdmin==='function')&&rstIsAdmin()) return true;
   var r=fstRole();
   return r==='Farm Manager' || r==='Faculty';
@@ -1337,7 +1337,7 @@ function fstCanEditLists(){
    which is only which screen is showing -- so a manager who had tapped into
    another view lost the ability to change it, and the database, which cannot
    see currentRole at all, had nothing it could copy. */
-function fstCanEditBugs(){
+function fstCanEditBugs(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
   if((typeof rstIsAdmin==='function')&&rstIsAdmin()) return true;
   return fstRole()==='Farm Manager';
 }
@@ -1348,7 +1348,7 @@ function assignsUndergrads(x){
    shared undergrad pool, not a lab everyone is in together. */
 function sameLab(a,b){ var la=personLab(a); return !!la && la===personLab(b); }
 
-function taskCan(actor,action,task){
+function taskCan(actor,action,task){ if(appAdminAll(actor))return true;   /* the App Manager has no restrictions -- app-01 */
   var me=pidOf(actor);
   if(!me || !personActive(me)) return false;
   var role=personRole(me); if(!role) return false;
@@ -1425,7 +1425,7 @@ function taskCan(actor,action,task){
    cultivar, area, rootzone) · 'mowing' (mower, cut height, irrigation heads).
    They take the same answer today; they are named separately so that if the
    farm ever wants them to differ, this is the only place that changes. */
-function mapCan(actor,action){
+function mapCan(actor,action){ if(appAdminAll(actor))return true;   /* the App Manager has no restrictions -- app-01 */
   var me=pidOf(actor)||SESSION.pid;
   if(!me||!personActive(me)) return false;
   var role=personRole(me); if(!role) return false;
@@ -1484,7 +1484,10 @@ function numBadge(n){return '<span style="width:22px;height:22px;border-radius:7
 function roRow(lead,title,sub){return '<div class="row" style="align-items:flex-start">'+(lead||'')+'<div style="flex:1;min-width:0"><div class="rt">'+title+'</div><div class="rs">'+sub+'</div></div></div>';}
 function renderBoard(){
  var seg=document.getElementById('tb-seg'); if(!seg)return;
- var mgr=currentRole==='manager';
+ /* actsAsManager(), not currentRole: Dillon asked for Bill's view of this
+    board while wearing the App Manager hat, and his farm role is Technician.
+    See the note over appAdminAll() in app-01. */
+ var mgr=actsAsManager();
  var viewer=currentRole==='faculty';
  var boardView=mgr||viewer;
  var requester=(currentRole==='grad'||currentRole==='tech');
@@ -1508,7 +1511,7 @@ function renderBoard(){
    :(requester?'<div class="boardbtns"><div class="action tap" data-board="selftask" style="background:#2f3133">＋ Assign task to me</div><div class="action tap" data-req="undergrad">＋ Request labor from Bill</div></div>':''));
  renderTasks();
 }
-function boardEnter(){ tbTab=(currentRole==='manager'||currentRole==='faculty')?'board':'mine'; boardDay=boardDefaultDay(); renderBoard(); }
+function boardEnter(){ tbTab=(actsAsManager()||currentRole==='faculty')?'board':'mine'; boardDay=boardDefaultDay(); renderBoard(); }
 function simpleTaskRow(t){var note=t.desc?'<div class="rs" style="margin-top:4px;color:#7b828d;line-height:1.4">'+esc(t.desc)+'</div>':'';return '<div class="row tap" data-task="'+t.id+'" style="align-items:flex-start"><div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+areaWithDue(t)+'</div>'+note+'</div><span style="color:#c2c7cd;font-size:17px;flex:none;align-self:center">›</span></div>';}
 function gradReqRow(t){var done=t.status==='done';var pending=(t.kind==='request'&&!t.assignee);var pill=done?'<span class="pill" style="background:#eaf3ea;color:#2f9e4f;flex:none">✓ Done</span>':(pending?'<span class="pill" style="background:#fff4e0;color:#9a5b00;flex:none">Pending</span>':'<span class="pill" style="background:#489FDF;color:#fff;flex:none">→ '+esc(nameOf(t.assignee)||t.assignee||'')+'</span>');return '<div class="row"><div style="flex:1;min-width:0"><div class="rt">'+esc(t.title)+'</div><div class="rs">'+(t.area||'')+'</div></div>'+pill+reqDelBtn(t)+'</div>';}
 function openGradReq(){var a=document.getElementById('gr-name');if(a)a.value='';var b=document.getElementById('gr-area');if(b)b.value='';var c=document.getElementById('gr-note');if(c)c.value='';go('gradreq');}
@@ -1795,7 +1798,7 @@ function renderTasks(){
       needs a person, so it reads as one job row above the crew, and tapping
       it opens the same who-and-when picker as anything else. See
       PART-FINISHED JOBS in app-04. */
-   if(currentRole==='manager'){
+   if(actsAsManager()){
      var lefts=tbLeftovers();
      if(lefts.length) html+='<div class="list">'+lefts.map(tbLeftRow).join('')+'</div>';
    }
@@ -1831,7 +1834,7 @@ function renderTasks(){
    /* Bill only. Faculty see their own lab and the pool, which is a deliberate
       scope -- this section is about the farm as a whole having nowhere to put
       a job that no day shows, and that is the farm manager's problem. */
-   if(currentRole==='manager'){
+   if(actsAsManager()){
      var off=boardOffChart(people);
      if(off.length){
        html+='<div class="sec">Not on any day above · '+off.length+'</div>';
@@ -1852,7 +1855,7 @@ function renderTasks(){
    html+= done.length? '<div class="list">'+done.map(function(t){return ro2?roRow('<span style="color:#2f9e4f;font-size:16px;flex:none;align-self:flex-start;margin-top:1px">✓</span>',esc(t.title),esc(tbDoneSub(t))):tbDoneRow(t);}).join('')+'</div>'
         : '<div class="sec" style="text-align:center;margin-top:20px">'+(doneOrd===asTodayOrd()?'Nothing completed yet today':'Nothing completed this day')+'</div>';
  } else if(tbTab==='requests'){
-   if(currentRole==='manager'){
+   if(actsAsManager()){
      var fromCrew=TASKS.filter(function(t){return t.kind==='request'&&!t.assignee&&t.origin!=='manager';});
      var sentCrew=TASKS.filter(function(t){return t.origin==='manager';});
      html+='<div class="sec">From crew — assign an undergrad</div>';

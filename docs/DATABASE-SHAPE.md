@@ -643,6 +643,7 @@ the phone's saved copy, and by then the built-in list would be gone.
 |---|---|
 | `spray`, `mowers` | everybody but the undergraduates — `canEditFarmKit()` |
 | `labs`, `semesters` | the Farm Manager, faculty, or the App Manager — `canEditFarmLists()` |
+| any of them | the App Manager, always — every permission here opens `appAdmin() \|\|` since 2026-09-29 |
 | read any of them | everybody signed in |
 | delete | nobody, ever |
 
@@ -657,6 +658,18 @@ roster now.
 rides on the sign-in token as its own claim (`app_admin`), stamped by
 `tools/create-accounts.js` exactly like `pid` — which is precisely why a rule is
 allowed to ask about it: the database can see it for itself.
+
+**Since 2026-09-29 the App Manager has no restrictions at all.** Every
+permission function in `firestore.rules` opens `appAdmin() ||`, and every
+permission function in the app opens `if(appAdminAll(...))return true;`. The two
+read the same claim, so they cannot disagree — and `||` short-circuits, so an
+App Manager request costs no roster lookups at all. Three things are left out on
+purpose and are **not** permissions: `allow delete: if false` (the ledgers are
+append only, removal elsewhere is a tombstone), `request.resource.data.id ==
+<document name>` (a record may not be filed under the wrong name), and
+`favorites`, where the document is named after the person whose stars it holds.
+`tools/test-app-admin.js` walks both files and fails if a permission on either
+side stops lifting. See `docs/DECISIONS.md`, 2026-09-29.
 
 ### Renaming moves records that ride a different drawer
 

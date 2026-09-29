@@ -128,7 +128,7 @@ var TEMPLATES=[];
    The list of jobs the farm does. Everybody but the undergraduates, matching
    invCanEdit(): deciding what a job IS is a different thing from doing it.
    Transcribed into firestore.rules as canEditTaskList(). */
-function tplCanEdit(){
+function tplCanEdit(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
   if(!SESSION.pid) return false;
   if(typeof personActive==='function'&&!personActive(SESSION.pid)) return false;
   /* Off the ROSTER, never off currentRole -- currentRole is screen state the
@@ -198,7 +198,7 @@ var FAVS=[];
    own record", and say nothing about roles. A looser rule cannot cause a
    silent refusal, and it means giving undergraduates favorites later would be
    a change here only, with no rules to republish. */
-function favCanUse(){
+function favCanUse(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
   if(!SESSION.pid) return false;
   if(typeof personActive==='function'&&!personActive(SESSION.pid)) return false;
   return (typeof personRole==='function')&&personRole(SESSION.pid)!=='Undergraduate Student';
@@ -904,7 +904,7 @@ function renderAssignList(){
 }
 function updateSaveBtn(){var b=document.getElementById('as-save');if(!b)return;b.textContent=PICKS.length?('Save · '+PICKS.length+' task'+(PICKS.length>1?'s':'')):'Save assignments';}
 function assignEnter(){
- var mgr=currentRole==='manager';
+ var mgr=actsAsManager();
  asTab='fav'; asPerson=mgr?null:SELF; PICKS=[]; asDay=boardDefaultDay();
  var seg=document.getElementById('as-seg'); if(seg)seg.querySelectorAll('span').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-atab')==='fav');});
  var sr=document.getElementById('as-search'); if(sr)sr.value='';
@@ -1075,7 +1075,7 @@ function saveAssignments(){
  if(!PICKS.length){toast('Add tasks first');return;}
  var who=asPerson, n=PICKS.length;
  PICKS.forEach(function(p){ if(p.kind==='tpl')commitTpl(p.id,p.note,p.plots,p.dueOrd,p); else if(p.kind==='ev')commitEv(p.id,p.note,p.plots,p.dueOrd,p); else commitTask(p.id,p.note,p.plots,p.dueOrd,p); });
- asPerson=(currentRole==='manager')?null:SELF; PICKS=[]; asTab='fav';
+ asPerson=actsAsManager()?null:SELF; PICKS=[]; asTab='fav';
  var seg=document.getElementById('as-seg'); if(seg)seg.querySelectorAll('span').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-atab')==='fav');});
  var sr=document.getElementById('as-search'); if(sr)sr.value='';
  renderAssignPeople(); renderAssignList(); updateSaveBtn();
@@ -1228,7 +1228,7 @@ function eventsOnDate(dt){
 function calSelf(){ return me().n; }
 function calUserLab(){return calMyLab();}   // who's adding → which lab tag
 function evLab(ev){return ev.lab||'Bill';}                     // untagged/farm items belong to Bill
-function calCanSeeType(t){ if(currentRole==='faculty'&&t==='crew')return false; return true; }
+function calCanSeeType(t){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */ if(currentRole==='faculty'&&t==='crew')return false; return true; }
 /* Taking an entry off the calendar MARKS it rather than removing it.
 
    Why it cannot simply be dropped from the list, now that the calendar is
@@ -1274,7 +1274,7 @@ function calAddTypes(){
     var t=calAddTypesFor(SESSION.pid);
     if(t&&t.length) return t;
   }
-  if(currentRole==='manager')return ['crew','event','spray','trial','other'];
+  if(actsAsManager())return ['crew','event','spray','trial','other'];
   if(currentRole==='grad'||currentRole==='tech')return ['event','spray','trial','other'];
   if(currentRole==='faculty')return ['event','trial','other'];
   if(currentRole==='undergrad')return ['timeoff'];
@@ -1398,7 +1398,7 @@ function openCalEvent(id){
  /* Bill may remove anything; everybody else may remove their own time off.
     Same function the database checks, so the button and the answer agree. */
  var mayRemove=(typeof calCanRemoveEvent==='function') ? calCanRemoveEvent(ev)
-                                                       : (currentRole==='manager');
+                                                       : actsAsManager();
  if(mayRemove){
    acts+='<div class="action tap" data-delev="'+ev.id+'" style="flex:1;background:#17181a">Remove</div>';
  }
@@ -2358,7 +2358,7 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
     try{ window.tcAutoClose(); }catch(e){}
     var body=document.getElementById('tc-body'),bk=document.getElementById('tc-back');
     if(currentRole==='undergrad'){renderWorker(body);if(bk)bk.style.display='none';}
-    else if(currentRole==='manager'){renderManager(body);if(bk)bk.style.display='';}
+    else if(actsAsManager()){renderManager(body);if(bk)bk.style.display='';}
     else if(currentRole==='faculty'){renderViewer(body);if(bk)bk.style.display='';}
     // grads and techs have no Time Clock access; if they land here anyway, show nothing.
     else{body.innerHTML='<div style="margin:14px;background:var(--card);border-radius:14px;padding:18px 16px;font:700 13px \'Public Sans\';color:var(--muted);text-align:center">Time Clock is limited to hourly crew, Bill and faculty.</div>';if(bk)bk.style.display='';}

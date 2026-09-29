@@ -343,7 +343,9 @@ section('6b. A refused stroke is not sent over and over');
     const m = rules.match(/match \/paint\/\{taskId\} \{([\s\S]*?)\n    \}/);
     ok('there is a block for it', !!m);
     ok('anyone signed in may read', m && /allow read: if actor\(\);/.test(m[1]));
-    ok('only people on the job may write', m && /allow create, update: if actor\(\) && onThisJob\(taskId\);/.test(m[1]));
+    /* `appAdmin() || (...)` since 2026-09-29 -- the App Manager has no
+       restrictions. For everybody else it is still being on the job. */
+    ok('only people on the job may write', m && /allow create, update: if appAdmin\(\) \|\| \(actor\(\) && onThisJob\(taskId\)\);/.test(m[1]));
     ok('nobody may delete', m && /allow delete: if false;/.test(m[1]));
   }
 

@@ -242,9 +242,36 @@ service cloud.firestore {
       );
     }
 
-    /* The App Manager holds every record, including the faculty's. It is a
-       claim on the token, stamped by tools/create-accounts.js, not a role on
-       the roster — the job is "looks after the app", not "works on the farm". */
+    /* ------------------------------------------------------------------
+       THE APP MANAGER HAS NO RESTRICTIONS      (Dillon, 2026-09-29)
+
+       It is a claim on the token, stamped by tools/create-accounts.js, not a
+       role on the roster — the job is "looks after the app", not "works on the
+       farm". The account holder cannot edit it, and the database can see it
+       for itself, which is precisely why a rule is allowed to ask about it.
+
+       Every permission below now starts `appAdmin() ||`. This is the SAME
+       claim `appAdminAll()` in app-01-shell.js reads, so the app and the
+       database answer the question identically — which matters more here than
+       anywhere else in this file. A permission the app grants and the database
+       refuses is a tap that quietly undoes itself a second later; that is the
+       third trap in CLAUDE.md and it went unnoticed on this farm for a month.
+
+       `||` short-circuits, so an App Manager request costs NO roster lookups
+       at all — it never reaches actor(), rec(), or any get().
+
+       WHAT IT DELIBERATELY DOES NOT TOUCH, and neither should you:
+
+         - `allow delete: if false`. The ledgers (invmoves, eqmaint) are append
+           only and removal elsewhere is a tombstone, never a deleted document.
+           That is the SHAPE of the record, not a permission: a genuinely
+           deleted document comes straight back off the next phone that
+           reconnects still holding its own copy. Dillon's call, 2026-09-29.
+         - `request.resource.data.id == <docId>`. A record filed under one name
+           may not claim to be another, for anybody. Also shape, not permission.
+         - `favorites`, where the document is NAMED after the person whose
+           stars it holds. Same reasoning; see favCanPush() in app-02.
+       ------------------------------------------------------------------ */
     function appAdmin() {
       return request.auth != null && request.auth.token.app_admin == true;
     }
@@ -448,23 +475,23 @@ service cloud.firestore {
          cannot be filed under one name and claim to be another. createdBy
          is stamped here and can never be rewritten (see update below), so
          "I raised this" stays true forever. */
-      allow create: if actor()
+      allow create: if (appAdmin() || (actor()
         && canCreate()
-        && request.resource.data.id == taskId
         && str(request.resource.data.get('createdBy', '')) == me()
         && (str(request.resource.data.get('assignee', '')) == ''
-            || canAssignTo(str(request.resource.data.get('assignee', ''))));
+            || canAssignTo(str(request.resource.data.get('assignee', ''))))))
+        && request.resource.data.id == taskId;
 
       /* An update is one of five moves. Each is checked against the branch
          of taskCan() that governs it, and the narrow moves may only touch
          the fields that move actually changes — so "I am claiming this"
          cannot quietly also rewrite the job. */
-      allow update: if actor()
-        && request.resource.data.id == resource.data.id
+      allow update: if (appAdmin() || (actor()
         && str(request.resource.data.get('createdBy', '')) == str(resource.data.get('createdBy', ''))
-        && (isClaim() || isCompletion() || isWorkUpdate() || isAssignment() || isEdit());
+        && (isClaim() || isCompletion() || isWorkUpdate() || isAssignment() || isEdit())))
+        && request.resource.data.id == resource.data.id;
 
-      allow delete: if actor() && canEdit(resource.data);
+      allow delete: if appAdmin() || (actor() && canEdit(resource.data));
 
     }
 
@@ -486,15 +513,17 @@ service cloud.firestore {
        rule, two places, and the copy that drifts is the one that causes harm.
        ------------------------------------------------------------------ */
     function canMap() {
-      return roleOf(me()) != 'Undergraduate Student';
+      /* The App Manager has no restrictions — see appAdmin() above. */
+      return appAdmin() ||
+        (roleOf(me()) != 'Undergraduate Student');
     }
 
     match /mapplaces/{placeId} {
       allow read: if actor();
-      allow create, update: if actor()
+      allow create, update: if (appAdmin() || (actor()
         && canMap()
-        && request.resource.data.id == placeId
-        && str(request.resource.data.get('updatedBy','')) == me();
+        && str(request.resource.data.get('updatedBy','')) == me()))
+        && request.resource.data.id == placeId;
       /* Nothing deletes a map record. Removing a PLACE is expressible without
          it (`removed: true`), and "clear this device's edits" must never be
          able to take the farm's corrections with it. */
@@ -530,7 +559,7 @@ service cloud.firestore {
       allow read: if actor();
       /* Undergrads claim ground too — being out on the mow is exactly who
          this is for. The gate is being on the job, not the person's rank. */
-      allow create, update: if actor() && onThisJob(taskId);
+      allow create, update: if appAdmin() || (actor() && onThisJob(taskId));
       allow delete: if false;
     }
 
@@ -547,7 +576,7 @@ service cloud.firestore {
        ------------------------------------------------------------------ */
     match /paint/{taskId} {
       allow read: if actor();
-      allow create, update: if actor() && onThisJob(taskId);
+      allow create, update: if appAdmin() || (actor() && onThisJob(taskId));
       allow delete: if false;
     }
 
@@ -572,12 +601,14 @@ service cloud.firestore {
        lab's person. Mirrors flCan(…,'edit'|'delete',…) exactly — one function
        for both, because the app uses one function for both. */
     function canEditLog() {
-      return str(logEntry().get('loggedBy','')) == me()
+      /* The App Manager has no restrictions — see appAdmin() above. */
+      return appAdmin() ||
+        (str(logEntry().get('loggedBy','')) == me()
           || str(logEntry().get('person','')) == me()
           || assignsUndergrads(me())
           || (roleOf(me()) == 'Faculty'
               && str(logEntry().get('person','')) != ''
-              && sameLab(me(), str(logEntry().get('person',''))));
+              && sameLab(me(), str(logEntry().get('person','')))));
     }
 
     match /fieldlog/{entryId} {
@@ -633,13 +664,17 @@ service cloud.firestore {
        and the field log already trusts them to write the farm's spray
        records. */
     function canMoveStock() {
-      return actor();
+      /* The App Manager has no restrictions — see appAdmin() above. */
+      return appAdmin() ||
+        (actor());
     }
 
     /* App: invCanEdit() — deciding what a product is, rather than recording
        what happened to it. */
     function canEditProduct() {
-      return actor() && roleOf(me()) != 'Undergraduate Student';
+      /* The App Manager has no restrictions — see appAdmin() above. */
+      return appAdmin() ||
+        (actor() && roleOf(me()) != 'Undergraduate Student');
     }
 
     match /invmoves/{moveId} {
@@ -678,10 +713,12 @@ service cloud.firestore {
        is out in a field. Faculty may fix their own lab's, matching the fact
        that they may already direct those people. */
     function canSetSchedule(pid) {
-      return actor()
+      /* The App Manager has no restrictions — see appAdmin() above. */
+      return appAdmin() ||
+        (actor()
         && ( pid == me()
           || assignsUndergrads(me())
-          || (roleOf(me()) == 'Faculty' && sameLab(me(), pid)) );
+          || (roleOf(me()) == 'Faculty' && sameLab(me(), pid)) ));
     }
 
     match /schedules/{schedId} {
@@ -758,7 +795,9 @@ service cloud.firestore {
        anybody, which is what the "add a punch" and time-wheel controls on his
        screen have always done. */
     function canPunchFor(pid) {
-      return actor() && (pid == me() || assignsUndergrads(me()));
+      /* The App Manager has no restrictions — see appAdmin() above. */
+      return appAdmin() ||
+        (actor() && (pid == me() || assignsUndergrads(me())));
     }
 
     match /punches/{punchId} {
@@ -798,7 +837,9 @@ service cloud.firestore {
        different things. Undergrads read it: looking up what the work you have
        been handed actually involves is the point of having it. */
     function canEditTaskList() {
-      return actor() && roleOf(me()) != 'Undergraduate Student';
+      /* The App Manager has no restrictions — see appAdmin() above. */
+      return appAdmin() ||
+        (actor() && roleOf(me()) != 'Undergraduate Student');
     }
 
     match /templates/{tplId} {
@@ -850,14 +891,20 @@ service cloud.firestore {
        undergraduates get none: doing the work and deciding what the study IS
        are two different things, the same line canEditTaskList() draws. */
     function canEditTrialLab(lab) {
-      return actor()
+      /* A blank lab is not a lab, for anybody including the App Manager: that
+         is the shape of the record, not a permission. The app says the same
+         thing on the first line of trCanEditLab(). */
+      return lab is string && lab != '' && lab != '—'
+        /* The App Manager files a study under ANY lab — see appAdmin() above.
+           Dillon asked for this one by name, 2026-09-29. */
+        && (appAdmin() ||
+           (actor()
         && roleOf(me()) != 'Undergraduate Student'
         /* The Farm Manager edits no study at all -- he lifts, and that is the
            whole of it. He carries the lab the pooled undergraduates hang on,
            which without this line would read as a lab he could file under. */
         && roleOf(me()) != 'Farm Manager'
-        && lab is string && lab != '' && lab != '—'
-        && (labOf(me()) == lab || grantsOf(me()).hasAny(['trials:' + lab]));
+        && (labOf(me()) == lab || grantsOf(me()).hasAny(['trials:' + lab]))));
     }
 
     /* App: trCanLiftAny() -- the Farm Manager, or whoever is holding that job
@@ -865,8 +912,10 @@ service cloud.firestore {
        assignsUndergrads() is one: ground fenced off by a study nobody is
        running any more has to be freeable without a code change. */
     function liftsRestrictions() {
-      return actor()
-        && (roleOf(me()) == 'Farm Manager' || grantsOf(me()).hasAny(['lift_restrictions']));
+      /* The App Manager has no restrictions — see appAdmin() above. */
+      return appAdmin() ||
+        (actor()
+        && (roleOf(me()) == 'Farm Manager' || grantsOf(me()).hasAny(['lift_restrictions'])));
     }
 
     match /trials/{trialId} {
@@ -932,7 +981,9 @@ service cloud.firestore {
        everybody but the undergraduates, the same line canEditTaskList() draws.
        Dillon added faculty to the whole of Farm settings on 2026-08-26. */
     function canEditFarmKit() {
-      return isAppManager() || (actor() && roleOf(me()) != 'Undergraduate Student');
+      /* The App Manager has no restrictions — see appAdmin() above. */
+      return appAdmin() ||
+        (isAppManager() || (actor() && roleOf(me()) != 'Undergraduate Student'));
     }
 
     /* App: clockCutCanEdit() -- the hour after which the app closes a shift
@@ -942,15 +993,19 @@ service cloud.firestore {
        these two in step -- widening this one without widening that one gives
        somebody the power to set a time they are not allowed to write. */
     function canEditClockSettings() {
-      return isAppManager() || (actor() && assignsUndergrads(me()));
+      /* The App Manager has no restrictions — see appAdmin() above. */
+      return appAdmin() ||
+        (isAppManager() || (actor() && assignsUndergrads(me())));
     }
 
     /* App: fstCanEditLists() -- the labs list and the semester dates. These two
        decide who belongs where and when the farm is running, and renaming a lab
        moves people and studies with it. Bill, faculty, or the App Manager. */
     function canEditFarmLists() {
-      return isAppManager()
-        || (actor() && (roleOf(me()) == 'Farm Manager' || roleOf(me()) == 'Faculty'));
+      /* The App Manager has no restrictions — see appAdmin() above. */
+      return appAdmin() ||
+        (isAppManager()
+        || (actor() && (roleOf(me()) == 'Farm Manager' || roleOf(me()) == 'Faculty')));
     }
 
     /* The App Manager post is the one thing here that is NOT on the roster: it
@@ -966,7 +1021,9 @@ service cloud.firestore {
        setting, it is who maintains the app. Bill or the App Manager. Faculty
        edit the rest of Farm settings and not this one. */
     function canEditBugSettings() {
-      return isAppManager() || (actor() && roleOf(me()) == 'Farm Manager');
+      /* The App Manager has no restrictions — see appAdmin() above. */
+      return appAdmin() ||
+        (isAppManager() || (actor() && roleOf(me()) == 'Farm Manager'));
     }
 
     match /farmsettings/{group} {
@@ -1008,24 +1065,32 @@ service cloud.firestore {
        to notice. Reporting raises a flag; it does NOT take the machine out of
        service, which is canTakeDownMachine() below and much narrower. */
     function canReportProblem() {
-      return actor();
+      /* The App Manager has no restrictions — see appAdmin() above. */
+      return appAdmin() ||
+        (actor());
     }
 
     /* App: eqCanTakeDown() and eqCanMaintain() — the same two people. Taking a
        machine out of service changes everyone's day, and the service record is
        the technicians' job and Bill's. */
     function canTakeDownMachine() {
-      return actor() && roleOf(me()) in ['Farm Manager', 'Technician'];
+      /* The App Manager has no restrictions — see appAdmin() above. */
+      return appAdmin() ||
+        (actor() && roleOf(me()) in ['Farm Manager', 'Technician']);
     }
     function canMaintainEquip() {
-      return actor() && roleOf(me()) in ['Farm Manager', 'Technician'];
+      /* The App Manager has no restrictions — see appAdmin() above. */
+      return appAdmin() ||
+        (actor() && roleOf(me()) in ['Farm Manager', 'Technician']);
     }
 
     /* App: eqCanEditMachine() — deciding what a machine IS (its name, model,
        hours, whether it is retired) rather than recording what happened to it.
        Faculty are in because a lab's own equipment is theirs to describe. */
     function canEditMachine() {
-      return actor() && roleOf(me()) in ['Farm Manager', 'Technician', 'Faculty'];
+      /* The App Manager has no restrictions — see appAdmin() above. */
+      return appAdmin() ||
+        (actor() && roleOf(me()) in ['Farm Manager', 'Technician', 'Faculty']);
     }
 
     match /equipment/{machineId} {
@@ -1131,7 +1196,9 @@ service cloud.firestore {
       return d.type == 'crew' && d.get('person', '') == me();
     }
     function calMayAdd(d) {
-      return actor() && (calIsOwnTimeOff(d) || d.type in calTypesFor(roleOf(me())));
+      /* The App Manager has no restrictions — see appAdmin() above. */
+      return appAdmin() ||
+        (actor() && (calIsOwnTimeOff(d) || d.type in calTypesFor(roleOf(me()))));
     }
     /* App: calCanRemoveEvent() — Bill may take anything off the farm's month;
        everybody else may remove their own time off and nothing else. */

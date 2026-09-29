@@ -264,6 +264,8 @@ get wrong.
 | `isWorkUpdate()` and the `isCompletion()` field list in `firestore.rules` | **What lets the crew save their work.** Without them, anybody who is not Bill or the job's creator can tap plots green and watch them turn orange again a second later, and can never finish a job — the database refuses the write and the phone takes the database's copy back. That was live from late August until 2026-09-22 and nobody could tell why. **Never remove either, never narrow the field lists, and never "tidy" them into `isEdit()`.** When the app starts writing a new field on a task while someone works or finishes it, add that field to the lists in the same change. See "The third trap" under The shared database. |
 | `FAVS` and `favCanUse()` in `app-05-tasks-clock.js` | Favorites are **per person**, and the record's id IS the person's id — that is what lets `firestore.rules` say "you may write the document named after you" with no lookup. Never fold this into a `fav` field on the task template: one shared record would make one person's star everybody's. The rules here are deliberately **looser** than the app (they say nothing about roles, the app hides the star from undergraduates) — don't "tighten" them to match, see `docs/DECISIONS.md`, 2026-09-28. |
 | `CATEGORIES` in `app-05-tasks-clock.js` | 7 values, not 9, since 2026-09-22: Paint folded into Miscellaneous, Aeration into Cultivation. `FL_CAT_TASKCAT` (`app-02`) maps the Field Log's own 6 categories onto these 1:1 — Maintenance is the one left out, on purpose, because that work gets its own log on the Equipment page. A template saved before this change can still be sitting in Firestore under the old name; `tplFixLegacy()` folds it to the new one everywhere a template enters `TEMPLATES` (initial load **and** `tplsyncOnSnapshot` in `app-02`) — miss either spot and Paint or Aeration silently comes back as its own heading on the Task List or Assign screen, which is exactly what happened the first time this shipped. See "The fifth trap" under The shared database and `docs/DECISIONS.md`. |
+| `appAdminAll()` in `app-01-shell.js` and `appAdmin()` in `firestore.rules` | **The App Manager has no restrictions**, since 2026-09-29 — see the section below. These two are the same question asked twice, of the same `app_admin` claim on the sign-in token. Change one and you must change the other, or the app offers a button the database refuses and the tap undoes itself a second later. **Every permission function in the app opens `if(appAdminAll(...))return true;` and every one in the rules opens `appAdmin() ||`.** `tools/test-app-admin.js` walks both files and fails if a function named like a permission does not, so a new one cannot quietly miss it. Pass the **actor** in where a function takes one (`appAdminAll(actor)`) — the hat only ever lifts for the person wearing it, never for somebody they are asking about. |
+| `flEntryPlots()` in `app-02-fieldlog-sync.js` | **What ground a Field Log entry covered.** Since 2026-09-29 an entry is one JOB, not one plot: a mow across six plots is one record carrying `plots`, a list. `plot` is still written beside it, set to the first of them, and it is **not** what anything reads — it is there for an entry written before that day, and for a phone still running the old app during a rollout. Read `a.plot` anywhere and you silently under-report: a search for plot 14 misses the six-plot mow that covered it, and a plot's count is wrong. Use `flEntryPlots()`, or `flPlotsLabel()` (three names, then a count — a feed row on a phone) / `flPlotsFull()` (every name — the detail page and the export). One statement writes both fields, the same discipline `ais`/`ai` uses on a product; write them anywhere else and they drift. The `.csv` export has a **Plots** column and a **Plot count** column. Old entries are **not** migrated, on purpose. See `docs/DECISIONS.md`, 2026-09-29. |
 | `flMixItems()` in `app-04-spray-inventory.js` | Decides whether a chemical amount is `mixCompute()`'s `total` (the whole tank, boom-charge buffer included) or its `onTarget` (just the ground, nothing else) — `sprayIsBoom()` decides which. Reading `mixCompute(t).items[i].need`/`.short` directly anywhere gets the **tank** figure always, which overstates what a backpack or granular job actually needs. Both `flSave()` (`app-02`, the manual Field Log entry) and `completeTask()` (`app-04`, finishing an assigned task) go through this and then `mixInvDecrement()` — one call per product, never blocking a save or a completion if a product doesn't match inventory. |
 | `invAiList()` and `ais` in `app-04-spray-inventory.js` | What is actually in a product. Since 2026-09-28 a product carries `ais`, a list of `{n, g}` — each active ingredient **and its own** FRAC/HRAC/IRAC group — because the farm's products are full of mixtures and the group is the half that matters: rotating chemistry means rotating groups, and a three-way fungicide hits three of them. Three things here are load-bearing. **`ai` and `moa` are still written**, in the same save, from the same rows — they are the plain-text version every screen outside the inventory page reads — the Field Log's entry, detail row and export column (`app-02`), the home screen's low-stock widget (`app-01`), and the mix calculator's product line (here). They are only safe *because* one place writes all three together; write them anywhere else and they drift. **Nothing is migrated** — an old product keeps its single line and is read through `invAiList()`. "Fixing" old products inside `invsyncOnItems` is the fifth trap below and it costs the farm its whole day of database allowance. And **`invAiSplit()` throws a split away whole if any piece has no letter in it** — Drive 75's ingredient is `3, 7-dichloro-8-quinolinecarboxylicacid`, one chemical whose *name* contains a comma, and without that test the farm gains an ingredient called "3". See `docs/DECISIONS.md`, 2026-09-28. |
 | `eqTakesHoc()` and `hocLog` in `app-04-spray-inventory.js` | What a mower is set to cut at. Since 2026-09-28 every mower whose type does **not** say *rotary* carries `hoc` (inches) and `hocLog` (the last `EQ_HOC_MAX` changes, `{at, h, by}`), both on the machine's own record. **The rotaries are left out on purpose and it is not a gap to fill.** A rotary deck is wound up and down per job — the same Z915E cuts a border at 3″ and a plot at 1.5″ the same afternoon — so one number on the machine would be a lie; those heights live **per plot** in `MGMT_DATA[plot].c`, set on the plot's Mowing screen. Give the rotaries a machine height too and the farm has two answers for the same ground with no way to tell which is current. Three more things: don't uncap `hocLog` (it rides inside a record all twenty-three phones re-read), don't let a plain save write a history line (`eqHocSet()` returns false when nothing moved, or every notes edit adds "the height stayed the same"), and don't let a blank box fall back to a guess — blank means nobody wrote one down, which is not 0″. **Who can set it:** Edit machine is Farm Manager, Technician and Faculty (`canEditMachine()`), so the crew cannot. Letting them is a **rules change**, not an app edit. See `docs/DECISIONS.md`, 2026-09-28. |
@@ -280,13 +282,13 @@ get wrong.
 
 ## Working inside the app
 
-The app is about 28,100 lines spread over the page and five files beside it.
+The app is about 28,300 lines spread over the page and five files beside it.
 **Work out which file first** — that is most of finding your way around:
 
 | File | Roughly | What is in it |
 |---|---|---|
 | `app-01-shell.js` | 2,500 | Per-person preferences, the phone/roomy shell, the notification feed (`ntfScan()` and the Notifications screen), home-screen widgets, theme and color-blind mode |
-| `app-02-fieldlog-sync.js` | 4,200 | The Field Log **screen** — including its manual "Add entry" form, which since 2026-09-22 picks a category and a real task name (`FL_CAT_TASKCAT`) and, for a Spray/Fertilize entry, embeds app-04's mix calculator (`flMixTask()`/`flMixItems()`) rather than a hand-typed amount; the shared-database drawers, including the roster one; ids and timestamps |
+| `app-02-fieldlog-sync.js` | 4,300 | The Field Log **screen** — one entry per JOB since 2026-09-29, naming every plot it covered (`flEntryPlots()`, in the table above), with category tiles that filter on several categories at once (`flState.types`, a list; empty means all). Its manual "Add entry" form picks a category and a real task name (`FL_CAT_TASKCAT`) and, for a Spray/Fertilize entry, embeds app-04's mix calculator (`flMixTask()`/`flMixItems()`) rather than a hand-typed amount. Also the shared-database drawers, including the roster one; ids and timestamps |
 | `app-03-people.js` | 1,900 | The Roster **screen**, labs, session, sign-in, profile, semesters, and who may change what. It no longer owns who is on the farm — the database does, and `RSTSYNC` in `app-02` is what carries it. |
 | `app-04-spray-inventory.js` | 4,400 | The spray mix calculator (`mixCompute()`, `MIX_UNITS`) — used by both a task's own work screen and, since 2026-09-22, the Field Log's manual entry — undergrad task-work mode, inventory, equipment. `completeTask()` here now also takes stock off the shelf for a finished chemical job (`mixInvDecrement()`). Since 2026-09-28 it also owns what is *in* a product (`invAiList()`, one row per active ingredient) and what a mower is *set to cut at* (`eqTakesHoc()`, `eqHocSet()`) — both in the table below. |
 | `app-05-tasks-clock.js` | 3,200 | Task templates and list, assign wizard, calendar, time clock (including `tcAutoClose()`, which closes a shift nobody clocked out of, and the sheet that asks the student when the app will not guess), weather, rainfall. `CATEGORIES` is 7 items, not 9 — see the table below before adding an eighth. |
@@ -351,6 +353,12 @@ log, inventory, map, — since 2026-08-31 — **the roster**, — since
 2026-09-18 — **alley paint** (what has been mown on the alleys; see
 `docs/DECISIONS.md`), and — since 2026-09-28 — **favorites** (the jobs each
 person stars, one record per person, named after that person).
+
+**A field log entry is one JOB and carries a list of plots** (since 2026-09-29).
+That list travels as plain strings, which the database is happy with — it is a
+list *inside* a list that gets thrown out, see the fourth trap. Nothing was
+migrated: an entry written before that day still has a single `plot`, and
+`flEntryPlots()` is what reads either shape.
 
 **The map's records do not travel in the shape the app holds them in, and that
 is load-bearing.** A plot's information goes as `[{k,v}, …]` rather than as
@@ -508,6 +516,49 @@ A drawer whose records pile up forever — one per finished job, say — should
 listen only to the ones still in use, the way alley paint listens only to
 `open` records. Otherwise every phone reads the farm's whole history every
 time the app opens.
+
+---
+
+## The App Manager has no restrictions
+
+Dillon asked for this in those words on 2026-09-29, and it is now a rule of the
+app rather than a list of exceptions. **Whoever holds the App Manager post
+answers yes to every permission**: writing a study for a lab that is not
+theirs, correcting somebody else's record, fixing anybody's punch, changing a
+setting that is normally Bill's. They also get **Bill's view of the Task
+Board**, his Assign screen and his Time Clock, and no page is ever covered by
+the "Coming Soon" card for them.
+
+**It is the token, never the roster.** `rstIsAdmin()` reads the `app_admin`
+claim off the sign-in token, stamped by `tools/create-accounts.js` on a laptop.
+`appAdmin()` in `firestore.rules` reads *the same claim*. That is what keeps
+the app and the database from disagreeing — and a disagreement here is the
+third trap above, which cost the farm a month.
+
+**Three things it deliberately does not do, and none of them is a gap to
+fill:**
+
+- **It does not change which home screen he lands on.** The post is a hat worn
+  on top of a farm job. Dillon holds it *and* is a technician in the Sorochan
+  lab, and sending him to Bill's home screen is exactly what left him unable to
+  reach his own work the first time this was tried — see `docs/DECISIONS.md`,
+  2026-08-25.
+- **It does not open a hard delete anywhere.** The stock ledger and the service
+  history are append only, and removal elsewhere is a tombstone. That is the
+  *shape* of a record, not a permission: a genuinely deleted document comes
+  straight back off the next phone that reconnects still holding its own copy.
+  Dillon's call, 2026-09-29.
+- **It does not touch `favorites`, or any `id == <document name>` check.** A
+  favorites record is *named after* the person whose stars it holds; that says
+  which record a phone owns, not who is allowed what. Same for a record filed
+  under the wrong name, and for a study filed under no lab at all.
+
+**Adding a permission function? Its first line is
+`if(appAdminAll(...))return true;`**, and the matching rule opens `appAdmin()
+||`. `tools/test-app-admin.js` fails if you forget, which is the only reason
+this will still be true in 2030. If a function genuinely should not lift, add
+it to that file's `EXEMPT` list **with the reason written down** — that list is
+short and every line of it is a deliberate decision somebody can argue with.
 
 ---
 

@@ -96,6 +96,26 @@ somebody permissions they should not have.
 | Undergrads | Do the work they are given — tick plots and trials off, fill in the spray mix, record which equipment they took — and mark it done |
 | Anybody on a job (helpers too) | The same: save their progress on it and finish it. Nothing else about the job |
 | Anybody who is not on the roster, or is switched off | Nothing at all |
+| **You, holding the App Manager post** | **Everything.** Every permission in the file, on every screen — see below |
+
+### You have no restrictions
+
+Since 2026-09-29 the App Manager answers yes to every permission in this file.
+Any lab's study, anybody's record, anybody's punch, any setting. It is not a
+role on the roster — it rides on your sign-in as a stamp nobody can edit,
+including you, so the database can check it for itself without looking anything
+up. The app asks the same question the same way, which is what stops the two
+from ever disagreeing.
+
+Three things it does **not** open, and none of them is about you:
+
+- **Nothing is ever hard-deleted.** The stock movements and the service history
+  only ever get added to — a mistake is corrected by another entry, never by
+  rubbing out the first. Everything else that gets "removed" is marked removed
+  rather than really deleted, because a phone that was switched off still holds
+  its own copy and would push a deleted record straight back.
+- **A record cannot be filed under the wrong name.**
+- **A study cannot be filed under no lab at all.**
 
 ### Undergrads attached to a lab
 

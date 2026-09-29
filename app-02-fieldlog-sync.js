@@ -85,7 +85,7 @@ function flCommit(){flStampIds();try{if(FIELDLOG.length>FL_CAP){FIELDLOG.sort((a
    and share one rule: whoever wrote the entry down, whoever the work was
    credited to, whoever holds the undergrad job, or faculty over their own
    lab's person. */
-function flCan(actor,action,entry){
+function flCan(actor,action,entry){ if(appAdminAll(actor))return true;   /* the App Manager has no restrictions -- app-01 */
   var me=pidOf(actor)||SESSION.pid;
   if(!me||!personActive(me)) return false;
   var role=personRole(me); if(!role) return false;
@@ -1100,6 +1100,7 @@ function invsyncSummary(){
    direct them. Nobody else touches it. */
 function schedCanEdit(pid){
   if(!pid||!SESSION.pid) return false;
+  if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
   /* Signed in AND still on the roster, which is the first thing every rule in
      firestore.rules checks. Somebody switched off keeps their screens until
      they reload; the database stops taking their writes immediately. */
@@ -1119,11 +1120,12 @@ function schedCanEdit(pid){
    only ever offered those controls to him. */
 function tcCanPunchFor(pid){
   if(!pid||!SESSION.pid) return false;
+  if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
   if(typeof personActive==='function'&&!personActive(SESSION.pid)) return false;
   if(SESSION.pid===pid) return true;
   return (typeof assignsUndergrads==='function')&&assignsUndergrads(SESSION.pid);
 }
-function tcCanEditPunches(){
+function tcCanEditPunches(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
   return !!SESSION.pid&&(typeof assignsUndergrads==='function')&&assignsUndergrads(SESSION.pid);
 }
 
@@ -1159,7 +1161,7 @@ function clockCutLabel(){
 /* Who may change it: the same people the database lets correct a punch, which
    is the same test tcCanEditPunches() makes. One rule, three places -- here,
    firestore.rules and tools/rules-model.js -- and they must never drift. */
-function clockCutCanEdit(){ return (typeof tcCanEditPunches==='function')&&tcCanEditPunches(); }
+function clockCutCanEdit(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */ return (typeof tcCanEditPunches==='function')&&tcCanEditPunches(); }
 function clockcfgScan(){
   var s; try{ s=JSON.stringify(CLOCKCFG); }catch(e){ return; }
   if(_storeSeen['clockcfg']===s) return;
@@ -1472,6 +1474,11 @@ function favsyncUploadNew(){
    away -- which would put a refusal on the Shared database screen every tick
    for something nobody did wrong. Mirrors the favorites block in
    firestore.rules: your own record, and no other. */
+/* No App Manager override here, deliberately. A favorites record is NAMED
+   after the person whose stars it holds, and firestore.rules says the same
+   thing (favId == me()). That is not a restriction on anybody -- it is which
+   record this phone owns -- and overriding it would send up a write the
+   database refuses. The star itself is favCanUse(), which IS overridden. */
 function favCanPush(r){
   if(!r||!SESSION.pid) return false;
   if(String(r.id)!==String(SESSION.pid)) return false;
@@ -1681,7 +1688,7 @@ function tcsyncSummary(){
    call, 2026-08-30. They are the ones on the mowers and are usually first to
    notice. Reporting only raises a flag; it does NOT take the machine out of
    service, which is the separate and narrower eqCanTakeDown() below. */
-function eqCanReportProblem(){
+function eqCanReportProblem(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
   if(!SESSION.pid) return false;
   /* Signed in AND still on the roster -- the first thing every rule in
      firestore.rules checks. Somebody switched off keeps their screens until
@@ -1691,14 +1698,14 @@ function eqCanReportProblem(){
 /* Taking a machine DOWN takes it out of everyone's day, so it stays with Bill
    and the technicians -- the people who answer for whether it runs. A grad who
    finds a machine unsafe reports it, and that flag is visible to everybody. */
-function eqCanTakeDown(){ return eqRoleIs(['Farm Manager','Technician']); }
+function eqCanTakeDown(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */ return eqRoleIs(['Farm Manager','Technician']); }
 /* Deciding what a machine IS -- its name, model, hours, whether it is retired
    -- rather than recording what happened to it. Faculty are in because a lab's
    own equipment is theirs to describe. */
-function eqCanEditMachine(){ return eqRoleIs(['Farm Manager','Technician','Faculty']); }
+function eqCanEditMachine(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */ return eqRoleIs(['Farm Manager','Technician','Faculty']); }
 /* Service history and the service intervals: the maintenance record, which is
    the technicians' job and Bill's. */
-function eqCanMaintain(){ return eqRoleIs(['Farm Manager','Technician']); }
+function eqCanMaintain(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */ return eqRoleIs(['Farm Manager','Technician']); }
 
 function eqRoleIs(roles){
   if(!SESSION.pid) return false;
@@ -1979,7 +1986,7 @@ function calAddTypesFor(pid){
   if(role==='Undergraduate Student') return ['timeoff'];
   return [];
 }
-function calCanAddType(type){ return calAddTypesFor(SESSION.pid).indexOf(type)>=0; }
+function calCanAddType(type){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */ return calAddTypesFor(SESSION.pid).indexOf(type)>=0; }
 
 /* Taking an entry OFF the calendar. Bill may remove anything, because a wrong
    entry on the farm's month is his to fix. Everybody else may remove their own
@@ -1987,6 +1994,7 @@ function calCanAddType(type){ return calAddTypesFor(SESSION.pid).indexOf(type)>=
    mistypes their own day off can undo it without going to find him. */
 function calCanRemoveEvent(ev){
   if(!ev||!SESSION.pid) return false;
+  if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
   if(typeof personActive==='function'&&!personActive(SESSION.pid)) return false;
   if(typeof personRole==='function'&&personRole(SESSION.pid)==='Farm Manager') return true;
   return ev.type==='crew' && !!ev.person && String(ev.person)===String(SESSION.pid);
@@ -2036,6 +2044,7 @@ function evJson(ev){ var d=evDoc(ev); return d?sdbJson(d):null; }
    add their own time off and nothing else. */
 function evCanPush(ev){
   if(!ev) return false;
+  if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
   if(ev.removed) return (typeof calCanRemoveEvent==='function')&&calCanRemoveEvent(ev);
   if(ev.type==='crew'&&ev.person&&String(ev.person)===String(SESSION.pid)) return true;
   return (typeof calCanAddType==='function')&&calCanAddType(ev.type);
@@ -2552,7 +2561,7 @@ function tplsyncOnSnapshot(snap){
 }
 /* Never offer a write that is going to be refused: an undergrad's phone holds
    the list too, and pushing it back up would log a refusal nobody caused. */
-function tplCanPush(){ return tplCanEdit(); }
+function tplCanPush(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */ return tplCanEdit(); }
 function tplsyncUploadNew(){
   var db=fbDb(); if(!db||!tplCanPush()) return 0;
   var n=0;
@@ -3857,7 +3866,7 @@ document.getElementById('fx-html').addEventListener('click',function(){ flDoExpo
    page, never this one. A task template also carries its own logField flag
    (app-05) for a finer override than category alone. */
 const FL_CAT_TASKCAT={spray:'Spray',fert:'Fertilize',cult:'Cultivation',mow:'Mow',irrig:'Irrigation',misc:'Miscellaneous'};
-function flCanChem(){return currentRole==='tech'||currentRole==='grad'||currentRole==='manager';}
+function flCanChem(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */return currentRole==='tech'||currentRole==='grad'||currentRole==='manager';}
 /* TEMPLATES/tplLive() live in app-05, loaded after this file -- safe to call
    here because this only runs when someone opens the screen, long after
    every file has finished loading (never at load time). See

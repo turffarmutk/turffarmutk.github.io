@@ -219,8 +219,16 @@ const DRAWERS = [
      to send it and the check would pass for the wrong reason. */
   { name: 'favorites',          coll: 'favorites',  push: 'favPush',   local: () => win.FAVS,
     sample: { id: P, tpls: ['tpl1', 'tpl9'], updatedAt: '2026-09-28T08:00:00', updatedBy: P } },
+  /* The sample carries a REAL restriction, not an empty list: a restriction is
+     a record inside a list, which Firestore is happy with (a list inside a list
+     is what it refuses), and since 2026-09-30 it can carry `whole` -- so the
+     shape that actually travels is the shape proven to settle. */
   { name: 'studies',            coll: 'trials',     push: 'trsyncPush', local: () => L().TRIALS,
-    sample: { id: 'zz1', title: 'Test study', lab: 'Sorochan', removed: false, restrictions: [] } },
+    sample: { id: 'zz1', title: 'Test study', lab: 'Sorochan', removed: false,
+              start: '2026-03-01', end: '2026-08-01',
+              stage: 'active', furthestStage: 'active',
+              restrictions: [{ id: 'zzr1', gid: 'zzg1', type: 'mow', scope: 'B14', whole: true,
+                               start: '2026-03-01', end: '2026-08-01', note: '', by: 'p01' }] } },
   { name: 'the task list',      coll: 'tasks',      push: 'tsyncScan', local: () => L().TASKS,
     sample: { id: 'zz1', title: 'Test task', createdBy: P, status: 'open' } },
   /* One record per task rather than a list, so `local` lists the tasks held. */

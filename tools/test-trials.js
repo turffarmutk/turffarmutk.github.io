@@ -582,5 +582,329 @@ section('15. placing the pin — close enough to see, and draggable after');
   ok('the dot is styled by a scoped name, not a bare one', HTML.indexOf('.trp-pin{') > 0);
 }
 
+/* ---------------------------------------------------------------- */
+section('16. THE ONE THAT MATTERS — the stage does not decide, the dates do');
+{
+  /* Dillon, 2026-09-30: a study still at the Planned stage kept its
+     restrictions off the farm map after their start date had passed, so closed
+     ground looked open. The restriction's own dates are the only test now, at
+     every stage and for everybody. Getting this wrong costs a season's trial,
+     so it is checked by running the real code rather than by reading it. */
+  w.eval("SESSION.pid='p01';");
+  w.eval("TRIALS.length=0; TR_GONE.length=0;");
+  const mk = (id, stage, lab, start, end) =>
+    "TRIALS.push({id:'" + id + "',title:'" + id + " study',lab:'" + lab + "',stage:'" + stage + "'," +
+    "coverage:'whole',multiPlot:false,start:'2020-01-01',end:'" + end + "'," +
+    "locations:[{plot:'AZ06',sqft:100}]," +
+    "restrictions:[{id:'r_" + id + "',type:'mow',scope:'AZ06',start:'" + start + "',end:'" + end + "',by:'p01',note:''}]});";
+
+  w.eval(mk('sPlan', 'planned', 'Sorochan', '2020-01-01', '2099-01-01'));
+  const held = () => w.eval("JSON.stringify(jobRes('AZ06','Mow','Rotary').full.map(function(x){return x.t.id;}))");
+  ok('a PLANNED study whose restriction has started stops the mower',
+     JSON.parse(held()).indexOf('sPlan') >= 0, held());
+
+  /* and the same study before its restriction starts does not */
+  w.eval("trById('sPlan').restrictions[0].start='2099-01-01';");
+  ok('the same study, restriction not started yet, stops nothing', JSON.parse(held()).length === 0, held());
+  w.eval("trById('sPlan').restrictions[0].start='2020-01-01';");
+
+  /* a completed study inside a re-entry interval still holds the ground */
+  w.eval("trById('sPlan').stage='completed';");
+  ok('a COMPLETED study with time left on its restriction still holds it',
+     JSON.parse(held()).indexOf('sPlan') >= 0, held());
+
+  /* an expired restriction lets go, whatever the stage says */
+  w.eval("trById('sPlan').stage='active'; trById('sPlan').restrictions[0].end='2020-06-01';");
+  ok('a restriction whose end date has gone by lets go', JSON.parse(held()).length === 0, held());
+
+  /* and Lift still ends one early */
+  w.eval("trById('sPlan').restrictions[0].end='2099-01-01'; trById('sPlan').restrictions[0].lifted='2026-01-01';");
+  ok('a lifted restriction stops nothing', JSON.parse(held()).length === 0, held());
+  w.eval("delete trById('sPlan').restrictions[0].lifted;");
+
+  /* THE CREW HALF: an undergraduate cannot SEE another lab's draft study, and
+     must still be stopped by the ground it closes. */
+  const ug = w.eval("JSON.parse(JSON.stringify((PEOPLE.filter(function(x){return x.role==='Undergraduate Student'&&x.active!==false;})[0]||{}).id))");
+  w.eval("trById('sPlan').stage='planned'; SESSION.pid='" + ug + "';");
+  ok('the draft study itself stays hidden from an undergraduate', !w.eval("trVisible(trById('sPlan'))"));
+  ok('but its closed ground still stops their mower',
+     JSON.parse(held()).indexOf('sPlan') >= 0, held());
+  ok('and the popup gives them the lab without the study name',
+     w.eval("trResStudyName(trById('sPlan'))").indexOf('lab study') > 0
+     && w.eval("trResStudyName(trById('sPlan'))").indexOf('sPlan study') < 0,
+     w.eval("trResStudyName(trById('sPlan'))"));
+  w.eval("SESSION.pid='p01';");
+  ok('somebody who may see the study gets its real name',
+     w.eval("trResStudyName(trById('sPlan'))").indexOf('sPlan study') === 0,
+     w.eval("trResStudyName(trById('sPlan'))"));
+
+  /* Nobody puts a stage test back into the two places that ask. */
+  ok('the map shading asks no stage question', !/stage!=='active'[\s\S]{0,80}trLiveRes/.test(SRC));
+  ok('and neither does the block on a job',
+     !/function jobRes\(plot[\s\S]{0,400}stage!=='active'/.test(SRC));
+}
+
+/* ---------------------------------------------------------------- */
+section('17. one restriction, several plots, in one pass of the form');
+{
+  /* Dillon, 2026-09-30: the same rest usually goes on a whole study, and the
+     form took one plot at a time. It takes a list now and writes one record
+     per plot -- separate records on purpose, because r.scope is read as ONE
+     plot name by the map, the job block and the Lift button. */
+  w.eval("TRIALS.length=0; TR_GONE.length=0; SESSION.pid='p01';");
+  w.eval("TRIALS.push({id:'sMulti',title:'Six plot study',lab:'Sorochan',stage:'active'," +
+         "coverage:'whole',multiPlot:true,start:'2026-01-01',end:'2026-12-01'," +
+         "locations:[{plot:'AZ06'},{plot:'AZ07'},{plot:'AZ08'}],restrictions:[]});");
+  w.eval("trResNew('sMulti');");
+  ok('the form opens on the first plot only, as it always did',
+     JSON.stringify(w.eval('JSON.parse(JSON.stringify(trResDraft.scopes))')) === '["AZ06"]',
+     w.eval('JSON.stringify(trResDraft.scopes)'));
+
+  /* save all three */
+  w.eval("trResDraft.scopes=['AZ06','AZ07','AZ08']; trResDraft.start='2026-02-01'; trResDraft.end='2026-11-01';");
+  w.eval("(function(){var b=document.getElementById('trr-body');if(b)b.innerHTML='';})();");
+  w.eval("trRenderRes(); trResDraft.scopes=['AZ06','AZ07','AZ08']; trSaveRes();");
+  const recs = w.eval("JSON.parse(JSON.stringify(trById('sMulti').restrictions))");
+  ok('three plots ticked writes three records', recs.length === 3, String(recs.length));
+  ok('each names one plot, never a list',
+     recs.every(r => typeof r.scope === 'string') &&
+     recs.map(r => r.scope).sort().join(',') === 'AZ06,AZ07,AZ08',
+     JSON.stringify(recs.map(r => r.scope)));
+  ok('each gets its own id, so one can be lifted alone',
+     new Set(recs.map(r => r.id)).size === 3);
+  /* THE ONE THAT MATTERS: no gid. trSyncFormRes() rebuilds t.restrictions from
+     the protocol form's rows plus every record WITHOUT a gid, so a gid this
+     form invented would be deleted the next time the protocol was saved. */
+  ok('and no gid, or saving the protocol would delete them',
+     recs.every(r => !r.gid), JSON.stringify(recs.map(r => r.gid)));
+  /* the protocol form really does leave them alone */
+  w.eval("(function(){var t=trById('sMulti');t.hasRes=false;t.resDraft=[];trSyncFormRes(t);})();");
+  ok('saving the protocol leaves all three standing',
+     w.eval("trById('sMulti').restrictions.length") === 3,
+     String(w.eval("trById('sMulti').restrictions.length")));
+  ok('a study with no plots refuses rather than writing a nameless record',
+     !/scopes\.length[\s\S]{0,40}push\(/.test(SRC) && /if\(!scopes\.length\)/.test(SRC));
+}
+
+/* ---------------------------------------------------------------- */
+section('18. a restriction that runs for the whole trial');
+{
+  /* Dillon, 2026-09-30: the quick option when entering a trial. It is not a
+     default filled in once -- the dates are worked out from the study on every
+     save, so moving the trial's end date moves the restriction with it. */
+  const run = (t) => w.eval('(function(){var t=' + J(t) + ';trSyncFormRes(t);return t.restrictions;})()');
+
+  const base = { start: '2026-03-01', end: '2026-08-01',
+                 locations: [{ plot: 'B14' }, { plot: 'B15' }], hasRes: true,
+                 resDraft: [{ gid: 'g1', type: 'mow', whole: true, start: '2020-01-01', end: '2020-02-01', note: '' }] };
+  const out = run(base);
+  ok('it takes the study\u2019s start date, not the row\u2019s',
+     out.every(r => r.start === '2026-03-01'), J(out.map(r => r.start)));
+  ok('and the study\u2019s end date', out.every(r => r.end === '2026-08-01'), J(out.map(r => r.end)));
+  ok('on every plot the study uses', out.length === 2);
+  ok('and it is marked so it can be read back', out.every(r => r.whole === true));
+
+  /* THE ONE THAT MATTERS: move the trial, and the restriction moves with it. */
+  const moved = run(Object.assign({}, base, { end: '2026-10-15' }));
+  ok('moving the trial\u2019s end date moves the restriction', moved.every(r => r.end === '2026-10-15'),
+     J(moved.map(r => r.end)));
+
+  /* A trial with no end date gives a restriction with no end date, which the
+     app words as "until it is lifted" and trResState() keeps live. */
+  const openEnded = run(Object.assign({}, base, { end: '' }));
+  ok('a trial with no end date leaves the restriction open', openEnded.every(r => r.end === ''));
+  ok('and that still reads as live', w.eval("trResState({start:'2026-03-01',end:''})") === 'active');
+
+  /* Unticking it goes back to the row's own dates and carries no marker, so a
+     record that never used this is byte-for-byte what it always was -- a
+     record that differs from what the server last said gets sent again. */
+  const own = run(Object.assign({}, base, {
+    resDraft: [{ gid: 'g1', type: 'mow', whole: false, start: '2026-04-01', end: '2026-05-01', note: '' }] }));
+  ok('a row with its own dates keeps them', own.every(r => r.start === '2026-04-01' && r.end === '2026-05-01'));
+  ok('and carries no whole-trial marker at all', own.every(r => !('whole' in r)), J(own[0]));
+
+  /* It round-trips: the form rebuilds its rows from the records. */
+  const back = w.eval('trResDraftFrom(' + J({ restrictions: [
+    { id: 'r1', gid: 'gA', type: 'mow', scope: 'B14', whole: true, start: '2026-03-01', end: '2026-08-01' }] }) + ')');
+  ok('reopening the form knows it runs for the whole trial', back[0].whole === true);
+  const backOld = w.eval('trResDraftFrom(' + J({ restrictions: [
+    { id: 'r1', gid: 'gB', type: 'mow', scope: 'B14', start: '2026-03-01', end: '2026-08-01' }] }) + ')');
+  ok('and a restriction saved before today does not pretend it does', backOld[0].whole === false);
+
+  /* Switching a whole-trial row back to its own dates must not leave a record
+     reusing the SAME id with a stale marker -- the id is what a lift is filed
+     against, so the record is reused, not rebuilt. */
+  const keep = { start: '2026-03-01', end: '2026-08-01', locations: [{ plot: 'B14' }], hasRes: true,
+                 resDraft: [{ gid: 'g1', type: 'mow', whole: false, start: '2026-04-01', end: '2026-05-01' }],
+                 restrictions: [{ id: 'rKeep', gid: 'g1', type: 'mow', scope: 'B14', whole: true,
+                                  start: '2026-03-01', end: '2026-08-01' }] };
+  const kept = run(keep);
+  ok('unticking it on a saved restriction keeps the id', kept.length === 1 && kept[0].id === 'rKeep');
+  ok('and clears the marker rather than leaving it stale', !('whole' in kept[0]), J(kept[0]));
+}
+
+/* ---------------------------------------------------------------- */
+section('19. THE ONE THAT MATTERS \u2014 a study moves itself along, and lets go');
+{
+  /* Dillon, 2026-09-30: a study starts on its start date, finishes on its end
+     date, and finishing hands the ground back. Tapping still works and still
+     wins. Everything here runs the real code. */
+  w.eval("SESSION.pid='p01'; TRIALS.length=0; TR_GONE.length=0;");
+  const today = w.eval('trTodayISO()');
+  const day = (n) => { const d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() + n);
+                       return d.toISOString().slice(0, 10); };
+  const put = (o) => w.eval('TRIALS.push(' + J(Object.assign({
+    lab: 'Sorochan', coverage: 'whole', multiPlot: false,
+    locations: [{ plot: 'AZ06' }], restrictions: [] }, o)) + ')');
+  const stage = (id) => w.eval("trById('" + id + "').stage");
+
+  /* --- planned -> active on the start date, and not a day early --- */
+  put({ id: 'aDue',   title: 'Starts today',    stage: 'planned', start: today,    end: day(90) });
+  put({ id: 'aSoon',  title: 'Starts tomorrow', stage: 'planned', start: day(1),   end: day(90) });
+  put({ id: 'aLate',  title: 'Started a while back', stage: 'planned', start: day(-30), end: day(60) });
+  w.eval('trAutoStage()');
+  ok('a study whose start date is TODAY goes active', stage('aDue') === 'active', stage('aDue'));
+  ok('one starting tomorrow is left alone', stage('aSoon') === 'planned', stage('aSoon'));
+  ok('one that started weeks ago goes active too', stage('aLate') === 'active', stage('aLate'));
+
+  /* --- active -> completed the day AFTER the end date, the same comparison
+         trResState() makes, so a study and its restrictions cannot disagree --- */
+  w.eval("TRIALS.length=0;");
+  put({ id: 'cOver',  title: 'Ended yesterday', stage: 'active', start: day(-90), end: day(-1) });
+  put({ id: 'cToday', title: 'Ends today',      stage: 'active', start: day(-90), end: today });
+  put({ id: 'cOpen',  title: 'No end date',     stage: 'active', start: day(-90), end: '' });
+  w.eval('trAutoStage()');
+  ok('a study whose end date has gone by finishes', stage('cOver') === 'completed', stage('cOver'));
+  ok('one ending TODAY is still running today', stage('cToday') === 'active', stage('cToday'));
+  ok('THE ONE THAT MATTERS \u2014 a study with no end date never finishes on its own',
+     stage('cOpen') === 'active', stage('cOpen'));
+
+  /* --- finishing lifts the ground --- */
+  w.eval("TRIALS.length=0;");
+  put({ id: 'lift', title: 'Ended, still holding', stage: 'active', start: day(-90), end: day(-1),
+        restrictions: [
+          { id: 'rA', type: 'mow', scope: 'AZ06', start: day(-90), end: '' },
+          { id: 'rB', type: 'irrigate', scope: 'AZ06', start: day(-90), end: day(30) },
+          { id: 'rC', type: 'mow', scope: 'AZ06', start: day(-90), end: day(30),
+            lifted: day(-40), liftedBy: 'Bill Taylor', liftedByPid: 'p07' }] });
+  w.eval('trAutoStage()');
+  const res = () => w.eval("JSON.parse(JSON.stringify(trById('lift').restrictions))");
+  ok('finishing lifts the restrictions still standing', res().filter(r => r.lifted).length === 3);
+  ok('including an open-ended one', res().filter(r => r.id === 'rA')[0].lifted === today);
+  ok('and one with time left to run', res().filter(r => r.id === 'rB')[0].lifted === today);
+  ok('a lift somebody already made is left exactly as it was',
+     res().filter(r => r.id === 'rC')[0].lifted === day(-40)
+     && res().filter(r => r.id === 'rC')[0].liftedBy === 'Bill Taylor');
+  ok('none of them stops a mower any more', w.eval("jobRes('AZ06','Mow','Rotary').full.length") === 0);
+  ok('the lift names no person, because no person decided it',
+     res().filter(r => r.id === 'rA')[0].liftedByPid === '');
+  /* The lift has to be able to travel, or it is only true on this phone. */
+  ok('and it is a real lift the drawer can send',
+     w.eval("JSON.stringify(trLiftDoc(trById('lift'),trById('lift').restrictions[0]))").indexOf('"lifted"') > 0);
+
+  /* --- THE ONE THAT MATTERS: it moves a study forward ONCE --- */
+  w.eval("TRIALS.length=0;");
+  put({ id: 'back', title: 'Put back by hand', stage: 'active', start: day(-90), end: day(-1) });
+  w.eval('trAutoStage()');
+  ok('it finishes the first time', stage('back') === 'completed');
+  w.eval("trSetStage(trById('back'),'active');");          /* a person puts it back */
+  w.eval('trAutoStage()');
+  ok('a person putting it back to Active MAKES IT STAY there', stage('back') === 'active', stage('back'));
+  w.eval('trAutoStage(); trAutoStage();');
+  ok('and it stays there however many times this runs', stage('back') === 'active');
+
+  /* the same going the other way: back to Planned is not re-started */
+  w.eval("TRIALS.length=0;");
+  put({ id: 'back2', title: 'Back to planned', stage: 'planned', start: day(-5), end: day(90) });
+  w.eval('trAutoStage()');
+  ok('it starts the first time', stage('back2') === 'active');
+  w.eval("trSetStage(trById('back2'),'planned'); trAutoStage();");
+  ok('put back to Planned, it stays planned', stage('back2') === 'planned', stage('back2'));
+
+  /* --- THE OTHER ONE THAT MATTERS: only a phone the DATABASE would let write
+         the study touches it. Otherwise every phone applies a change it can
+         never push, and disagrees with the server for good. --- */
+  w.eval("TRIALS.length=0;");
+  put({ id: 'mine',   title: 'My lab',    lab: 'Sorochan', stage: 'planned', start: day(-5), end: day(90) });
+  put({ id: 'theirs', title: 'Other lab', lab: 'Brosnan',  stage: 'planned', start: day(-5), end: day(90) });
+  const ug = w.eval("JSON.parse(JSON.stringify((PEOPLE.filter(function(x){return x.role==='Undergraduate Student'&&x.active!==false;})[0]||{}).id))");
+  w.eval("SESSION.pid='" + ug + "'; trAutoStage();");
+  ok('an undergraduate\u2019s phone moves nothing at all',
+     stage('mine') === 'planned' && stage('theirs') === 'planned');
+  w.eval("SESSION.pid='p07'; trAutoStage();");            /* Bill edits no lab */
+  ok('and neither does Bill\u2019s, because he may not write a study',
+     stage('mine') === 'planned' && stage('theirs') === 'planned');
+  w.eval("SESSION.pid='p01'; trAutoStage();");            /* Sorochan technician */
+  ok('the lab\u2019s own phone moves its own study', stage('mine') === 'active');
+  ok('and leaves another lab\u2019s alone, as the database would',
+     stage('theirs') === 'planned', stage('theirs'));
+  ok('what it may move is the same test the drawer uses to push',
+     w.eval("trsyncCanPushTrial(trById('mine'))") && !w.eval("trsyncCanPushTrial(trById('theirs'))"));
+
+  /* --- a completed study is left alone, and a person can still finish one by
+         hand at any time --- */
+  w.eval("TRIALS.length=0;");
+  put({ id: 'hand', title: 'Finished by hand', stage: 'active', start: day(-10), end: day(90),
+        restrictions: [{ id: 'rH', type: 'mow', scope: 'AZ06', start: day(-10), end: day(90) }] });
+  const liftedByHand = w.eval("trSetStage(trById('hand'),'completed')");
+  ok('a person can finish a study long before its end date', stage('hand') === 'completed');
+  ok('and that lifts its restrictions too', liftedByHand === 1
+     && w.eval("trById('hand').restrictions[0].lifted") === today);
+  w.eval('trAutoStage()');
+  ok('a finished study is not touched again', stage('hand') === 'completed');
+
+  /* Nothing here may be wired into a snapshot handler: applying a change as a
+     record ARRIVES is what spent 4.4 million reads in an afternoon. */
+  ok('the automatic move is never called from a drawer\u2019s snapshot handler',
+     !/syncOn[A-Za-z]*\([^)]*\)\s*\{[\s\S]{0,2000}trAutoStage\(/.test(SRC));
+  ok('and it saves through trSave() like any other edit',
+     /if\(moved\)\s*trSave\(\);/.test(SRC));
+}
+
+/* ---------------------------------------------------------------- */
+section('20. the protocol form\u2019s order, and the restriction tile');
+{
+  /* Dillon, 2026-09-30: Location moved up to sit directly under Study, and the
+     restriction control became a tile rather than a tick box. Both are what he
+     asked for, so both are pinned -- an order is exactly the sort of thing a
+     later tidy-up puts back "somewhere more logical". */
+  w.eval("SESSION.pid='p01'; TRIALS.length=0; TR_GONE.length=0; trNew(); trRenderEdit();");
+  const secs = w.eval("JSON.parse(JSON.stringify([].slice.call(" +
+    "document.querySelectorAll('#tre-body .tr-sec')).map(function(e){return e.textContent;})))");
+  ok('Location sits directly under Study',
+     secs[0] === 'Study' && secs[1] === 'Location', J(secs));
+  ok('and the rest follows in order',
+     secs[2] === 'Size of the trial' && secs[3] === 'Restrictions', J(secs));
+  /* The Location section's pin hint used to send you "above" for the trial
+     size. That section is now BELOW it, so the hint has to point the other way.
+     (The Total trial area line inside the size section still says "above", and
+     is still right -- the fields it means really are above it.) */
+  ok('the location hint no longer sends you up for the trial size',
+     !/treatments, reps and plot size above/.test(SRC));
+  ok('it sends you down to the section by name instead',
+     /Size of the trial\\u201d below|Size of the trial\u201d below/.test(SRC));
+
+  const tile = () => w.eval("document.getElementById('tre-hasres').className");
+  ok('the restriction control is a tile, not a tick box',
+     /tr-tile/.test(tile()) && !/tr-opt/.test(tile()), tile());
+  ok('it is scoped, so the rule cannot land on somebody else\u2019s element',
+     HTML.indexOf('.tr-tile{') > 0 && !/^\s*\.tile\{/m.test(HTML));
+  ok('it starts off', !/\bon\b/.test(tile()), tile());
+  ok('and says in WORDS which way it is set, not only in colour',
+     /Add a restriction/.test(w.eval("document.getElementById('tre-hasres').textContent")));
+
+  /* It still does exactly what the tick box did. */
+  w.eval("document.getElementById('tre-hasres').click();");
+  ok('tapping it adds the first restriction',
+     w.eval('trDraft.hasRes') === true && w.eval('trDraft.resDraft.length') === 1);
+  ok('and the tile lights up', /\bon\b/.test(tile()), tile());
+  ok('and says how many there are',
+     /1 restriction/.test(w.eval("document.getElementById('tre-hasres').textContent")));
+  w.eval("document.getElementById('tre-hasres').click();");
+  ok('tapping it again turns it back off', w.eval('trDraft.hasRes') === false);
+  ok('and the rows come off the form',
+     !w.eval("!!document.querySelector('#tre-body [data-rd-type=\"0\"]')"));
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

@@ -85,7 +85,7 @@ show up." Never edit `sw.js` by hand; this command writes it.
 npm test
 ```
 
-42 sets of automated checks, about 2,800 in total, in a minute or so. They
+44 sets of automated checks, about 3,300 in total, in a minute or so. They
 run several at a time (`tools/run-tests.js`); `npm run test:serial` runs them
 one after another instead, which is slower but easier to read when two of them
 disagree.
@@ -240,7 +240,10 @@ This app contains an unusual number of things that look like mistakes and are
 deliberate: the CAFS alleyway split, the alleys being one painted shape that
 finishes at 80% rather than ten zones that finish at 100%, the SF4/SF9 plot
 swap, the missing task priority field, saving by scanning instead of on every
-change, sharing having no off switch. Every one of them is a trap for someone tidying up.
+change, sharing having no off switch, one restriction across six plots being
+six records rather than one, and restrictions paying no attention at all to
+what stage their study is at. Every one of them is a trap for someone tidying
+up.
 
 That file is the only place the reasoning survives. When you make a choice a
 future person could mistake for a bug, add the entry **in the same change**,
@@ -276,23 +279,27 @@ get wrong.
 | The task fields the bell reads | `assignee`, `assignedBy`, `requestedBy`, `completedBy`, `partial`, `leftPlots`, `restAssigned` — plus `kind`, `origin`, `target` and `students`, which are what tell a labor request from an ordinary job and which way it was going. The notification feed (`ntfScan()`, `app-01-shell.js`) works out who to tell by watching these change. Rename one in the task code and the alerts stop — no error, no empty screen, just a bell that never lights up again. `tools/test-notifications.js` section 10 checks the app still writes them. **The feed is derived, not stored:** it is worked out on each phone from the task list, so there is no drawer, no rule and no row in `test-sync-settles.js` to add. Don't turn it into one without reading `docs/DECISIONS.md`, 2026-09-24. |
 | `TR_RES_PALETTE` in `UT-TurfFarm-App.html` | The seven colors the app hands to a restriction type somebody adds on the Restriction types screen. **Every one is also a key in `CB_MAP` mapping to itself.** That is what makes it survive color-blind mode — a color that is not in `CB_MAP` gets the generic shift, so it comes out something nobody chose, with no error and nothing to see. Add a color here, add it there, in the same change. The person adding a restriction type never picks a color, on purpose. |
 | `jobResCfg()` in `UT-TurfFarm-App.html` | Decides which restrictions stop a given job. It is the **union** of `JOB_RES` (the eight built-in types, written into the code) and whatever a restriction type on the farm's own list says it `stops`. Union, never replacement: a list that is empty, malformed or has not reached this phone yet can then only fail by leaving the original eight blocking what they always did. Derive it purely from `TR_RTYPES` and a bad list silently **unblocks** a job on ground a study has closed — the crew mow a trial and nothing anywhere says why. See `docs/DECISIONS.md`, 2026-09-25. |
+| `trLiveRes()` in `UT-TurfFarm-App.html` | **What closes ground, and what does not.** A restriction is in force when its start date has passed, its end date has not, and nobody has lifted it. That is the *whole* test. It deliberately does **not** ask what stage the study is at, and does **not** ask `trVisible()`. Both used to be asked and both were wrong: a study still marked Planned kept its restrictions off the map after their start date (Dillon reported it, 2026-09-30), and `trVisible()` hides another lab's draft study from the crew — right for the study, wrong for the ground, because an undergraduate on a mower has to know the plot is closed whoever owns it. What is held back instead is the study's **name** (`trResStudyName()`). Put either test back into `trMapPins()` or `jobRes()` and closed ground silently looks open. `tools/test-trials.js` section 16 fails if you do. |
+| `trSetStage()` in `UT-TurfFarm-App.html` | **The only door to a study's stage**, and the thing that hands its ground back. Finishing a study lifts every restriction still standing on it, so a second place that writes `t.stage` is a second place that forgets to lift. It also records `furthestStage` — how far a study has ever got — which is what stops `trAutoStage()` shoving a study forward again after somebody deliberately put it back. A study with no `furthestStage` is read as standing at its current stage, so nothing needs migrating. See `docs/DECISIONS.md`, 2026-09-30. |
+| `trAutoStage()` in `UT-TurfFarm-App.html` | Moves a study to Active on its start date and to Completed the day **after** its end date — the same comparisons `trResState()` makes, so a study and its own restrictions can never disagree about what day it is. Three things are load-bearing: **only a phone `trCanEditLab()` allows runs it** (the same test the database makes, so a phone never applies a change it cannot push — the shape `tcAutoClose()` uses); **a study with no end date never finishes on its own**; and it must **never be called from a drawer's snapshot handler**, because it writes, and writing as a record arrives is the 2026-08-31 disaster. It runs before the Trials screen and the map draw, plus a slow timer. |
+| `scope` on a restriction, and `whole` on one | A restriction's `scope` is **one plot name**, always a string. Several plots means several records — that is how the map badges, `jobRes()`, the home widget and Bill's per-plot **Lift** all keep working, and both forms write them that way (`trSaveRes()` for the ticked plots, `trSyncFormRes()` for a protocol-form row). Turning `scope` into a list breaks six screens quietly. `whole:true` on a record means *runs for the whole trial*: its dates are taken from the study **on every save**, never copied in once, so moving the trial's end date moves the restriction with it. Neither field needed a rules change — both ride inside records the lab already writes. |
 | `roster-emails.local.json` | The crew's email addresses. Deliberately kept out of the public repo. Never commit it. |
 
 ---
 
 ## Working inside the app
 
-The app is about 28,300 lines spread over the page and five files beside it.
+The app is about 28,700 lines spread over the page and five files beside it.
 **Work out which file first** — that is most of finding your way around:
 
 | File | Roughly | What is in it |
 |---|---|---|
-| `app-01-shell.js` | 2,500 | Per-person preferences, the phone/roomy shell, the notification feed (`ntfScan()` and the Notifications screen), home-screen widgets, theme and color-blind mode |
-| `app-02-fieldlog-sync.js` | 4,300 | The Field Log **screen** — one entry per JOB since 2026-09-29, naming every plot it covered (`flEntryPlots()`, in the table above), with category tiles that filter on several categories at once (`flState.types`, a list; empty means all). Its manual "Add entry" form picks a category and a real task name (`FL_CAT_TASKCAT`) and, for a Spray/Fertilize entry, embeds app-04's mix calculator (`flMixTask()`/`flMixItems()`) rather than a hand-typed amount. Also the shared-database drawers, including the roster one; ids and timestamps |
+| `app-01-shell.js` | 2,600 | Per-person preferences, the phone/roomy shell, the notification feed (`ntfScan()` and the Notifications screen), home-screen widgets, theme and color-blind mode |
+| `app-02-fieldlog-sync.js` | 4,400 | The Field Log **screen** — one entry per JOB since 2026-09-29, naming every plot it covered (`flEntryPlots()`, in the table above), with category tiles that filter on several categories at once (`flState.types`, a list; empty means all). Its manual "Add entry" form picks a category and a real task name (`FL_CAT_TASKCAT`) and, for a Spray/Fertilize entry, embeds app-04's mix calculator (`flMixTask()`/`flMixItems()`) rather than a hand-typed amount. Also the shared-database drawers, including the roster one; ids and timestamps |
 | `app-03-people.js` | 1,900 | The Roster **screen**, labs, session, sign-in, profile, semesters, and who may change what. It no longer owns who is on the farm — the database does, and `RSTSYNC` in `app-02` is what carries it. |
 | `app-04-spray-inventory.js` | 4,400 | The spray mix calculator (`mixCompute()`, `MIX_UNITS`) — used by both a task's own work screen and, since 2026-09-22, the Field Log's manual entry — undergrad task-work mode, inventory, equipment. `completeTask()` here now also takes stock off the shelf for a finished chemical job (`mixInvDecrement()`). Since 2026-09-28 it also owns what is *in* a product (`invAiList()`, one row per active ingredient) and what a mower is *set to cut at* (`eqTakesHoc()`, `eqHocSet()`) — both in the table below. |
 | `app-05-tasks-clock.js` | 3,200 | Task templates and list, assign wizard, calendar, time clock (including `tcAutoClose()`, which closes a shift nobody clocked out of, and the sheet that asks the student when the app will not guess), weather, rainfall. `CATEGORIES` is 7 items, not 9 — see the table below before adding an eighth. |
-| `UT-TurfFarm-App.html` | 11,900 | Every screen's markup, all the CSS, and three remaining blocks of code: the map, trials, sign-in and boot |
+| `UT-TurfFarm-App.html` | 12,300 | Every screen's markup, all the CSS, and three remaining blocks of code: the map, **trials** (which grew a lot on 2026-09-30 — stages that advance themselves, restrictions on several plots at once; four rows in the table above), sign-in and boot |
 
 Within a file, navigate by the `/* ===== SECTION ===== */` headings and by
 function name — **not** by line number, which changes the moment either of you
@@ -398,11 +405,16 @@ record already travels and the rules already say who may write it, so a new
 field needs no new collection, no rule and nothing published by hand — the app
 push alone ships it. Both of 2026-09-28's additions went this way: a product's
 ingredient list rides in `invitems`, a mower's height of cut and its history
-ride in `equipment`. Two things still apply. **Firestore refuses a list inside
+ride in `equipment`. So did all three of 2026-09-30's: a restriction's `whole`
+flag and a study's `stage` and `furthestStage` all ride inside the study record
+the lab already writes. Two things still apply. **Firestore refuses a list inside
 a list** but is happy with a list of small records, which is what both of those
 are — see the fourth trap. And **the drawer's row in
 `tools/test-sync-settles.js` should carry the new shape in its sample**, or the
-settling of that shape is proven by nothing.
+settling of that shape is proven by nothing. The studies row is the worked
+example: its sample used to be `restrictions: []`, which proved nothing about
+the shape that actually travels, and now carries a real restriction with its
+dates and its `whole` flag.
 
 **THE TWO TRAPS THAT SPENT 4.4 MILLION READS IN AN AFTERNOON.** Both look like
 nothing. Both are in `docs/DECISIONS.md` under 2026-08-31.

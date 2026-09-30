@@ -409,6 +409,21 @@
   .tr-opt.sq.on .bx:after{border-radius:2px}
   .tr-opt .ol{font:800 13px 'Public Sans';color:var(--ink)}
   .tr-opt .os{font:600 11px 'Public Sans';color:var(--muted);margin-top:2px;line-height:1.4}
+  /* The restriction tile on the protocol form. A card you tap rather than a
+     checkbox, because what it turns on is the one thing on this form the crew
+     ever see. Scoped with the tr- prefix like everything else here -- a bare
+     .tile would land on any element anywhere in the app carrying that word.
+     Every color is a variable or one the page already uses, so color-blind
+     mode rewrites it along with the rest and nothing needs adding to CB_MAP. */
+  .tr-tile{display:flex;align-items:center;gap:12px;background:var(--card);border:2px solid var(--line);
+           border-radius:14px;padding:14px 15px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.07);
+           transition:border-color .15s,background .15s}
+  .tr-tile.on{border-color:var(--acc);background:#fff6ec;box-shadow:0 6px 16px rgba(255,130,0,.2)}
+  .tr-tile .mk{width:38px;height:38px;border-radius:12px;flex:none;display:flex;align-items:center;
+               justify-content:center;background:#eef1f4;color:var(--muted);font:900 19px 'Archivo'}
+  .tr-tile.on .mk{background:var(--acc);color:#fff}
+  .tr-tile .tl{font:800 14px 'Archivo';color:var(--ink);line-height:1.2}
+  .tr-tile .ts{font:600 11px 'Public Sans';color:var(--muted);margin-top:3px;line-height:1.4}
   .tr-pinbtn{margin-top:2px;background:#2f3133;color:#fff;border-radius:11px;padding:12px;text-align:center;font:800 12.5px 'Public Sans';cursor:pointer}
   /* The trial pin on the placing map. A Leaflet marker rather than a circle,
      because only a marker can be dragged, and Dillon asked for a pin he can
@@ -4090,6 +4105,10 @@ function mapChrome(m){
 
 function mapEnter(){
   var el=document.getElementById('appmap');
+  /* Before the shapes are drawn: a study that finished overnight has to have
+     let go of its ground BEFORE the map paints it, or the crew read a hold
+     that is over. */
+  try{ trAutoStage(); }catch(e){}
   try{ peSyncChrome(); }catch(e){}
   mfWire();
   if(_appmap){ setTimeout(function(){_appmap.invalidateSize();updateView();try{trMapPins();}catch(e){}},60); return; }
@@ -4652,6 +4671,34 @@ function trResState(r){
   if(r.start && r.start>t) return 'scheduled';
   return 'active';
 }
+/* WHAT MAKES A RESTRICTION COUNT -- and what deliberately does not.
+   --------------------------------------------------------------------
+   Only the restriction's own dates, and whether somebody lifted it. That is
+   the whole test, and trResState() above is all of it.
+
+   TWO THINGS USED TO BE ASKED AS WELL, and both were wrong. Dillon reported
+   the first on 2026-09-30: a study still sitting at the Planned stage kept its
+   restrictions off the farm map even after their start date had gone by, so
+   ground that was closed looked open to every phone. A stage is paperwork --
+   a trial goes in days before anybody remembers to tap Active, and a trial
+   tapped Completed can still be inside a re-entry interval with a fortnight
+   left on its restriction. Neither has anything to do with what is standing on
+   the ground, so neither decides any more.
+
+   The second was trVisible(), which hides another lab's draft study from the
+   crew. That is right for the STUDY and wrong for the GROUND: an undergraduate
+   on a mower has to know the plot is closed whoever owns it and whatever stage
+   the paperwork is at. So the shading, the badges and the block on a job apply
+   to everybody now, and what gets held back instead is the study's NAME --
+   trResPopHtml() and jobResPopHtml() show the lab without the title to anybody
+   trVisible() would have kept it from.
+
+   The safe direction matters here, because the two mistakes do not cost the
+   same. A restriction shown when it did not need to be costs somebody a
+   question. A restriction hidden while it is in force costs a season's trial.
+
+   Don't add a stage test back to either caller. Ending a restriction early is
+   what the Lift button on the study page is for. */
 function trLiveRes(t){ return (t.restrictions||[]).filter(function(r){ return trResState(r)==='active'; }); }
 /* ---- a restriction with no end date -------------------------------------
    Dillon's call, 2026-09-25: an open-ended restriction is worded "until it is
@@ -4942,7 +4989,13 @@ function trWire(){
   if(add&&!add._wired){ add._wired=1; add.addEventListener('click',function(){
     if(!trCanCreate()){ toast('View only for your role'); return; } trNew(); }); }
 }
-function trialsEnter(){ var a=document.getElementById('tr-addbtn'); if(a)a.style.display=trCanCreate()?'':'none'; trWire(); trRender(); }
+function trialsEnter(){
+  /* Before drawing, not after: the stage on every card and the "N active"
+     count are exactly what a study that should have started is wrong about. */
+  try{ trAutoStage(); }catch(e){}
+  var a=document.getElementById('tr-addbtn'); if(a)a.style.display=trCanCreate()?'':'none';
+  trWire(); trRender();
+}
 
 /* ============================ DETAIL ============================ */
 var trCur=null;
@@ -5238,7 +5291,8 @@ function trRenderDetail(){
         +'<div class="rs" style="color:'+(trResExtent(t,r)==='pin'?'#b26a00':'#8a8f98')+'">'+esc(trResExtentText(t,r))+'</div>'
         +'<div class="rs">'+trResRangeText(r)+(r.by?(' · set by '+esc(nameOf(r.by)||r.by)):'')+'</div>'
         +(r.note?'<div class="rs" style="color:#8a8f98">'+esc(r.note)+'</div>':'')
-        +(r.lifted?'<div class="rs" style="color:#8a8f98">Lifted '+trFmt(r.lifted)+(r.liftedBy?(' by '+esc(r.liftedBy)):'')+'</div>':'')
+        +(r.lifted?'<div class="rs" style="color:#8a8f98">Lifted '+trFmt(r.lifted)
+            +(r.liftedBy?((r.liftedByPid?' by ':' · ')+esc(r.liftedBy)):'')+'</div>':'')
         +'</div>'
         +'<div style="text-align:right;flex:none"><span class="pill" style="background:'+badge[1]+';color:'+badge[2]+'">'+badge[0]+'</span>'
         +((st==='active'||st==='scheduled')&&trCanLift(r)?'<div class="tr-lift" data-lift="'+esc(r.id)+'">Lift</div>':'')
@@ -5250,10 +5304,14 @@ function trRenderDetail(){
   body.innerHTML=h;
 
   if(ab){
+    /* Two buttons for whoever can change the study, not three. Dillon's call,
+       2026-09-30: the Map button was the third thing squeezed onto the bar and
+       it duplicated what tapping a plot row above already does. Somebody who
+       can only look at the study still gets it, because a plot row is the only
+       other way there and a bar with nothing in it looks broken. */
     ab.innerHTML = can
       ? '<div class="action tap" id="trd-edit" style="flex:1">Edit protocol</div>'
         +'<div class="action tap" id="trd-addres" style="flex:1;background:#2f3133">＋ Restriction</div>'
-        +'<div class="action tap" id="trd-map" style="flex:none;background:#2f3133;padding-left:15px;padding-right:15px">Map</div>'
       : '<div class="action tap" id="trd-map" style="flex:1;background:#2f3133">View on map</div>';
   }
 
@@ -5261,8 +5319,23 @@ function trRenderDetail(){
     var st=e.target.closest('[data-stage]');
     if(st){ var tt=trById(trCur); if(!tt)return;
       if(!trCanEdit(tt)){ toast('Only the '+esc(tt.lab)+' lab can change the stage'); return; }
-      tt.stage=st.getAttribute('data-stage'); trSave(); trRenderDetail();
-      toast('Stage → '+TR_STAGE[tt.stage].label); return; }
+      var to=st.getAttribute('data-stage');
+      /* Finishing a study by hand does exactly what finishing it on its end
+         date does -- the ground goes back to the farm. Asked first, because
+         it cannot be undone from here: a restriction that should be back on is
+         a new restriction, which is also what firestore.rules says (no
+         un-lifting). */
+      var standing=(to==='completed')
+        ? (tt.restrictions||[]).filter(function(r){ return !r.lifted; }).length : 0;
+      if(standing && !confirm('Finish "'+tt.title+'"?\n\nThis lifts '+standing+' restriction'
+          +(standing===1?'':'s')+' and hands the ground back to the farm.')) return;
+      var n=trSetStage(tt,to);
+      trSave(); trRenderDetail();
+      toast('Stage → '+TR_STAGE[tt.stage].label
+        +(n?(' · '+n+' restriction'+(n===1?'':'s')+' lifted'):''));
+      if(n) trNotifyBill('Study finished · '+esc(tt.title),
+        tt.lab+' lab · '+n+' restriction'+(n===1?'':'s')+' lifted · '+trMe());
+      return; }
     var lf=e.target.closest('[data-lift]');
     if(lf){ trLift(lf.getAttribute('data-lift')); return; }
     var gp=e.target.closest('[data-goplot]');
@@ -5286,6 +5359,122 @@ function trLift(rid){
   toast('Restriction lifted ✓');
   trNotifyBill('Restriction lifted · '+r.scope,trRType(r.type).label+' · '+esc(t.title)+' · '+trMe());
 }
+/* ---- a study that moves itself along -------------------------------------
+   Dillon's call, 2026-09-30: a study should start on its start date and finish
+   on its end date without anybody having to remember to tap it, and finishing
+   should hand the ground back. Tapping a stage by hand still works and still
+   wins.
+
+   FOUR THINGS MAKE THIS SAFE. None of them is optional.
+
+   1. ONLY A PHONE THAT MAY WRITE THE STUDY DOES IT. trCanEditLab() is the same
+      test firestore.rules makes, so a phone never offers a write the database
+      is going to refuse -- every other phone just receives the change. That is
+      the shape tcAutoClose() uses, for exactly the same reason.
+
+   2. IT MOVES A STUDY FORWARD ONCE, EVER. `furthestStage` is how far a study
+      has ever got. Somebody who puts a finished study back to Active keeps it
+      there: the app does not shove it forward again on the next tick and turn
+      their tap into an argument. A study that has never carried the field is
+      read as standing at its current stage, so nothing needs migrating and no
+      study gets written to merely to add it.
+
+   3. A STUDY WITH NO END DATE NEVER FINISHES ON ITS OWN. There is nothing to
+      go on, and a guess would take ground off the map while the trial is still
+      standing on it. It waits for a person.
+
+   4. THE DATES MEAN WHAT THEY MEAN EVERYWHERE ELSE. A study becomes active ON
+      its start date and finishes the day AFTER its end date -- the same
+      comparison trResState() makes, so a restriction and the study it belongs
+      to can never disagree about what day it is.
+
+   Finishing a study LIFTS ITS RESTRICTIONS. The ground goes back to the farm
+   the day the trial is over, which is what the end date was for. */
+function trFurthestStage(t){
+  var f=(t&&t.furthestStage)||'';
+  if(TR_STAGE_ORDER.indexOf(f)<0) f=(t&&t.stage)||'planned';
+  return f;
+}
+/* The stage this study should be at today, or '' for "leave it alone". */
+function trStageDue(t,today){
+  if(!t) return '';
+  today=today||trTodayISO();
+  var past=TR_STAGE_ORDER.indexOf(trFurthestStage(t));
+  if(t.stage==='planned' && t.start && t.start<=today && past<TR_STAGE_ORDER.indexOf('active'))
+    return 'active';
+  if(t.stage==='active' && t.end && t.end<today && past<TR_STAGE_ORDER.indexOf('completed'))
+    return 'completed';
+  return '';
+}
+/* Take every restriction still standing off this study. Used by a study
+   finishing, whether the app did it or somebody tapped Completed.
+
+   liftedByPid is left EMPTY on purpose: no person decided this, the calendar
+   did, and filing it under whoever's phone happened to be open would read as
+   though they had. The study page words a lift with no person behind it
+   differently -- see trRenderDetail(). */
+function trLiftAllOn(t){
+  var n=0, today=trTodayISO();
+  (t&&t.restrictions||[]).forEach(function(r){
+    if(!r||r.lifted) return;
+    r.lifted=today; r.liftedBy='the study finishing'; r.liftedByPid='';
+    n++;
+  });
+  return n;
+}
+/* Move a study to a stage. EVERYTHING that changes a stage goes through here --
+   a tap on the study page and the calendar below -- so the two can never come
+   to disagree about what a stage change involves.
+
+   It works out how far the study has ever got BEFORE it moves it, which is the
+   bit that stops the app arguing with a person: put a finished study back to
+   Active and `furthestStage` still says completed, so the calendar leaves it
+   alone from then on.
+
+   Returns how many restrictions the move lifted. */
+function trSetStage(t,to){
+  if(!t||TR_STAGE_ORDER.indexOf(to)<0) return 0;
+  var was=trFurthestStage(t);
+  t.stage=to;
+  t.furthestStage=(TR_STAGE_ORDER.indexOf(to)>TR_STAGE_ORDER.indexOf(was))?to:was;
+  return (to==='completed')?trLiftAllOn(t):0;
+}
+function trAutoStage(){
+  if(typeof TRIALS==='undefined'||!Array.isArray(TRIALS)) return 0;
+  if(typeof trCanEditLab!=='function') return 0;
+  var today=trTodayISO(), moved=0;
+  TRIALS.forEach(function(t){
+    if(!t||!t.id||!t.lab) return;
+    if(!trCanEditLab(t.lab)) return;      /* the same test the database makes */
+    /* A study entered long after the fact can be due more than one step, so
+       this walks rather than jumps. The guard is belt and braces: there are
+       three stages, so it can never run more than twice. */
+    var guard=0, to;
+    while((to=trStageDue(t,today)) && guard++<3){
+      var n=trSetStage(t,to); moved++;
+      if(to==='completed')
+        trNotifyBill('Study finished \u00b7 '+esc(t.title),
+          t.lab+' lab \u00b7 its end date has passed'
+          +(n?(' \u00b7 '+n+' restriction'+(n===1?'':'s')+' lifted'):' \u00b7 no restrictions to lift'));
+    }
+  });
+  if(moved) trSave();
+  return moved;
+}
+/* The Trials screen and the map both run this before they draw, which covers
+   somebody opening either one. These two cover the rest: a phone that is
+   already open when a study's date comes round, and the home screen, which
+   shows restrictions without going near either screen.
+
+   The first pass waits, because a phone that has just opened has not heard
+   from the database yet and its studies are whatever it had last time. Thirty
+   minutes after that is plenty for something that changes once at midnight --
+   a phone in a pocket should not be doing this constantly, and being a little
+   late costs nothing, because the dates written are the study's own, never
+   "now". */
+setTimeout(function(){ try{ trAutoStage(); }catch(e){} },20000);
+setInterval(function(){ try{ trAutoStage(); }catch(e){} },1800000);
+
 function trDelete(){
   var t=trById(trCur); if(!t) return;
   /* The button is only drawn for the lab, but the check lives here as well --
@@ -5345,7 +5534,8 @@ function trResDraftFrom(t){
   var byGid={}, order=[];
   (t.restrictions||[]).forEach(function(r){
     if(!r||!r.gid||byGid[r.gid]) return;
-    byGid[r.gid]={gid:r.gid,type:r.type,start:r.start||'',end:r.end||'',noEnd:!r.end,note:r.note||''};
+    byGid[r.gid]={gid:r.gid,type:r.type,whole:r.whole===true,
+                  start:r.start||'',end:r.end||'',noEnd:!r.end,note:r.note||''};
     order.push(r.gid);
   });
   return order.map(function(g){ return byGid[g]; });
@@ -5368,8 +5558,21 @@ function trSyncFormRes(t){
     plots.forEach(function(pl){
       var r=had[d.gid+'|'+pl]||{id:newId('r'),gid:d.gid,scope:pl,by:trMe()};
       r.type=d.type;
-      r.start=d.start||trTodayISO();
-      r.end=d.noEnd?'':(d.end||'');
+      if(d.whole){
+        /* "For the whole trial" is worked out here, on every save, rather than
+           copied into the row once. The study's dates can only be changed on
+           this same form, so the two go up in one write and cannot drift. */
+        r.whole=true;
+        r.start=t.start||trTodayISO();
+        r.end=t.end||'';
+      } else {
+        /* Taken off the record rather than written as false, so a restriction
+           that never used it is byte-for-byte what it always was -- a record
+           that differs from what the server last said gets sent again. */
+        delete r.whole;
+        r.start=d.start||trTodayISO();
+        r.end=d.noEnd?'':(d.end||'');
+      }
       r.note=d.note||'';
       out.push(r);
     });
@@ -5429,85 +5632,6 @@ function trRenderEdit(){
     +'<div class="os">The study runs on until somebody sets an end date or marks it completed.</div>'
     +'</div></div>';
   h+='</div>';
-  h+='</div>';
-
-  /* ---- size of the trial ----
-     Treatments across, reps down, and the size of one plot. The total is
-     worked out from those three rather than typed, because a typed total
-     cannot be drawn on a map — see trGridFt(). */
-  h+='<div class="tr-sec">Size of the trial</div><div class="list">';
-  h+=trNumList('tre-nums');
-  h+='<div class="tr-fgrp"><div class="tr-lbl">Number of treatments</div>'
-    +'<input class="tr-in" id="tre-ntrt" list="tre-nums" type="number" min="1" max="'+TR_MAX_N+'" step="1" '
-    +'inputmode="numeric" placeholder="Pick or type a number" value="'+esc(d.nTrt||'')+'">'
-    +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:6px">One column of the trial per treatment.</div></div>';
-  h+='<div class="tr-fgrp"><div class="tr-lbl">Number of reps</div>'
-    +'<input class="tr-in" id="tre-nrep" list="tre-nums" type="number" min="1" max="'+TR_MAX_N+'" step="1" '
-    +'inputmode="numeric" placeholder="Pick or type a number" value="'+esc(d.nRep||'')+'">'
-    +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:6px">One row of the trial per rep.</div></div>';
-  h+='<div class="tr-fgrp"><div class="tr-lbl">Size of one plot</div>'
-    +'<div style="display:flex;align-items:center;gap:9px">'
-    +'<input type="number" min="0" step="0.5" inputmode="decimal" class="tr-in" id="tre-plotw" placeholder="Width ft" style="flex:1" value="'+esc(d.plotW||'')+'">'
-    +'<span style="font:800 14px \'Public Sans\';color:var(--muted);flex:none">×</span>'
-    +'<input type="number" min="0" step="0.5" inputmode="decimal" class="tr-in" id="tre-plotl" placeholder="Length ft" style="flex:1" value="'+esc(d.plotL||'')+'">'
-    +'</div>'
-    +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:6px">Both in feet. Square footage per plot is worked out below.</div></div>';
-  h+='<div class="tr-fgrp"><div class="tr-lbl">Alleys between plots (ft)</div>'
-    +'<input type="number" min="0" step="0.5" inputmode="decimal" class="tr-in" id="tre-alley" placeholder="Leave blank for none" value="'+esc(d.alley||'')+'">'
-    +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:6px">Walking room between plots. Counted between them, not around the outside.</div></div>';
-  h+='<div class="tr-fgrp" id="tre-total">'+trTotalHtml(d)+'</div>';
-  h+='</div>';
-
-  /* ---- restrictions ----
-     "Treatments / products" used to sit here. It came off on 2026-09-25: the
-     products in a trial are usually a company's to keep quiet about, and the
-     app had no business asking twenty-three phones to carry them. What a
-     restriction closes is the opposite — the crew need it, on the map, today.
-     Studies saved before that date keep whatever was typed, and the study page
-     still shows it; nothing asks for it again. */
-  h+='<div class="tr-sec">Restrictions</div><div class="list">';
-  h+='<div class="tr-fgrp">';
-  h+='<div class="tr-opt sq'+(d.hasRes?' on':'')+'" id="tre-hasres" style="margin-bottom:0"><div class="bx"></div><div style="flex:1">'
-    +'<div class="ol">This trial restricts what can be done on its ground</div>'
-    +'<div class="os">No mow, no spray, and so on. It shows on the farm map and warns the crew off the job.</div>'
-    +'</div></div>';
-  h+='</div>';
-  if(d.hasRes){
-    var rows=d.resDraft||[];
-    if(!rows.length){
-      h+='<div class="tr-fgrp"><div style="font:600 12.5px \'Public Sans\';color:var(--muted)">No restriction added yet.</div></div>';
-    }
-    rows.forEach(function(r,i){
-      h+='<div class="tr-fgrp">';
-      h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
-        +'<div class="tr-lbl" style="margin:0;flex:1">Restriction '+(i+1)+'</div>'
-        +'<span class="tap" data-rd-del="'+i+'" style="color:#c0392b;font:800 15px \'Public Sans\';flex:none;padding:0 4px">✕</span></div>';
-      h+='<select class="tr-in" data-rd-type="'+i+'"'+selStyle+'>'
-        +'<option value=""'+(r.type?'':' selected')+'>Choose a restriction…</option>'
-        +TR_RTYPES.map(function(x){ return '<option value="'+esc(x.k)+'"'+(r.type===x.k?' selected':'')+'>'+esc(x.label)+'</option>'; }).join('')
-        +'</select>';
-      if(r.noEnd){
-        h+='<div style="margin-top:9px"><div class="tr-lbl">Starts</div>'
-          +'<input type="date" class="tr-in" data-rd-start="'+i+'" value="'+esc(r.start)+'"></div>';
-      } else {
-        h+='<div class="tr-2col" style="margin-top:9px">'
-          +'<div><div class="tr-lbl">Starts</div><input type="date" class="tr-in" data-rd-start="'+i+'" value="'+esc(r.start)+'"></div>'
-          +'<div><div class="tr-lbl">Ends</div><input type="date" class="tr-in" data-rd-end="'+i+'" value="'+esc(r.end)+'"></div>'
-          +'</div>';
-      }
-      h+='<div class="tr-opt sq'+(r.noEnd?' on':'')+'" data-rd-noend="'+i+'" style="margin-top:9px;margin-bottom:0"><div class="bx"></div><div style="flex:1">'
-        +'<div class="ol">No end date — until it is lifted</div>'
-        +'<div class="os">It stays on the map until Bill or the lab lifts it from the study page.</div>'
-        +'</div></div>';
-      h+='<div style="margin-top:9px"><div class="tr-lbl">Note for the crew</div>'
-        +'<textarea class="tr-in" data-rd-note="'+i+'" placeholder="e.g. N section only — untreated check block">'+esc(r.note||'')+'</textarea></div>';
-      h+='</div>';
-    });
-    h+='<div class="tr-fgrp"><div class="tr-pinbtn tap" id="tre-addres">＋ Add another restriction</div>'
-      +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:7px">'
-      +'Every restriction here covers all of this study’s ground. To restrict one plot of a multi-plot '
-      +'study on its own, save first and use ＋ Restriction on the study page.</div></div>';
-  }
   h+='</div>';
 
   /* ---- location ----
@@ -5577,11 +5701,123 @@ function trRenderEdit(){
       } else {
         h+='<div style="font:600 10.5px \'Public Sans\';color:#b26a00;margin-top:7px">'
           +(fpv?('The map will draw the trial as '+trFtNum(fpv.w)+' ft × '+trFtNum(fpv.h)+' ft, and you can turn it to line up with the plot. ')
-               :'Fill in the treatments, reps and plot size above and the map can draw the real footprint. ')
+               :'Fill in the treatments, reps and plot size under \u201cSize of the trial\u201d below and the map can draw the real footprint. ')
           +'You can still save and add the pin later.</div>';
       }
     }
     h+='</div>';
+  }
+  h+='</div>';
+
+  /* ---- size of the trial ----
+     Treatments across, reps down, and the size of one plot. The total is
+     worked out from those three rather than typed, because a typed total
+     cannot be drawn on a map — see trGridFt(). */
+  h+='<div class="tr-sec">Size of the trial</div><div class="list">';
+  h+=trNumList('tre-nums');
+  h+='<div class="tr-fgrp"><div class="tr-lbl">Number of treatments</div>'
+    +'<input class="tr-in" id="tre-ntrt" list="tre-nums" type="number" min="1" max="'+TR_MAX_N+'" step="1" '
+    +'inputmode="numeric" placeholder="Pick or type a number" value="'+esc(d.nTrt||'')+'">'
+    +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:6px">One column of the trial per treatment.</div></div>';
+  h+='<div class="tr-fgrp"><div class="tr-lbl">Number of reps</div>'
+    +'<input class="tr-in" id="tre-nrep" list="tre-nums" type="number" min="1" max="'+TR_MAX_N+'" step="1" '
+    +'inputmode="numeric" placeholder="Pick or type a number" value="'+esc(d.nRep||'')+'">'
+    +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:6px">One row of the trial per rep.</div></div>';
+  h+='<div class="tr-fgrp"><div class="tr-lbl">Size of one plot</div>'
+    +'<div style="display:flex;align-items:center;gap:9px">'
+    +'<input type="number" min="0" step="0.5" inputmode="decimal" class="tr-in" id="tre-plotw" placeholder="Width ft" style="flex:1" value="'+esc(d.plotW||'')+'">'
+    +'<span style="font:800 14px \'Public Sans\';color:var(--muted);flex:none">×</span>'
+    +'<input type="number" min="0" step="0.5" inputmode="decimal" class="tr-in" id="tre-plotl" placeholder="Length ft" style="flex:1" value="'+esc(d.plotL||'')+'">'
+    +'</div>'
+    +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:6px">Both in feet. Square footage per plot is worked out below.</div></div>';
+  h+='<div class="tr-fgrp"><div class="tr-lbl">Alleys between plots (ft)</div>'
+    +'<input type="number" min="0" step="0.5" inputmode="decimal" class="tr-in" id="tre-alley" placeholder="Leave blank for none" value="'+esc(d.alley||'')+'">'
+    +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:6px">Walking room between plots. Counted between them, not around the outside.</div></div>';
+  h+='<div class="tr-fgrp" id="tre-total">'+trTotalHtml(d)+'</div>';
+  h+='</div>';
+
+  /* ---- restrictions ----
+     "Treatments / products" used to sit here. It came off on 2026-09-25: the
+     products in a trial are usually a company's to keep quiet about, and the
+     app had no business asking twenty-three phones to carry them. What a
+     restriction closes is the opposite — the crew need it, on the map, today.
+     Studies saved before that date keep whatever was typed, and the study page
+     still shows it; nothing asks for it again. */
+  h+='<div class="tr-sec">Restrictions</div><div class="list">';
+  h+='<div class="tr-fgrp">';
+  /* A tile rather than a tick box, Dillon's call 2026-09-30. It does the same
+     thing it always did -- on adds the first restriction, off takes this
+     form's own restrictions back off -- but it is the one control on this form
+     whose answer the crew actually see out in the field, and a 19px square did
+     not say so. It states which way it is set in words, because a tile that
+     only says it with color is unreadable to anybody the color-blind mode
+     exists for. */
+  var nRes=(d.hasRes&&(d.resDraft||[]).length)||0;
+  h+='<div class="tr-tile tap'+(d.hasRes?' on':'')+'" id="tre-hasres">'
+    +'<div class="mk">'+(d.hasRes?'\u2713':'\uff0b')+'</div>'
+    +'<div style="flex:1;min-width:0">'
+    +'<div class="tl">'+(d.hasRes
+        ? ('This trial closes its ground'+(nRes?(' \u00b7 '+nRes+' restriction'+(nRes===1?'':'s')):''))
+        : 'Add a restriction')+'</div>'
+    +'<div class="ts">'+(d.hasRes
+        ? 'On the farm map and in the crew\u2019s way when they pick up the job. Tap to take them off this form.'
+        : 'No mow, no spray, and so on. It shows on the farm map and warns the crew off the job.')+'</div>'
+    +'</div></div>';
+  h+='</div>';
+  if(d.hasRes){
+    var rows=d.resDraft||[];
+    if(!rows.length){
+      h+='<div class="tr-fgrp"><div style="font:600 12.5px \'Public Sans\';color:var(--muted)">No restriction added yet.</div></div>';
+    }
+    rows.forEach(function(r,i){
+      h+='<div class="tr-fgrp">';
+      h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+        +'<div class="tr-lbl" style="margin:0;flex:1">Restriction '+(i+1)+'</div>'
+        +'<span class="tap" data-rd-del="'+i+'" style="color:#c0392b;font:800 15px \'Public Sans\';flex:none;padding:0 4px">✕</span></div>';
+      h+='<select class="tr-in" data-rd-type="'+i+'"'+selStyle+'>'
+        +'<option value=""'+(r.type?'':' selected')+'>Choose a restriction…</option>'
+        +TR_RTYPES.map(function(x){ return '<option value="'+esc(x.k)+'"'+(r.type===x.k?' selected':'')+'>'+esc(x.label)+'</option>'; }).join('')
+        +'</select>';
+      /* The quick way, and the way almost every restriction here is meant:
+         it runs as long as the trial does, so there is nothing to type and
+         nothing to keep in step by hand. The date boxes only appear when
+         somebody deliberately wants a shorter window. */
+      h+='<div class="tr-opt sq'+(r.whole?' on':'')+'" data-rd-whole="'+i+'" style="margin-top:9px;margin-bottom:0"><div class="bx"></div><div style="flex:1">'
+        +'<div class="ol">Runs for the whole trial</div>'
+        +'<div class="os">Starts and ends with the study, and follows it if you change its dates.</div>'
+        +'</div></div>';
+      if(r.whole){
+        h+='<div style="border:1px solid var(--line);border-radius:11px;padding:11px 12px;margin-top:9px;background:#f6f7f8">'
+          +'<div style="font:800 13px \'Archivo\';color:var(--ink)">'
+          +(d.start?esc(trFmt(d.start)):'no start date yet')
+          +(d.end?(' – '+esc(trFmt(d.end))):' – until it is lifted')+'</div>'
+          +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:4px">'
+          +(d.start?'Taken from the study\u2019s own dates above.'
+                   :'Set the study\u2019s start date above and this follows it.')
+          +(d.end?'':' The study has no end date, so this stays until somebody lifts it.')
+          +'</div></div>';
+      } else if(r.noEnd){
+        h+='<div style="margin-top:9px"><div class="tr-lbl">Starts</div>'
+          +'<input type="date" class="tr-in" data-rd-start="'+i+'" value="'+esc(r.start)+'"></div>';
+      } else {
+        h+='<div class="tr-2col" style="margin-top:9px">'
+          +'<div><div class="tr-lbl">Starts</div><input type="date" class="tr-in" data-rd-start="'+i+'" value="'+esc(r.start)+'"></div>'
+          +'<div><div class="tr-lbl">Ends</div><input type="date" class="tr-in" data-rd-end="'+i+'" value="'+esc(r.end)+'"></div>'
+          +'</div>';
+      }
+      if(!r.whole)
+        h+='<div class="tr-opt sq'+(r.noEnd?' on':'')+'" data-rd-noend="'+i+'" style="margin-top:9px;margin-bottom:0"><div class="bx"></div><div style="flex:1">'
+          +'<div class="ol">No end date — until it is lifted</div>'
+          +'<div class="os">It stays on the map until Bill or the lab lifts it from the study page.</div>'
+          +'</div></div>';
+      h+='<div style="margin-top:9px"><div class="tr-lbl">Note for the crew</div>'
+        +'<textarea class="tr-in" data-rd-note="'+i+'" placeholder="e.g. N section only — untreated check block">'+esc(r.note||'')+'</textarea></div>';
+      h+='</div>';
+    });
+    h+='<div class="tr-fgrp"><div class="tr-pinbtn tap" id="tre-addres">＋ Add another restriction</div>'
+      +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:7px">'
+      +'Every restriction here covers all of this study’s ground. To restrict one plot of a multi-plot '
+      +'study on its own, save first and use ＋ Restriction on the study page.</div></div>';
   }
   h+='</div>';
 
@@ -5669,6 +5905,22 @@ function trRenderEdit(){
       trRenderEdit();
     });
   });
+  body.querySelectorAll('[data-rd-whole]').forEach(function(x){
+    x.addEventListener('click',function(){
+      trStash();
+      var r=trDraft.resDraft[+x.getAttribute('data-rd-whole')]; if(!r) return;
+      r.whole=!r.whole;
+      /* Coming OFF it, the boxes open on the study's own dates rather than
+         empty -- whoever is shortening the window is adjusting that, not
+         starting from nothing. */
+      if(!r.whole){
+        r.start=r.start||trDraft.start||trTodayISO();
+        r.end=trDraft.end||r.end||'';
+        r.noEnd=!r.end;
+      }
+      trRenderEdit();
+    });
+  });
   body.querySelectorAll('[data-cov]').forEach(function(o){
     o.addEventListener('click',function(){
       trStash();
@@ -5711,8 +5963,15 @@ function trRenderEdit(){
     });
   }
 }
+/* A restriction added on the protocol form runs for the WHOLE trial unless
+   somebody says otherwise -- that is what the farm nearly always wants, and it
+   is the one thing you should not have to type twice. `whole` is not just a
+   default filled in once: while it is on, the dates are taken from the study
+   on every save, so moving the trial's end date moves the restriction with it
+   in the same write. Untick it and the dates it was already using stay in the
+   boxes, ready to be adjusted. */
 function trNewResRow(){
-  return {gid:newId('g'),type:'',start:(trDraft&&trDraft.start)||trTodayISO(),
+  return {gid:newId('g'),type:'',whole:true,start:(trDraft&&trDraft.start)||trTodayISO(),
           end:(trDraft&&trDraft.end)||'',noEnd:!(trDraft&&trDraft.end),note:''};
 }
 /* 1 to 50, offered as a dropdown AND typable: an <input list=…> is a text box
@@ -5871,6 +6130,9 @@ function trSaveStudy(){
   if(trDraft.hasRes) (trDraft.resDraft||[]).forEach(function(r,i){
     if(bad) return;
     if(!r.type){ bad='Choose what restriction '+(i+1)+' is'; return; }
+    /* A whole-trial row has no dates of its own to get wrong -- it takes the
+       study's, which were checked a few lines above. */
+    if(r.whole) return;
     if(!r.start){ bad='Restriction '+(i+1)+' needs a start date'; return; }
     if(!r.noEnd&&!r.end){ bad='Restriction '+(i+1)+' needs an end date, or tick "until it is lifted"'; return; }
     if(r.end&&r.end<r.start){ bad='Restriction '+(i+1)+' ends before it starts'; return; }
@@ -6133,7 +6395,12 @@ var trResDraft=null;
 function trResNew(studyId){
   var t=trById(studyId); if(!t) return;
   if(!trCanEdit(t)){ toast('Only '+esc(t.lab)+' lab or Bill can restrict these plots'); return; }
-  trResDraft={studyId:studyId,id:null,type:(TR_RTYPES[0]||{}).k||'mow',scope:(trPlots(t)[0]||''),note:'',
+  /* scopes is a LIST, because one trip through this form can now restrict
+     several plots at once. It opens on the first plot only -- the way it always
+     has -- so nobody who taps straight through places more than they meant to.
+     "All N plots" is one tap away. */
+  trResDraft={studyId:studyId,id:null,type:(TR_RTYPES[0]||{}).k||'mow',
+    scopes:(trPlots(t)[0]?[trPlots(t)[0]]:[]),note:'',
     start:trTodayISO(),end:t.end||'',noEnd:!t.end};
   show('trialres',true);
 }
@@ -6151,16 +6418,35 @@ function trRenderRes(){
     +'</select></div>';
   h+='<div class="tr-fgrp"><div class="tr-lbl">Applies to</div>';
   if(t.multiPlot){
-    h+='<select class="tr-in" id="trr-scope"'+selStyle+'>'
-      +(plots.length?plots.map(function(p){return '<option'+(d.scope===p?' selected':'')+'>'+p+'</option>';}).join('')
-                    :'<option value="">Add plots to the study first</option>')
-      +'</select>'
-      +'<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:6px">This trial covers whole plots, so the restriction covers the whole plot you pick.</div>';
+    /* Tick boxes rather than a dropdown, because the same rest usually goes on
+       the whole study at once and doing that a plot at a time meant filling
+       this form out six times. Each plot ticked still gets its OWN record, so
+       the map, the job blocking and Bill's Lift button all keep working a plot
+       at a time -- and one plot can come off later without the others. */
+    if(!plots.length){
+      h+='<div style="border:1px solid var(--line);border-radius:11px;padding:12px 13px;background:#f6f7f8">'
+        +'<div style="font:800 14px \'Archivo\';color:var(--ink)">No plots on this study yet</div>'
+        +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:4px">Add them under Edit protocol first.</div></div>';
+    } else {
+      var picked=function(p){ return (d.scopes||[]).indexOf(p)>=0; };
+      var allOn=plots.every(picked);
+      h+='<div class="tr-opt sq'+(allOn?' on':'')+'" data-resall="1"><div class="bx"></div><div style="flex:1">'
+        +'<div class="ol">All '+plots.length+' plots</div>'
+        +'<div class="os">Puts this one restriction on every plot the study uses.</div></div></div>';
+      h+=plots.map(function(p,i){
+        var rc=(t.restrictions||[]).filter(function(r){return r.scope===p&&trResState(r)==='active';}).length;
+        return '<div class="tr-opt sq'+(picked(p)?' on':'')+'" data-resplot="'+esc(p)+'"'
+          +(i===plots.length-1?' style="margin-bottom:0"':'')+'><div class="bx"></div>'
+          +'<div style="flex:1"><div class="ol">'+esc(p)+'</div>'
+          +(rc?'<div class="os">'+rc+' restriction'+(rc===1?'':'s')+' already live here</div>':'')
+          +'</div></div>';
+      }).join('');
+      h+='<div style="font:600 10.5px \'Public Sans\';color:var(--muted);margin-top:8px">This trial covers whole plots, so the restriction covers all of every plot ticked.</div>';
+    }
   } else {
     var only=plots[0]||'';
     var pin=trResExtent(t)==='pin';
-    h+='<input type="hidden" id="trr-scope" value="'+esc(only)+'">'
-      +'<div style="border:1px solid var(--line);border-radius:11px;padding:12px 13px;background:'+(pin?'#fff8f1':'#f6f7f8')+'">'
+    h+='<div style="border:1px solid var(--line);border-radius:11px;padding:12px 13px;background:'+(pin?'#fff8f1':'#f6f7f8')+'">'
       +'<div style="font:800 14px \'Archivo\';color:var(--ink)">'+esc(only||'No plot on this study yet')+(pin?' · pinned area':' · entire plot')+'</div>'
       +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:4px;line-height:1.45">'
       +(pin?('The restriction covers only the trial footprint'+(trFootprintFt(t)?(' — '+Math.round(trFootprintFt(t).w)+' × '+Math.round(trFootprintFt(t).h)+' ft at '+(t.rot||0)+'°'):'')+', not the rest of '+esc(only)+'.')
@@ -6205,15 +6491,44 @@ function trRenderRes(){
     if(trResDraft.noEnd) trResDraft.end='';
     trRenderRes();
   });
+  /* Ticking a plot redraws the form, so what was already typed is read back
+     first -- same reason the "no end date" box does it. The listener sits on
+     the body, which survives the redraw, so it is wired once and not per plot. */
+  if(!body._resWired){ body._resWired=1; body.addEventListener('click',function(e){
+    var one=e.target.closest('[data-resplot]'), all=e.target.closest('[data-resall]');
+    if(!one&&!all) return;
+    if(!trResDraft) return;
+    var st=trById(trResDraft.studyId); if(!st) return;
+    var ps=trPlots(st), cur=(trResDraft.scopes||[]).slice();
+    trResStash();
+    if(all){
+      /* Tapping "All" when everything is already on clears the lot, so it is a
+         way back out rather than a one-way door. */
+      trResDraft.scopes = ps.every(function(p){return cur.indexOf(p)>=0;}) ? [] : ps.slice();
+    } else {
+      var pn=one.getAttribute('data-resplot'), at=cur.indexOf(pn);
+      if(at>=0) cur.splice(at,1); else cur.push(pn);
+      /* Kept in the study's own plot order, so the toast, the note to Bill and
+         the list of records all read in the order the study lists its plots. */
+      trResDraft.scopes = ps.filter(function(x){ return cur.indexOf(x)>=0; });
+    }
+    trRenderRes();
+  }); }
+  /* The button counts, so a six-plot restriction cannot be placed without the
+     screen having said six first. */
+  var sv=document.getElementById('trr-save');
+  if(sv){ var n=(trResDraft.scopes||[]).length;
+    sv.textContent = n>1 ? ('Place restriction on '+n+' plots') : 'Place restriction'; }
 }
 /* Read the form back before it is redrawn, so ticking the box does not throw
    away what was already typed. */
 function trResStash(){
   if(!trResDraft) return;
+  /* Which plots are ticked lives on the draft, not in the page -- the tick
+     boxes ARE the draft, so there is nothing here to read them back from. */
   var g=function(id){ var e=document.getElementById(id); return e?e.value:undefined; };
   var v;
   if((v=g('trr-type'))!==undefined) trResDraft.type=v;
-  if((v=g('trr-scope'))!==undefined) trResDraft.scope=v;
   if((v=g('trr-start'))!==undefined) trResDraft.start=v;
   if((v=g('trr-end'))!==undefined) trResDraft.end=v;
   if((v=g('trr-note'))!==undefined) trResDraft.note=v;
@@ -6222,19 +6537,34 @@ function trSaveRes(){
   if(!trResDraft) return;
   var t=trById(trResDraft.studyId); if(!t) return;
   var g=function(id){ var e=document.getElementById(id); return e?e.value:''; };
-  var type=g('trr-type'), scope=g('trr-scope'), start=g('trr-start'), note=g('trr-note');
+  var type=g('trr-type'), start=g('trr-start'), note=g('trr-note');
   var end=trResDraft.noEnd?'':g('trr-end');
-  if(!scope){ toast('Add a plot to the study first'); return; }
+  /* One record per plot ticked. Kept as separate records ON PURPOSE: every
+     screen that reads a restriction -- the map badges, whether a job is
+     blocked, the Lift button, the home widget -- reads r.scope as ONE plot
+     name. A list in there would need all of them changed and would take the
+     per-plot lift away. The protocol form already works this way. */
+  var scopes=(trResDraft.scopes||[]).filter(function(x){return x;});
+  /* "Tick a plot" only makes sense when there is one to tick -- a study with no
+     plots at all gets sent to the form that can add them. */
+  if(!scopes.length){ toast(trPlots(t).length?'Tick at least one plot':'Add a plot to the study first'); return; }
   if(!start){ toast('Set a start date'); return; }
   if(!end&&!trResDraft.noEnd){ toast('Set an end date, or tick "until it is lifted"'); return; }
   if(end&&end<start){ toast('End date is before the start'); return; }
   t.restrictions=t.restrictions||[];
-  /* No gid: this one was added here, on the study, so the new-study form never
-     touches it. See trSyncFormRes(). */
-  t.restrictions.push({id:newId('r'),type:type,scope:scope,note:note,start:start,end:end,by:trMe()});
+  /* No gid: these were added here, on the study, so the new-study form never
+     touches them. See trSyncFormRes(). */
+  scopes.forEach(function(sc){
+    t.restrictions.push({id:newId('r'),type:type,scope:sc,note:note,start:start,end:end,by:trMe()});
+  });
   trSave();
-  toast('Restriction placed · Bill alerted');
-  trNotifyBill('Restriction placed · '+scope,trRType(type).label+' · '+esc(t.title)+' · '+(end?('through '+trFmt(end)):'until it is lifted'));
+  var many=scopes.length>1;
+  toast(many?('Restriction placed on '+scopes.length+' plots · Bill alerted'):'Restriction placed · Bill alerted');
+  /* One alert for the whole job, not six -- Bill reads the plots off the line
+     under it rather than scrolling past the same restriction six times. */
+  trNotifyBill('Restriction placed · '+(many?(scopes.length+' plots'):scopes[0]),
+    trRType(type).label+' · '+esc(t.title)+' · '+esc(scopes.join(', '))
+    +' · '+(end?('through '+trFmt(end)):'until it is lifted'));
   trCur=t.id; show('trialdetail',false); trRender();
 }
 
@@ -6338,8 +6668,9 @@ function trMapPins(){
   /* Restricted ground (its own layer, drawn under the trial outlines). A restriction
      covers the pinned footprint on a sub-plot trial and the whole plot otherwise. */
   TRIALS.forEach(function(t){
-    /* Active studies only — planned and completed work never shades the map. */
-    if(!trVisible(t) || t.stage!=='active') return;
+    /* No stage test and no trVisible() test: the restriction's own dates are
+       the whole answer, and closed ground is drawn for everybody. The long
+       version is over trLiveRes(). */
     var live=trLiveRes(t); if(!live.length) return;
     /* Group the live restrictions by the ground they cover, so one shape carries
        every restriction on that ground and one popup lists them all. */
@@ -6400,16 +6731,25 @@ function trMapPins(){
   syncChipOffsets(_appmap);
 }
 /* Popup for a restricted area on the farm map: what kind, when, and the crew note. */
+/* What a popup may call the study behind a restriction. The closed ground is
+   everybody's business; the study's NAME is not, while it is still a draft
+   another lab has not put out yet. trVisible() is the same test the studies
+   list uses, so nobody loses a title here that they could read there. */
+function trResStudyName(t){
+  if(!t) return 'A study';
+  return trVisible(t) ? (esc(t.title)+' &middot; '+esc(t.lab)+' lab')
+                      : (esc(t.lab)+' lab study');
+}
 function trResPopHtml(t,g){
   var h='<div class="plotpop"><div class="pp-title">Restricted &middot; '+esc(g.scope||trPlotsLabel(t))+'</div>';
-  h+='<div class="pp-note">'+esc(t.title)+' &middot; '+esc(t.lab)+' lab</div>';
+  h+='<div class="pp-note">'+trResStudyName(t)+'</div>';
   g.list.forEach(function(r){
     var ty=trRType(r.type);
     h+='<div class="pp-mgmt-h" style="color:'+ty.c+'">'
       +'<span class="pp-resdot" style="background:'+ty.c+'">'+esc(ty.ab)+'</span>'+esc(ty.label)+'</div>';
     h+='<table class="pp-tbl">'
       +'<tr><td class="pp-k">Starts</td><td class="pp-v">'+trFmt(r.start)+'</td></tr>'
-      +'<tr><td class="pp-k">Ends</td><td class="pp-v">'+trFmt(r.end)+'</td></tr>'
+      +'<tr><td class="pp-k">Ends</td><td class="pp-v">'+esc(trResEndText(r))+'</td></tr>'
       +'<tr><td class="pp-k">Area</td><td class="pp-v">'+esc(trResExtentText(t,r))+'</td></tr>'
       +(r.by?('<tr><td class="pp-k">Placed by</td><td class="pp-v">'+esc(nameOf(r.by)||r.by)+'</td></tr>'):'')
       +'</table>';
@@ -8410,7 +8750,8 @@ function jobRes(plot,type,name){
   var cfg=(arguments.length>1)?jobResCfg(type,name):JOB_RES.mow;
   if(!cfg||typeof TRIALS==='undefined') return {full:full,pin:pin,cfg:cfg};
   TRIALS.forEach(function(t){
-    if(!trVisible(t)||t.stage!=='active') return;
+    /* Every study, at every stage, for everybody -- a job is stopped by the
+       restriction's dates alone. See trLiveRes(). */
     trLiveRes(t).forEach(function(r){
       if(cfg.kinds.indexOf(r.type)<0||r.scope!==plot) return;
       ((trResExtent(t,r)==='pin'&&t.pin)?pin:full).push({t:t,r:r});
@@ -8427,8 +8768,10 @@ function jobBlockPopHtml(b,type,name){
     var r=jobRes(n,type,name);
     r.full.concat(r.pin).forEach(function(x){
       var rt=trRType(x.r.type);
-      h+='<div class="pp-mgmt-h" style="color:'+rt.c+'"><span class="pp-resdot" style="background:'+rt.c+'">'+esc(rt.ab)+'</span>'+esc(n)+' &middot; '+esc(x.t.title)+'</div>'
-        +'<div class="pp-note">'+esc(trResExtentText(x.t,x.r))+' &middot; through '+trFmt(x.r.end)+'</div>';
+      h+='<div class="pp-mgmt-h" style="color:'+rt.c+'"><span class="pp-resdot" style="background:'+rt.c+'">'+esc(rt.ab)+'</span>'
+        +esc(n)+' &middot; '+(trVisible(x.t)?esc(x.t.title):(esc(x.t.lab)+' lab study'))+'</div>'
+        +'<div class="pp-note">'+esc(trResExtentText(x.t,x.r))+' &middot; '
+          +(x.r.end?('through '+trFmt(x.r.end)):'until it is lifted')+'</div>';
     });
   });
   return h+'</div>';
@@ -8441,11 +8784,12 @@ function jobResPopHtml(plot,res){
       :('Work around the trial footprint — the rest of the plot is fine.'))+'</div>';
   all.forEach(function(x){
     var rt=trRType(x.r.type);
-    h+='<div class="pp-mgmt-h" style="color:'+rt.c+'"><span class="pp-resdot" style="background:'+rt.c+'">'+esc(rt.ab)+'</span>'+esc(x.t.title)+'</div>'
+    h+='<div class="pp-mgmt-h" style="color:'+rt.c+'"><span class="pp-resdot" style="background:'+rt.c+'">'+esc(rt.ab)+'</span>'
+      +(trVisible(x.t)?esc(x.t.title):'Study on this plot')+'</div>'
       +'<table class="pp-tbl">'
       +'<tr><td class="pp-k">Lab</td><td class="pp-v">'+esc(x.t.lab)+'</td></tr>'
       +'<tr><td class="pp-k">Starts</td><td class="pp-v">'+trFmt(x.r.start)+'</td></tr>'
-      +'<tr><td class="pp-k">Ends</td><td class="pp-v">'+trFmt(x.r.end)+'</td></tr>'
+      +'<tr><td class="pp-k">Ends</td><td class="pp-v">'+esc(trResEndText(x.r))+'</td></tr>'
       +'<tr><td class="pp-k">Area</td><td class="pp-v">'+esc(trResExtentText(x.t,x.r))+'</td></tr>'
       +'</table>'
       +'<div class="pp-note" style="margin-top:3px">'+(x.r.note?esc(x.r.note):'No notes')+'</div>';

@@ -1334,6 +1334,156 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### The protocol form asks WHERE second, and the restriction control is a tile — 2026-09-30
+**Decision:** the sections on the new-study form run **Study → Location → Size
+of the trial → Restrictions**. Location used to sit last. And the control that
+turns restrictions on is a tile (`.tr-tile`) rather than a tick box; it still
+toggles exactly as the box did.
+**Why:** Dillon asked for both. Where a trial is is the thing everybody else on
+the farm needs — the map, the crew, whether a job is blocked — so it belongs
+near the top rather than after the arithmetic. The tile is the same reasoning:
+what it switches on is the one answer on this form the crew actually see out in
+a field, and a 19px square did not look like it.
+**Don't:** don't regroup Location back down next to Size of the trial because
+they both feel like "measurements" — the order is the one asked for.
+`tools/test-trials.js` section 20 pins it. Two smaller traps: the Location
+section's pin hint used to say the trial size was "above" it, which now points
+the wrong way and has been reworded — check any hint that says above or below
+if these move again. And the tile must keep saying in WORDS which way it is
+set: a tile that says it only in orange is unreadable to exactly the people
+color-blind mode exists for. Its colors are the ones the Field Log's tiles
+already use, in ordinary rules, so the color-blind rewrite handles them and
+nothing goes in `CB_MAP` — that list is only for colors written inside
+`body.cb` rules.
+
+### A study starts and finishes on its own dates, and finishing lets the ground go — 2026-09-30
+**Decision:** a study moves from **Planned** to **Active** on its start date,
+and from **Active** to **Completed** the day after its end date. **Finishing a
+study lifts every restriction still standing on it** — whether the app did the
+finishing or a person tapped it. Tapping a stage by hand still works, and
+tapping Completed asks first, because a lift cannot be undone. Dillon's call,
+in those words.
+**Why:** nobody should have to remember to tap a date that is already written
+on the study, and the end date is the farm's promise about when it gets its
+ground back. Four things keep it safe, and none is decoration:
+  1. **Only a phone that may write the study does it** — `trCanEditLab()` is
+     the same test `firestore.rules` makes, so a phone never applies a change
+     it cannot push. Every other phone just receives it. Same shape as
+     `tcAutoClose()`.
+  2. **It moves a study forward once, ever.** `furthestStage` is how far a
+     study has ever got, so somebody who puts a finished study back to Active
+     keeps it there instead of arguing with a timer every half hour. A study
+     with no such field is read as standing at its current stage, so nothing is
+     migrated and no study is written to merely to add it.
+  3. **A study with no end date never finishes on its own.** There is nothing
+     to go on, and a guess would take ground off the map while the trial is
+     still standing on it.
+  4. **The date comparisons are the ones `trResState()` already makes** —
+     active ON the start date, finished the day AFTER the end date — so a
+     study and its own restrictions can never disagree about what day it is.
+**Don't:** don't call `trAutoStage()` from a drawer's snapshot handler. It
+writes, and writing as a record arrives is what spent 4.4 million reads in an
+afternoon (2026-08-31). It runs before the Trials screen and the map draw,
+plus a slow timer for a phone left open overnight. Don't let a phone that
+cannot write the study apply the change "just locally" either — that phone
+would then disagree with the server for good. Don't file the automatic lift
+under a person: `liftedByPid` is left empty on purpose, because the calendar
+decided it and not whoever's phone was open, and the study page words a lift
+with nobody behind it as "· the study finishing" rather than "by …". And
+every stage change goes through `trSetStage()` — a second place that sets
+`t.stage` is a second place that forgets to lift.
+
+### A restriction can run "for the whole trial", and that is worked out on every save — 2026-09-30
+**Decision:** each restriction row on the protocol form has **Runs for the
+whole trial**, ticked by default on a new row. While it is on there are no date
+boxes at all; the restriction takes the study's own start and end **every time
+the study is saved**, and the row carries `whole:true` onto each record so it
+survives a reopen. Untick it and the boxes appear, pre-filled with the study's
+dates.
+**Why:** Dillon asked for the quick option, and this is what the farm means
+almost every time — a restriction that lasts as long as the trial. The row
+already *defaulted* to the trial's dates, but that was a copy taken once:
+change the trial's end date afterwards and the restriction silently kept the
+old one. Deriving it at save time closes that, and it cannot drift, because a
+study's dates can only be changed on this same form — so the study and its
+restrictions go up in one write.
+**Don't:** don't "simplify" it by deriving the dates when a restriction is
+*read* instead. `r.start` / `r.end` are read by the map, the job block, the
+Lift button, the home widget and the export, and they must keep meaning one
+plain thing. Don't write `whole:false` onto rows that do not use it either —
+it is deleted instead, so a restriction that never used this is byte-for-byte
+what it always was, and a record that differs from what the server last said
+gets sent again (the 2026-08-31 entries). Nothing is migrated: a restriction
+saved before today keeps its own dates and reads back with the box unticked.
+
+### A restriction is in force by its own dates — the study's stage does not decide — 2026-09-30
+**Decision:** the farm map's shading and the block on a job no longer ask what
+stage a study is at, and no longer ask `trVisible()` either. A restriction
+counts when its start date has passed, its end date has not, and nobody has
+lifted it — at **every** stage, and for **everybody**. What is held back from
+somebody who could not see the study is the study's **name**: the popups show
+the lab without the title (`trResStudyName()`).
+**Why:** Dillon reported it — a study still marked Planned kept its
+restrictions off the map after the start date had gone by, so ground that was
+closed looked open. A stage is paperwork. A trial goes in the ground days
+before anybody taps Active, and a trial tapped Completed can still be inside a
+re-entry interval with a fortnight left to run. The `trVisible()` half was the
+worse one: it hides another lab's draft study from the crew, which is right for
+the study and wrong for the ground — an undergraduate on a mower has to know
+the plot is closed whoever owns it. The two mistakes do not cost the same. A
+restriction shown when it need not be costs somebody a question; a restriction
+hidden while it is in force costs a season's trial. Note the study **page**
+was right all along and showed the restriction — that mismatch is how this got
+noticed.
+**Don't:** don't put a stage test back into `trMapPins()` or `jobRes()` because
+a completed study seems like it should let go. Completing a study **does** let
+it go — since later the same day, finishing one lifts its restrictions (see the
+entry above) — and that is a LIFT, which is a different thing from the stage
+deciding. The distinction is the whole point: the ground is released by an act
+that is recorded, travels to every phone and can be read off the study page,
+not by a label quietly changing what the map draws.
+`tools/test-trials.js` section 16 runs the real code as an undergraduate and
+fails if either test comes back.
+
+### A restriction goes on several plots at once, as several records — 2026-09-30
+**Decision:** the "Applies to" question on the study page's restriction form is
+a list of tick boxes with an "All N plots" box on top, instead of a dropdown
+that took one plot. Saving writes **one restriction record per plot ticked**,
+each with its own id and no `gid`. The form still opens with only the first
+plot ticked.
+**Why:** Dillon asked for it — the same rest usually goes on a whole study, and
+the only way to do that was to fill the form out once per plot. The records stay
+separate because `r.scope` is read as ONE plot name by everything downstream:
+the map badges, whether a job is blocked (`jobResCfg()`), the home screen's
+widget, the Field Log, and Bill's Lift button. A list in `scope` would mean
+changing all of them and would take away lifting a single plot, which Bill
+does. The protocol form already worked exactly this way (`trSyncFormRes()`
+writes one record per plot for each row), so this makes the two paths match.
+Opening on the first plot rather than on all of them keeps somebody who taps
+straight through placing exactly what they place today.
+**Don't:** don't "tidy" the six records into one with `scope` as a list — see
+above for the six screens that break silently. Don't give these records a
+`gid` to group them either: `trSyncFormRes()` rebuilds `t.restrictions` from
+the protocol form's rows plus every record **without** a gid, so a gid this
+form invented would be deleted the next time anybody saved the protocol. And
+don't read the ticked plots back out of the page in `trResStash()` — the tick
+boxes are drawn *from* `trResDraft.scopes`, so the draft is the only copy.
+
+### The study page has two buttons, not three — 2026-09-30
+**Decision:** the bar at the bottom of a study is **Edit protocol** and
+**＋ Restriction** for whoever can change the study. The Map button was taken
+off. Somebody who can only look at the study still gets "View on map".
+**Why:** Dillon's call. Three buttons on a phone left each one cramped, and the
+map was already one tap away — every plot row in "Plots & areas" above goes
+straight to that plot on the map. The view-only bar keeps its button because a
+plot row is the only other way there and an empty action bar looks broken.
+**Don't:** don't delete `trShowOnMap()` because "nothing calls it" — the
+view-only bar still does. One thing this does cost: on a part-of-a-plot study
+with a pin, `trShowOnMap()` drew the trial footprint box and a plot row draws
+the plot outline instead, so the footprint view is now only reachable by
+whoever cannot edit the study. Fix that by routing the plot rows through
+`trShowOnMap()` when the study has a pin, not by putting the third button back.
+
 ### The map editor's chips wrap, and its "Editing" button fights the banner — 2026-09-29
 **Decision:** the row of editing chips on the Farm Map (`.pebar`) wraps onto a
 second line instead of running off the side of a phone, and `.pespacer` — the

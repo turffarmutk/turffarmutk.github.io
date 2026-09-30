@@ -1334,6 +1334,59 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### The Task Board only names people who are out — 2026-09-30
+**Decision:** a name appears on the Board tab for a given day only when that
+person is **down for that day, has punched today, or has a job dated to it**.
+Everybody else is drawn nowhere. `tbBoardShown()` (`app-03-people.js`) is the
+filter; `tbPersonState()` answers the first two and `tbHasTaskOn()` the third.
+Technicians joined the list of people the board can draw at the same time
+(`rstTechIds()` in `tbBoardPeople()`), so a technician out on a job now shows
+up for Bill and for faculty — which was the other half of what Dillon asked
+for. An empty day says so in a sentence instead of leaving a bare date.
+**Why:** Dillon, in his words: "I only want the names of people scheduled or
+have been assigned a task to appear. Everyone else should be silently in the
+background until a task is assigned to them." Before this, all seven
+undergraduates and all four graduate students got a heading and an "All caught
+up ✓" row every day whoever was actually working, so the one screen the farm
+manager reads to see what is happening was mostly people who are not there — he
+had to scroll past nine names to find the two with work on them. Technicians
+were the opposite problem: they were on no list at all, so a technician out on
+a job was invisible and their work fell into "Not on any day above".
+**Don't:** hand `boardOffChart()` the filtered list. It takes
+`tbBoardPeople()` — the whole list — because its job is to sweep up work on
+people the board knows **nothing** about. Give it the names drawn today and
+every job dated to a day you are not looking at lands in "Not on any day
+above", which is a list of work with nowhere to go and would then be most of
+the farm's week. Same for `tbStateSig()`, the once-a-minute repaint: it has to
+walk the whole list, because the change it is watching for is somebody
+**arriving** — clocking in when they were not being drawn a minute ago. A
+signature built from the drawn names cannot see them, because they were not in
+it.
+
+### A request is the requester's to withdraw, and nobody else's — 2026-09-30
+**Decision:** the bin on a **request** draws for the person who raised it and
+for nobody else. Bill and a faculty advisor kept the bin on ordinary jobs and
+lost it on somebody else's request. One extra line in the `edit`/`delete` case
+of `taskCan()` (`app-03-people.js`), copied into the `allow delete` line in
+`firestore.rules` and mirrored in `tools/rules-model.js`.
+**Why:** Dillon asked for it in those words — "only the person requesting
+having permission to do so." A request is not work, it is somebody **asking**
+for work, so cancelling one is cancelling their own ask. Bill declining a
+request he is not going to fill is a different act, and the board deliberately
+gives him no button for it: if he could delete the request instead, the person
+who asked would find it simply gone from their Requests tab with nothing
+anywhere saying why, and would ask again. Nothing was lost on screen — Bill's
+Requests tab never drew a bin on a crew request (`tbReqRow()`), so the only
+place this took a button away is the task detail screen.
+**Don't:** fold it back into `canEdit()`. It is the **one** place the delete
+rule is narrower than the edit rule, which makes it the one place the app and
+the database are most likely to drift apart — and a bin the database refuses
+puts the row straight back a second after the tap, with nothing on screen to
+say why. `tools/test-rules.js` sweeps every person against every request for
+exactly that reason. And don't switch it to read `requestedBy`: `createdBy` is
+stamped on create and can never be rewritten, so it is the only field where "I
+raised this" stays true forever.
+
 ### The protocol form asks WHERE second, and the restriction control is a tile — 2026-09-30
 **Decision:** the sections on the new-study form run **Study → Location → Size
 of the trial → Restrictions**. Location used to sit last. And the control that

@@ -150,6 +150,16 @@ PIDS.forEach(a => {
     cases.push([a, 'edit', { assignee: b, createdBy: a }, 'edit a job they raised for ' + b]);
     cases.push([a, 'delete', { assignee: b, createdBy: b }, 'delete ' + b + "'s own job"]);
     cases.push([a, 'delete', { assignee: null, createdBy: b }, 'delete an open job ' + b + ' raised']);
+    /* A REQUEST, which since 2026-09-30 only its author may delete. Worth
+       sweeping rather than spot-checking: this is the one place the delete
+       rule is narrower than canEdit(), so it is the one place the app and the
+       database are most likely to drift apart. */
+    cases.push([a, 'delete', { kind: 'request', assignee: null, createdBy: b, requestedBy: b },
+                'delete a request ' + b + ' raised']);
+    cases.push([a, 'delete', { kind: 'request', assignee: b, createdBy: b, requestedBy: b },
+                'delete a request ' + b + ' raised that is now on them']);
+    cases.push([a, 'edit', { kind: 'request', assignee: null, createdBy: b, requestedBy: b },
+                'edit a request ' + b + ' raised']);
   });
 });
 

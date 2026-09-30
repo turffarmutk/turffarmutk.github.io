@@ -331,6 +331,11 @@ function rstUndergradIds(){return rstActive().filter(function(p){return p.role==
    not the farm's organisation chart. The board is the one place they join up.
    See tbBoardPeople(). */
 function rstGradIds(){return rstActive().filter(function(p){return p.role==='Graduate Student';}).map(function(p){return p.id;});}
+/* The technicians, as roster ids, and kept separate for the same reason. The
+   Task Board draws them too since 2026-09-30 -- but only on a day they are
+   actually out, and Bill still only ASKS a technician, exactly as he asks a
+   grad student. See tbBoardPeople(). */
+function rstTechIds(){return rstActive().filter(function(p){return p.role==='Technician';}).map(function(p){return p.id;});}
 function rstCrewList(){return rstActive().filter(function(p){return p.role==='Graduate Student'||p.role==='Technician';})
   .map(function(p){return {pid:p.id,name:pName(p),role:p.role==='Graduate Student'?'Grad student':'Technician',lab:p.lab||'—'};});}
 /* Demo logins point at real roster entries, so editing a person on the roster
@@ -1397,9 +1402,36 @@ function taskCan(actor,action,task){ if(appAdminAll(actor))return true;   /* the
        which is exactly how 'claim' and 'complete' above already read.
        Widened on 2026-08-31 to include the deputy: before that, a job that
        landed on anybody but an undergrad had nobody who could remove it if
-       Bill had not raised it himself. See docs/DECISIONS.md. */
+       Bill had not raised it himself. See docs/DECISIONS.md.
+       NARROWED for deletes on a REQUEST, 2026-09-30 -- the note inside. */
     case 'edit':
     case 'delete':
+      /* A REQUEST IS THE REQUESTER'S TO WITHDRAW, AND NOBODY ELSE'S.
+         Dillon, 2026-09-30, in those words: only the person requesting may
+         delete a request.
+
+         A request is not work yet -- it is somebody ASKING for work -- so
+         taking it back is taking back their own ask, which is a different act
+         from Bill deciding he will not do it. He has no button for that, on
+         purpose: if he could delete the request instead, the person who asked
+         would find it simply gone from their Requests tab with nothing
+         anywhere saying why, and they would ask again.
+
+         What this does NOT touch:
+           - a request Bill raised himself. createdBy is him, so his own bin
+             on "Sent to grad / tech" is untouched.
+           - an ordinary job. Bill's bin on the board, the "Not on any day
+             above" list and the task detail screen all read the lines below
+             and none of them changed.
+           - editing. Bill turns a request into a job by ASSIGNING it, which
+             is what the Assign screen does and is a different branch above.
+           - the App Manager, who is answered yes at the top of this function.
+
+         Copied into firestore.rules at `allow delete`, and mirrored in
+         tools/rules-model.js. All three have to give the same answer or the
+         bin undoes itself a second after the tap -- the third trap in
+         CLAUDE.md. */
+      if(action==='delete' && t.kind==='request') return pidOf(t.createdBy)===me;
       if(assignsUndergrads(me)) return true;
       if(pidOf(t.createdBy)===me) return true;
       if(role==='Faculty' && target && sameLab(me,target)) return true;
@@ -1462,17 +1494,19 @@ function receivedRow(t){return '<div class="row"><div style="flex:1;min-width:0"
    work nobody wanted any more sat on somebody's screen until they did it or
    Bill went round the board and deleted it by hand.
 
-   Nothing about WHO may do this is new. taskCan(...,'delete') has always said
-   "the person who raised it", and firestore.rules says the same thing in
-   canEdit(). This is the button that was missing, not the permission.
+   taskCan(...,'delete') has always said "the person who raised it"; this was
+   the button that was missing, not the permission. Since 2026-09-30 it says
+   ONLY that, for a request -- Bill and a faculty advisor lost the bin on a
+   request somebody else raised. The reason is in taskCan().
 
    Two things it will not draw:
      - on a finished job. That is the farm's record of work that actually
        happened, and a request is the only place on the board somebody could
        have quietly removed one.
-     - when taskCan() says no. A request filed before the app started
-       stamping createdBy has nobody the database recognises as its author,
-       so the bin would be a button that does nothing. Better absent. */
+     - when taskCan() says no -- which now means anybody but its author. A
+       request filed before the app started stamping createdBy has nobody the
+       database recognises as its author either, so the bin would be a button
+       that does nothing. Better absent. */
 function reqDelBtn(t){
   if(!t||t.status==='done') return '';
   if(!taskCan(SESSION.pid,'delete',t)) return '';
@@ -1593,9 +1627,13 @@ function deleteTask(id){
      - one whose date has passed, or falls outside this run. An overdue job
        does not turn red and does not move to today. It stops being drawn.
      - one sitting on somebody the board does not list. That list is
-       tbBoardPeople(): the undergraduates and, since 2026-09-23, the graduate
-       students. A job on a technician, on faculty, or on the person reading
-       the board is still off it.
+       tbBoardPeople(): the undergraduates, the graduate students (2026-09-23)
+       and the technicians (2026-09-30). A job on faculty, or on the person
+       reading the board, is still off it.
+       It is deliberately tbBoardPeople() and NOT tbBoardShown() -- the names
+       actually drawn today. A person with nothing on Monday is hidden on
+       Monday, and their Tuesday job belongs on Tuesday's chip, not down here
+       in a list of work with nowhere to go.
 
    Both were invisible to the person running the farm, and until 2026-08-31
    both were also undeletable, because the bin only draws on a row the board
@@ -1671,10 +1709,19 @@ function tbPersonState(pid,d){
   }
   return {k:'sched',txt:'Scheduled '+span};
 }
-/* WHO THE BOARD TAB LISTS, and in what order.
+/* WHO THE BOARD TAB CAN DRAW, and in what order.
    ONE function, because the once-a-minute repaint below has to look at exactly
    the same people the board drew. A name it does not know about is a name
    whose color can change with nothing noticing.
+
+   CAN draw, not DOES. Since 2026-09-30 a name only actually appears on a day
+   when that person is down for it or has a job on it -- tbBoardShown(), just
+   below, is the filter and the note over it is the reason. This function stays
+   the WHOLE list because two other things need it: the once-a-minute repaint,
+   which has to spot somebody clocking in who was not showing a moment ago,
+   and boardOffChart(), which sweeps up jobs on people the board does not know
+   about at all. Hand boardOffChart() the filtered list instead and every job
+   dated a day you are not looking at lands in "Not on any day above".
 
    Since 2026-09-23 that is the undergraduates AND the graduate students.
    Dillon asked for the grads on the board beside the undergrads, and the
@@ -1702,19 +1749,66 @@ function tbBoardPeople(){
       .forEach(function(id){ if(id&&people.indexOf(id)<0) people.unshift(id); });
   } else {
     rstGradIds().forEach(function(id){ if(people.indexOf(id)<0) people.push(id); });
+    /* THE TECHNICIANS - Dillon, 2026-09-30: he asked for them on the board
+       "if they are currently on a job so that Bill and the Faculty can see."
+       A technician sets their own day, so most days there is nothing to show
+       and their name would be noise -- which is exactly what the filter below
+       now handles for everybody. They appear when they are out: on the clock,
+       down for the day, or holding a job dated to it. Faculty already had
+       their own lab's technicians through labMembers() above. */
+    rstTechIds().forEach(function(id){ if(people.indexOf(id)<0) people.push(id); });
   }
   /* Whoever is reading the board is never a section on it -- their own work
      lives on their Mine tab. Same rule boardOffChart() applies; see the note
      inside renderTasks(). */
   return people.filter(function(id){ return !isMe(id); });
 }
+/* WHOSE NAME ACTUALLY APPEARS ON THE DAY SHOWING - Dillon, 2026-09-30:
+   "I only want the names of people scheduled or have been assigned a task to
+   appear. Everyone else should be silently in the background until a task is
+   assigned to them."
+
+   Before this, every undergraduate and every graduate student got a heading
+   and an "All caught up ✓" row whether or not they were anywhere near the
+   farm that day, so the one screen Bill reads to see what is happening was
+   mostly people who are not there. Now a name has to have a reason to be on
+   it, and there are two:
+
+     - they are down for this day, on the clock, or have punched today. That is
+       tbPersonState() returning anything at all -- the same call that colors
+       the name, so a name that appears always has a color and a line of words
+       under it saying why.
+     - they have a job dated to this day. Somebody Bill gave work to shows up
+       even if they never set their hours, which is the whole point: the work
+       is the thing he is looking for.
+
+   Nobody is hidden from the FARM by this -- their jobs are still on their own
+   Mine tab, still in the notification feed, still in the database. This is one
+   screen's list of names.
+
+   The job test is the same filter the board itself draws with, minus the
+   status, so somebody who came in and finished everything still has a name on
+   the day rather than vanishing the moment they are done. taskOnDay() reads
+   the day chip you are standing on, the same one bDate came from, so the two
+   can never disagree about which day this is. */
+function tbHasTaskOn(pid){
+  return TASKS.some(function(t){ return t.kind==='task'&&taskIsFor(t,pid)&&taskOnDay(t); });
+}
+function tbBoardShown(people,d){
+  return (people||[]).filter(function(id){
+    return !!tbPersonState(id,d) || tbHasTaskOn(id);
+  });
+}
 /* The colors move on their own -- a shift ends, somebody on another phone
    clocks in -- and the board is otherwise only drawn when you open it. Once a
    minute, if the Board tab is showing today and any name's color would now
    be different, draw it again. Comparing first means a board nobody is
    changing is left alone, so it does not jump under a thumb mid-scroll.
-   The people it walks are tbBoardPeople(), just above -- the same list the
-   board itself drew, which is the whole reason that is one function. */
+   The people it walks are tbBoardPeople() -- the WHOLE list, not the names
+   drawn. That is the point of it now: since names only appear for people who
+   are out, somebody clocking in has to make this signature move, and a
+   signature built from the drawn names alone could not see them arrive
+   because they were not in it a minute ago. */
 var _tbStateSig='';
 function tbStateSig(){
   if(tbTab!=='board'||boardDayOrd()!==asTodayOrd()) return '';
@@ -1784,8 +1878,10 @@ function renderTasks(){
       is the thing he asked to stop seeing. See boardOffChart() below: it
       has to skip his jobs too, or they all land in "Not on any day
       above" instead and his name is right back on the board.
-      Who the list holds is tbBoardPeople() -- undergraduates and graduate
-      students, or a PI's own lab plus the pool. */
+      Who the list COULD hold is tbBoardPeople() -- the undergraduates, the
+      graduate students and the technicians, or a PI's own lab plus the pool.
+      Who it actually draws for the day showing is tbBoardShown(): only the
+      people down for it, punched in on it, or holding a job dated to it. */
    var bDate=asDateFromOrd(boardDayOrd());
    /* How many of the people ON THIS BOARD are down to be here. Not
       schedCrewOn(), which answers for the undergrad pool alone -- that is the
@@ -1804,7 +1900,14 @@ function renderTasks(){
    }
    html+='<div class="sec" style="color:#2f3133">'+WEEKDAYS[boardDay]+' · '+asDateLabel(boardDayOrd())
         +(bIn?(' <span style="color:#2f9e4f">· '+bIn+' in</span>'):'')+'</div>';
-   people.forEach(function(s){
+   /* Only the people with a reason to be on this day -- see tbBoardShown().
+      `people` above is still the whole list, because boardOffChart() at the
+      bottom of this branch has to know who the board KNOWS ABOUT, not who it
+      drew today. Get those two the wrong way round and every job dated to a
+      day you are not looking at lands in "Not on any day above". */
+   var shown=tbBoardShown(people,bDate);
+   if(!shown.length) html+='<div class="list"><div class="row" style="border-bottom:none"><div style="flex:1"><div class="rs">Nobody is down for this day and nothing is assigned to it. Names appear here once somebody is scheduled, clocks in, or is given a job.</div></div></div></div>';
+   shown.forEach(function(s){
      var mine=taskInOrder(TASKS.filter(function(t){return taskIsFor(t,s)&&t.status==='todo'&&t.kind==='task'&&taskOnDay(t);}));
      /* The board was undergraduates only until 2026-09-23, so a name on it
         needed no explaining. Now that the graduate students are here too,

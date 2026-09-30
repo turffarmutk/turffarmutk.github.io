@@ -156,7 +156,16 @@ function Rules(doc, mePid) {
           && sameLab(me, str(d.assignee)));
   }
 
-  return { actor, canCreate, canAssignTo, canDirectUndergrad, canClaim, canComplete, canEdit, onTask };
+  /* delete -- the same test as canEdit, EXCEPT on a request, which is the
+     requester's to withdraw and nobody else's. Dillon, 2026-09-30. Mirrors
+     the `allow delete` line in firestore.rules, which is the one place that
+     line is narrower than canEdit(). */
+  function canDelete(d) {
+    return str(d.kind) === 'request' ? str(d.createdBy) === me : canEdit(d);
+  }
+
+  return { actor, canCreate, canAssignTo, canDirectUndergrad, canClaim, canComplete,
+           canEdit, canDelete, onTask };
 }
 
 /*
@@ -168,7 +177,7 @@ function Rules(doc, mePid) {
  *   claim             -> isClaim()           (canClaim)
  *   complete          -> isCompletion()      (canComplete)
  *   edit              -> isEdit()            (canEdit)
- *   delete            -> allow delete        (canEdit)
+ *   delete            -> allow delete        (canDelete)
  */
 function rulesCan(doc, actorPid, action, task) {
   const R = Rules(doc, actorPid);
@@ -180,8 +189,8 @@ function rulesCan(doc, actorPid, action, task) {
     case 'assign':   return R.canAssignTo(t.assignee == null ? '' : t.assignee);
     case 'claim':    return R.canClaim(t);
     case 'complete': return R.canComplete(t);
-    case 'edit':
-    case 'delete':   return R.canEdit(t);
+    case 'edit':     return R.canEdit(t);
+    case 'delete':   return R.canDelete(t);
   }
   return false;
 }

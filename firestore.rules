@@ -491,7 +491,28 @@ service cloud.firestore {
         && (isClaim() || isCompletion() || isWorkUpdate() || isAssignment() || isEdit())))
         && request.resource.data.id == resource.data.id;
 
-      allow delete: if appAdmin() || (actor() && canEdit(resource.data));
+      /* A REQUEST IS THE REQUESTER'S TO WITHDRAW, AND NOBODY ELSE'S.
+         Dillon, 2026-09-30, in those words: only the person requesting may
+         delete a request. A request is somebody ASKING for work, not work,
+         so cancelling one is cancelling their own ask -- a different act
+         from Bill deciding he will not do it, which the board gives him no
+         button for on purpose.
+
+         This is the ONE place the delete rule is narrower than canEdit(),
+         and it is the same line taskCan(...,'delete') draws in
+         app-03-people.js. The two have to agree: if the app drew a bin the
+         database refuses, the row comes straight back a second after the
+         tap with nothing on screen to say why -- the bug that cost the farm
+         a month in September. Ordinary jobs are untouched.
+
+         createdBy, not requestedBy: createdBy is stamped on create and can
+         never be rewritten (see the update rule above), so "I raised this"
+         stays true forever. Both request forms write the same id into both
+         fields. */
+      allow delete: if appAdmin() || (actor() && (
+           str(resource.data.get('kind', '')) == 'request'
+             ? str(resource.data.get('createdBy', '')) == me()
+             : canEdit(resource.data)));
 
     }
 

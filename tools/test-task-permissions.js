@@ -215,6 +215,23 @@ section('8c. taking back a request you raised');
   ok('no bin on somebody ELSE\'s request',             !bin('p02', req('p09')));
   ok('and the rule refuses that one too',              !can('p02', 'delete', req('p09')));
 
+  /* ONLY THE PERSON REQUESTING - Dillon, 2026-09-30, in those words. Bill and
+     a faculty advisor may remove an ordinary job that is not theirs; a request
+     is not a job, it is somebody's ask, and the two rows below are the whole
+     of what changed that day. If a future tidy-up folds the request case back
+     into canEdit(), these are the checks that will catch it. */
+  ok('Bill gets NO bin on a request the crew raised',  !bin('p07', req('p09')));
+  ok('and the rule refuses him too',                   !can('p07', 'delete', req('p09')));
+  ok('nor does a faculty advisor on their own lab\'s',  !bin('p13', req('p09')));
+  ok('and the rule refuses them too',                  !can('p13', 'delete', req('p09')));
+  /* The same people, on an ordinary job, are untouched -- that is the line
+     this change was careful NOT to move. */
+  ok('Bill still removes an ordinary job he did not raise',
+     can('p07', 'delete', { id: 't1', kind: 'task', status: 'todo', assignee: 'p18', createdBy: 'p09' }));
+  /* The App Manager is answered yes at the top of taskCan() like everywhere
+     else -- checked in tools/test-app-admin.js, where the hat is actually on.
+     The hat rides on the sign-in token, so it is not on in this harness. */
+
   ok('no bin on a FINISHED job -- that is the record', !bin('p09', req('p09', { status: 'done' })));
   ok('even for Bill, who may delete anything else',    !bin('p07', req('p09', { status: 'done' })));
 

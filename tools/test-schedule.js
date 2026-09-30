@@ -253,19 +253,18 @@ section('3c. the graduate students stand on the board with the undergraduates');
 
   ok('the undergrads are still on it', people.indexOf('p18') >= 0, people.join(','));
   ok('and the grad students are on it now', people.indexOf('p09') >= 0, people.join(','));
-  ok('technicians are not', people.indexOf('p05') < 0, people.join(','));
+  /* Dillon, 2026-09-30: "I would like technicians to even appear on the task
+     board if they are currently on a job so that Bill and the Faculty can
+     see." They are on the list the board CAN draw from now; whether a name
+     actually appears is section 3e. */
+  ok('and so are the technicians', people.indexOf('p05') >= 0, people.join(','));
   ok('nor is the person reading it', people.indexOf('p07') < 0, people.join(','));
   ok('every entry is a roster id, never a display name',
      people.every(x => /^p\d+$/.test(x)), people.join(','));
 
-  const body = w.document.getElementById('tb-body').innerHTML;
-  ok("a grad student's name is drawn", body.indexOf('Rose Gibbons') >= 0);
-  ok('with their job title beside it, so Bill knows he asks rather than tells',
-     /Rose Gibbons · Grad Student/.test(body), body.slice(0, 200));
-  ok('an undergrad carries no title — nothing changed for them',
-     body.indexOf('Sam Dean · ') < 0 || /Sam Dean · \d/.test(body));
-
-  /* The job that used to disappear. */
+  /* The job that used to disappear. It also gives Rose a reason to be on the
+     board at all -- since 2026-09-30 a name with no shift and no job is not
+     drawn, so this push has to come BEFORE looking for her name. */
   /* TASKS and STUDENTS are declared with let/const, so they are not window
      properties — the boot's export list is the way in. boardDay is a var and
      so is reachable. */
@@ -275,8 +274,13 @@ section('3c. the graduate students stand on the board with the undergraduates');
                    dueAt: w.atToday(null), repeat: 'None' });
   w.eval('boardDay=' + new Date().getDay() + ';');
   w.renderBoard();
-  const body2 = w.document.getElementById('tb-body').innerHTML;
-  ok("a grad student's job is drawn on their day", body2.indexOf('ZZ Collect plugs') >= 0);
+  const body = w.document.getElementById('tb-body').innerHTML;
+  ok("a grad student's name is drawn", body.indexOf('Rose Gibbons') >= 0);
+  ok('with their job title beside it, so Bill knows he asks rather than tells',
+     /Rose Gibbons · Grad Student/.test(body), body.slice(0, 200));
+  ok('an undergrad carries no title — nothing changed for them',
+     body.indexOf('Sam Dean · ') < 0 || /Sam Dean · \d/.test(body));
+  ok("a grad student's job is drawn on their day", body.indexOf('ZZ Collect plugs') >= 0);
   ok('and no longer falls off the chart',
      !w.boardOffChart(w.tbBoardPeople()).some(t => t.id === gid));
 
@@ -345,6 +349,106 @@ section('3d. a grad student fills in their hours on their own profile');
   ok('the day-board count did not quietly gain the grads',
      w.schedCrewOn(tue).indexOf('p09') < 0, w.schedCrewOn(tue).join(','));
   ok('no errors', c.errs.length === 0, c.errs[0]);
+}
+
+/* ------------------------------------------------------------------------- */
+section('3e. only people with a reason to be there have a name on the board');
+{
+  /* Dillon, 2026-09-30: "I only want the names of people scheduled or have
+     been assigned a task to appear. Everyone else should be silently in the
+     background until a task is assigned to them."
+
+     Before this, every undergraduate and every graduate student got a heading
+     and an "All caught up ✓" row whether or not they were anywhere near the
+     farm, so the screen Bill reads to see what is happening was mostly people
+     who are not there.
+
+     Nothing is hidden from the farm by this. The jobs are still on their
+     owner's Mine tab, still in the notification feed, still in the database.
+     tbBoardPeople() is deliberately unchanged in size, because two other
+     things read it: the once-a-minute repaint, which has to notice somebody
+     clocking in who was not showing a moment ago, and boardOffChart(), which
+     sweeps up work on people the board knows nothing about. */
+  const c = boot({});
+  const w = c.win;
+  const now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const iso = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0')
+            + '-' + String(today.getDate()).padStart(2, '0');
+  const dow = now.getDay();
+  const weekend = (dow === 0 || dow === 6);
+  const board = () => { w.eval('boardDay=' + (weekend ? 1 : dow) + ';'); w.renderBoard();
+                        return w.document.getElementById('tb-body').innerHTML; };
+
+  w.sessionSet('p07');                       // Bill, the farm manager
+  w.boardEnter();
+  const empty = board();
+  ok('an empty day draws no names at all',
+     empty.indexOf('Garrett Willard') < 0 && empty.indexOf('Rose Gibbons') < 0, empty.slice(0, 160));
+  ok('and says so in words rather than showing a bare date',
+     empty.indexOf('Nobody is down for this day') >= 0, empty.slice(0, 200));
+  ok('nobody is offered an "All caught up" row they did not earn',
+     empty.indexOf('All caught up') < 0);
+
+  /* REASON ONE: a job. This is the half Dillon put first -- somebody Bill has
+     given work to appears even if they never filled their hours in. */
+  const tid = w.newId('t');
+  c.p.TASKS.push({ id: tid, title: 'ZZ Drag the infield', area: 'Plots 3-4', assignee: 'p18',
+                   status: 'todo', kind: 'task', type: 'Miscellaneous',
+                   dueAt: w.atToday(null), repeat: 'None' });
+  const withJob = board();
+  ok('an undergrad with a job dated to the day has a name', withJob.indexOf('Garrett Willard') >= 0);
+  ok('and their job under it', withJob.indexOf('ZZ Drag the infield') >= 0);
+  ok('the undergrad next to them, with nothing, still has none',
+     withJob.indexOf('Barrett Smith') < 0, withJob.slice(0, 300));
+
+  /* A finished job still counts. Somebody who came in and cleared their list
+     should not vanish off the board the moment they are done. */
+  c.p.TASKS[c.p.TASKS.length - 1].status = 'done';
+  c.p.TASKS[c.p.TASKS.length - 1].completedBy = 'p18';
+  ok('and they stay on it once the job is finished', board().indexOf('Garrett Willard') >= 0);
+  c.p.TASKS.pop();
+  ok('but not when the job is taken away again', board().indexOf('Garrett Willard') < 0);
+
+  /* REASON TWO: they are down for the day. */
+  if (!weekend) {
+    const dayKey = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dow];
+    w.eval("schedSave('p19','" + w.semCurrentName() + "',(function(){var d=schedDefault();"
+           + "d." + dayKey + "={on:true,start:'08:00',end:'12:00'};return d;})());");
+    const sched = board();
+    ok('somebody scheduled for the day has a name, job or no job',
+       sched.indexOf('Barrett Smith') >= 0, sched.slice(0, 300));
+    ok('and the row says they are expected',
+       /Barrett Smith[\s\S]{0,240}scheduled|Barrett Smith[\s\S]{0,240}Scheduled/.test(sched));
+  }
+
+  /* REASON THREE, and the one Dillon asked for by name: a technician out on a
+     job. They set their own day and keep no standing hours, so a punch is
+     usually the only sign -- which is exactly why they were not on the board
+     before. */
+  ok('a technician with nothing on is not drawn', board().indexOf('Greg Breeden') < 0);
+  w.eval("tcApplyRemote([{id:'pu-tb3',pid:'p05',date:'" + iso + "',in:'07:00',out:null}]);");
+  const onClock = board();
+  ok('a technician on the clock IS drawn', onClock.indexOf('Greg Breeden') >= 0, onClock.slice(0, 400));
+  ok('with their job title, so Bill knows he asks rather than tells',
+     /Greg Breeden · Technician/.test(onClock), onClock.slice(0, 400));
+  ok('and the green line saying they are clocked in',
+     /Greg Breeden[\s\S]{0,300}Clocked in/.test(onClock));
+
+  /* The once-a-minute repaint has to be able to SEE them arrive, which is why
+     it walks the whole list and not the drawn names. */
+  ok('the repaint signature moves when somebody clocks in',
+     w.tbStateSig().indexOf('Clocked in') >= 0 || weekend, w.tbStateSig().slice(0, 120));
+
+  /* A technician's job no longer falls off the chart either -- it is drawn on
+     their day like anybody else's. */
+  const kid = w.newId('t');
+  c.p.TASKS.push({ id: kid, title: 'ZZ Rebuild the reel', area: '—', assignee: 'p05',
+                   status: 'todo', kind: 'task', type: 'Maintenance',
+                   dueAt: w.atToday(null), repeat: 'None' });
+  ok("a technician's job is drawn on their day", board().indexOf('ZZ Rebuild the reel') >= 0);
+  ok('and is not swept into "Not on any day above"',
+     !w.boardOffChart(w.tbBoardPeople()).some(t => t.id === kid));
+  ok('no errors while drawing any of it', c.errs.length === 0, c.errs[0]);
 }
 
 section('4. THE WIPE — the time clock keeps its history across a pay period');

@@ -221,6 +221,12 @@ ok('he may edit and delete somebody else\'s log entry',
 ok('he may assign, edit and delete anybody\'s task',
    ['assign', 'edit', 'delete', 'complete', 'claim', 'create']
      .every(a => win.taskCan('p01', a, { assignee: 'p09', createdBy: 'p09' }) === true));
+/* A REQUEST is the one thing on a task only its author may delete, since
+   2026-09-30 -- Bill and a faculty advisor both lost the bin on somebody
+   else's. The hat lifts that too, like every other permission. */
+ok('and delete a request somebody else raised',
+   win.taskCan('p01', 'delete', { kind: 'request', assignee: null,
+                                  createdBy: 'p09', requestedBy: 'p09' }) === true);
 
 section('3c. Bill\'s view of the Task Board, which is what Dillon asked for');
 ok('the board reads as the manager\'s', win.actsAsManager() === true);

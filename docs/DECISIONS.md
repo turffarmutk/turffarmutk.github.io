@@ -1334,6 +1334,31 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### A restriction shows Lift, not "Active" — 2026-09-30
+**Decision:** on a study's Restrictions list, a restriction that is still in
+force no longer carries an "Active" pill. Where that pill was, there is now a
+proper orange **Lift** button — the small line of text under the pill is gone.
+Lifting it turns the button into one grey word, **Inactive**, and fades the
+whole row. A restriction that simply ran out of dates says **Inactive** and
+fades in exactly the same way: to anyone reading the page, ended and lifted are
+the same fact — the ground is open again — and which of the two it was is
+spelled out in the lines to the left ("Lifted Sep 30 by …", or the date range).
+A **Scheduled** one keeps its pill *and* gets the button, and somebody who may
+not lift it (`trCanLift()` says no) still sees the plain Active pill, so the
+state is never missing.
+**Why:** Dillon asked for it. The pill said nothing the red badge on the left
+and the un-faded row had not already said, while Lift — the one thing on that
+row anybody might actually press, and the only thing that ends a restriction
+early — was 11px of orange text tucked underneath it. Fading the dead ones
+means the restrictions still closing ground are the ones the eye lands on.
+**Don't:** put the "Active" pill back beside the button "so the state is
+obvious" — un-faded *is* the state, and the pair reads as two controls. Don't
+give `.tr-res.off` a different meaning: it is set for `ended` and `lifted`
+together, and `trResState()` is what decides, not a new flag. And lifting still
+happens on the first tap with no "are you sure" — that is unchanged from the
+old text link, but the button is easier to hit, so if a mis-tap is ever
+reported the answer is a confirm, not moving the button somewhere quieter.
+
 ### The map loses its "Find a plot" box — 2026-09-30
 **Decision:** the search box in the farm map's legend strip is gone, for
 everyone — not hidden by role, removed. Its code went with it (`mfFeature()`,

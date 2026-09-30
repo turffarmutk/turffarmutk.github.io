@@ -374,9 +374,16 @@
   .tr-banner.soft{background:#fff5ec;border-color:#ffd9ac;color:#9a5b00}
   .tr-res{display:flex;gap:11px;align-items:flex-start;padding:12px 14px;border-bottom:1px solid var(--line)}
   .tr-res:last-child{border-bottom:none}
+  /* A restriction that is no longer closing any ground is faded whole, so a
+     study's live restrictions are the ones that catch the eye. Dillon asked
+     for this on 2026-09-30, along with the Lift button below. */
+  .tr-res.off{opacity:.5}
   .tr-resic{width:32px;height:26px;border-radius:8px;background:#fdeceb;color:#c0392b;font:800 9.5px 'Public Sans';letter-spacing:.3px;text-transform:uppercase;display:flex;align-items:center;justify-content:center;flex:none}
   .tr-resic.off{background:#eef1f4;color:#9aa0a8}
-  .tr-lift{font:800 11px 'Public Sans';color:var(--acc);cursor:pointer;flex:none;padding-top:2px}
+  /* Lift is a real button now, not a line of small orange text beside a pill
+     saying "Active". It is the only thing that ends a restriction early, so
+     it should look like something you press. */
+  .tr-lift{background:var(--acc);color:#fff;border-radius:9px;padding:8px 14px;font:800 12px 'Archivo';cursor:pointer;flex:none;white-space:nowrap}
   .tr-stage{display:flex;gap:6px;margin-top:11px}
   .tr-stage span{flex:1;text-align:center;font:800 11px 'Public Sans';padding:8px 4px;border-radius:9px;background:#eef1f4;color:#7b828d;cursor:pointer;user-select:none}
   .tr-stage span.on{background:var(--acc);color:#fff;box-shadow:0 2px 7px rgba(255,130,0,.32)}
@@ -5261,9 +5268,24 @@ function trRenderDetail(){
   } else {
     h+='<div class="list">'+t.restrictions.map(function(r){
       var st=trResState(r), ty=trRType(r.type);
-      var badge={active:['Active','#fdeceb','#c0392b'],scheduled:['Scheduled','#eef4ff','#2456b8'],
-                 ended:['Ended','#eef1f4','#7b828d'],lifted:['Lifted','#eef1f4','#7b828d']}[st];
-      return '<div class="tr-res">'
+      /* The right-hand column. While a restriction still closes ground the
+         button to lift it sits there on its own -- Dillon, 2026-09-30: an
+         "Active" pill said nothing the red badge and the un-faded row had not
+         already said, and it pushed the one thing you might actually want to
+         press down into small text underneath. A Scheduled one keeps its pill
+         as well, because "not in force yet" is the one state you cannot see
+         by looking. Ended and lifted both read "Inactive" and fade the whole
+         row: to anyone reading the study they are the same thing, the ground
+         is open again, and which of the two it was is spelled out in the lines
+         to the left. Someone who may not lift it still sees the state. */
+      var off=(st==='ended'||st==='lifted');
+      var right = off
+        ? '<span class="pill" style="background:#eef1f4;color:#7b828d">Inactive</span>'
+        : (st==='scheduled'?'<span class="pill" style="background:#eef4ff;color:#2456b8">Scheduled</span>':'')
+          +(trCanLift(r)
+              ? '<div class="tr-lift tap" data-lift="'+esc(r.id)+'">Lift</div>'
+              : (st==='active'?'<span class="pill" style="background:#fdeceb;color:#c0392b">Active</span>':''));
+      return '<div class="tr-res'+(off?' off':'')+'">'
         +'<div class="tr-resic'+(st==='active'?'':' off')+'">'+esc(ty.ab)+'</div>'
         +'<div style="flex:1;min-width:0"><div class="rt">'+esc(ty.label)+' · '+esc(r.scope)+'</div>'
         +'<div class="rs" style="color:'+(trResExtent(t,r)==='pin'?'#b26a00':'#8a8f98')+'">'+esc(trResExtentText(t,r))+'</div>'
@@ -5272,9 +5294,8 @@ function trRenderDetail(){
         +(r.lifted?'<div class="rs" style="color:#8a8f98">Lifted '+trFmt(r.lifted)
             +(r.liftedBy?((r.liftedByPid?' by ':' · ')+esc(r.liftedBy)):'')+'</div>':'')
         +'</div>'
-        +'<div style="text-align:right;flex:none"><span class="pill" style="background:'+badge[1]+';color:'+badge[2]+'">'+badge[0]+'</span>'
-        +((st==='active'||st==='scheduled')&&trCanLift(r)?'<div class="tr-lift" data-lift="'+esc(r.id)+'">Lift</div>':'')
-        +'</div></div>';
+        +'<div style="flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:7px">'+right+'</div>'
+        +'</div>';
     }).join('')+'</div>';
   }
 

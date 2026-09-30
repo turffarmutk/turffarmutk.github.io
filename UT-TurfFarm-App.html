@@ -134,20 +134,22 @@
   .hubn{color:#fff;font:800 10px 'Public Sans';min-width:19px;height:19px;padding:0 5px;border-radius:20px;display:flex;align-items:center;justify-content:center}
   .hub .t{font:800 15px 'Archivo';color:var(--ink)}
   .hub .s{font:700 11px 'Public Sans';color:var(--muted)}
-  .seg{display:flex;background:#e7e9e6;border-radius:11px;padding:3px;margin:12px 14px}
+  /* THE APP'S THREE-WAY SWITCHES -- Task Board, Equipment, Calendar, Trials and
+     the Assign screen, five of them, all .seg. The track was #e7e9e6, and the
+     page behind it on the Field theme is #e9ebe7: near enough the same color
+     that a switch read as three or four words floating loose rather than one
+     control with positions. So the track is the same gray the on/off switches
+     already use (#cfd3d8), with a hairline edge and a deeper shadow under the
+     chosen one -- which of them is on is then obvious at arm's length in
+     sunlight, and every switch in the app looks like the same control.
+
+     This started life scoped to #as-seg because changing .seg would land on
+     all the others. On 2026-09-30 Dillon asked for exactly that, so it lives
+     on .seg now and there is no per-screen version to keep in step. The border
+     costs no layout: box-sizing is border-box app-wide. */
+  .seg{display:flex;background:#cfd3d8;border:1px solid #c9ced4;border-radius:11px;padding:3px;margin:12px 14px}
   .seg span{flex:1;text-align:center;font:700 12px 'Public Sans';padding:8px;border-radius:8px;color:var(--muted)}
-  .seg span.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
-  /* The Assign screen's Scheduled / All tasks / Recent switch. The shared .seg
-     track above is #e7e9e6, and the page behind it on the Field theme is
-     #e9ebe7 -- near enough the same color that the switch read as three words
-     floating loose rather than one control with three positions. This gives it
-     the same gray track the on/off switches already use, a hairline edge, and a
-     deeper shadow under the chosen one, so which of the three is on is obvious
-     at arm's length in sunlight.
-     Scoped by id on purpose: .seg is shared by several other screens, so
-     changing .seg itself would land on all of them. */
-  #as-seg{background:#cfd3d8;border:1px solid #c9ced4}
-  #as-seg span.on{background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.22)}
+  .seg span.on{background:#fff;color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.22)}
   /* The favorites star, on a task list row and on an assign row. 40px square
      because it sits right next to a row that opens the job when tapped, and a
      thumb in a glove needs a target it cannot miss by two pixels.

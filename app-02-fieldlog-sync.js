@@ -195,6 +195,22 @@ function flPlotMatch(a){
   for(var i=0;i<p.length;i++) if(flState.plots.indexOf(p[i])>=0) return true;
   return false;
 }
+/* WHAT A FEED ROW SAYS UNDER THE JOB'S NAME: who did the work, and the day
+   they did it. Dillon asked for that on 2026-09-30, and the reason is how the
+   log is actually read -- you scan it to see whose work an afternoon was, and
+   when. It used to say the ground covered and the one-line summary, which was
+   the same person's name again in longhand ("Mowing / Bill Smith / 2:15 PM")
+   plus a plot list. The ground is on the entry's own page a tap away, and the
+   plot tiles at the top of the screen are the quicker way to ask "what
+   happened on 14". The time of day went with it, to the same page.
+
+   An entry written before anybody was stamped on it, or a seed row, has no
+   person -- it shows the date on its own rather than a stray separator. */
+function flWhoLine(a){
+  var who=nameOf(a.person)||a.person||'';
+  var when=a.date||'';
+  return who&&when?(who+' \u00b7 '+when):(who||when);
+}
 function flRender(){
  const feed=document.getElementById('fl-feed'); if(!feed)return;
  /* flLive(): a corrected entry is replaced by its correction, never counted
@@ -213,7 +229,7 @@ function flRender(){
   const cats=flState.types.length?flState.types.map(k=>(FL_TYPES[k]||FL_TYPES.misc).label).join(' + ')+' · ':'';
   head.textContent=scope+cats+items.length+' '+(items.length===1?'activity':'activities');}
  if(!items.length){feed.innerHTML='<div class="fl-empty">No activities logged for this filter yet.</div>';return;}
- feed.innerHTML='<div class="list">'+items.map(a=>{const t=FL_TYPES[a.type];return '<div class="row tap" data-flog="'+a.id+'"><span class="dot" style="background:'+t.dot+'"></span><div style="flex:1"><div class="rt">'+esc(a.title)+'</div><div class="rs">'+esc(flPlotsLabel(a))+' · '+esc(a.detail)+'</div></div><div style="text-align:right;flex:none"><span class="pill" style="background:'+t.bg+';color:'+t.fg+'">'+esc(t.label)+'</span><div class="rs" style="margin-top:5px">'+a.date+(a.time?(' · '+a.time):'')+'</div></div></div>';}).join('')+'</div>';
+ feed.innerHTML='<div class="list">'+items.map(a=>{const t=FL_TYPES[a.type];return '<div class="row tap" data-flog="'+a.id+'"><span class="dot" style="background:'+t.dot+'"></span><div style="flex:1;min-width:0"><div class="rt">'+esc(a.title)+'</div><div class="rs">'+esc(flWhoLine(a))+'</div></div><span class="pill" style="background:'+t.bg+';color:'+t.fg+'">'+esc(t.label)+'</span></div>';}).join('')+'</div>';
 }
 const FL_PLOTS=['11','12','13','14','15','16','17','18','GH'];
 function flPlotLabel(id){return id==='all'?'All plots':(id==='GH'?'Greenhouse':(/^\d+$/.test(id)?'Plot '+id:id));}

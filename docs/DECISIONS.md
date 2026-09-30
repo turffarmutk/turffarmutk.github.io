@@ -1334,6 +1334,25 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### A Field Log row says who did it and when, not what ground it covered — 2026-09-30
+**Decision:** a row in the Field Log feed is the job's name, then **who did the
+work and the day they did it** underneath, with the category on the right in
+its own colour and nothing else beside it. `flWhoLine()`
+(`app-02-fieldlog-sync.js`) writes the second line off `person` and `date`.
+What used to be there — the plot list and the one-line summary — is gone from
+the row, and so is the time of day, which used to sit under the category pill.
+**Why:** Dillon asked for it in those words. The old second line read "Plot 11,
+Plot 12, Plot 13 · Mowing · Bill Czekai · 2:15 PM", which is the category
+twice (it was already the pill) and a plot list long enough to wrap on a phone.
+The log is read to see whose work an afternoon was and when — the ground is one
+tap away on the entry's own page, which names every plot, and the plot tiles
+and the search box at the top of the screen are the faster way to ask "what
+happened on 14" anyway.
+**Don't:** put the plots back on the row because it looks like information went
+missing. It did not — `flPlotsFull()` still names every one of them on the
+detail page and in the `.csv` export, and `flPlotMatch()` still searches the
+whole list. A row that wraps to three lines on a phone is what this replaced.
+
 ### The Task Board only names people who are out — 2026-09-30
 **Decision:** a name appears on the Board tab for a given day only when that
 person is **down for that day, has punched today, or has a job dated to it**.

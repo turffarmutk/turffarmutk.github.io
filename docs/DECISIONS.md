@@ -1334,6 +1334,46 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### The map loses its "Find a plot" box — 2026-09-30
+**Decision:** the search box in the farm map's legend strip is gone, for
+everyone — not hidden by role, removed. Its code went with it (`mfFeature()`,
+`mfMatches()`, `mfRender()`, `mfGo()`, `mfWire()`). The legend row above it
+stays exactly as it was.
+**Why:** Dillon asked for it off the map. Leaving the code behind wired to
+nothing is worse than removing it: the next person reads it, believes the
+feature is there, and spends an afternoon working out why it never appears.
+**Don't:** delete the `.mfsug`, `.mfrow`, `.mfn`, `.mfs` or `.mfnone` rules in
+the stylesheet along with it. They look like the search box's own styles and
+they are not — the two plot-PICKER maps (Choose Plots, and the assign wizard)
+draw their suggestion lists with the same class names through
+`pickFindWire()`, which is separate code further down the file. Taking them
+out leaves both pickers with an unstyled, unreadable dropdown and nothing
+errors.
+
+### The Studies tiles become numbers on the toggle bar — 2026-09-30
+**Decision:** the three tiles above the Studies list (Active, Planned,
+Restrictions) are gone, and the Active / Planned / Done toggle bar underneath
+now carries the count on each tab. The number a tab shows is **what you get
+when you tap it** — so the lab chips and the search box narrow it, and it is
+worked out by `trCountFor()`, which runs the list's own `trFilter()` with the
+stage swapped in rather than counting a second way. The farm-wide
+**restrictions** total went with the tiles; it is still on the manager's home
+screen widget and every study's card still shows its own.
+**Why:** Dillon asked for the tiles to come off and the numbers to move onto
+the bar. The tiles were a third of the screen above the fold on a phone, and
+two of their three numbers were answers to the question the bar already asks.
+Counting inside `trFilter()` is what stops the bar and the list disagreeing:
+a separate count would have gone stale the moment somebody typed in the search
+box, and "Planned 2" over a list of four is worse than no number at all.
+**Don't:** write the count style on `.seg span`. `.seg` is the same three-way
+switch the Assign, Equipment and Roster screens use — a rule there puts an
+empty gap on all of them (see the bare-class-names row in `CLAUDE.md`). It is
+scoped to `#tr-seg`. And don't take the `on`-class line back out of
+`trRender()`: arriving from the home screen's Trials widget forces the tab to
+Active (`app-01-shell.js`) without moving the white highlight, so the bar could
+say Planned while the list showed Active — invisible while the tabs were bare
+words, a plain lie now they carry numbers.
+
 ### Repeats come off the task list, everywhere — 2026-09-30
 **Decision:** the **Repeat** control is gone from the Add-to-the-task-list
 form, and with it the "How often (per week)" chips, the repeat on a task

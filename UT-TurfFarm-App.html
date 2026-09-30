@@ -450,6 +450,15 @@
   .tr-pdf:active{background:#fbf5ec;border-color:var(--acc)}
   .tr-pdf .fn{display:block;font:800 15px 'Archivo';color:var(--ink);word-break:break-all;line-height:1.3}
   .tr-pdf .sub{display:block;font:700 11.5px 'Public Sans';color:var(--muted);margin-top:5px;letter-spacing:0}
+  /* The count that rides on each tab of the Studies toggle bar, where the three
+     tiles above it used to be. Scoped to #tr-seg on purpose: .seg is the same
+     three-way switch the Assign, Equipment and Roster screens use, and a rule
+     written on .seg span would put an empty gap on every one of them. Not
+     italic -- <i> is only being used as a short tag with no styling of its
+     own. */
+  #tr-seg .segn{margin-left:5px;font-style:normal;font-weight:800;opacity:.55}
+  #tr-seg span.on .segn{opacity:1;color:var(--acc)}
+  #tr-seg .segn:empty{display:none}
 
   /* ---- 1a REFINED PRO (base look) ---- */
   .pro{--bg:#f3f4f2;--card:#fff;--line:#e6e8eb;--ink:#1f2328;--muted:#98a0aa}
@@ -635,12 +644,11 @@
   .maplegend .lg{display:flex;gap:12px;flex-wrap:wrap;align-items:center;font:700 10.5px 'Public Sans';color:#6b7280;padding-bottom:9px;margin-bottom:9px;border-bottom:1px solid #eef0f2}
   .maplegend .lg span{display:flex;align-items:center;gap:4px}
   .maplegend .mpin{position:static}
-  /* Plot finder — lives in the legend strip, suggestions open upward so the
-     tab bar never covers them. */
-  .mapfind{position:relative}
-  .mapfind input{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;background:#f5f6f7;padding:9px 12px;font:700 12px 'Public Sans';color:var(--ink);outline:none}
-  .mapfind input::placeholder{color:#9aa1a9;font-weight:700}
-  .mapfind input:focus{border-color:var(--acc);background:#fff}
+  /* The farm map's own "Find a plot" box came off on 2026-09-30 — Dillon asked
+     for the legend strip back. The .mfsug rules below STAY: the two plot-PICKER
+     maps (Choose Plots, and the assign wizard) draw their own search results
+     with these same classes, through pickFindWire(), which is separate code.
+     Delete them with the box and both pickers lose their suggestion list. */
   .mfsug{position:absolute;left:0;right:0;bottom:calc(100% + 6px);background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 24px rgba(0,0,0,.16);max-height:196px;overflow:auto;display:none;z-index:900}
   .mfsug .mfrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer}
   .mfsug .mfrow:last-child{border-bottom:0}
@@ -1467,7 +1475,7 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
               <span class="pechip done" data-pe="done">Done</span>
             </div>
             <div class="mapchips"><span class="on" data-mchip="plots">Plots</span><span class="on" data-mchip="labels">Labels</span><span data-mchip="alleys">Alleys</span><span data-mchip="mower">Mower</span><span data-mchip="cut">Cut Ht</span><span data-mchip="trials">Trials</span><span data-mchip="res">Restrictions</span><span data-mchip="irrig" class="soon" title="Coming soon">Irrigation · soon</span></div>
-            <div class="mapvp" style="position:relative;flex:1;min-height:0;background:#6f8a5f"><div id="appmap"></div><div class="locbtn tap" id="map-locate" role="button" aria-label="Show my location" title="Show my location"><svg viewBox="0 0 24 24" aria-hidden="true"><circle class="lb-ring" cx="12" cy="12" r="6.4"/><circle class="lb-core" cx="12" cy="12" r="2.6"/><path class="lb-tick" d="M12 1.4v3.2M12 19.4v3.2M1.4 12h3.2M19.4 12h3.2"/></svg></div><div class="maphint">Drag to pan · scroll / pinch to zoom · tap a plot · names appear when zoomed in</div></div><div class="maplegend"><div id="map-legrow"></div><div class="mapfind"><div class="mfsug" id="mf-sug"></div><input id="mf-in" type="text" autocomplete="off" spellcheck="false" placeholder="Find a plot — B14, O5, CAFS17…"></div></div></div><div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab"><span class="te">📋</span>Tasks</div><div class="tab on"><span class="te">🗺️</span>Map</div><div class="tab"><span class="te">📦</span>Inventory</div><div class="tab"><span class="te">•••</span>More</div></div>
+            <div class="mapvp" style="position:relative;flex:1;min-height:0;background:#6f8a5f"><div id="appmap"></div><div class="locbtn tap" id="map-locate" role="button" aria-label="Show my location" title="Show my location"><svg viewBox="0 0 24 24" aria-hidden="true"><circle class="lb-ring" cx="12" cy="12" r="6.4"/><circle class="lb-core" cx="12" cy="12" r="2.6"/><path class="lb-tick" d="M12 1.4v3.2M12 19.4v3.2M1.4 12h3.2M19.4 12h3.2"/></svg></div><div class="maphint">Drag to pan · scroll / pinch to zoom · tap a plot · names appear when zoomed in</div></div><div class="maplegend" style="display:none"><div id="map-legrow"></div></div></div><div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab"><span class="te">📋</span>Tasks</div><div class="tab on"><span class="te">🗺️</span>Map</div><div class="tab"><span class="te">📦</span>Inventory</div><div class="tab"><span class="te">•••</span>More</div></div>
 </section>
 
 <section class="screen" id="s-indoor"><div class="app field" style="position:relative"><div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">LH — Indoor plots</div><div style="font-size:12px;color:#cfe0ff">Light house</div></div><div style="flex:1;overflow:auto;background:#dfe3d9;display:flex;justify-content:center;align-items:flex-start;padding:14px"><svg viewBox="0 0 360 590" width="100%" style="max-width:360px" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#46c866"/><stop offset="1" stop-color="#2f9e4f"/></linearGradient><filter id="sh" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="1.2" stdDeviation="1.4" flood-color="#000000" flood-opacity="0.35"/></filter><style>.lhp{cursor:pointer}.lhp:hover rect{stroke:#ff8200;stroke-width:2.6}.lhp:active rect{fill:#2f9e4f}</style></defs><rect x="18" y="18" width="324" height="554" rx="9" fill="#6b6f73"/><rect x="26" y="26" width="308" height="538" rx="5" fill="#f5f1e8"/><g transform="translate(316,44)"><line x1="0" y1="10" x2="0" y2="-8" stroke="#58595b" stroke-width="1.6"/><path d="M0,-11 L3,-4 L-3,-4 Z" fill="#58595b"/><text x="0" y="22" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#58595b">N</text></g><rect x="40" y="34" width="264" height="26" rx="4" fill="#e5e8ee"/><text x="172" y="50" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="9" fill="#8a8f98" letter-spacing="0.5">BACK WALKWAY</text><rect x="158" y="66" width="44" height="402" rx="4" fill="#ece6da"/><line x1="180" y1="74" x2="180" y2="460" stroke="#c3b79d" stroke-width="1.4" stroke-dasharray="5 6"/><text x="180" y="270" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="9" fill="#a89a7f" transform="rotate(-90 180 270)" letter-spacing="1">CENTER WALKWAY</text><g class="lhp" onclick="lhPlot('LH6')"><g filter="url(#sh)"><rect x="54" y="74" width="104" height="57" rx="7" fill="url(#g)" stroke="#227a3a" stroke-width="1.4"/></g><text x="106.0" y="106.5" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif" font-weight="700" font-size="13" fill="#ffffff">LH6</text></g><g class="lhp" onclick="lhPlot('LH12')"><g filter="url(#sh)"><rect x="202" y="74" width="104" height="57" rx="7" fill="url(#g)" stroke="#227a3a" stroke-width="1.4"/></g><text x="254.0" y="106.5" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif" font-weight="700" font-size="13" fill="#ffffff">LH12</text></g><g class="lhp" onclick="lhPlot('LH5')"><g filter="url(#sh)"><rect x="54" y="140" width="104" height="57" rx="7" fill="url(#g)" stroke="#227a3a" stroke-width="1.4"/></g><text x="106.0" y="172.5" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif" font-weight="700" font-size="13" fill="#ffffff">LH5</text></g><g class="lhp" onclick="lhPlot('LH11')"><g filter="url(#sh)"><rect x="202" y="140" width="104" height="57" rx="7" fill="url(#g)" stroke="#227a3a" stroke-width="1.4"/></g><text x="254.0" y="172.5" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif" font-weight="700" font-size="13" fill="#ffffff">LH11</text></g><g class="lhp" onclick="lhPlot('LH4')"><g filter="url(#sh)"><rect x="54" y="206" width="104" height="57" rx="7" fill="url(#g)" stroke="#227a3a" stroke-width="1.4"/></g><text x="106.0" y="238.5" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif" font-weight="700" font-size="13" fill="#ffffff">LH4</text></g><g class="lhp" onclick="lhPlot('LH10')"><g filter="url(#sh)"><rect x="202" y="206" width="104" height="57" rx="7" fill="url(#g)" stroke="#227a3a" stroke-width="1.4"/></g><text x="254.0" y="238.5" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif" font-weight="700" font-size="13" fill="#ffffff">LH10</text></g><g class="lhp" onclick="lhPlot('LH3')"><g filter="url(#sh)"><rect x="54" y="272" width="104" height="57" rx="7" fill="url(#g)" stroke="#227a3a" stroke-width="1.4"/></g><text x="106.0" y="304.5" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif" font-weight="700" font-size="13" fill="#ffffff">LH3</text></g><g class="lhp" onclick="lhPlot('LH9')"><g filter="url(#sh)"><rect x="202" y="272" width="104" height="57" rx="7" fill="url(#g)" stroke="#227a3a" stroke-width="1.4"/></g><text x="254.0" y="304.5" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif" font-weight="700" font-size="13" fill="#ffffff">LH9</text></g><g class="lhp" onclick="lhPlot('LH2')"><g filter="url(#sh)"><rect x="54" y="338" width="104" height="57" rx="7" fill="url(#g)" stroke="#227a3a" stroke-width="1.4"/></g><text x="106.0" y="370.5" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif" font-weight="700" font-size="13" fill="#ffffff">LH2</text></g><g class="lhp" onclick="lhPlot('LH8')"><g filter="url(#sh)"><rect x="202" y="338" width="104" height="57" rx="7" fill="url(#g)" stroke="#227a3a" stroke-width="1.4"/></g><text x="254.0" y="370.5" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif" font-weight="700" font-size="13" fill="#ffffff">LH8</text></g><g class="lhp" onclick="lhPlot('LH1')"><g filter="url(#sh)"><rect x="54" y="404" width="104" height="57" rx="7" fill="url(#g)" stroke="#227a3a" stroke-width="1.4"/></g><text x="106.0" y="436.5" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif" font-weight="700" font-size="13" fill="#ffffff">LH1</text></g><g class="lhp" onclick="lhPlot('LH7')"><g filter="url(#sh)"><rect x="202" y="404" width="104" height="57" rx="7" fill="url(#g)" stroke="#227a3a" stroke-width="1.4"/></g><text x="254.0" y="436.5" text-anchor="middle" font-family="-apple-system,Segoe UI,sans-serif" font-weight="700" font-size="13" fill="#ffffff">LH7</text></g><rect x="40" y="476" width="264" height="78" rx="6" fill="#eaf1e4" stroke="#cdd8c4" stroke-width="1"/><text x="172" y="512" text-anchor="middle" font-family="-apple-system,sans-serif" font-weight="600" font-size="12" fill="#6f8158">Open area</text><text x="172" y="528" text-anchor="middle" font-family="-apple-system,sans-serif" font-size="9" fill="#93a07e">front of building (south)</text><rect x="150" y="562" width="44" height="10" fill="#f5f1e8"/><path d="M150,566 A44,44 0 0,1 194,566" fill="none" stroke="#b9bec4" stroke-width="1.3"/></svg></div><div class="maplegend"><div class="rs" style="font-size:13px">12 indoor plots · 64 ft² each · <strong style="color:#ff8200">tap a plot</strong> to see its experiment · ‹ returns to the farm map.</div></div><div id="lh-sheet" style="display:none;position:absolute;left:0;right:0;bottom:0;background:#fff;border-top:4px solid #ff8200;border-radius:16px 16px 0 0;box-shadow:0 -4px 22px rgba(0,0,0,.28);padding:16px 16px 22px;z-index:60;max-height:72%;overflow:auto"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div id="lh-title" style="font-weight:800;font-size:18px;flex:1;color:#1f2328">LH1</div><div onclick="lhClose()" style="cursor:pointer;font-size:20px;color:#9aa0a8;line-height:1">✕</div></div><div id="lh-body"></div></div></div><div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab"><span class="te">📋</span>Tasks</div><div class="tab on"><span class="te">🗺️</span>Map</div><div class="tab"><span class="te">📦</span>Inventory</div><div class="tab"><span class="te">•••</span>More</div></div></section>
@@ -1708,8 +1716,7 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
 <section class="screen" id="s-trial">
 <div class="app field">
   <div class="hdr" style="justify-content:space-between"><div class="title">Studies</div><span class="tap" id="tr-addbtn" style="font-size:24px;color:#fff;line-height:1;font-weight:800">＋</span></div>
-  <div class="kpis" id="tr-kpis"></div>
-  <div class="seg" id="tr-seg"><span class="on" data-t="active">Active</span><span data-t="planned">Planned</span><span data-t="completed">Done</span></div>
+  <div class="seg" id="tr-seg"><span class="on" data-t="active">Active<i class="segn"></i></span><span data-t="planned">Planned<i class="segn"></i></span><span data-t="completed">Done<i class="segn"></i></span></div>
   <input class="inv-search" id="tr-search" placeholder="Search title, plot, PI, treatment…" autocomplete="off">
   <div class="chips" id="tr-labchips"></div>
   <div id="tr-body" style="padding-bottom:16px"></div>
@@ -3948,13 +3955,19 @@ function trialsLegendHtml(){
   s+='</div><div class="rs" style="margin-top:4px">Active studies colored by lab. Tap a study for its plot, coverage and restrictions.</div>';
   return s;
 }
-/* Only the swatch row swaps with the chips — the plot finder under it stays put. */
+/* The swatch row, and the white strip it sits in. The strip used to hold the
+   "Find a plot" box as well, so it always had something in it; with the box
+   gone (2026-09-30) an empty legend would leave a 25px band of white between
+   the map and the tab bar with nothing in it, which just eats map on a phone.
+   So the strip is hidden outright when there is no legend to show. */
 function mapLegend(which){
   var el=document.getElementById('map-legrow'); if(!el) return;
   if(which==='mower') el.innerHTML=mowerLegendHtml();
   else if(which==='trials') el.innerHTML=trialsLegendHtml();
   else el.innerHTML='';
-  el.style.marginBottom=el.innerHTML?'9px':'0';
+  el.style.marginBottom='0';
+  var strip=el.parentElement;
+  if(strip&&strip.classList.contains('maplegend')) strip.style.display=el.innerHTML?'block':'none';
 }
 /* Restrictions carry their own four-letter badge on the ground, so they need no
    legend row — only mower colors and lab colors do. */
@@ -4128,7 +4141,6 @@ function mapEnter(){
      that is over. */
   try{ trAutoStage(); }catch(e){}
   try{ peSyncChrome(); }catch(e){}
-  mfWire();
   if(_appmap){ setTimeout(function(){_appmap.invalidateSize();updateView();try{trMapPins();}catch(e){}},60); return; }
   if(!el || typeof L==='undefined') return;
   /* Goes to 20, the same as the plot-picking maps. At 18 you could not get
@@ -4220,79 +4232,11 @@ function mapLocateInit(){
 /* Leaving the map screen hands the GPS back — the farm map has no reason to
    hold a watch open behind another screen. */
 function mapLocateLeave(){ if(_meDot) mapLocateOff(); }
-/* ---- Plot finder ---------------------------------------------------------
-   Type a plot number, tap the hit, and the map flies to it and opens the same
-   popup a tap on the ground would. Facilities and the alleys are searchable
-   too, since people look for the Shop as often as for B14. */
-function mfFeature(name){
-  for(var i=0;i<PLOTS_DATA.features.length;i++){
-    var f=PLOTS_DATA.features[i];
-    if(((f.properties||{}).number||'')===name) return f;
-  }
-  return null;
-}
-function mfSubtitle(f){
-  var p=f.properties||{}, n=p.number;
-  if(p.type==='dump')     return 'Dump pile';
-  if(p.type==='facility') return 'Facility';
-  if(p.type==='border')   return 'Border';
-  if(typeof MGMT_DATA!=='undefined'&&MGMT_DATA[n]&&MGMT_DATA[n].m) return mowerLabel(n);
-  var o=(typeof infoObj==='function')?infoObj(n):{};
-  return o.Turfgrass||o.Type||'Plot';
-}
-function mfMatches(q){
-  q=(q||'').trim().toLowerCase(); if(!q) return [];
-  var starts=[],has=[],seen={};
-  PLOTS_DATA.features.forEach(function(f){
-    var n=(f.properties||{}).number; if(!n||n==='LH'||seen[n])return;
-    var l=n.toLowerCase(); if(l.indexOf(q)<0)return;
-    seen[n]=1; (l.indexOf(q)===0?starts:has).push(f);
-  });
-  function byName(a,b){ return (a.properties.number+'').localeCompare(b.properties.number+'',undefined,{numeric:true}); }
-  return starts.sort(byName).concat(has.sort(byName)).slice(0,8);
-}
-function mfRender(q){
-  var box=document.getElementById('mf-sug'); if(!box)return;
-  if(!(q||'').trim()){ box.style.display='none'; box.innerHTML=''; return; }
-  var m=mfMatches(q);
-  box.innerHTML=m.length
-    ? m.map(function(f){ var n=f.properties.number;
-        return '<div class="mfrow" data-mfgo="'+esc(n)+'"><span class="mfn">'+esc(n)+'</span><span class="mfs">'+esc(mfSubtitle(f))+'</span></div>'; }).join('')
-    : '<div class="mfnone">No plot matches “'+esc(q)+'”</div>';
-  box.style.display='block';
-}
-function mfGo(name){
-  var f=mfFeature(name); if(!f||!_appmap)return;
-  var b; try{ b=L.geoJSON(f).getBounds(); }catch(e){ return; }
-  var z=_appmap.getMaxZoom();
-  try{ z=Math.min(_appmap.getBoundsZoom(b,false,L.point(48,48)),_appmap.getMaxZoom()); }catch(e){}
-  _appmap.setView(b.getCenter(),Math.max(z,LABEL_MIN_ZOOM),{animate:true});
-  setTimeout(function(){
-    try{ L.popup({maxWidth:300}).setLatLng(b.getCenter()).setContent(plotPopupHtml(f.properties)).openOn(_appmap); }catch(e){}
-  },420);
-  var box=document.getElementById('mf-sug'); if(box){box.style.display='none';box.innerHTML='';}
-  var inp=document.getElementById('mf-in'); if(inp){inp.value=name;inp.blur();}
-}
-var _mfWired=false;
-function mfWire(){
-  if(_mfWired)return; _mfWired=true;
-  var inp=document.getElementById('mf-in'),box=document.getElementById('mf-sug');
-  if(!inp||!box)return;
-  inp.addEventListener('input',function(){ mfRender(inp.value); });
-  inp.addEventListener('focus',function(){ if(inp.value.trim())mfRender(inp.value); });
-  inp.addEventListener('keydown',function(e){
-    if(e.key==='Enter'){ var m=mfMatches(inp.value); if(m.length)mfGo(m[0].properties.number); }
-    if(e.key==='Escape'){ inp.value=''; box.style.display='none'; box.innerHTML=''; inp.blur(); }
-  });
-  box.addEventListener('click',function(e){
-    var r=e.target.closest('[data-mfgo]'); if(!r)return;
-    mfGo(r.getAttribute('data-mfgo'));
-  });
-  document.addEventListener('click',function(e){
-    if(e.target.closest('.mapfind'))return;
-    box.style.display='none';
-  });
-}
+/* The farm map's "Find a plot" box was here until 2026-09-30, when Dillon
+   asked for it off the map. Its code went with it -- mfFeature(), mfMatches(),
+   mfRender(), mfGo() and mfWire() -- because dead code that still looks wired
+   up is worse than no code. The two plot-PICKER maps keep their own search
+   boxes, which are separate: pickFindWire() and pickMatches(), further down. */
 </script>
 <script>
 /* ============================================================
@@ -4958,19 +4902,35 @@ function trCardHtml(t){
   if(t.stage==='active'&&pr!=null) h+='<div class="tr-bar"><i style="width:'+Math.round(pr*100)+'%"></i></div>';
   return h+'</div>';
 }
+/* How many studies each tab of the toggle bar would show if you tapped it. It
+   borrows the list's own filter with the stage swapped in, rather than
+   counting separately, because two counts of the same thing written two ways
+   is two things to keep in step -- and the lab chips and the search box narrow
+   the list, so a number worked out any other way stops matching the cards
+   underneath it the moment somebody types. */
+function trCountFor(stage){
+  var was=trState.tab, n;
+  trState.tab=stage;
+  try{ n=trFilter().length; } finally { trState.tab=was; }
+  return n;
+}
 function trRender(){
   var body=document.getElementById('tr-body'); if(!body) return;
 
-  var k=document.getElementById('tr-kpis');
-  if(k){
-    var vis=TRIALS.filter(trVisible);
-    var na=vis.filter(function(t){return t.stage==='active';}).length;
-    var np=vis.filter(function(t){return t.stage==='planned';}).length;
-    var nr=trAllLiveRestrictions().length;
-    k.innerHTML='<div class="kpi"><div class="n">'+na+'</div><div class="l">Active</div></div>'
-      +'<div class="kpi"><div class="n">'+np+'</div><div class="l">Planned</div></div>'
-      +'<div class="kpi"><div class="n">'+nr+'</div><div class="l">Restrictions</div></div>';
-  }
+  /* The three tiles that used to sit above the toggle bar are gone (Dillon,
+     2026-09-30) and their numbers now ride on the tabs themselves. The
+     restrictions total went with them -- it is still on the manager home
+     screen and on every study's own card. */
+  var seg=document.getElementById('tr-seg');
+  if(seg) seg.querySelectorAll('span[data-t]').forEach(function(sp){
+    var n=sp.querySelector('.segn'); if(n) n.textContent=trCountFor(sp.getAttribute('data-t'));
+    /* Which tab is lit is also set here, not only by the tap. Arriving from the
+       home screen's Trials widget forces the tab back to Active (app-01), and
+       nothing moved the white highlight to match it -- so the bar could say
+       Planned while the list showed Active. Harmless while the tabs were bare
+       words; a lie now that they carry numbers. */
+    sp.classList.toggle('on',sp.getAttribute('data-t')===trState.tab);
+  });
 
   var chips=document.getElementById('tr-labchips');
   if(chips){

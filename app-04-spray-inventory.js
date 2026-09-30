@@ -888,8 +888,12 @@ function openTask(id){
     is what made five mystery tasks on Dillon's own list unanswerable in
     August 2026 -- the board could say a job was his, and nothing anywhere in
     the app could say where it had come from. */
- rows+=fldRow('Added by',esc(nameOf(t.createdBy)||t.createdBy||'—'));
- rows+=fldRow('↻ Repeat',t.repeat,true);
+ /* The "↻ Repeat" row used to close this list. It is gone -- see the note in
+    the markup where the Repeat control was: nothing in the app ever acted on
+    it, so it was a job announcing a schedule nobody had set up. Dillon,
+    2026-09-30. `fldRow`'s third argument is "this is the last row", which now
+    belongs to Added by. */
+ rows+=fldRow('Added by',esc(nameOf(t.createdBy)||t.createdBy||'—'),true);
  var picker= isReq? '<div class="sec">Assign to undergrad</div><div class="chiprow" id="td-people">'+STUDENTS.map(function(s,i){return rosterPill(s,i===0);}).join('')+'</div>':'';
  document.getElementById('td-body').innerHTML=
    '<div class="hdr" style="background:#2f3133;padding:15px 16px;gap:10px"><div class="title" style="color:#fff;font-size:17px;flex:1;line-height:1.15">'+esc(t.title)+'</div>'+stat+'</div>'

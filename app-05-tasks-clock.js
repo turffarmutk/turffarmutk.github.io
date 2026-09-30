@@ -36,7 +36,6 @@ app.addEventListener('click',function(e){var m=e.target.closest('[data-mode]');i
 const CATEGORIES=['Mow','Spray','Fertilize','Cultivation','Irrigation','Maintenance','Miscellaneous'];
 function isMowCat(cat){ return /mow/i.test(cat||''); }
 const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const FREQS=[2,3,4,5,6];
 const PLOTS=[
  {n:'11',label:'11',l:5,t:6,w:28,h:22},{n:'12',label:'12',l:36,t:6,w:28,h:22},{n:'13',label:'13',l:67,t:6,w:28,h:22},
  {n:'14',label:'14',l:5,t:31,w:28,h:30},{n:'15',label:'15',l:36,t:31,w:28,h:30},{n:'16',label:'16',l:67,t:31,w:28,h:30},
@@ -118,7 +117,7 @@ var TEMPLATES=[];
   if(stored&&stored.length){ stored.forEach(function(t){ if(t) TEMPLATES.push(tplFixLegacy(t)); }); }
   else{
     TASK_SEED.forEach(function(t){
-      TEMPLATES.push(tplFixLegacy({id:t.id,name:t.name,category:t.category,plots:[],repeat:'As needed',freq:null,months:[],
+      TEMPLATES.push(tplFixLegacy({id:t.id,name:t.name,category:t.category,plots:[],repeat:'None',freq:null,months:[],
                       machines:(t.machines||[]).slice(),machine:'',eqNote:t.eqNote||'',logField:t.logField!==false}));
     });
   }
@@ -262,7 +261,7 @@ function tplMachineList(list){
  var byId={}; all.forEach(function(e){byId[e.id]=e;});
  return list.map(function(id){return byId[id];}).filter(Boolean);
 }
-let FORM={id:null,mode:'template',students:1,name:'',category:CATEGORIES[0],plots:[],repeat:'Daily',freq:3,months:[]};
+let FORM={id:null,mode:'template',students:1,name:'',category:CATEGORIES[0],plots:[],repeat:'None',freq:3,months:[]};
 
 /* "Plots 14, 15" — except the alley network, which reads as zones. */
 function areaLabel(pl){
@@ -293,8 +292,6 @@ function wantsMachineRow(){
 function initFormChrome(){
  var cat=document.getElementById('tn-cat');
  if(cat&&!cat.options.length)cat.innerHTML=CATEGORIES.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join('');
- var fr=document.getElementById('tn-freq');
- if(fr)fr.innerHTML=FREQS.map(function(n){return '<span class="fchip" data-freq="'+n+'">'+n+'× / wk</span>';}).join('');
 }
 function editAssigneePool(){
  var pool=CREW.slice();
@@ -348,11 +345,6 @@ function syncForm(){
     courtesy, not a lock. */
  var dw=document.getElementById('tn-delwrap');
  if(dw) dw.style.display=(!req&&!asg&&!edt&&!!FORM.id&&(typeof tplCanEdit!=='function'||tplCanEdit()))?'':'none';
- document.getElementById('tn-repeat').value=FORM.repeat;
- var custom=FORM.repeat==='Custom';
- document.getElementById('tn-custom-sec').style.display=custom?'':'none';
- document.getElementById('tn-freq').style.display=custom?'':'none';
- document.querySelectorAll('#tn-freq .fchip').forEach(function(c){c.classList.toggle('on',+c.getAttribute('data-freq')===+FORM.freq);});
  /* Favorite: a job's own row only. A request, an assignment or a one-off edit
     has no template behind it, so there is nothing to star -- and it is hidden
     from undergraduates for the same reason the star is, which favCanUse()
@@ -377,8 +369,8 @@ function openForm(tpl){
  /* fav is read off MY favorites record, not off the job -- the star is per
     person, so two people opening the same job see different answers here.
     A brand-new job starts unstarred. */
- if(tpl){FORM={id:tpl.id,mode:'template',students:1,name:tpl.name,category:tpl.category,plots:(tpl.plots||[]).slice(),repeat:tpl.repeat,freq:tpl.freq||3,months:(tpl.months||[]).slice(),machine:tpl.machine||'',machines:(tpl.machines||[]).slice(),eqNote:tpl.eqNote||'',logField:tpl.logField!==false,fav:favHas(tpl.id)};}
- else{FORM={id:null,mode:'template',students:1,name:'',category:CATEGORIES[0],plots:[],repeat:'As needed',freq:3,months:[],machines:[],eqNote:'',logField:true,fav:false};}
+ if(tpl){FORM={id:tpl.id,mode:'template',students:1,name:tpl.name,category:tpl.category,plots:(tpl.plots||[]).slice(),repeat:'None',freq:3,months:(tpl.months||[]).slice(),machine:tpl.machine||'',machines:(tpl.machines||[]).slice(),eqNote:tpl.eqNote||'',logField:tpl.logField!==false,fav:favHas(tpl.id)};}
+ else{FORM={id:null,mode:'template',students:1,name:'',category:CATEGORIES[0],plots:[],repeat:'None',freq:3,months:[],machines:[],eqNote:'',logField:true,fav:false};}
  syncForm(); go('tasknew');
 }
 function openReqForm(withStudents){
@@ -457,8 +449,6 @@ document.getElementById('tn-logfield-row')&&document.getElementById('tn-logfield
 document.getElementById('s-tasknew').addEventListener('click',function(e){
 });document.getElementById('tn-machine').addEventListener('change',function(e){FORM.machine=e.target.value;});
 document.getElementById('tn-when')&&document.getElementById('tn-when').addEventListener('change',function(e){FORM.dueOrd=parseInt(e.target.value,10)||FORM.dueOrd;});
-document.getElementById('tn-repeat').addEventListener('change',function(e){FORM.repeat=e.target.value;syncForm();});
-document.getElementById('tn-freq').addEventListener('click',function(e){var c=e.target.closest('[data-freq]');if(!c)return;FORM.freq=+c.getAttribute('data-freq');syncForm();});
 /* The "Months active" boxes used to be wired up here. They came off the form
    on 2026-09-28 -- the Assign screen's Scheduled tab was the only thing that
    ever read them. FORM.months is still loaded and saved untouched, so a job's
@@ -632,7 +622,6 @@ function tplSummary(t){
  if(t.plots&&t.plots.length)bits.push(areaLabel(t.plots));
  if(t.machines&&t.machines.length)bits.push(tplMachineList(t.machines).map(function(e){return e.name;}).join(' · '));
  else if(t.eqNote)bits.push(t.eqNote);
- bits.push(t.repeat==='Custom'?(t.freq+'×/wk'):t.repeat);
  return bits.join(' · ');
 }
 /* ================== THE TASK LIST ==================
@@ -669,7 +658,7 @@ function renderTemplates(){
      +(edit?'Nothing on the list yet — tap ＋ Add to put the first job on it':'No jobs on the list yet')+'</div>';
    return;
  }
- var items=live.filter(function(t){if(!q)return true;return (t.name+' '+t.category+' '+(t.plots||[]).join(' ')+' '+t.repeat).toLowerCase().indexOf(q)>=0;});
+ var items=live.filter(function(t){if(!q)return true;return (t.name+' '+t.category+' '+(t.plots||[]).join(' ')).toLowerCase().indexOf(q)>=0;});
  if(!items.length){ el.innerHTML='<div class="sec" style="text-align:center;margin-top:24px">No matches for “'+esc(q)+'”</div>'; return; }
 
  /* Grouped by category. A flat list of forty jobs is a list you scroll past;
@@ -868,7 +857,6 @@ function renderAssignPeople(){
   +'<div class="sec">Grad students · sends a request</div><div class="chiprow">'+grads.map(function(c){return crewPill(c,asPerson===c.pid);}).join('')+'</div>'
   +'<div class="sec">Technicians · sends a request</div><div class="chiprow">'+techs.map(function(c){return crewPill(c,asPerson===c.pid);}).join('')+'</div>';
 }
-function asRepeatLabel(t){return t.repeat==='Custom'?(t.freq+'×/wk'):t.repeat;}
 function getPick(kind,id){return PICKS.find(function(p){return p.kind===kind&&p.id===id;});}
 function assignRow(kind,id,title,sub){
  var r=pickRank(kind,id);
@@ -927,7 +915,10 @@ function renderAssignList(){
      }).join('')+'</div>';
    });
  } else {
-   var done=TASKS.filter(function(t){return t.status==='done'&&(!t.repeat||t.repeat==='None');})
+   /* Every finished job is a one-off now that repeats are gone. A job closed
+      before that change can still carry an old repeat on it, and leaving the
+      filter in would quietly hide it from this tab forever. */
+   var done=TASKS.filter(function(t){return t.status==='done';})
      .filter(function(t){return !q||(t.title+' '+(t.type||'')).toLowerCase().indexOf(q)>=0;});
    html+='<div class="sec">Recently completed · one-off</div>';
    html+= done.length? '<div class="list">'+done.map(function(t){return assignRow('task',t.id,t.title,(t.area||'')+' · done '+(nameOf(t.completedBy)||'')+(t.completedAt?' · '+(fmtTime(t.completedAt)||t.completedAt):''));}).join('')+'</div>'
@@ -1112,7 +1103,10 @@ function pushAssign(o){
  else { base.kind='task'; base.assignee=(asPerson===OPEN?null:(asPerson===SELF?SESSION.pid:asPerson)); }
  TASKS.push(base);
 }
-function commitTpl(id,note,plots,dueOrd,mow){var t=TEMPLATES.find(function(x){return x.id===id;});if(!t)return;var pl=(plots&&plots.length?plots:(t.plots||[])).slice();pushAssign({tplId:t.id,title:t.name,area:jobIsTrialDots(t.category,t.name)?'All active trials':(pl.length?areaLabel(pl):'—'),plots:pl,type:t.category,repeat:t.repeat,badge:(t.repeat&&t.repeat!=='None')?{t:'↻ '+asRepeatLabel(t),bg:'#eef1f4',fg:'#7b828d'}:null,note:note,dueOrd:dueOrd,mow:mow});}
+/* A job handed out is a job for that day. It used to carry its template's
+   repeat and a small grey "↻ Weekly" badge; both are gone -- see the note in
+   the markup where the Repeat control was. */
+function commitTpl(id,note,plots,dueOrd,mow){var t=TEMPLATES.find(function(x){return x.id===id;});if(!t)return;var pl=(plots&&plots.length?plots:(t.plots||[])).slice();pushAssign({tplId:t.id,title:t.name,area:jobIsTrialDots(t.category,t.name)?'All active trials':(pl.length?areaLabel(pl):'—'),plots:pl,type:t.category,repeat:'None',badge:null,note:note,dueOrd:dueOrd,mow:mow});}
 function commitTask(id,note,plots,dueOrd,mow){var t=TASKS.find(function(x){return x.id===id;});if(!t)return;var pl=(plots&&plots.length?plots:parsePlots(t)).slice();pushAssign({title:t.title,area:pl.length?areaLabel(pl):t.area,plots:pl,type:t.type,repeat:'None',badge:null,note:note||t.desc||'',dueOrd:dueOrd,mow:mow});}
 function commitEv(id,note,plots,dueOrd,mow){var e=EVENTS.find(function(x){return x.id===id;});if(!e)return;var pl=(plots&&plots.length?plots:parsePlots({area:e.title})).slice();pushAssign({title:e.title,area:pl.length?areaLabel(pl):(e.sub||'Spray'),plots:pl,type:'Spray',repeat:'None',badge:{t:'From calendar',bg:'#e7f1fb',fg:'#1f6fb0'},note:note||e.sub||'',dueOrd:dueOrd,mow:mow});}
 function saveAssignments(){

@@ -1790,18 +1790,18 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
             <div class="chiprow" id="tn-target" style="display:none"></div>
             <div class="list" id="tn-selfrow" style="display:none"><div class="fld" style="border-bottom:none"><span class="fl">Assigned to</span><span class="fv">Me</span></div></div>
             <div id="tn-schedule">
-            <div class="sec">Repeat</div>
-            <div class="list">
-              <div class="fld" style="border-bottom:none"><span class="fl">Repeats</span><select id="tn-repeat" class="inv-sel" style="max-width:150px"><option value="As needed">As needed</option><option value="Daily">Daily</option><option value="Weekly">Weekly</option><option value="Monthly">Monthly</option><option value="Custom">Custom</option></select></div>
-            </div>
-            <div class="sec" id="tn-custom-sec" style="display:none">How often (per week)</div>
-            <div class="chiprow" id="tn-freq" style="display:none"></div>
-            <!-- "Months active" used to be here. It came off on 2026-09-28 when
-                 the Assign screen's Scheduled tab became Favorites: that tab was
-                 the only thing that ever read the months, so the boxes had
-                 stopped meaning anything. Whatever months a job already had are
-                 still saved on it, untouched, in case the Scheduled view is ever
-                 wanted back -- see tplSave() in app-05-tasks-clock.js. -->
+            <!-- "Repeat" used to be here, and "Months active" before that, and
+                 both are gone for the same reason: nothing on the farm ever
+                 acted on them. Nothing in the app has ever created a job from a
+                 repeat -- it was a label, printed on the task list row, on the
+                 job's detail page and as a small badge when it was handed out,
+                 saying a thing nobody had told the app to do. Dillon asked for
+                 it to go on 2026-09-30; the work goes out on the day it is
+                 assigned, and that is the whole of it.
+                 The months came off on 2026-09-28 when the Assign screen's
+                 Scheduled tab became Favorites. Whatever repeat or months a job
+                 already had is still saved on it, untouched, and is simply
+                 never read -- see tplSave() in app-05-tasks-clock.js. -->
             <div class="sec" id="tn-fav-sec">Favorite</div>
             <div class="list" id="tn-fav-wrap">
               <div class="fld tap" id="tn-fav-row" style="border-bottom:none"><span class="fl">On your favorites</span><span class="fv" id="tn-fav">☆ No ›</span></div>

@@ -1334,6 +1334,31 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### Repeats come off the task list, everywhere — 2026-09-30
+**Decision:** the **Repeat** control is gone from the Add-to-the-task-list
+form, and with it the "How often (per week)" chips, the repeat on a task
+list row's summary line, the `↻ Repeat` row on a job's detail page, and the
+grey `↻ Weekly` badge a handed-out job used to carry. Every remaining task
+and template is written with `repeat:'None'`, including one that is edited and
+re-saved, so a job that had a repeat quietly loses it the next time anybody
+touches it. Dillon asked for it in those words: get rid of it on the form
+**and on every task already on the app**.
+**Why:** nothing in this app has ever created a job from a repeat. There is no
+scheduler; a repeat was a label, printed in three places, describing a thing
+nobody had told the app to do — and a job on the board saying "↻ Weekly" that
+never comes back next week is worse than no label at all. Work goes out on the
+day it is assigned. The Assign screen's **Recent** tab also stopped filtering
+on it, because "recently completed one-off jobs" is now every completed job,
+and leaving the filter in would have hidden anything closed before today's
+change from that tab forever.
+**Don't:** confuse this with the **calendar's** Repeat, which is a different
+control on a different form (`ca-repeat`, `evOnDay()`) and DOES work — a
+calendar event genuinely repeats. It is untouched. And don't strip `repeat`,
+`freq` or `months` off the stored records to "finish the job": they are still
+written (as 'None', null and whatever was there), nothing reads them, and
+rewriting every template to tidy a field nobody sees is a day's database
+allowance spent for no change on any screen — see 2026-08-31.
+
 ### A Field Log entry shows its ground on the map, and drops Area and Work order — 2026-09-30
 **Decision:** three changes to the entry's own page, all Dillon's. The **Work
 order** section is gone — what the job was scheduled for, what it repeats on,

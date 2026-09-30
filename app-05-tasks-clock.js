@@ -532,17 +532,29 @@ function renderPlotPick(){
     Everything else -- a job, a field log entry, a whole-plot study -- keeps
     Done, because those take as many plots as they take. */
  var one=(typeof PICKCTX.thenPin==='function');
+ /* ---- SHOWING ground rather than choosing it --------------------------
+    A Field Log entry's plots open this same map to be LOOKED AT: the ground
+    the job covered, painted green, and nothing to press. It is the picker
+    because the picker already knows how to draw the farm and light plots up
+    -- a second map would be a second set of plot shapes to keep in step.
+    In this mode there is no Done, no Select all, and a tap changes nothing;
+    taps are swallowed in the onTap below rather than left to select, because
+    a tap that quietly unpainted a plot would look like the record changing. */
+ var vw=!!PICKCTX.view;
  var hd=document.querySelector('#s-plotpick .hdr .title');
- if(hd) hd.textContent=one?'Which plot is the trial in?':'Choose plots';
- var dn=document.getElementById('pp-done'); if(dn) dn.style.display=one?'none':'';
+ if(hd) hd.textContent=vw?(PICKCTX.viewTitle||'Where this happened')
+                        :(one?'Which plot is the trial in?':'Choose plots');
+ var dn=document.getElementById('pp-done'); if(dn) dn.style.display=(one||vw)?'none':'';
  var hint=document.querySelector('#s-plotpick .maphint');
- if(hint) hint.textContent=one?'Tap the plot the trial sits in \u2014 the map opens on it next'
-                             :'Tap plots to select \u00b7 red ground is closed to mowing';
- jobMapDraw(st,{mode:'pick',targets:targets,blockOn:PICKCTX.quick,sel:PICK,fitKey:'pp:'+PICKCTX.type+'|'+PICKCTX.name,jobType:PICKCTX.type,jobName:PICKCTX.name,onTap:function(n,info){
+ if(hint) hint.textContent=vw?'The ground this job covered, in green'
+                            :(one?'Tap the plot the trial sits in \u2014 the map opens on it next'
+                                 :'Tap plots to select \u00b7 red ground is closed to mowing');
+ jobMapDraw(st,{mode:'pick',targets:targets,blockOn:PICKCTX.quick,sel:PICK,fitSel:vw,fitKey:(vw?'ppv:'+PICK.join(','):'pp:'+PICKCTX.type+'|'+PICKCTX.name),jobType:PICKCTX.type,jobName:PICKCTX.name,onTap:function(n,info){
    if(info.blocked){ toast(resStopMsg(info,n)); return; }
    if(info.partial) toast(resAroundMsg(info,n));
    /* Read the same way the find box does, for the same reason -- these two are
       the only ways into this screen and they must not be able to disagree. */
+   if(vw) return;                       /* looking, not choosing */
    if(typeof PICKCTX.thenPin==='function'){ PICKCTX.thenPin(n); return; }
    jobTapSelect(PICK,n,info);
    renderPlotPick();
@@ -565,8 +577,10 @@ function renderPlotPick(){
  var k=document.getElementById('pp-kind'); if(k)k.textContent=jobKindLabel(PICKCTX.type,PICKCTX.name)||'Plots';
  /* Just how many are picked. It used to read "3 of 18 selected", but the map
     now offers the whole farm and "3 of 158" is a number nobody needs. */
- var c=document.getElementById('pp-count'); if(c)c.textContent=PICK.length+' selected';
- jobSyncAllChip('pp-all',PICK,PICKCTX.quick,PICKCTX.type,PICKCTX.name,PICKCTX.def);
+ var c=document.getElementById('pp-count');
+ if(c)c.textContent=vw?(PICK.length+(PICK.length===1?' plot':' plots')):(PICK.length+' selected');
+ if(vw){ var av=document.getElementById('pp-all'); if(av)av.style.display='none'; }
+ else jobSyncAllChip('pp-all',PICK,PICKCTX.quick,PICKCTX.type,PICKCTX.name,PICKCTX.def);
 }
 document.getElementById('pp-all').addEventListener('click',function(){
  var r=jobToggleAll(PICK,PICKCTX.quick,PICKCTX.type,PICKCTX.name);
@@ -588,6 +602,18 @@ function pickOpen(type,name,list){
  PICK=(list||[]).filter(function(n){return PICKCTX.targets.indexOf(n)>=0;});
 }
 function openPlotPick(){plotPickDone=null;pickOpen(FORM.category,FORM.name,FORM.plots);go('plotpick');}
+/* Which of these names the map actually has a shape for. Whoever is about to
+   offer a "show it on the map" button asks this first: a Field Log entry can
+   carry an area typed by hand ("Greenhouse", "Shop") where a plot would be,
+   and a map that opens on nothing is worse than no button. */
+function plotsOnMap(list){ return jobRealPlots(list||[]); }
+/* Open the picker to be read. `list` is painted green over the whole farm. */
+function pickShow(list,title){
+  plotPickDone=null;
+  pickOpen('','',list||[]);
+  PICKCTX.view=true; PICKCTX.viewTitle=title||'';
+  go('plotpick');
+}
 function openFlPlotPick(){
  /* FL_CAT_TASKCAT/flStripAlleys live in app-02 (loaded before this file):
     the category-name conversion so the map's quick-select works the same as

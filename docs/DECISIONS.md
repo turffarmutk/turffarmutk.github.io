@@ -1334,6 +1334,32 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### A Field Log entry shows its ground on the map, and drops Area and Work order — 2026-09-30
+**Decision:** three changes to the entry's own page, all Dillon's. The **Work
+order** section is gone — what the job was scheduled for, what it repeats on,
+who it was assigned to. The **Area** row is gone. And the plots are no longer
+one line of text in Details: they are their own **Ground covered** section,
+and tapping it opens the farm map with exactly those plots painted green.
+That map is the plot picker in a read-only mode (`pickShow()`, `app-05`;
+`PICKCTX.view`): no Done, no Select all, taps do nothing, and it opens zoomed
+to the ground itself rather than to the whole farm (`fitSel` in
+`jobMapDraw()`).
+**Why:** `area` on a board-written entry is the same ground the plot list
+already names, word for word, so the page said it twice. The work order is the
+job's paperwork, not the record of what was done, and it pushed the parts
+people actually read down the page. And "Plot 11, Plot 12, Plot 13, Plot 14,
+Plot 15, Plot 16" is a list you have to hold in your head — a picture of the
+same six is not.
+**Don't:** delete `area`, `dueAt`, `due`, `repeat` or `taskId` off the record
+because nothing draws them any more. They are still written, still travel, and
+`area` is still a column in the `.csv` export; this was a change to one page.
+Don't let the map button appear for ground the map has no shape for either —
+an entry can carry a typed area ("Greenhouse", "Shop") where a plot would be,
+which is what `plotsOnMap()` tests for, and a map that opens on nothing is
+worse than no button. And don't make the read-only map selectable "since the
+picker already does it": a tap that quietly unpainted a plot would look like
+the record changing.
+
 ### The Assign screen has no day picker, and a name on the board is a button — 2026-09-30
 **Decision:** two halves of the same thing, both Dillon's. **One**, the Assign
 screen's Mon–Fri strip is gone. The day a job lands on is the day the Task

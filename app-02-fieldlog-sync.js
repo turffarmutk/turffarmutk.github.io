@@ -248,11 +248,13 @@ function renderFlDetail(){
  if(!body)return;
  if(!a){body.innerHTML='';if(ab)ab.innerHTML='';return;}
  var t=FL_TYPES[a.type]||FL_TYPES.misc;
- var task=(a.taskId&&typeof TASKS!=='undefined')?TASKS.filter(function(x){return x.id===a.taskId;})[0]:null;
  var plots=flEntryPlots(a);
+ /* `area` is deliberately NOT a row here. On an entry written by the board it
+    is the same ground the plot list already names, word for word, so it read
+    as the app saying the same thing twice. It is still written on the record
+    and still goes out in the export -- this is the detail page only.
+    Dillon, 2026-09-30. */
  var rows=flDetRow('Operation',a.op||t.label)
-  +flDetRow(plots.length>1?'Plots':'Plot',flPlotsFull(a))
-  +flDetRow('Area',a.area)
   +flDetRow('Date',a.date)
   +flDetRow('Time',a.time)
   +flDetRow('Logged by',nameOf(a.person)||a.person)
@@ -260,21 +262,41 @@ function renderFlDetail(){
   +flDetRow('Equipment',a.equipment);
  var chem=flDetRow('Product',a.product)+flDetRow('Active ingredient',a.ai)
   +flDetRow('Rate',a.rate)+flDetRow('Amount used',a.amount)+flDetRow('Target',a.target);
- /* Entries written by the board keep the work order's own wording — the
-    schedule it ran on and the instructions the crew worked from. */
- var job=flDetRow('From task',task?task.title:(a.taskId?'Task '+a.taskId:null))
-  +flDetRow('Job type',task?task.type:null)
-  +flDetRow('Scheduled',a.dueAt?fmtDateTime(a.dueAt):a.due)
-  +flDetRow('Repeats',a.repeat)
-  +flDetRow('Assigned to',task?(nameOf(task.assignee)||'unassigned'):null);
+ /* ---- THE GROUND IT COVERED, AS A DOOR TO THE MAP ----------------------
+    The plots used to be one line of text in Details. They are their own
+    section now, and tapping it opens the farm map with exactly those plots
+    painted green -- Dillon, 2026-09-30, because "Plot 11, Plot 12, Plot 13,
+    Plot 14, Plot 15, Plot 16" is a list you have to hold in your head, and a
+    picture of the same six is not.
+
+    The names stay written out underneath the button. The map needs a signal
+    and a screen; the record has to read on a phone in a field with neither.
+
+    The button only appears for ground the map has a shape for (plotsOnMap(),
+    app-05). An entry can carry a typed area -- "Greenhouse", "Shop" -- where
+    a plot would be, and a map that opens on nothing is worse than no button.
+    The section still lists whatever the entry says either way. */
+ var mapPlots=(typeof plotsOnMap==='function')?plotsOnMap(plots):[];
+ var ground='';
+ if(plots.length){
+   var gTitle=plots.length===1?flRowPlot(plots[0]):(plots.length+' plots');
+   var gSub=plots.length===1?(mapPlots.length?'Tap to see it on the farm map':'Not on the farm map')
+                            :flPlotsFull(a);
+   ground='<div class="sec">Ground covered</div><div class="list">'
+     +'<div class="row'+(mapPlots.length?' tap" id="fld-map"':'"')+'>'
+     +'<div style="flex:1;min-width:0"><div class="rt">'+esc(gTitle)+'</div>'
+     +'<div class="rs" style="line-height:1.45">'+esc(gSub)+'</div></div>'
+     +(mapPlots.length?'<span class="fld-mappill">Map \u203a</span>':'')
+     +'</div></div>';
+ }
  body.innerHTML=
    '<div class="hdr" style="background:#2f3133;padding:15px 16px;gap:10px">'
    +'<div style="flex:1;min-width:0"><div class="title" style="color:#fff;font-size:17px;line-height:1.15">'+esc(a.title)+'</div>'
    +'<div style="font:700 11px \'Public Sans\';color:#b9bfc6;margin-top:3px">'+esc(flPlotsLabel(a))+' · '+esc(a.date)+'</div></div>'
    +'<span class="pill" style="background:'+t.bg+';color:'+t.fg+';flex:none">'+esc(t.label)+'</span></div>'
   +'<div class="sec">Details</div><div class="list">'+(rows||'<div class="fld"><span class="fl">Summary</span><span class="fv">'+esc(a.detail||'')+'</span></div>')+'</div>'
+  +ground
   +(chem?'<div class="sec">Application</div><div class="list">'+chem+'</div>':'')
-  +(job?'<div class="sec">Work order</div><div class="list">'+job+'</div>':'')
   +(a.notes?'<div class="sec">Notes</div><div class="list"><div class="fld" style="align-items:flex-start"><span class="fl">Notes</span><span class="fv" style="text-align:right;white-space:pre-wrap">'+esc(a.notes)+'</span></div></div>':'')
   +(!rows&&!a.detail?'':'')
   +'<div style="height:14px"></div>';
@@ -310,6 +332,9 @@ function renderFlDetail(){
 }
 document.getElementById('s-fldetail').addEventListener('click',function(e){
  var a=flById(flCur); if(!a)return;
+ /* The ground section opens the farm map with this entry's plots painted --
+    pickShow() in app-05, which is the plot picker in a read-only mode. */
+ if(e.target.closest('#fld-map')){ pickShow(flEntryPlots(a),a.title); return; }
  if(e.target.closest('#fld-edit')){ go('flfix'); return; }
  if(e.target.closest('#fld-del')){
    if(!confirm('Delete this entry?\n\nThis removes it from the shared log everywhere, for good — there is no undo.')) return;

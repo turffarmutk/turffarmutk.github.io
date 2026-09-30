@@ -1921,8 +1921,21 @@ function renderTasks(){
         clocked out or the shift is over. See tbPersonState(). Plain grey
         means they are not down for this day and have not punched. */
      var bst=tbPersonState(s,bDate);
-     html+='<div class="sec'+(bst?(' tbp-'+bst.k):'')+'">'+esc(slabel)+' · '+mine.length+(mine.length===1?' task':' tasks')
+     /* THE NAME IS A BUTTON, for whoever is allowed to hand work out. It opens
+        the Assign screen with this person already picked and the day already
+        set to the day showing here -- Dillon, 2026-09-30, because reading the
+        board and then finding the same name again in the picker was the whole
+        job done twice. The "＋ Assign" chip is there so it looks like a
+        button; a heading that quietly does something when tapped is a heading
+        nobody taps. Faculty and the crew see the name plain, because handing
+        out other people's work is not theirs to do. */
+     var canAsg=actsAsManager();
+     html+='<div class="sec tbp-head'+(bst?(' tbp-'+bst.k):'')+(canAsg?' tap':'')+'"'
+          +(canAsg?' data-asfor="'+esc(s)+'"':'')+'>'
+          +'<div class="tbp-who">'+esc(slabel)+' · '+mine.length+(mine.length===1?' task':' tasks')
           +(bst?('<div class="tbp-sub"><span class="tbp-dot"></span>'+esc(bst.txt)+'</div>'):'')
+          +'</div>'
+          +(canAsg?'<span class="tbp-add">＋ Assign</span>':'')
           +'</div>';
      /* Every row here belongs to somebody else, so every row keeps the manager
         controls — rank arrows and a bin — because that is him directing other

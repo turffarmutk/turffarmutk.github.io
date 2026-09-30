@@ -589,6 +589,15 @@
   .tbp-on{color:#2f9e4f!important}
   .tbp-off{color:#c0392b!important}
   .tbp-sub{font:800 10px 'Public Sans';letter-spacing:.3px;margin-top:2px;text-transform:none;display:flex;align-items:center;gap:6px}
+  /* The name is a button for whoever hands work out -- it opens Assign with
+     this person picked. The chip carries its own color, because the heading's
+     color is the person's state (orange/green/red) and the chip is not about
+     them. Scoped to .tbp- names rather than anything short: .sec is every
+     heading in the app. */
+  .sec.tbp-head{display:flex;align-items:flex-start;gap:10px}
+  .tbp-who{flex:1;min-width:0}
+  .tbp-add{flex:none;align-self:center;font:800 10px 'Public Sans';letter-spacing:.3px;
+    text-transform:none;color:#1f6fb0!important;background:#e7f1fb;padding:5px 10px;border-radius:20px;white-space:nowrap}
   .tbp-dot{display:none;width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
   /* Color-blind palette: the standard remap would turn red and orange into two
      near-identical oranges, which is the one pair these colors exist to tell
@@ -1210,29 +1219,31 @@ html[data-size="tablet"] .hdr.hh .hh-r{gap:14px}
 /* ---------- 5c. the task board's day strip ----------
    Only Mon-Fri ever get a chip here -- nobody works Saturday or Sunday, so
    there is never a task to add or view on those two days. See
-   boardDayChips() and renderAssignPeople(). Five chips share the row equally
-   at every width, phone included, rather than bunching at the left with
-   empty space beside them; the rail-equipped shell also has room to spell
-   the day out instead of abbreviating it. Both labels are in the DOM and CSS
-   picks one. */
+   boardDayChips(). Five chips share the row equally at every width, phone
+   included, rather than bunching at the left with empty space beside them;
+   the rail-equipped shell also has room to spell the day out instead of
+   abbreviating it. Both labels are in the DOM and CSS picks one.
+
+   The Assign screen had a second strip of its own (#as-days) until
+   2026-09-30. It is gone: the day comes from this one now, so there is
+   nothing left to keep the two in step. */
 .dl-f{display:none}
-html[data-size="tablet"] #tb-days .dl-f,
-html[data-size="tablet"] #as-days .dl-f{display:inline}
-html[data-size="tablet"] #tb-days .dl-s,
-html[data-size="tablet"] #as-days .dl-s{display:none}
-#tb-days,#as-days{flex-wrap:nowrap}
-#tb-days .chip,#as-days .chip{flex:1 1 0;min-width:0;text-align:center;overflow:hidden;text-overflow:ellipsis}
-html[data-size="tablet"] #tb-days,
-html[data-size="tablet"] #as-days{
+html[data-size="tablet"] #tb-days .dl-f{display:inline}
+html[data-size="tablet"] #tb-days .dl-s{display:none}
+#tb-days{flex-wrap:nowrap}
+#tb-days .chip{flex:1 1 0;min-width:0;text-align:center;overflow:hidden;text-overflow:ellipsis}
+html[data-size="tablet"] #tb-days{
   flex-wrap:nowrap;gap:10px;padding:12px 20px 6px}
-html[data-size="tablet"] #tb-days .chip,
-html[data-size="tablet"] #as-days .chip{
+html[data-size="tablet"] #tb-days .chip{
   flex:1 1 0;min-width:0;text-align:center;padding:11px 8px;font-size:13px;
   border-radius:12px;overflow:hidden;text-overflow:ellipsis}
 /* Tablet is narrower and the rail eats 82px of it — trim the padding rather
    than let Wednesday clip. */
-html[data-size="tablet"] #tb-days,html[data-size="tablet"] #as-days{gap:7px}
-html[data-size="tablet"] #tb-days .chip,html[data-size="tablet"] #as-days .chip{padding:10px 4px;font-size:12px}
+html[data-size="tablet"] #tb-days{gap:7px}
+html[data-size="tablet"] #tb-days .chip{padding:10px 4px;font-size:12px}
+/* The Assign screen says which day it is assigning to, in words, because
+   there is no strip there to point at any more. */
+.as-src{display:block;margin-top:3px;text-transform:none;letter-spacing:0;font:700 10.5px 'Public Sans';color:var(--muted)}
 /* Drilling into a task shrinks the board to a 440px master pane. Seven long
    day names do not survive that, so the strip falls back to the phone spelling
    for as long as the split is up. */

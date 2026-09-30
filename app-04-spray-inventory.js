@@ -1187,6 +1187,10 @@ function completeTask(id,note,paint){ var t=TASKS.find(function(x){return x.id==
 document.getElementById('tb-seg').addEventListener('click',function(e){var sp=e.target.closest('span[data-tab]');if(!sp)return;tbTab=sp.getAttribute('data-tab');renderTasks();});
 document.getElementById('s-taskboard').addEventListener('click',function(e){
  var bd=e.target.closest('[data-bday]'); if(bd){boardDay=parseInt(bd.getAttribute('data-bday'),10);renderTasks();return;}
+ /* A name on the board opens the Assign screen with that person picked. The
+    day goes with it -- assignEnter() takes boardDay, which is the day these
+    names are standing under. See assignFor() in app-05. */
+ var af=e.target.closest('[data-asfor]'); if(af){assignFor(af.getAttribute('data-asfor'));return;}
  var bb=e.target.closest('[data-board]'); if(bb){var w=bb.getAttribute('data-board');if(w==='assign'||w==='selftask')go('assign');else if(w==='assignlab')openAssignForm();else if(w==='reqct')openCrewReq();return;}
  var ac=e.target.closest('[data-accept]'); if(ac){acceptCrewReq(ac.getAttribute('data-accept'));return;}
  var gr=e.target.closest('[data-req]'); if(gr){openReqForm(gr.getAttribute('data-req')==='undergrad');return;}

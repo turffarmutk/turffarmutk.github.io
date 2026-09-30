@@ -754,6 +754,15 @@ function areaWithDue(t){return taskBoardSub(t)+(isFutureTask(t)?' · 📅 '+dueL
    All of it is gone. The undergrads say when they are coming in, on their own
    profile, and every screen that needs to know reads schedShiftOn(). One
    answer, given by the people who actually know it. */
+/* THE DAY THE WORK LANDS ON IS THE DAY THE TASK BOARD WAS SHOWING.
+   The Assign screen used to carry its own Mon-Fri strip, so the day was picked
+   twice -- once to look at the board, once to assign -- and the two could
+   disagree without either screen saying so. Dillon asked for the strip to go
+   on 2026-09-30: you pick the day on the board, press Assign Tasks, and that
+   is the day. assignEnter() copies boardDay in on every entry, and the board
+   button is the only way onto this screen, so there is no path that could
+   leave this stale. It stays a separate variable rather than reading boardDay
+   straight, because boardDay changes the moment you go back to the board. */
 var asDay=boardDefaultDay();
 function asDayOrd(){var t=asToday0();for(var i=0;i<7;i++){var d=new Date(t);d.setDate(d.getDate()+i);if(d.getDay()===asDay)return asOrd(d);}return asTodayOrd();}
 /* The date the day chips are pointing at -- the next occurrence of that
@@ -791,20 +800,18 @@ function schedSortForDay(ids,d){
 function rosterPill(s,on){ return schedPill(pidOf(s)||s,on,new Date(),true); }
 function renderAssignPeople(){
  var el=document.getElementById('as-people'); if(!el)return;
- var todayDow=new Date().getDay();
- /* Same two-label trick as boardDayChips() — CSS decides which one shows.
-    Nobody works Saturday or Sunday, so those two never get a chip here —
-    same reasoning as boardDayChips() on the task board itself. */
- var days='<div class="chiprow" id="as-days">'+[1,2,3,4,5].map(function(i){var w=WEEKDAYS[i];var isToday=(i===todayDow);return '<span class="chip'+(asDay===i?' on':'')+(isToday?' today':'')+'" data-asday="'+i+'"'+(isToday?' title="Today"':'')+'><span class="dl-s">'+w+'</span><span class="dl-f">'+WEEKDAYS_FULL[i]+'</span>'+(isToday?'<span class="todot"></span>':'')+'</span>';}).join('')+'</div>';
- var dayLabel=WEEKDAYS[asDay]+' · '+asDateLabel(asDayOrd());
+ /* The day is fixed by the board and cannot be changed here, so it is said
+    out loud, in full, with where it was chosen -- a date with no control
+    beside it otherwise reads as a control somebody forgot to draw. */
+ var dayLabel=WEEKDAYS_FULL[asDay]+' · '+asDateLabel(asDayOrd());
+ var fromBoard='<span class="as-src">Set on the Task Board — go back to change the day.</span>';
  /* Grad students and technicians reach this same screen from their own
     "＋ Assign task to me" button, but who else to hand work to is Bill's
     call, not theirs — so the picker below (every other crew member, the
     open board) never renders for them. assignEnter() locks asPerson to
     SELF for this role and it never changes. */
  if(currentRole!=='manager'){
-   el.innerHTML='<div class="sec">Day board</div>'+days
-     +'<div class="sec">'+dayLabel+'</div>'
+   el.innerHTML='<div class="sec">Assigning to '+esc(dayLabel)+' '+fromBoard+'</div>'
      +'<div class="chiprow"><span class="ppill on"><span class="ppn"><span class="dotsm"></span>'+meName()+'</span><span class="ppt">Assigning to yourself</span></span></div>';
    return;
  }
@@ -826,8 +833,8 @@ function renderAssignPeople(){
    : (inCount? (inCount+' scheduled in'+(inCount===STUDENTS.length?'':' · the rest are off or have not set their hours'))
              : 'Nobody has hours down for '+WEEKDAYS_FULL[asDay]+' this term.');
  el.innerHTML=
-   '<div class="sec">Day board</div>'+days
-  +'<div class="sec">'+dayLabel+' · assign directly</div>'
+   '<div class="sec">Assigning to '+esc(dayLabel)+' '+fromBoard+'</div>'
+  +'<div class="sec">Assign directly</div>'
   +'<div style="margin:0 16px 6px;font:600 11px \'Public Sans\';color:'+(inCount?'#2f9e4f':'var(--muted)')+';line-height:1.4">'+esc(note)+'</div>'
   +'<div class="chiprow">'+(workingPills||'<span style="font:600 11.5px \'Public Sans\';color:var(--muted);padding:2px 4px">No undergrads on the roster</span>')+'</div>'
   +'<div class="sec">Yourself</div><div class="chiprow">'+self+'</div>'
@@ -903,9 +910,21 @@ function renderAssignList(){
  el.innerHTML=html;
 }
 function updateSaveBtn(){var b=document.getElementById('as-save');if(!b)return;b.textContent=PICKS.length?('Save · '+PICKS.length+' task'+(PICKS.length>1?'s':'')):'Save assignments';}
+/* TAPPING A NAME ON THE TASK BOARD OPENS THIS SCREEN WITH THAT PERSON ALREADY
+   PICKED. Dillon asked for it on 2026-09-30: he reads the board, sees who has
+   nothing on, and the next thing he wants is to give them something. Before
+   this he had to press Assign Tasks and find the same name again in the
+   picker. The name is handed over in this one variable rather than as an
+   argument, because the screen is entered through go('assign') and the screen
+   dispatcher takes no arguments. assignEnter() reads it once and clears it, so
+   arriving any other way -- the Assign Tasks button -- starts with nobody
+   picked, exactly as before. */
+var asPendingPerson=null;
+function assignFor(pid){ asPendingPerson=pid; go('assign'); }
 function assignEnter(){
  var mgr=actsAsManager();
- asTab='fav'; asPerson=mgr?null:SELF; PICKS=[]; asDay=boardDefaultDay();
+ asTab='fav'; asPerson=mgr?(asPendingPerson||null):SELF; PICKS=[]; asDay=boardDay;
+ asPendingPerson=null;
  var seg=document.getElementById('as-seg'); if(seg)seg.querySelectorAll('span').forEach(function(s){s.classList.toggle('on',s.getAttribute('data-atab')==='fav');});
  var sr=document.getElementById('as-search'); if(sr)sr.value='';
  var ttl=document.querySelector('#s-assign .hdr .title'); if(ttl)ttl.textContent=mgr?'Assign Tasks':'Assign task to me';
@@ -1091,7 +1110,6 @@ document.getElementById('s-assign').addEventListener('click',function(e){
    var fid=fv.getAttribute('data-fav');
    if(favToggle(fid)) toast(favHas(fid)?'Added to your favorites ★':'Taken off your favorites');
    renderAssignList(); return; }
- var dd=e.target.closest('[data-asday]'); if(dd){asDay=parseInt(dd.getAttribute('data-asday'),10);renderAssignPeople();return;}
  var p=e.target.closest('[data-person]'); if(p){var n=p.getAttribute('data-person');var prev=asPerson;asPerson=asPerson===n?null:n;if(asPerson!==prev)PICKS=[];renderAssignPeople();renderAssignList();updateSaveBtn();return;}
  var at=e.target.closest('span[data-atab]'); if(at){asTab=at.getAttribute('data-atab');renderAssignList();return;}
  var up=e.target.closest('[data-unpick]'); if(up){e.stopPropagation();var parts=up.getAttribute('data-unpick').split(':');removePick(parts[0],parts.slice(1).join(':'));return;}

@@ -1334,6 +1334,30 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### The Assign screen has no day picker, and a name on the board is a button — 2026-09-30
+**Decision:** two halves of the same thing, both Dillon's. **One**, the Assign
+screen's Mon–Fri strip is gone. The day a job lands on is the day the Task
+Board was showing when Assign Tasks was pressed; `assignEnter()`
+(`app-05-tasks-clock.js`) copies `boardDay` into `asDay` on every entry, and
+the screen says the day in words with "Set on the Task Board" under it. **Two**,
+a person's name on the Board tab is now a button for whoever hands work out —
+it opens the Assign screen with that person already picked and that day already
+set. `assignFor()` (`app-05`) carries the name over in one variable, which
+`assignEnter()` reads once and clears.
+**Why:** the day was being picked twice, once to look at the board and once to
+assign, and nothing on either screen said the two disagreed — so work could be
+dated to a day Bill was not looking at. And reading the board to find who has
+nothing on, only to go and find the same name again in the picker, was the job
+done twice. The Assign Tasks button is the only way onto that screen, so there
+is no path the day could arrive stale by.
+**Don't:** put a day strip back on the Assign screen because the date there
+looks like a control somebody forgot to draw — it is deliberately not one, and
+a second strip is what this removed. Don't make `asDay` read `boardDay`
+straight either: `boardDay` changes the moment you go back to the board, so the
+copy is what holds the day still while the assignment is being built. And don't
+widen the "＋ Assign" chip past `actsAsManager()` — handing out other people's
+work is Bill's, and faculty and the crew see the name plain.
+
 ### A Field Log row says who did it and when, not what ground it covered — 2026-09-30
 **Decision:** a row in the Field Log feed is the job's name, then **who did the
 work and the day they did it** underneath, with the category on the right in

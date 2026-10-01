@@ -247,6 +247,17 @@ function completionFieldsOk(before, after, mePid) {
     && eqPickOk(before, after, mePid);
 }
 
+/* The field half of isStorageUpdate() in the invitems block of
+   firestore.rules. Since 2026-10-01 anybody counting the shelf may say where a
+   product is STORED, and nothing else on the product in the same write -- this
+   is the mirror of that, and it has to match the rules file word for word or
+   test-inventory.js fails. Widening this list widens what a crew member may
+   rewrite on a product, so it is a deliberate act, not a tidy-up. */
+const STORAGE_FIELDS = ['loc'];
+function isStorageUpdate(before, after) {
+  return changedKeys(before, after).every(k => STORAGE_FIELDS.indexOf(k) >= 0);
+}
+
 module.exports = { rosterDoc, Rules, rulesCan, creditsWorker, keepsRoster, ROSTER_V, rosterCanWriteIn,
-                   eqPickOk, isWorkUpdate, completionFieldsOk, changedKeys,
-                   WORK_FIELDS, COMPLETION_FIELDS };
+                   eqPickOk, isWorkUpdate, completionFieldsOk, changedKeys, isStorageUpdate,
+                   WORK_FIELDS, COMPLETION_FIELDS, STORAGE_FIELDS };

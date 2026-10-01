@@ -470,10 +470,30 @@ var NOTIF_ALERTS=[
   sub:'Bill asking you to take a job on, or a grad or technician asking you for help'},
  {g:'Task board', k:'reqok',  t:'A labor request I sent is accepted', d:1, live:1},
  {g:'Task board', k:'reqdone',t:'A job I asked for is finished', d:1, live:1},
- {g:'Equipment',  k:'equip',  t:'Equipment down',        d:1},
- {g:'Inventory',  k:'low',    t:'Low stock alerts',      d:1},
+ /* Wired up on 2026-10-01; before that these three saved their setting and
+    nothing read it. WHO HEARS WHICH is Dillon's call and is written out in
+    full over ntfScanEquip() further down -- the short version is that a
+    machine going down reaches everybody, because anybody might walk out to
+    it, while an issue report and a low shelf only reach the people who would
+    act on them.
+
+    TWO ROWS FOR EQUIPMENT, not one. "Equipment down" covering an issue report
+    as well would be this screen telling a small lie about what it does, which
+    is the exact thing the "Not sending yet" labels exist to stop. */
+ {g:'Equipment',  k:'equip',  t:'A machine goes down',   d:1, live:1,
+  sub:'And when it is back in service \u00b7 everybody is told'},
+ {g:'Equipment',  k:'eqflag', t:'An issue is reported on a machine', d:1, live:1,
+  sub:'Bill, the technicians and faculty \u00b7 whoever would fix it'},
+ {g:'Inventory',  k:'low',    t:'A product reaches its reorder point', d:1, live:1,
+  sub:'Bill and faculty \u00b7 the people who order'},
+ /* Still the only unwired row, and deliberately so: Dillon's call on
+    2026-10-01 was that a spray window you only hear about when you happen to
+    open the app is worth little, so weather waits for real phone push. */
  {g:'Weather',    k:'wx',     t:'Weather & spray window',d:1},
- {g:'Trials',     k:'trials', t:'Trials & restrictions', d:0},
+ /* Default ON, where the day it was written it was off. Closed ground is the
+    one thing on this list that can put somebody on a trial with a mower. */
+ {g:'Trials',     k:'trials', t:'Ground closes, or opens again', d:1, live:1,
+  sub:'A restriction starting, ending or being lifted, named by plot'},
  /* The clock's four. The first two are for whoever runs the crew -- they only
     ever raise on a phone that can edit a timesheet -- and the last two are
     for the student whose shift it is. Everybody sees all four switches,
@@ -629,7 +649,14 @@ notifLoad();
                thrown away with the task itself so it cannot grow forever
      list   -- the events themselves, newest first, capped both ways
      readAt -- when this person last opened the screen
-     base   -- when this phone started watching; 0 means it never has        */
+     base   -- when this phone started watching; 0 means it never has
+
+   and since 2026-10-01 three more of the same kind, one per thing the farm
+   watches besides jobs and punches: eseen (machines that are down or flagged),
+   iseen (products at or below their reorder point) and rseen (restrictions
+   standing on ground right now), each with its own baseline. They are short
+   lists of ids rather than an entry per record -- see the long note over
+   ntfScanEquip().                                                          */
 var NTF_MAX=120;           /* events kept per person */
 var NTF_KEEP_DAYS=30;      /* and for how long, whichever runs out first */
 /* `seen` is jobs and `pseen` is time-clock punches, with a baseline each.
@@ -639,16 +666,25 @@ var NTF_KEEP_DAYS=30;      /* and for how long, whichever runs out first */
    different moments: a phone can easily know about the farm's jobs a minute
    before the first punch reaches it, and counting that as "I have now seen
    the time clock" would make every historical shift look like news. */
-var NTF={seen:{},pseen:{},list:[],readAt:0,base:0,pbase:0};
+var NTF={seen:{},pseen:{},list:[],readAt:0,base:0,pbase:0,
+         eseen:{},iseen:{},rseen:{},ebase:0,ibase:0,rbase:0};
 function ntfLoad(){
   var s=prefsGet('ntfeed',null)||{};
-  NTF={seen:(s.seen&&typeof s.seen==='object')?s.seen:{},
-       pseen:(s.pseen&&typeof s.pseen==='object')?s.pseen:{},
+  /* A map that is missing reads as empty and a baseline that is missing reads
+     as 0, which is what makes adding one safe for a phone whose ledger was
+     written by an older build: it simply takes a fresh silent baseline for
+     the new thing and tells nobody about the farm's history. */
+  function map(x){ return (x&&typeof x==='object')?x:{}; }
+  NTF={seen:map(s.seen), pseen:map(s.pseen),
+       eseen:map(s.eseen), iseen:map(s.iseen), rseen:map(s.rseen),
        list:Array.isArray(s.list)?s.list:[],
-       readAt:+s.readAt||0, base:+s.base||0, pbase:+s.pbase||0};
+       readAt:+s.readAt||0, base:+s.base||0, pbase:+s.pbase||0,
+       ebase:+s.ebase||0, ibase:+s.ibase||0, rbase:+s.rbase||0};
 }
 function ntfSave(){ prefsSet('ntfeed',{seen:NTF.seen,pseen:NTF.pseen,list:NTF.list,
-                                       readAt:NTF.readAt,base:NTF.base,pbase:NTF.pbase}); }
+                                       readAt:NTF.readAt,base:NTF.base,pbase:NTF.pbase,
+                                       eseen:NTF.eseen,iseen:NTF.iseen,rseen:NTF.rseen,
+                                       ebase:NTF.ebase,ibase:NTF.ibase,rbase:NTF.rbase}); }
 function ntfOn(k){ try{ return NOTIF['a_'+k]!==false; }catch(e){ return true; } }
 
 /* Whose plate the job is on. Just the assignee: a labor request that has not
@@ -719,14 +755,22 @@ function ntfScan(){
   try{ me=(typeof SESSION!=='undefined'&&SESSION)?SESSION.pid:null; }catch(e){}
   if(!me) return 0;                              /* nobody signed in yet */
   var now=Date.now();
-  /* Two walks, each with its own guard, and NEITHER may be able to stop the
-     other running. They were one function for about an hour and the time
+  /* FIVE walks, each with its own guard, and NONE of them may be able to stop
+     another running. They were one function for about an hour and the time
      clock sat behind the job walk's "no jobs, nothing to do" line -- so on a
      farm with an empty task list the clock alerts silently did not exist.
-     Nothing on screen said so; the test caught it. */
-  var a=ntfScanTasks(me,now), b=ntfScanPunches(me,now);
-  if(a.changed||b.changed){ ntfTrim(); ntfSave(); }
-  return a.made+b.made;
+     Nothing on screen said so; the test caught it. Written out one per line,
+     with the result of each kept, for the same reason: a chain of && here
+     would make an empty equipment list silence the ground alerts. */
+  var jobs=ntfScanTasks(me,now);
+  var punches=ntfScanPunches(me,now);
+  var machines=ntfScanEquip(me,now);
+  var shelf=ntfScanInv(me,now);
+  var ground=ntfScanRes(me,now);
+  if(jobs.changed||punches.changed||machines.changed||shelf.changed||ground.changed){
+    ntfTrim(); ntfSave();
+  }
+  return jobs.made+punches.made+machines.made+shelf.made+ground.made;
 }
 function ntfScanTasks(me,now){
   var all=null; try{ all=TASKS; }catch(e){}
@@ -779,6 +823,24 @@ function ntfScanTasks(me,now){
   NTF.seen=fresh;
   if(first) NTF.base=now;
   return {made:made,changed:changed};
+}
+
+/* Scan, then show it: the one call every hook uses, so a new alert reaching
+   the bell and a new alert reaching the SCREEN somebody is looking at can
+   never come apart. The hooks are the places where the things this feed
+   watches actually change -- a task arriving (tsyncRepaint in the page), a
+   machine, a product or a study arriving (the three drawers in app-02), and
+   the half-hourly timer, which is there because closed ground changes with the
+   DATE and not because anybody tapped anything. */
+function ntfTick(){
+  var made=0;
+  try{ made=ntfScan(); }catch(e){}
+  try{ if(made&&typeof updateBellBadges==='function') updateBellBadges(); }catch(e){}
+  try{
+    var n=document.getElementById('s-notifications');
+    if(n&&n.classList.contains('active')){ renderNotifFeed(); ntfMarkRead(); }
+  }catch(e){}
+  return made;
 }
 
 /* ---- the time clock ----
@@ -862,7 +924,7 @@ function ntfScanPunches(me,now){
    clock-out. */
 function ntfPushPunch(kind,p,now){
   var d=null; try{ d=String(p.date||''); }catch(e){ d=''; }
-  NTF.list.unshift({ id:'n'+now.toString(36)+Math.random().toString(36).slice(2,7),
+  NTF.list.unshift({ id:ntfNewId(now),
     k:kind, punch:String(p.id), t:now,
     who:String(p.pid||''), d:d,
     at:String((kind==='clockin'||kind==='shiftask')?(p.in||''):(p.out||'')),
@@ -875,6 +937,247 @@ function ntfHrs(a,b){
   function m(t){ var x=String(t).split(':'); return (+x[0])*60+(+x[1]); }
   return Math.round(Math.max(0,m(b)-m(a))/6)/10;
 }
+
+/* ===== THE FARM'S OWN THINGS: MACHINES, THE SHELF, AND CLOSED GROUND =====
+   Three more walks, wired up 2026-10-01. The switches for these existed from
+   the day the Notifications screen was written and did nothing at all, which
+   is why they carried the words "Not sending yet" until today.
+
+   They are the same shape as the two walks above: notice what CHANGED, take a
+   silent baseline the first time this phone looks, and tell only the people
+   who can do something about it.
+
+   WHO HEARS WHAT -- Dillon's calls, 2026-10-01, and they are not guesses:
+
+     a machine goes down, or comes back      EVERYBODY. Anybody might walk out
+       to that mower, and the crew are the people most likely to. This is the
+       one of the four that deliberately reaches an undergraduate.
+     an issue is reported on a machine       Bill, the technicians and faculty
+       -- whoever would fix it. "It still runs but something is wrong" is not
+       an interruption for somebody who cannot act on it.
+     a product reaches its reorder point     Bill and faculty. They are the
+       people who order. (Worth knowing: the Inventory page is still behind
+       the Coming Soon cover for faculty, so they hear it but cannot yet go
+       and look. Releasing that page is Dillon's call, not this file's.)
+     ground closes, or opens again           EVERYBODY, named by PLOT and never
+       by study. That is the same rule the farm map already follows: closed
+       ground is drawn for every phone, but another lab's study name is held
+       back. An undergraduate on a mower has to know CAFS14 is shut whoever
+       owns it. See trLiveRes() and trResStudyName() in the page.
+
+   WHY THESE LEDGERS ARE SHORTER THAN THE JOB ONE. The job walk keeps an entry
+   per task because it asks five questions about each one. These three only ask
+   "is this true right now", so they keep only the ids for which it IS -- the
+   machines that are down, the products that are low, the restrictions standing.
+   An id APPEARING is one alert and an id DISAPPEARING is the other. On a normal
+   day all three maps are empty or nearly so.
+
+   AND THE ONE TRAP IN THAT. A record that is gone altogether must say nothing.
+   Each walk therefore only ever decides about records it can still SEE: it
+   loops over the farm's list, so a machine or a study that has been removed is
+   simply never examined, and its stale entry drops out of the map on the way
+   past. Deleting a study does open its ground, but "CAFS14 is open again" from
+   a record nobody can look at any more is a sentence with no answer behind it.
+
+   ALL THREE ARE SAFE TO CALL FROM A SNAPSHOT HANDLER, for the same reason the
+   two above are: they read lists this phone already holds and write to this
+   phone only. storeSaveLocal()'s side of the line, never storeTouch()'s. See
+   CLAUDE.md, the two traps.                                               */
+
+/* Is the signed-in person one of these roles, read off the ROSTER -- never
+   currentRole, which is only about which screen is showing and which the
+   database cannot see. Same shape as eqRoleIs() in app-02, reached through a
+   typeof guard because this file runs before that one is loaded. */
+function ntfRoleIs(roles){
+  /* The App Manager has no restrictions, so he hears what Bill hears. Being
+     left off an alert is not strictly a refusal, but the person who can do
+     everything Bill can do should be told the same things. */
+  try{ if(appAdminAll()) return true; }catch(e){}
+  var me=null;
+  try{ me=(typeof SESSION!=='undefined'&&SESSION)?SESSION.pid:null; }catch(e){}
+  if(!me) return false;
+  try{
+    if(typeof personActive==='function'&&!personActive(me)) return false;
+    if(typeof personRole!=='function') return false;
+    return roles.indexOf(personRole(me))>=0;
+  }catch(e){ return false; }
+}
+/* Did this walk's map come out different from last time. ntfSeenDiff() above
+   compares the three fields a JOB entry has and is left alone on purpose;
+   these entries are single values, and a diff that quietly ignored them would
+   simply stop saving them. It only decides whether to write to the phone --
+   never whether to raise an alert. */
+function ntfFlagDiff(a,b){
+  a=a||{}; b=b||{};
+  var ka=Object.keys(a), kb=Object.keys(b);
+  if(ka.length!==kb.length) return true;
+  for(var i=0;i<kb.length;i++) if(a[kb[i]]!==b[kb[i]]) return true;
+  return false;
+}
+/* A short number for a row: 2.5, 12, 0 -- never 2.4999999999. fmt() in app-04
+   does the same job for the Inventory screens and is not reached from here, so
+   the bell has its own two lines rather than a cross-file call it would have
+   to guard anyway. */
+function ntfQty(n){ n=+n; if(!isFinite(n)) n=0; return String(Math.round(n*100)/100); }
+/* The newest open problem report on a machine, which is where the name and the
+   description of what is wrong actually live. EQPROBLEMS travels with the
+   equipment drawer, so this reads the same on every phone. */
+function ntfEqProblem(id){
+  var all=null; try{ all=EQPROBLEMS; }catch(e){}
+  if(!all) return null;
+  for(var i=0;i<all.length;i++){
+    var q=all[i];
+    if(q&&String(q.eq)===String(id)&&q.status!=='closed') return q;
+  }
+  return null;
+}
+/* Long enough to be useful on a two-line row, short enough not to push the
+   time off the end of it. */
+function ntfClip(txt,n){
+  txt=String(txt||'').replace(/\s+/g,' ').trim();
+  return (txt.length>n)?(txt.slice(0,n-1)+'…'):txt;
+}
+
+/* ---- machines ---- */
+function ntfScanEquip(me,now){
+  var all=null; try{ all=EQUIP; }catch(e){}
+  if(!all||!all.length) return {made:0,changed:false};
+  /* The issue report goes to whoever would fix it, and that is the same list
+     of roles the Edit machine form itself asks for. */
+  var fixes=ntfRoleIs(['Farm Manager','Technician','Faculty']);
+  var first=!NTF.ebase, fresh={}, made=0;
+  all.forEach(function(m){
+    if(!m||!m.id) return;
+    var id=String(m.id);
+    /* Down wins over flagged: a machine that is out of service is out of
+       service, and saying both about one mower reads as a bug. */
+    var st=(m.status==='down')?'down':(m.flagged?'flag':'');
+    if(st) fresh[id]=st;
+    if(first) return;                            /* the baseline walk tells nobody anything */
+    var was=NTF.eseen[id]||'';
+    if(st==='down'&&was!=='down'&&ntfOn('equip')){
+      var q=ntfEqProblem(id);
+      ntfPushEq('eqdown',m,now,(q&&(q.downBy||q.by))||null,q?q.desc:'');  made++;
+    }
+    /* It was out of service and it is not any more. Covers both ways back:
+       Bill setting it available, and the repair being signed off. */
+    else if(was==='down'&&st!=='down'&&ntfOn('equip')){
+      ntfPushEq('equp',m,now,null,''); made++;
+    }
+    /* Reported, but still running. Only from nothing -- a machine that goes
+       from flagged to down has already said the louder of the two things, and
+       a flag CLEARING says nothing at all, because nobody wants "the issue on
+       the 3235C has gone away" when what happened is somebody tidied up. */
+    else if(st==='flag'&&was===''&&fixes&&ntfOn('eqflag')){
+      var r=ntfEqProblem(id);
+      ntfPushEq('eqflag',m,now,(r&&r.by)||null,r?r.desc:''); made++;
+    }
+  });
+  var changed=first||made>0||ntfFlagDiff(NTF.eseen,fresh);
+  NTF.eseen=fresh;
+  if(first) NTF.ebase=now;
+  return {made:made,changed:changed};
+}
+
+/* ---- the shelf ---- */
+function ntfScanInv(me,now){
+  var all=null; try{ all=INVENTORY; }catch(e){}
+  if(!all||!all.length) return {made:0,changed:false};
+  var orders=ntfRoleIs(['Farm Manager','Faculty']);
+  var first=!NTF.ibase, fresh={}, made=0;
+  all.forEach(function(it){
+    if(!it||!it.id) return;
+    var low=false;
+    /* isLow() is the Inventory screen's own answer -- at or below the reorder
+       point -- borrowed rather than worked out a second time here, so the bell
+       and the Low chip can never disagree about which products are low. */
+    try{ low=(typeof isLow==='function')&&isLow(it); }catch(e){}
+    if(!low) return;
+    var id=String(it.id);
+    fresh[id]=1;
+    if(first) return;
+    /* Only the moment it DROPS to the reorder point. A product sitting low for
+       a fortnight says it once, which is what the map keeps it for; coming
+       back up says nothing, because a delivery is not news to the person who
+       booked it in. */
+    if(!NTF.iseen[id]&&orders&&ntfOn('low')){ ntfPushLow(it,now); made++; }
+  });
+  var changed=first||made>0||ntfFlagDiff(NTF.iseen,fresh);
+  NTF.iseen=fresh;
+  if(first) NTF.ibase=now;
+  return {made:made,changed:changed};
+}
+
+/* ---- closed ground ----
+   The one of the three whose answer changes WITH THE DATE rather than because
+   somebody tapped something: a restriction standing from the 6th starts
+   closing ground at midnight on the 6th with no record changing at all. So
+   this walk also hangs off the half-hourly timer that moves studies along in
+   the page, not only off a record arriving. */
+function ntfScanRes(me,now){
+  var all=null; try{ all=TRIALS; }catch(e){}
+  if(!all||!all.length) return {made:0,changed:false};
+  var first=!NTF.rbase, fresh={}, made=0;
+  all.forEach(function(t){
+    if(!t) return;
+    var list=t.restrictions||[];
+    list.forEach(function(r,i){
+      if(!r) return;
+      /* A restriction saved before ids were stamped on them falls back to its
+         place in the study's list, which is stable enough for a ledger that
+         only has to recognise the same restriction on the next walk. */
+      var key=String(t.id)+'/'+String(r.id||('#'+i));
+      var live=false;
+      try{ live=(typeof trResState==='function')&&trResState(r)==='active'; }catch(e){}
+      if(live) fresh[key]=1;
+      if(first) return;
+      var was=!!NTF.rseen[key];
+      /* The person who PLACED it is told as well, unlike a job you gave
+         yourself. Two reasons, and the second is the real one: seeing the row
+         appear is how they know it took, and the record only carries the
+         placer's NAME (r.by), not their id -- so leaving them out would mean
+         matching on a name, and the price of getting that wrong is somebody
+         not being told that ground is closed. That is the one thing this alert
+         must never do. */
+      if(live&&!was&&ntfOn('trials')){ ntfPushRes('resclose',t,r,now); made++; }
+      else if(was&&!live&&ntfOn('trials')){ ntfPushRes('resopen',t,r,now); made++; }
+    });
+  });
+  var changed=first||made>0||ntfFlagDiff(NTF.rseen,fresh);
+  NTF.rseen=fresh;
+  if(first) NTF.rbase=now;
+  return {made:made,changed:changed};
+}
+
+/* The three push functions, one per source, each copying in the facts its own
+   row needs -- the same reason ntfPush() copies a job's title: the machine may
+   be retired, the product renamed and the study finished by the time somebody
+   scrolls back, and a row has to still read as a sentence. */
+function ntfPushEq(kind,m,now,who,note){
+  NTF.list.unshift({ id:ntfNewId(now), k:kind, t:now,
+    eq:String(m.id), ttl:String(m.name||'A machine'),
+    area:String(m.location||''), who:who||null, note:ntfClip(note,64) });
+}
+function ntfPushLow(it,now){
+  var q=0; try{ q=(typeof invQty==='function')?invQty(it):(+it.qty||0); }catch(e){}
+  NTF.list.unshift({ id:ntfNewId(now), k:'low', t:now,
+    item:String(it.id), ttl:String(it.name||'A product'),
+    q:q, thr:(+it.thr||0), u:String(it.unit||'') });
+}
+function ntfPushRes(kind,t,r,now){
+  var ty='Restricted', endTxt='';
+  try{ if(typeof trRType==='function') ty=trRType(r.type).label||ty; }catch(e){}
+  try{ if(typeof trResEndText==='function') endTxt=trResEndText(r); }catch(e){}
+  NTF.list.unshift({ id:ntfNewId(now), k:kind, t:now,
+    /* The plot, and deliberately NOT the study's name or its lab -- see the
+       note at the top of this section. */
+    plot:String(r.scope||''), ttl:String(ty),
+    endTxt:String(endTxt), why:(r.lifted?'lifted':'ended') });
+}
+/* One id generator, so the three above and the two older pushes cannot drift
+   into making ids of different shapes. */
+function ntfNewId(now){ return 'n'+now.toString(36)+Math.random().toString(36).slice(2,7); }
+
 function ntfSeenDiff(a,b){
   var ka=Object.keys(a),kb=Object.keys(b);
   if(ka.length!==kb.length) return true;
@@ -897,7 +1200,7 @@ function ntfSeenDiff(a,b){
         `origin` is unreliable to read later because the request has by then
         become an ordinary task                                            */
 function ntfPush(kind,t,who,now){
-  NTF.list.unshift({ id:'n'+now.toString(36)+Math.random().toString(36).slice(2,7),
+  NTF.list.unshift({ id:ntfNewId(now),
     k:kind, task:String(t.id), t:now,
     ttl:String(t.title||'A job'),
     who:who||null,
@@ -944,7 +1247,19 @@ var NTF_KIND={
   clockin: {c:'#2f7d3a'},   /* circle   - somebody is on the farm */
   clockout:{c:'#517c96'},   /* ring     - informational, the day is done */
   shiftauto:{c:'#9a5b00'},  /* diamond  - check this, it is your pay */
-  shiftask:{c:'#c0392b'}    /* square   - urgent, only you can answer it */
+  shiftask:{c:'#c0392b'},   /* square   - urgent, only you can answer it */
+  /* The farm's own three, added 2026-10-01. Every one of these REUSES a color
+     already above rather than introducing a new one, and that is the safe
+     choice on purpose: a color that is not in CB_MAP keeps its row but loses
+     its SHAPE in color-blind mode, which is the half of the signal that does
+     not depend on seeing color at all. Reusing means the meaning carries over
+     too -- red square is "deal with this", green circle is "that is done". */
+  eqdown:  {c:'#c0392b'},   /* square   - urgent, do not walk out to it */
+  equp:    {c:'#2f9e4f'},   /* circle   - complete, same as done on purpose */
+  eqflag:  {c:'#d17a00'},   /* diamond  - needs attention, still running */
+  low:     {c:'#9a5b00'},   /* diamond  - check this, order something */
+  resclose:{c:'#7c5cbf'},   /* triangle - ground is shut, stay off it */
+  resopen: {c:'#2f9e4f'}    /* circle   - complete, the ground is yours again */
 };
 /* 24-hour "07:02" as the farm reads it. The time clock has its own t12()
    inside its closure; this is the same answer where the bell can reach it. */
@@ -993,6 +1308,25 @@ function ntfLine(e){
       +' · tell Bill if that is wrong' };
   if(e.k==='shiftask') return { t:'You did not clock out',
     s:'Clocked in at '+ntfT12(e.inAt)+ntfDay(e.d)+' · tap to say when you left' };
+  /* The farm's own three. Like the clock's rows these build their own
+     sentence, because the facts in them are a machine, a shelf or a plot
+     rather than a job. */
+  if(e.k==='eqdown')  return { t:esq(e.ttl)+' is out of service',
+    s:(e.who?(ntfWho(e.who)+' marked it down'):'Marked down')
+      +(e.note?' \u00b7 '+esq(e.note):'')+where };
+  if(e.k==='equp')    return { t:esq(e.ttl)+' is back in service',
+    s:'Ready to use again'+where };
+  if(e.k==='eqflag')  return { t:'Something is wrong with '+esq(e.ttl),
+    s:ntfWho(e.who)+' reported it'+(e.note?' \u00b7 '+esq(e.note):'')
+      +' \u00b7 still running'+where };
+  if(e.k==='low')     return { t:esq(e.ttl)+' is low',
+    s:ntfQty(e.q)+' '+esq(e.u)+' left \u00b7 reorder at '+ntfQty(e.thr)+' '+esq(e.u) };
+  /* Named by plot, never by study. The ground is everybody's business; whose
+     trial it is, is not. */
+  if(e.k==='resclose')return { t:(e.plot?esq(e.plot):'Ground')+' is closed',
+    s:esq(e.ttl)+(e.endTxt?(' \u00b7 '+esq(e.endTxt)):'') };
+  if(e.k==='resopen') return { t:(e.plot?esq(e.plot):'Ground')+' is open again',
+    s:esq(e.ttl)+(e.why==='lifted'?' was lifted':' has ended') };
   if(e.k==='reqok')   return { t:esq(e.ttl)+' was accepted', s:ntfWho(e.who)+' has taken it on'+where };
   if(e.k==='reqdone') return { t:esq(e.ttl)+' is done', s:ntfWho(e.who)+' finished the job you asked for'+where };
   return { t:esq(e.ttl)+' came back part-finished',
@@ -1018,7 +1352,7 @@ function renderNotifFeed(){
       +'<div style="font:800 15px \'Archivo\';color:var(--ink)">Nothing yet</div>'
       +'<div style="font:600 12px \'Public Sans\';color:var(--muted);margin-top:6px;line-height:1.5">'
       +'You\'ll hear here when a job is given to you, when a job you handed out is finished, '
-      +'and when one comes back only part-done.</div></div>';
+      +'when a machine goes down, and when ground on the farm closes or opens again.</div></div>';
     return;
   }
   var now=Date.now(), buckets=[['Today',86400000],['This week',604800000],['Previous',Infinity]];
@@ -1056,6 +1390,26 @@ document.getElementById('s-notifications').addEventListener('click',function(e){
      behind the Coming Soon cover for everybody but Bill). */
   if(ev.punch){
     if(ev.k==='shiftask'&&typeof tcAskOutSheet==='function') tcAskOutSheet(ev.punch);
+    return;
+  }
+  /* A machine or a product row opens the thing itself -- but ONLY if that page
+     is open to whoever is reading. Equipment and Inventory are both still
+     behind the Coming Soon cover for most of the farm, and dropping somebody
+     on a covered screen is worse than the tap doing nothing: it looks like the
+     app is broken rather than like the page is not ready. Same reasoning as
+     the clock rows above. */
+  if(ev.eq){
+    try{ if(!csLocked('equipment')&&typeof openMachine==='function') openMachine(ev.eq); }catch(_q){}
+    return;
+  }
+  if(ev.item){
+    try{ if(!csLocked('inventory')&&typeof openItem==='function') openItem(ev.item); }catch(_q){}
+    return;
+  }
+  /* Ground opens the farm map at that plot, which every phone can reach --
+     and seeing where the closed plot IS is the whole point of the alert. */
+  if(ev.plot){
+    try{ if(typeof trGoPlot==='function') trGoPlot(ev.plot); }catch(_q){}
     return;
   }
   var t=null; try{ t=TASKS.find(function(x){return x.id===ev.task;}); }catch(_e){}

@@ -1037,6 +1037,11 @@ function invsyncOnItems(snap){
 }
 
 function invsyncRepaintScreens(){
+  /* A product arriving can have dropped below its reorder point, so the bell
+     is worked out here. Reads lists and writes to this phone only -- never
+     storeTouch(), which is what keeps an arriving record from causing a send.
+     See CLAUDE.md, the two traps. */
+  try{ if(typeof ntfTick==='function') ntfTick(); }catch(e){}
   try{
     var scr=document.querySelector('.screen.active');
     var id=scr?scr.id.replace(/^s-/,''):'';
@@ -2177,6 +2182,9 @@ function eqsyncOnSnapshot(tab,snap){
 }
 
 function eqsyncRepaint(){
+  /* A machine arriving may have just gone down, which everybody is told about.
+     Same rule as above: this phone only, never storeTouch(). */
+  try{ if(typeof ntfTick==='function') ntfTick(); }catch(e){}
   try{
     var scr=document.querySelector('.screen.active');
     var id=scr?scr.id.replace(/^s-/,''):'';
@@ -3225,6 +3233,9 @@ function trsyncTick(){
   trsyncPush();
 }
 function trsyncRepaint(){
+  /* A study arriving may carry a restriction that closes ground, or one that
+     has just been lifted. Same rule again: this phone only. */
+  try{ if(typeof ntfTick==='function') ntfTick(); }catch(e){}
   try{
     var d=document.getElementById('s-sharedb');
     if(d&&d.classList.contains('active')&&typeof sdbRender==='function') sdbRender();

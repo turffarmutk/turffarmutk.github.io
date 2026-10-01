@@ -90,7 +90,13 @@ function boot(store) {
       + 'signIn:function(pid){return sessionSet(pid,{quiet:true});},'
       + 'RST_LOGIN:RST_LOGIN,NOTIF_ALERTS:NOTIF_ALERTS,go:go,'
       + 'acceptCrewReq:acceptCrewReq,assignsUndergrads:assignsUndergrads,'
-      + 'ntfReqFor:function(t,me){return ntfReqFor(t,me);}'
+      + 'ntfReqFor:function(t,me){return ntfReqFor(t,me);},'
+      /* The three lists the farm's own alerts are worked out from, plus the
+         one call every hook uses. Reached through functions because EQUIP and
+         the rest are `let` inside the app and never land on window. */
+      + 'ntfTick:ntfTick,equip:function(){return EQUIP;},probs:function(){return EQPROBLEMS;},'
+      + 'inv:function(){return INVENTORY;},trials:function(){return TRIALS;},'
+      + 'isLow:isLow,invQty:invQty,today:trTodayISO,csLocked:csLocked'
       + '};');
   } catch (e) { console.log('app script threw: ' + e.message); fail++; }
   return { win, doc: win.document, n: win.__n || {}, errs };
@@ -390,10 +396,17 @@ section('6d. one row per job per look, and the six switches are separate');
   ok('three stages in one look raise exactly one row', n.ntfScan() === 1);
   ok('and it is the latest stage', n.ntf().list[0].k === 'reqdone', n.ntf().list[0].k);
 
-  /* Each switch works on its own. */
-  const kinds = 'tasks,done,partial,reqnew,reqok,reqdone,clockin,clockout,shiftauto,shiftask'.split(',');
+  /* Each switch works on its own. Fourteen since 2026-10-01: the equipment,
+     inventory and trials switches were wired up, and weather deliberately was
+     not -- so `wx` is the one row still carrying "Not sending yet", and if it
+     ever creeps into this list without push being built, that label is a lie
+     again. */
+  const kinds = ('tasks,done,partial,reqnew,reqok,reqdone,equip,eqflag,low,trials,'
+               + 'clockin,clockout,shiftauto,shiftask').split(',');
   const live = n.NOTIF_ALERTS.filter(a => a.live).map(a => a.k);
-  ok('all ten are marked as really sending', live.join(',') === kinds.join(','), live.join(','));
+  ok('all fourteen are marked as really sending', live.join(',') === kinds.join(','), live.join(','));
+  ok('and weather is still honest about not sending',
+     n.NOTIF_ALERTS.filter(a => a.k === 'wx')[0].live === undefined);
   kinds.forEach(k => {
     ok('"' + k + '" has its own switch, on by default',
        n.NOTIF()['a_' + k] === true, String(n.NOTIF()['a_' + k]));
@@ -440,13 +453,31 @@ section('6e. the dot colours survive colour-blind mode');
     const pair = map[hex] + '/' + shape[hex];
     (seen[pair] = seen[pair] || []).push(k);
   });
-  /* "a job I handed out is finished" and "a job I asked for is finished" share
-     one on purpose -- they are the same news down two different routes. Any
-     OTHER pair sharing means two unrelated alerts are indistinguishable to
-     somebody reading the dots rather than the words. */
+  /* SHARING IS ALLOWED, BUT ONLY WHERE IT MEANS SOMETHING -- and the list of
+     where is written out here rather than left to a rule, because a colour
+     two unrelated alerts share by ACCIDENT is the bug this check exists for.
+
+     The reason it is a list at all: the colour-blind palette is six colours
+     and five dot shapes, so sixteen alerts cannot each have their own pair.
+     What they can do is share by MEANING, so somebody reading the dots rather
+     than the words still gets the right instruction from them:
+
+       green circle   something is finished, or the ground is yours again
+       amber diamond  somebody has to pick this up
+       dark diamond   check this one
+       pink triangle  stop and deal with this before you carry on
+       red square     urgent, and only you can answer it
+
+     Add an alert and it either joins one of these groups or brings its own
+     pair. What it may not do is quietly land on top of an unrelated one. */
+  const DELIBERATE = ['done+reqdone+equp+resopen', 'partial+eqflag',
+                      'reqnew+resclose', 'shiftauto+low', 'shiftask+eqdown'];
   const shared = Object.keys(seen).filter(p => seen[p].length > 1).map(p => seen[p].join('+'));
-  ok('only the two "finished" alerts share a colour and shape',
-     shared.length === 1 && shared[0] === 'done+reqdone', shared.join(' | ') || 'none');
+  const stray = shared.filter(g => DELIBERATE.indexOf(g) < 0);
+  ok('every shared colour and shape is one of the deliberate groups',
+     stray.length === 0, stray.join(' | ') || 'none');
+  ok('and all five groups are still there',
+     DELIBERATE.every(g => shared.indexOf(g) >= 0), shared.join(' | '));
 }
 
 section('6f. the switches are grouped by the page they come from');
@@ -514,8 +545,9 @@ section('7. the toggles on the Notifications screen actually gate it');
   ok('turned back on and it works again', n.ntfScan() === 1);
 
   const live = n.NOTIF_ALERTS.filter(a => a.live).map(a => a.k).join(',');
-  ok('ten alerts are marked as really sending',
-     live === 'tasks,done,partial,reqnew,reqok,reqdone,clockin,clockout,shiftauto,shiftask', live);
+  ok('fourteen alerts are marked as really sending',
+     live === 'tasks,done,partial,reqnew,reqok,reqdone,equip,eqflag,low,trials,'
+            + 'clockin,clockout,shiftauto,shiftask', live);
 }
 
 section('8. the feed is the person’s, not the phone’s');
@@ -865,6 +897,241 @@ section('18. the shift the app would not guess at asks its owner');
      every check above passed while the toast never appeared, the screen never
      repainted and the bell never updated. Only the console showed it. */
   ok('and none of that threw', b.errs.length === 0, b.errs.join(' | '));
+}
+
+/* ---------------------------------------------------------------------
+   19-21. THE FARM'S OWN THINGS, wired up 2026-10-01.
+
+   Three switches on the Notifications screen saved their setting and did
+   nothing for a month, which is why they carried the words "Not sending yet".
+   These three sections are what makes that no longer true, and what stops it
+   quietly becoming true again.
+
+   WHAT EACH ONE IS REALLY GUARDING is who hears it. Those are Dillon's calls,
+   not the code's, and every one of them is a line somebody could "tidy" into
+   the obvious-looking rule and get wrong: a machine going down deliberately
+   reaches an UNDERGRADUATE, while a low shelf deliberately does not reach a
+   TECHNICIAN, and closed ground deliberately does not say whose study it is.
+   --------------------------------------------------------------------- */
+
+section('19. a machine going down reaches everybody; an issue report does not');
+{
+  const store = {};
+  const b = boot(store);
+  const { n, doc } = b;
+  const BILL = n.RST_LOGIN.manager, STU = n.RST_LOGIN.undergrad;
+
+  /* An undergraduate, because that is the point: the crew are the people most
+     likely to walk out to a mower that has just gone down. */
+  n.signIn(STU);
+  const m = n.equip()[0];
+  ok('the farm has machines to watch', !!m && !!m.id);
+  n.ntfScan();                                   /* silent baseline */
+  ok('the baseline told nobody about the machines already there', n.ntf().list.length === 0);
+
+  n.probs().unshift({ id: 'pz1', eq: m.id, by: BILL, downBy: BILL, status: 'open',
+                      desc: 'Hydraulic leak at the left deck' });
+  m.status = 'down';
+  ok('an undergraduate is told it went down', n.ntfScan() === 1);
+  ok('by the right alert', n.ntf().list[0].k === 'eqdown', n.ntf().list[0].k);
+  ok('and looking again does not say it twice', n.ntfScan() === 0);
+
+  n.go('notifications');
+  let html = doc.getElementById('ntf-body').innerHTML;
+  ok('the row says the machine is out of service', /is out of service/.test(html));
+  ok('and who marked it down', /Bill/.test(html), html.slice(0, 300));
+  ok('and what is wrong with it', /Hydraulic leak/.test(html));
+
+  /* Back in service, and the row is the plain good news -- no name on it,
+     because what matters is that the mower can be used again. */
+  m.status = 'available';
+  ok('and they are told when it is back', n.ntfScan() === 1);
+  ok('by the other alert', n.ntf().list[0].k === 'equp', n.ntf().list[0].k);
+  n.go('notifications');
+  ok('which says it is usable again', /is back in service/.test(doc.getElementById('ntf-body').innerHTML));
+
+  /* AN ISSUE REPORT IS A DIFFERENT AUDIENCE. "It still runs but something is
+     wrong" is for whoever would fix it, and an undergraduate cannot. */
+  const m2 = n.equip()[1];
+  n.probs().unshift({ id: 'pz2', eq: m2.id, by: STU, downBy: null, status: 'open',
+                      desc: 'Pulls to the right' });
+  m2.flagged = true;
+  ok('an undergraduate hears nothing about an issue report', n.ntfScan() === 0);
+
+  /* The same machine, the same flag, on Bill's phone. */
+  const store2 = {};
+  const b2 = boot(store2);
+  b2.n.signIn(BILL);
+  b2.n.ntfScan();
+  b2.n.probs().unshift({ id: 'pz3', eq: b2.n.equip()[1].id, by: STU, downBy: null,
+                         status: 'open', desc: 'Pulls to the right' });
+  b2.n.equip()[1].flagged = true;
+  ok('Bill does hear about it', b2.n.ntfScan() === 1);
+  ok('by the issue alert', b2.n.ntf().list[0].k === 'eqflag', b2.n.ntf().list[0].k);
+  b2.n.go('notifications');
+  const h2 = b2.doc.getElementById('ntf-body').innerHTML;
+  ok('and the row says it is still running', /still running/.test(h2), h2.slice(0, 300));
+
+  /* A machine going from flagged to DOWN says the louder thing, once. */
+  b2.n.equip()[1].status = 'down';
+  ok('the same machine going down says so', b2.n.ntfScan() === 1);
+  ok('and only the down alert', b2.n.ntf().list[0].k === 'eqdown', b2.n.ntf().list[0].k);
+
+  /* A technician is on the fixing list too. */
+  const b3 = boot({});
+  b3.n.signIn(n.RST_LOGIN.tech);
+  b3.n.ntfScan();
+  b3.n.probs().unshift({ id: 'pz4', eq: b3.n.equip()[2].id, by: STU, status: 'open', desc: 'Belt squeal' });
+  b3.n.equip()[2].flagged = true;
+  ok('a technician hears an issue report', b3.n.ntfScan() === 1);
+
+  ok('and none of that threw', b.errs.length === 0, b.errs.join(' | '));
+}
+
+section('20. the shelf tells Bill and faculty, and nobody else');
+{
+  /* Bill and faculty, in Dillon's words on 2026-10-01: they are the people who
+     order. A technician is NOT on this list, which is the line most likely to
+     get "tidied" into the equipment one. */
+  function lowOne(who) {
+    const b = boot({});
+    b.n.signIn(who);
+    b.n.ntfScan();                               /* baseline, including whatever is already low */
+    const it = b.n.inv().filter(x => !b.n.isLow(x))[0];
+    it.thr = b.n.invQty(it) + 5;                 /* the shelf has just dropped below its point */
+    return { b: b, made: b.n.ntfScan(), it: it };
+  }
+  const bill = lowOne(boot({}).n.RST_LOGIN.manager);
+  ok('Bill is told a product is low', bill.made === 1);
+  ok('by the right alert', bill.b.n.ntf().list[0].k === 'low', bill.b.n.ntf().list[0].k);
+  bill.b.n.go('notifications');
+  const html = bill.b.doc.getElementById('ntf-body').innerHTML;
+  ok('the row names the product', html.indexOf(bill.it.name.slice(0, 12)) >= 0, html.slice(0, 300));
+  ok('and says how little is left and where the line is',
+     /left/.test(html) && /reorder at/.test(html), html.slice(0, 300));
+  ok('and saying it once is enough', bill.b.n.ntfScan() === 0);
+
+  const fac = lowOne(boot({}).n.RST_LOGIN.faculty);
+  ok('faculty are told as well', fac.made === 1);
+
+  const tech = lowOne(boot({}).n.RST_LOGIN.tech);
+  ok('a technician is not', tech.made === 0);
+  const stu = lowOne(boot({}).n.RST_LOGIN.undergrad);
+  ok('nor is an undergraduate', stu.made === 0);
+  const grad = lowOne(boot({}).n.RST_LOGIN.grad);
+  ok('nor a graduate student', grad.made === 0);
+
+  /* A delivery putting it back above the line says nothing, because it is not
+     news to the person who booked it in. */
+  bill.it.thr = 0;
+  ok('coming back up is silent', bill.b.n.ntfScan() === 0);
+}
+
+section('21. closed ground reaches everybody, by plot and never by study');
+{
+  const store = {};
+  const b = boot(store);
+  const { n, doc } = b;
+  const STU = n.RST_LOGIN.undergrad;
+  /* An undergraduate on a mower is exactly who this alert is for, and the
+     study belongs to a lab that is nothing to do with them. */
+  n.signIn(STU);
+  n.ntfScan();
+  const today = n.today();
+  const study = { id: 's-ntf1', title: 'Dollar spot fungicide screen', lab: 'Sorochan',
+                  stage: 'active', start: today, end: '', plots: ['CAFS14'],
+                  restrictions: [] };
+  n.trials().push(study);
+  ok('a study with no restrictions closes nothing', n.ntfScan() === 0);
+
+  study.restrictions.push({ id: 'r-ntf1', type: 'mow', scope: 'CAFS14',
+                            start: today, end: '', by: 'Somebody Else' });
+  ok('ground closing tells the undergraduate', n.ntfScan() === 1);
+  ok('by the right alert', n.ntf().list[0].k === 'resclose', n.ntf().list[0].k);
+  ok('and it does not say it again', n.ntfScan() === 0);
+
+  n.go('notifications');
+  let html = doc.getElementById('ntf-body').innerHTML;
+  ok('the row names the plot', /CAFS14/.test(html), html.slice(0, 300));
+  ok('and what is not allowed on it', /No mow/.test(html));
+  ok('and says it runs until somebody lifts it', /until it is lifted/.test(html));
+  /* THE WHOLE POINT OF THE WORDING. The ground is everybody's business; whose
+     trial it is, is not -- the same rule the farm map follows. */
+  ok('and it does NOT name the study', html.indexOf('Dollar spot') < 0, html.slice(0, 400));
+  ok('nor the lab', html.indexOf('Sorochan') < 0, html.slice(0, 400));
+
+  /* Lifted, and the ground is theirs again. */
+  study.restrictions[0].lifted = today;
+  study.restrictions[0].liftedBy = 'Bill';
+  ok('lifting it says so', n.ntfScan() === 1);
+  ok('by the other alert', n.ntf().list[0].k === 'resopen', n.ntf().list[0].k);
+  n.go('notifications');
+  html = doc.getElementById('ntf-body').innerHTML;
+  ok('the row says the plot is open again', /CAFS14 is open again/.test(html), html.slice(0, 300));
+  ok('and that somebody lifted it', /was lifted/.test(html));
+
+  /* A restriction that has not started yet is not standing on anything. */
+  const future = '2099-01-01';
+  study.restrictions.push({ id: 'r-ntf2', type: 'herbicide', scope: 'CAFS15',
+                            start: future, end: '', by: 'Somebody Else' });
+  ok('a restriction starting next year closes nothing today', n.ntfScan() === 0);
+
+  /* AND THE TRAP: a study that is GONE says nothing. Its ground is open, but
+     "CAFS16 is open again" from a record nobody can look at any more is a
+     sentence with no answer behind it. */
+  const gone = { id: 's-ntf2', title: 'Shade study', lab: 'Brosnan', stage: 'active',
+                 start: today, end: '', plots: ['CAFS16'],
+                 restrictions: [{ id: 'r-ntf3', type: 'mow', scope: 'CAFS16',
+                                  start: today, end: '', by: 'Somebody Else' }] };
+  n.trials().push(gone);
+  ok('its restriction closes the ground', n.ntfScan() === 1);
+  const before = n.ntf().list.length;
+  n.trials().splice(n.trials().indexOf(gone), 1);
+  ok('and the study being removed altogether says nothing', n.ntfScan() === 0);
+  ok('so nothing was added to the feed', n.ntf().list.length === before);
+
+  /* Turning the switch off stops it, like every other row. */
+  const b4 = boot({});
+  b4.n.signIn(STU);
+  b4.n.NOTIF().a_trials = false;
+  b4.n.ntfScan();
+  b4.n.trials().push({ id: 's-ntf3', title: 'Another', lab: 'Sorochan', stage: 'active',
+                       start: b4.n.today(), end: '', plots: ['CAFS20'],
+                       restrictions: [{ id: 'r-ntf4', type: 'mow', scope: 'CAFS20',
+                                        start: b4.n.today(), end: '', by: 'X' }] });
+  ok('with the switch off, closed ground is silent', b4.n.ntfScan() === 0);
+
+  ok('and none of that threw', b.errs.length === 0, b.errs.join(' | '));
+}
+
+section('22. the three new walks cannot silence each other, or the two old ones');
+{
+  /* FIVE walks now, and the one way this breaks is a shared guard: the clock
+     alerts once sat behind the job walk's "no jobs, nothing to do" line, so on
+     a farm with an empty task list they silently did not exist. Nothing on
+     screen said so. This is that check, for every pair at once. */
+  const b = boot({});
+  const { n } = b;
+  const BILL = n.RST_LOGIN.manager, STU = n.RST_LOGIN.undergrad;
+  n.signIn(BILL);
+  n.setTasks([]);                                /* no jobs at all */
+  n.trials().length = 0;                         /* and no studies */
+  n.ntfScan();
+  const m = n.equip()[0];
+  m.status = 'down';
+  ok('a machine going down is heard on a farm with no jobs and no studies',
+     n.ntfScan() === 1, n.ntf().list.map(e => e.k).join(','));
+
+  /* And the other way round: a job landing is still heard with nothing wrong
+     anywhere else. */
+  n.signIn(STU);
+  n.ntfScan();
+  n.setTasks([task({ id: 'q1', assignee: null })]);
+  n.ntfScan();
+  n.tasks()[0].assignee = STU;
+  n.tasks()[0].assignedBy = BILL;
+  ok('and a job landing is still heard', n.ntfScan() === 1);
+  ok('nothing threw', b.errs.length === 0, b.errs.join(' | '));
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

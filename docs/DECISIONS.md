@@ -1534,6 +1534,101 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### Three of the four dead notification switches are wired; weather is not — 2026-10-01
+**Decision:** the Equipment, Inventory and Trials switches on the Notifications
+screen now actually raise alerts, and **weather deliberately still does not**.
+Who hears each one is Dillon's call, and none of it is the obvious rule:
+
+- **a machine goes down, or comes back** — *everybody*, undergraduates
+  included, because anybody might walk out to that mower and the crew are the
+  people most likely to;
+- **an issue is reported on a machine** ("it still runs but something is
+  wrong") — only Bill, the technicians and faculty, the people who would fix it;
+- **a product reaches its reorder point** — only **Bill and faculty**, the
+  people who order. Not technicians, which is the line most likely to be
+  "tidied" into matching the equipment one;
+- **ground closes or opens again** — *everybody*, named by **plot** and never
+  by study, which is the same rule the farm map already follows: closed ground
+  is drawn for every phone, but another lab's study name is held back.
+
+Weather was left alone because an alert that can only reach you while you have
+the app open is worth very little for a spray window, and the forecast is only
+fetched when the app opens or somebody opens the Weather page. Its switch still
+says **"Not sending yet"**, which is now the only row on that screen that does.
+**Why:** the switches had saved their setting since the day they were written
+and nothing read them, so somebody could turn "Equipment down" on, watch it
+stay on through a reload, and reasonably conclude they would be told when a
+mower went down. Wiring them was cheap — these are all records every phone
+already holds, so like every other alert they cost no database reads, no writes
+and no rules change. Weather is the one where wiring it would have been the
+dishonest half-measure rather than the honest one.
+**Don't:** don't give the low-stock alert to technicians or the crew to make it
+"consistent" with equipment — the two lists are different on purpose and both
+came from Dillon. Don't put the study's name or its lab on a closed-ground row.
+And don't add `live:1` to the weather row until a phone really does buzz with
+the app shut; the label is the whole point. Worth knowing when push does get
+built: faculty hear about low stock but still cannot open the Inventory page,
+which is behind the Coming Soon cover for everybody but Bill — releasing that
+page is a separate decision of Dillon's, not a bug in the alert.
+
+### The three new alert ledgers keep what IS, not one entry per record — 2026-10-01
+**Decision:** the job walk keeps a small entry per task because it asks five
+questions about each one. The three walks added on 2026-10-01 (`ntfScanEquip`,
+`ntfScanInv`, `ntfScanRes` in `app-01-shell.js`) only ask "is this true right
+now", so each keeps just the ids for which it IS — the machines that are down,
+the products at or below their reorder point, the restrictions standing on
+ground. An id **appearing** is one alert and an id **disappearing** is the
+other. On a normal day all three maps are empty or nearly so.
+**Why:** 191 products and every machine in a ledger that is written to the
+phone on every change, for the sake of three flags, when the interesting state
+is almost always "no".
+**Don't:** the trap in this shape is that a record which is **gone altogether**
+must say nothing. Each walk only ever decides about records it can still see —
+it loops over the farm's own list, so a study or a machine that has been
+removed is never examined and its stale entry simply drops out on the way past.
+Make the walk iterate over the LEDGER instead of over the farm's list and
+deleting a study announces "CAFS14 is open again" to twenty-three phones, from
+a record nobody can open. Note also that these alerts, like the older ones, are
+**derived on each phone** — no collection, no rule, no row in
+`test-sync-settles.js`. And `ntfFlagDiff()` is a second diff on purpose:
+`ntfSeenDiff()` compares the three fields a job entry has, and reusing it here
+would have quietly stopped these maps ever being saved.
+
+### The bell counts one list, not two — 2026-10-01
+**Decision:** `newCount()` in `app-03-people.js` no longer counts `NOTIFS`.
+**Why:** `NOTIFS` is an older in-memory list that three places still push onto
+during a session — a restriction being placed or lifted, a plot proximity
+warning and an off-site clock-in — and **nothing renders it**: the
+Notifications screen draws `NTF` and only `NTF`. So counting it put a number on
+the bell with no row behind it. You placed a restriction, the bell said 1, you
+opened the screen and there was nothing there, and a reload took even the
+number away. A badge that lies about having something to show undermines the
+real alerts sitting next to it. The toast on placing a restriction said "Bill
+alerted" for the same reason and was equally untrue; it says what happened
+instead, and a restriction in force now genuinely reaches every phone through
+the feed.
+**Don't:** don't rip `NOTIFS` out. The plot proximity warning and the off-site
+clock-in are two events that still deserve a real alert of their own one day,
+and that list is where the wish is written down. The two of them still toast,
+and the proximity one still raises the phone's own notification.
+
+### Alert dots share a colour only where they share a MEANING — 2026-10-01
+**Decision:** six of the sixteen alert kinds reuse another kind's colour, and
+the pairings are listed in `tools/test-notifications.js` section 6e rather than
+being banned.
+**Why:** the colour-blind palette is six colours and five dot shapes, so
+sixteen alerts cannot each have their own pair — and `NTF_KIND` may only use
+colours that are keys in `CB_MAP`, or the row keeps its colour and silently
+loses its SHAPE in color-blind mode, which is the half of the signal that does
+not depend on seeing colour. So they share by meaning instead: green circle is
+finished or yours again, amber diamond is somebody must pick this up, dark
+diamond is check this, pink triangle is stop before you carry on, red square is
+urgent and only you can answer it.
+**Don't:** don't add an alert whose dot lands on top of an unrelated one — the
+test fails on any grouping not in that list, which is the point. And don't
+introduce a new hand-picked colour without adding it to `CB_MAP` and
+`CB_SHAPE`; CLAUDE.md says the same thing about `TR_RES_PALETTE`.
+
 ### Admin folded into Farm settings, and Farm settings moved to Profile — 2026-09-30
 **Decision:** two changes Dillon asked for together, and they only make sense
 together. **One:** the Admin screen is gone. Everything it held now sits at the

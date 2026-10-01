@@ -1404,15 +1404,27 @@ function updateBellBadges(){
 }
 function renderHomeNotif(){ updateBellBadges(); }
 function _oldRenderHomeNotif(){var el=document.getElementById('homenotif');if(!el)return;var seen=getSeen()||(Date.now()-12*3600e3),now=Date.now();var nw=NOTIFS.filter(function(n){return (now-n.h*3600e3)>seen;});if(!nw.length){el.style.display='none';el.innerHTML='';return;}var rows=nw.map(function(n){return '<div class="row"><span class="dot" style="background:'+n.c+'"></span><div style="flex:1"><div class="rt">'+n.t+'</div><div class="rs">'+n.s+'</div></div><span class="rs" style="flex:none">'+n.time+'</span></div>';}).join('');rows+='<div class="row tap" data-go="notifications" style="justify-content:center"><div class="rt" style="color:var(--acc)">View all notifications ›</div></div>';el.innerHTML='<div class="list" style="margin:0">'+rows+'</div>';el.style.display='block';}
-/* Two lists feed the bell. NTF is the real one -- jobs handed out, finished
-   and part-finished, worked out from the task list on this phone (see the
-   notification feed in app-01-shell.js). NOTIFS is the older in-memory one
-   that a couple of places still push onto during a session: the plot
-   proximity alert and the off-site clock-in. Those vanish on a reload, which
-   is why they are counted against `seen` rather than against readAt. */
+/* ONE list feeds the bell, and that is the fix made on 2026-10-01. NTF is the
+   real feed, worked out on this phone from the records it already holds (see
+   app-01-shell.js). NOTIFS is an older in-memory list that three places still
+   push onto during a session -- a restriction being placed or lifted, a plot
+   proximity warning, and an off-site clock-in -- and NOTHING RENDERS IT: the
+   Notifications screen draws NTF and only NTF.
+
+   So counting it put a number on the bell with no row behind it. You placed a
+   restriction, the bell said 1, you opened the screen and there was nothing
+   there, and after a reload even the number was gone. A badge that lies about
+   having something to show is worse than no badge, and it undermines the real
+   alerts sitting next to it.
+
+   The things those three places say are not lost: each one toasts, the plot
+   warning also raises the phone's own notification, and a restriction now
+   reaches every phone properly through the feed (ntfScanRes). What is left in
+   NOTIFS is an in-memory list nobody reads, kept rather than ripped out
+   because the proximity warning and the off-site clock-in are the two events
+   that still deserve a real alert of their own one day. */
 function newCount(){
-  var seen=getSeen()||(Date.now()-12*3600e3),now=Date.now();
-  var n=NOTIFS.filter(function(x){return (now-x.h*3600e3)>seen;}).length;
+  var n=0;
   try{ n+=ntfUnread(); }catch(e){}
   return n;
 }

@@ -155,12 +155,16 @@ section('4. notification settings are written down');
   {
     const { win, doc, p } = boot(store);
     p.setRole('manager');
-    ok('trials alerts start off', p.NOTIF.a_trials === false, String(p.NOTIF.a_trials));
+    /* Ground closing starts ON, since 2026-10-01: it is the one alert on that
+       screen that can stop somebody driving a mower onto a trial. So the row
+       this section flips to prove that a switch is written down is flipped the
+       other way round now -- on, then off, then still off after a reload. */
+    ok('ground alerts start on', p.NOTIF.a_trials === true, String(p.NOTIF.a_trials));
     win.go('notifsettings');
     const tgl = doc.querySelector('#s-notifsettings .nts-tgl[data-k="a_trials"]');
     ok('the screen renders a toggle for each alert', !!tgl);
     if (tgl) tgl.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
-    ok('tapping it flips the value', p.NOTIF.a_trials === true, String(p.NOTIF.a_trials));
+    ok('tapping it flips the value', p.NOTIF.a_trials === false, String(p.NOTIF.a_trials));
 
     const q = doc.querySelector('#s-notifsettings .nts-tgl[data-k="quiet"]');
     if (q) q.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
@@ -173,7 +177,7 @@ section('4. notification settings are written down');
   {
     const { p } = boot(store);
     p.setRole('manager');
-    ok('the alert is still on after a reload', p.NOTIF.a_trials === true, String(p.NOTIF.a_trials));
+    ok('the alert is still off after a reload', p.NOTIF.a_trials === false, String(p.NOTIF.a_trials));
     ok('quiet hours too', p.NOTIF.quiet === true, String(p.NOTIF.quiet));
     ok('and the summary matches what it was', p.notifSummary() === summary, p.notifSummary());
   }

@@ -5504,7 +5504,15 @@ function trAutoStage(){
    late costs nothing, because the dates written are the study's own, never
    "now". */
 setTimeout(function(){ try{ trAutoStage(); }catch(e){} },20000);
-setInterval(function(){ try{ trAutoStage(); }catch(e){} },1800000);
+/* Studies move themselves along, and in the same breath the bell notices
+   ground that has closed or opened because the DATE changed rather than
+   because a record did -- a restriction standing from the 6th shuts its plot
+   at midnight with nothing arriving from anywhere. Half an hour is close
+   enough for ground that is measured in days. */
+setInterval(function(){
+  try{ trAutoStage(); }catch(e){}
+  try{ if(typeof ntfTick==='function') ntfTick(); }catch(e){}
+},1800000);
 
 function trDelete(){
   var t=trById(trCur); if(!t) return;
@@ -6590,7 +6598,12 @@ function trSaveRes(){
   });
   trSave();
   var many=scopes.length>1;
-  toast(many?('Restriction placed on '+scopes.length+' plots · Bill alerted'):'Restriction placed · Bill alerted');
+  /* It used to say "Bill alerted", which was not true: the alert went into an
+     in-memory list on THIS phone that nothing ever drew. Since 2026-10-01 a
+     restriction in force really does reach every phone, by plot, through the
+     notification feed -- so the toast says what happened and lets the feed do
+     the telling. */
+  toast(many?('Restriction placed on '+scopes.length+' plots'):'Restriction placed');
   /* One alert for the whole job, not six -- Bill reads the plots off the line
      under it rather than scrolling past the same restriction six times. */
   trNotifyBill('Restriction placed · '+(many?(scopes.length+' plots'):scopes[0]),
@@ -9973,13 +9986,7 @@ function tsyncRepaint(){
      asks the database nothing -- storeSaveLocal()'s side of the line, never
      storeTouch()'s, which is what keeps a record ARRIVING from causing a send.
      See CLAUDE.md, the two traps. */
-  try{ if(typeof ntfScan==='function'&&ntfScan()) updateBellBadges(); }catch(e){}
-  try{
-    var n=document.getElementById('s-notifications');
-    if(n&&n.classList.contains('active')&&typeof renderNotifFeed==='function'){
-      renderNotifFeed(); if(typeof ntfMarkRead==='function') ntfMarkRead();
-    }
-  }catch(e){}
+  try{ if(typeof ntfTick==='function') ntfTick(); }catch(e){}
   try{
     var b=document.getElementById('s-taskboard');
     if(b&&b.classList.contains('active')&&typeof renderBoard==='function') renderBoard();

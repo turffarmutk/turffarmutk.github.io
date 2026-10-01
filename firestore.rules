@@ -833,6 +833,73 @@ service cloud.firestore {
     }
 
     /* ------------------------------------------------------------------
+       PROFILE PICTURES
+
+       ONE DOCUMENT PER PERSON, NAMED AFTER THAT PERSON -- the same shape as
+       the favorites above, and copied from them. "You may write the document
+       that is named after you" is one comparison and needs no lookup.
+
+       ON READING. Open to anybody signed in, exactly like the favorites, the
+       punches and the schedules, and for the identical reason spelled out
+       there: a phone HOLDS everybody's pictures because refusing records that
+       are not yours would need a different query per person, and no drawer in
+       this app does that.
+
+       ON WRITING, there are two doors and they are not the same size.
+
+         - YOUR OWN: anything, including taking it off. Everybody gets this,
+           undergraduates included -- Dillon's call, 2026-10-01. A picture of
+           your own face changes nothing for anybody else, so there is no role
+           here to protect anything.
+
+         - SOMEBODY ELSE'S: Bill and the App Manager, and ONLY to leave no
+           picture behind. That is the moderation route Dillon asked for when
+           asked who deals with a picture that should not be on the farm's
+           phones. It is deliberately clear-only: no screen anywhere puts a
+           picture onto another person's account, and this rule is what makes
+           that true rather than merely unimplemented. Bill can take a bad
+           picture off; he cannot choose somebody's face.
+
+       THE SIZE CAP IS A RULE, not just app manners. A phone camera photo is
+       three to five megabytes and this farm is on the free plan, where every
+       phone re-reads a record each time it changes. The app shrinks a picture
+       to a 160px square first (PHOTO_PX in app-03-people.js), and 60000
+       characters is well clear of what that produces while still refusing
+       anything that did not go through it.
+
+       Transcribed from photoCanWrite() in app-03-people.js and phCanPush()
+       in app-02-fieldlog-sync.js.
+       ------------------------------------------------------------------ */
+    function photoImgOk() {
+      return !('img' in request.resource.data.keys())
+        || request.resource.data.img == null
+        || (request.resource.data.img is string
+            && request.resource.data.img.size() < 60000);
+    }
+    function photoIsCleared() {
+      return !('img' in request.resource.data.keys())
+        || request.resource.data.img == null;
+    }
+    /* App: photoCanClear(). Taking somebody else's picture down. */
+    function canClearPhoto() {
+      /* The App Manager has no restrictions — see appAdmin() above. */
+      return appAdmin() || (actor() && roleOf(me()) == 'Farm Manager');
+    }
+    match /photos/{photoId} {
+      allow read: if actor();
+
+      allow create, update: if actor()
+        && request.resource.data.id == photoId
+        && photoImgOk()
+        && ( photoId == me() || (canClearPhoto() && photoIsCleared()) );
+
+      /* Taking a picture off is img:null, not a missing record -- a document
+         genuinely deleted comes straight back off the next phone that
+         reconnects still holding its own copy. Same as everywhere else. */
+      allow delete: if false;
+    }
+
+    /* ------------------------------------------------------------------
        TIME CLOCK — drawer 6
 
        One document per punch. NOT append-only, and that is deliberate rather

@@ -1603,6 +1603,205 @@ function favsyncSummary(){
   return FAVSYNC.up+' sent · '+FAVSYNC.down+' received'+(f?(' · '+f+' refused'):'')+sdbStuckNote();
 }
 
+/* ================= PROFILE PICTURES =================
+   One record per person, and the record's id IS the person's id -- copied
+   straight from the favorites drawer above, which is copied from the weekly
+   schedules. That shape is what lets firestore.rules say "you may write the
+   document named after you" without a per-person query.
+
+   WHAT TRAVELS is {id, img, at, by}: four flat fields, no lists anywhere, so
+   there is nothing here for Firestore's "no list inside a list" to throw away
+   (see docs/DECISIONS.md, 2026-09-22).
+
+   `img` IS A SMALL JPEG WRITTEN AS TEXT, and small is the whole trick. It is
+   shrunk to a 160px square on the phone before it is ever stored -- see
+   PHOTO_PX in app-03-people.js, which is where the reasoning lives. A record
+   over PHOTO_MAX_CHARS is refused HERE as well, because this is the last place
+   before the wire and a record the database turns away is one the phone keeps
+   offering forever.
+
+   TAKING A PICTURE OFF IS img:null, never a deleted document -- a genuinely
+   deleted document comes back off the next phone that reconnects still holding
+   its own copy.
+
+   EVERY PHONE HOLDS EVERYBODY'S PICTURES even though only two screens draw
+   one. Same decision as the favorites, the punches, the schedules and time
+   off, and the same reason: refusing records that are not yours would need a
+   different query per person and no drawer here does that. If that ever
+   changes it changes for all of them together.
+
+   The helpers live in app-03-people.js (PHOTOS, photoOf, photoCanSet,
+   photoCanClear, photoWrite). This file owns only the wire. */
+var PHSYNC_COLL='photos';
+var PHSYNC_RETRY_MS=10000;
+var PHSYNC={ on:false, live:false, ready:false, seen:{}, err:null, up:0, down:0, failed:{} };
+var _phsyncNextTry=0;
+
+/* On, always — see "SHARING IS NOT OPTIONAL" over flsyncWanted(). */
+function phsyncWanted(){ return true; }
+function phsyncHydrate(){ PHSYNC.on=phsyncWanted(); }
+function phsyncSetWanted(on){
+  PHSYNC.on=!!on;
+  if(on){ _phsyncNextTry=0; phsyncStart(); } else phsyncStop();
+}
+/* The record as the SERVER should hold it. Four fields and no more: anything
+   else a phone is carrying locally stays local, because a field the rules do
+   not expect is a refused write. */
+function phDoc(r){
+  var out; try{ out=JSON.parse(JSON.stringify(r||{})); }catch(e){ return null; }
+  if(!out||!out.id) return null;
+  var img=(typeof out.img==='string'&&out.img)?out.img:null;
+  /* The ceiling again, at the last moment before the wire. A picture over it
+     cannot have come from photoShrink(), so it came from an older phone or a
+     hand edit -- either way the database would refuse it, and a refused write
+     is offered again on every tick forever. Better to never send it. */
+  if(img&&img.length>((typeof PHOTO_MAX_CHARS==='number')?PHOTO_MAX_CHARS:40000)) return null;
+  return { id:String(out.id), img:img,
+           at:(typeof out.at==='string')?out.at:'',
+           by:(typeof out.by==='string')?out.by:'' };
+}
+function phJson(r){ var d=phDoc(r); return d?sdbJson(d):null; }
+function phById(id){ for(var i=0;i<PHOTOS.length;i++) if(PHOTOS[i]&&String(PHOTOS[i].id)===String(id)) return PHOTOS[i]; return null; }
+
+function phsyncStart(){
+  if(PHSYNC.live) return true;
+  if(Date.now()<_phsyncNextTry) return false;
+  var db=fbDb();
+  if(!db||!SESSION.pid){
+    PHSYNC.err=db?'Nobody is signed in yet':'The database code did not load on this device';
+    _phsyncNextTry=Date.now()+PHSYNC_RETRY_MS; return false;
+  }
+  try{
+    PHSYNC.unsub=db.collection(PHSYNC_COLL).onSnapshot(snapOpts(),phsyncOnSnapshot,function(e){
+      PHSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+      PHSYNC.live=false; PHSYNC.ready=false; _phsyncNextTry=Date.now()+PHSYNC_RETRY_MS;
+    });
+    PHSYNC.live=true; PHSYNC.err=null; return true;
+  }catch(e){
+    PHSYNC.err=(typeof sdbError==='function')?sdbError(e):String(e&&e.message||e);
+    _phsyncNextTry=Date.now()+PHSYNC_RETRY_MS; return false;
+  }
+}
+function phsyncStop(){
+  try{ if(PHSYNC.unsub) PHSYNC.unsub(); }catch(e){}
+  PHSYNC.unsub=null; PHSYNC.live=false; PHSYNC.ready=false;
+  PHSYNC.seen={}; PHSYNC.failed={};
+}
+function phsyncOnSnapshot(snap){
+  var changes; try{ changes=snap.docChanges(); }catch(e){ return; }
+  var touched=false;
+  changes.forEach(function(ch){
+    if(ch.type==='removed'){
+      delete PHSYNC.seen[String(ch.doc.id)];
+      var had=phById(ch.doc.id);
+      if(had){ var k=PHOTOS.indexOf(had); if(k>=0){ PHOTOS.splice(k,1); touched=true; } }
+      return;
+    }
+    var data; try{ data=ch.doc.data(); }catch(e){ return; }
+    if(!data) return;
+    data.id=String(ch.doc.id);
+    PHSYNC.seen[data.id]=sdbJson(data);
+    delete PHSYNC.failed[data.id];
+    PHSYNC.down++;
+    var have=phById(data.id);
+    if(have){
+      if(sdbJson(phDoc(have))!==sdbJson(data)){
+        /* APPLY IT COMPLETELY. Copying the arriving fields over the top and
+           leaving whatever the server did not send behind is the other half of
+           the 4.4-million-read day: the leftover field means the record never
+           matches, so it goes up again forever. */
+        Object.keys(have).forEach(function(k){ if(!(k in data)) delete have[k]; });
+        Object.keys(data).forEach(function(k){ have[k]=data[k]; });
+        touched=true;
+      }
+      return;
+    }
+    PHOTOS.push(data); touched=true;
+  });
+  var fromCache=true;
+  try{ fromCache=!!(snap.metadata&&snap.metadata.fromCache); }catch(e){}
+  if(!PHSYNC.ready&&!fromCache){ PHSYNC.ready=true; phsyncUploadNew(); }
+  if(touched){
+    /* storeSaveLocal(), NEVER storeTouch(). A record arriving is the thing a
+       send causes, so offering all the drawers from here closes a circle that
+       runs at network speed. See the note over storeScan(). */
+    try{ storeSaveLocal(); }catch(e){}
+    /* A picture set on the laptop should appear on the phone without waiting
+       for a navigation, so repaint whatever draws a face. */
+    try{ if(typeof photoRepaint==='function') photoRepaint(); }catch(e){}
+    try{ phsyncRepaint(); }catch(e){}
+  }
+}
+function phsyncUploadNew(){
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  PHOTOS.slice().forEach(function(r){
+    if(!r||!r.id) return;
+    var id=String(r.id);
+    if(PHSYNC.seen[id]!==undefined) return;
+    if(!phCanPush(r)) return;
+    var doc=phDoc(r); if(!doc) return;
+    if(!sdbMaySend('photos/'+id,'photos')) return;   /* the brake — see sdbMaySend() */
+    PHSYNC.seen[id]=sdbJson(doc);
+    n++; PHSYNC.up++;
+    try{ db.collection(PHSYNC_COLL).doc(id).set(doc).catch(function(e){ phsyncFail(id,e); }); }
+    catch(e){ phsyncFail(id,e); }
+  });
+  return n;
+}
+/* Never offer the database a write it is going to refuse. This phone holds
+   everybody's pictures, and all but my own would be turned away -- which would
+   put a refusal on the Shared database screen every tick for something nobody
+   did wrong. Mirrors the photos block in firestore.rules exactly.
+
+   THE ONE PLACE THIS IS LOOSER THAN THE FAVORITES IT WAS COPIED FROM: Bill and
+   the App Manager may also push somebody ELSE'S record, but only one that
+   leaves no picture behind. That is the moderation route Dillon asked for on
+   2026-10-01 -- take a bad picture off, never choose somebody's face. The
+   rules make the same two-part test, so neither side can drift. */
+function phCanPush(r){
+  if(!r||!r.id||!SESSION.pid) return false;
+  if(typeof photoCanWrite!=='function') return false;
+  return photoCanWrite(String(r.id),(typeof r.img==='string'&&r.img)?r.img:null);
+}
+function phsyncFail(id,e){
+  PHSYNC.failed[id]=(typeof sdbError==='function')?sdbError(e):String((e&&e.message)||e);
+}
+function phPush(){
+  if(!PHSYNC.on||!PHSYNC.live||!PHSYNC.ready) return 0;
+  var db=fbDb(); if(!db) return 0;
+  var n=0;
+  PHOTOS.forEach(function(r){
+    if(!r||!r.id||!phCanPush(r)) return;
+    var id=String(r.id), json=phJson(r);
+    if(json===null||PHSYNC.seen[id]===json) return;
+    if(!sdbMaySend('photos/'+id,'photos')) return;   /* the brake — see sdbMaySend() */
+    PHSYNC.seen[id]=json; n++; PHSYNC.up++;
+    try{ db.collection(PHSYNC_COLL).doc(id).set(JSON.parse(json)).catch(function(e){ phsyncFail(id,e); }); }
+    catch(e){ phsyncFail(id,e); }
+  });
+  return n;
+}
+function phsyncTick(){
+  if(!PHSYNC.on) return;
+  if(!PHSYNC.live){ phsyncStart(); return; }
+  phPush();
+}
+function phsyncRepaint(){
+  try{
+    var d=document.getElementById('s-sharedb');
+    if(d&&d.classList.contains('active')&&typeof sdbRender==='function') sdbRender();
+  }catch(e){}
+}
+function phsyncSummary(){
+  if(!PHSYNC.on) return 'Off — a picture set on this phone stays on it';
+  if(PHSYNC.err) return PHSYNC.err;
+  if(!PHSYNC.live) return 'Connecting…';
+  if(!PHSYNC.ready) return 'Connected — waiting for the shared copy';
+  var f=Object.keys(PHSYNC.failed).length;
+  return PHSYNC.up+' sent · '+PHSYNC.down+' received'+(f?(' · '+f+' refused'):'')+sdbStuckNote();
+}
+
 /* ================= TIME CLOCK ================= */
 /* The punches live inside the Time Clock's own closure, so this module talks
    to them through the three doors it opens: tcPunchDocs(), tcApplyRemote()
@@ -1859,6 +2058,33 @@ function eqDoc(rec){
   if(!out||!out.id) return null;
   out.id=String(out.id);
   if(out.eq!==undefined&&out.eq!==null) out.eq=String(out.eq);
+  /* A MACHINE PHOTO TOO BIG TO SEND IS DROPPED FROM THE COPY THAT GOES UP, and
+     the rest of the machine still travels. That last part is the whole point:
+     refusing the WHOLE record over its photo would stop the machine's STATUS
+     travelling, so somebody marks a mower down and it still reads Available on
+     everybody else's phone -- which is the one thing this drawer exists to
+     prevent.
+
+     Only a `data:` picture is measured. `photo` is also allowed to be a Photo
+     URL typed into the Edit machine form, and a link is a link however long it
+     looks; measuring those would throw away something the database was always
+     happy to take.
+
+     The picker has shrunk pictures since 2026-10-01 (eqPhotoShrink's options at
+     eqPhotoInput, app-04-spray-inventory.js), so anything caught here was saved
+     by an older phone. It stays visible on the phone that took it until that
+     machine is next edited, at which point the stripped copy comes back round
+     and clears it. That is deliberate: it was never shared with anybody, and
+     silently deleting a photo somebody took is worse than letting it fade on
+     the one device that has it.
+
+     This settles on the spot rather than sending forever, because the drawer
+     compares eqDoc(local) against what the server said -- and both sides of
+     that comparison have been through here. */
+  if(typeof out.photo==='string'&&out.photo.slice(0,5)==='data:'
+     &&out.photo.length>((typeof EQ_PHOTO_MAX_CHARS==='number')?EQ_PHOTO_MAX_CHARS:120000)){
+    out.photo=null;
+  }
   return out;
 }
 /* Two records are the same to this drawer if they say the same thing. Keyed by

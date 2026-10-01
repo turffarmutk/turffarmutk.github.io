@@ -4673,16 +4673,52 @@ function markSchedDone(id){
  toast((EQMTL[s.type]||'Service')+' logged ✓');
  renderEquip();
 }
+/* HOW BIG A MACHINE PHOTO IS ALLOWED TO BE, and why there are two numbers.
+
+   From the day the camera button shipped until 2026-10-01 this stored the
+   camera file at full size -- three to five megabytes, and half as much again
+   once written as text. Firestore refuses any single document over about one
+   megabyte, so EVERY machine photo was thrown out before it left the phone.
+   The photo looked fine to whoever took it and reached nobody, and the only
+   sign anywhere was `· N refused` on the Shared database screen. Exactly the
+   shape of the map drawer's 2026-09-22 bug, arrived at from a different
+   direction.
+
+   640px ON THE LONG EDGE, not a square. The avatar in app-03-people.js crops
+   to a square because it is drawn in a circle; a machine is drawn in a wide
+   strip (150px tall on the detail page) and an 82px tile, and both let CSS do
+   the cropping. Squaring it here would cut the end off the mower in the one
+   copy the farm keeps. 640 covers both of those on a retina screen and lands
+   around 40-70KB, roughly 55-95KB once written as text.
+
+   THE CEILING IS NOT JUST FIRESTORE'S LIMIT. There are 87 machines. Every
+   phone downloads every machine record, so a photo on each one is a download
+   every phone pays for on a field with no wifi. 120,000 characters is about
+   90KB, which keeps the whole list affordable even if every machine gets one.
+   Raise either number on purpose or not at all. */
+var EQ_PHOTO_PX=640;
+var EQ_PHOTO_MAX_CHARS=120000;
+
 function eqPhotoInput(){
  var inp=document.getElementById('eq-photo-file');
  if(!inp){
    inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.id='eq-photo-file'; inp.style.display='none'; document.body.appendChild(inp);
    inp.addEventListener('change',function(){
-     var f=inp.files&&inp.files[0]; if(!f){return;}
-     var mp=EQUIP.find(function(x){return x.id===window.eqPhotoFor;}); if(!mp){inp.value='';return;}
-     var r=new FileReader();
-     r.onload=function(){mp.photo=r.result;toast('Photo added ✓');stack=stack.filter(function(x){return x!=='eqdetail';});openMachine(mp.id);};
-     r.readAsDataURL(f); inp.value='';
+     var f=inp.files&&inp.files[0]; inp.value='';
+     if(!f){return;}
+     var mp=EQUIP.find(function(x){return x.id===window.eqPhotoFor;}); if(!mp){return;}
+     toast('Working on that photo…');
+     /* square:false -- keep the whole machine in frame, see EQ_PHOTO_PX above. */
+     photoShrink(f,function(img,err){
+       if(err){ toast(err); return; }
+       mp.photo=img;
+       /* storeSaveLocal(), never storeTouch(): saving to the phone is what is
+          wanted here and the two-second heartbeat does the sending. */
+       try{ storeSaveLocal(); }catch(e){}
+       toast('Photo added ✓');
+       stack=stack.filter(function(x){return x!=='eqdetail';});
+       openMachine(mp.id);
+     },{px:EQ_PHOTO_PX,max:EQ_PHOTO_MAX_CHARS,square:false});
    });
  }
  return inp;

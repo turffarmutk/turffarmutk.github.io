@@ -290,6 +290,241 @@ function labOf(x){ var p=rstFind(pidOf(x)||''); return p?(p.lab||'—'):''; }
    `t.assignee===meName()` string comparisons, which broke the moment two
    people shared a display name. */
 function isMe(x){ var id=pidOf(x); return !!id && id===SESSION.pid; }
+
+/* ===== PROFILE PICTURES =====
+   One record per person, and the record's id IS the person's id -- the same
+   shape as the favorites and the weekly schedules, copied from them on
+   purpose. That shape is what lets firestore.rules say "you may write the
+   document named after you" with no lookup of anything.
+
+   WHY ITS OWN DRAWER RATHER THAN A FIELD ON THE ROSTER RECORD. The roster is
+   the one record every other rule in firestore.rules reads, through rec(), and
+   every phone holds all of it before anybody has even signed in. Putting
+   picture bytes inside it would make the farm's most load-bearing record
+   heavy for every rule evaluation and every phone, to carry something only
+   two screens ever draw. So the picture travels beside the person, never
+   inside them. A roster edit and a new picture are then also two separate
+   writes, which is what stops one being refused because of the other.
+
+   WHAT TRAVELS is {id, img, at, by} -- flat, four fields, no lists at all, so
+   there is nothing here for Firestore's "no list inside a list" to catch.
+
+   `img` is a small JPEG written as text (a data URL). TAKING A PICTURE OFF
+   SETS IT TO NULL AND KEEPS THE RECORD -- it is never a deleted document,
+   because a document genuinely deleted comes straight back off the next phone
+   that reconnects still holding its own copy. Same shape as everything else
+   that gets removed in this app. */
+var PHOTOS=[];
+
+/* The square a picture is stored at, and the ceiling on the text it becomes.
+
+   THESE TWO NUMBERS ARE THE WHOLE REASON THIS WORKS. A photo straight off a
+   phone camera is three to five megabytes. The shared database refuses any
+   single record over about one megabyte outright, and the farm is on the free
+   plan, where every phone re-reads a record each time it changes. So a picture
+   is shrunk on the phone BEFORE it is stored -- never after, and never not at
+   all, which is what the equipment photo code does (eqPhotoInput() in
+   app-04-spray-inventory.js) and why a machine photo has never reached a
+   second phone.
+
+   160px square at JPEG quality 0.72 lands around 6-9KB, which is roughly 9-12KB
+   once written as text. Twenty-three of those is under a third of a megabyte
+   for the whole farm. 160 rather than 74 because the Profile page draws it at
+   74 and a retina screen asks for twice that.
+
+   Raise PHOTO_PX and you raise what every phone downloads, so raise it on
+   purpose or not at all. */
+var PHOTO_PX=160;
+var PHOTO_MAX_CHARS=40000;
+
+function photoRec(x){
+  var id=String(pidOf(x)||x||'');
+  if(!id) return null;
+  for(var i=0;i<PHOTOS.length;i++) if(PHOTOS[i]&&String(PHOTOS[i].id)===id) return PHOTOS[i];
+  return null;
+}
+/* The picture for anybody, or '' when there is not one. Every screen that
+   draws a face goes through this, so there is ONE answer to "has this person
+   got a picture" and the fallback to their initials is decided in one place.
+   A record whose img is null is somebody whose picture was taken off, which
+   reads the same as never having had one -- deliberately, because the crew
+   should not be shown the difference. */
+function photoOf(x){ var r=photoRec(x); return (r&&typeof r.img==='string'&&r.img)?r.img:''; }
+
+/* EVERYBODY sets their own, undergraduates included -- Dillon's call,
+   2026-10-01, in the words "everyone can add a profile picture". There is no
+   role test here on purpose: a picture of your own face changes nothing for
+   anybody else, so there is nothing for a role to protect.
+
+   Read off the ROSTER, never currentRole, for the reason every permission in
+   this app does: the database cannot see currentRole, so reading it here would
+   let the app offer a button whose write the database then refuses. */
+function photoCanSet(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */
+  if(!SESSION.pid) return false;
+  return !(typeof personActive==='function'&&!personActive(SESSION.pid));
+}
+/* Taking somebody ELSE'S picture down. Bill and whoever holds the App Manager
+   post, and nobody else -- Dillon's call, 2026-10-01, when asked who should be
+   able to deal with a picture that should not be on the farm's phones.
+
+   It is CLEAR ONLY, never replace: there is no screen anywhere that puts a
+   picture onto somebody else's account, and firestore.rules enforces the same
+   thing by refusing any write to another person's record that leaves an image
+   behind. Bill can take a bad picture off; he cannot choose your face. */
+function photoCanClear(actor){ if(appAdminAll(actor))return true;   /* the App Manager has no restrictions -- app-01 */
+  var id=pidOf(actor)||SESSION.pid; if(!id) return false;
+  if(typeof personActive==='function'&&!personActive(id)) return false;
+  return (typeof personRole==='function')&&personRole(id)==='Farm Manager';
+}
+/* Your own, always; anybody else's only to take it off. One function so the
+   screens and firestore.rules cannot drift, the same discipline taskCan()
+   uses. */
+function photoCanWrite(pid,img){
+  var id=String(pidOf(pid)||pid||''); if(!id) return false;
+  if(id===String(SESSION.pid)) return photoCanSet();
+  return !img && photoCanClear();
+}
+
+/* Writing one. Both of these go through storeSaveLocal() rather than
+   storeTouch(): saving to the phone is what is wanted, and the two-second
+   heartbeat does the sending two seconds later. Calling storeTouch() from
+   anywhere a record might also ARRIVE is the 2026-08-31 disaster. */
+function photoWrite(pid,img){
+  var id=String(pidOf(pid)||pid||''); if(!id) return false;
+  if(!photoCanWrite(id,img)) return false;
+  var r=photoRec(id);
+  if(!r){ r={id:id,img:null,at:'',by:''}; PHOTOS.push(r); }
+  r.img=img||null;
+  r.at=new Date().toISOString();
+  r.by=String(SESSION.pid||'');
+  try{ storeSaveLocal(); }catch(e){}
+  return true;
+}
+function photoClear(pid){ return photoWrite(pid,null); }
+
+/* Turning what came out of the camera into something the farm can afford to
+   share. Everything about this function is about size -- see PHOTO_PX above.
+
+   It hands back the picture through a callback rather than returning it,
+   because reading a file and decoding an image are both things the browser
+   does in its own time. `done(img, err)` -- exactly one of the two is set. */
+function photoShrink(file,done,opts){
+  if(!file){ done(null,'No picture was chosen'); return; }
+  /* The defaults ARE the avatar, so every existing caller is unchanged. The
+     equipment page passes its own, because a machine photo is a different
+     problem: bigger, and it must keep its shape -- a mower cropped to a square
+     loses the end of the mower. See EQ_PHOTO_PX in app-04-spray-inventory.js. */
+  opts=opts||{};
+  var px=opts.px||PHOTO_PX;
+  var max=opts.max||PHOTO_MAX_CHARS;
+  var square=(opts.square!==false);
+  var r=new FileReader();
+  r.onerror=function(){ done(null,'That file could not be read'); };
+  r.onload=function(){
+    var im=new Image();
+    im.onerror=function(){ done(null,'That file does not look like a picture'); };
+    im.onload=function(){
+      var cv,cx;
+      try{
+        var iw=im.width||0, ih=im.height||0;
+        if(!iw||!ih){ done(null,'That picture appears to be empty'); return; }
+        cv=document.createElement('canvas');
+        if(square){
+          /* A SQUARE CUT FROM THE MIDDLE, not a squash. An avatar is drawn in a
+             circle, and a tall phone photo stretched into a square puts the face
+             somewhere nobody recognises. Taking the middle square first keeps
+             whatever the person pointed the camera at. */
+          cv.width=px; cv.height=px;
+          cx=cv.getContext('2d');
+          var sq=Math.min(iw,ih);
+          cx.drawImage(im,((iw-sq)/2),((ih-sq)/2),sq,sq,0,0,px,px);
+        }else{
+          /* THE WHOLE FRAME, just smaller. The long edge becomes px and the
+             short one follows, so nothing is cut off. A picture already smaller
+             than px is left at its own size rather than blown up, which would
+             add bytes and no detail. */
+          var sc=Math.min(1,px/Math.max(iw,ih));
+          cv.width=Math.max(1,Math.round(iw*sc));
+          cv.height=Math.max(1,Math.round(ih*sc));
+          cx=cv.getContext('2d');
+          cx.drawImage(im,0,0,cv.width,cv.height);
+        }
+      }catch(e){ done(null,'That picture could not be resized on this phone'); return; }
+      var out='';
+      try{ out=cv.toDataURL('image/jpeg',0.72)||''; }catch(e){ out=''; }
+      /* One more squeeze before giving up. A busy photo can still come out over
+         the ceiling at 0.72, and a slightly softer picture is a better answer
+         than refusing somebody a photo. */
+      if(out.length>max){ try{ out=cv.toDataURL('image/jpeg',0.5)||''; }catch(e){} }
+      if(!out){ done(null,'That picture could not be resized on this phone'); return; }
+      if(out.length>max){ done(null,'That picture is too detailed to share — try another'); return; }
+      done(out,null);
+    };
+    im.src=r.result;
+  };
+  r.readAsDataURL(file);
+}
+/* The hidden file box the camera button opens. Built once and kept, the same
+   way eqPhotoInput() does it -- a fresh one per tap leaks a node per tap.
+   `accept="image/*"` is what makes a phone offer Camera and Photo Library
+   rather than a file browser. */
+function photoInput(){
+  var inp=document.getElementById('pf-photo-file');
+  if(!inp){
+    inp=document.createElement('input');
+    inp.type='file'; inp.accept='image/*'; inp.id='pf-photo-file'; inp.style.display='none';
+    document.body.appendChild(inp);
+    inp.addEventListener('change',function(){
+      var f=inp.files&&inp.files[0]; inp.value='';
+      if(!f) return;
+      if(!photoCanSet()){ toast('You cannot set a picture right now'); return; }
+      toast('Working on that picture…');
+      photoShrink(f,function(img,err){
+        if(err){ toast(err); return; }
+        if(!photoWrite(SESSION.pid,img)){ toast('That picture could not be saved'); return; }
+        toast('Picture added ✓');
+        try{ photoRepaint(); }catch(e){}
+      });
+    });
+  }
+  return inp;
+}
+function photoPick(){ if(!photoCanSet()){ toast('You cannot set a picture right now'); return; } photoInput().click(); }
+
+/* Everywhere a face is drawn, repainted in one call. Two screens today --
+   the Profile page and the round avatar in the home banner -- and keeping
+   them in one function is what stops the next one being forgotten. */
+function photoRepaint(){
+  try{ if(typeof fillProfile==='function') fillProfile(); }catch(e){}
+  try{ if(typeof hwApply==='function') hwApply(currentRole); }catch(e){}
+  try{ if(typeof rstEditRender==='function'&&document.getElementById('s-rosteredit')
+         &&document.getElementById('s-rosteredit').classList.contains('active')) rstEditRender(); }catch(e){}
+}
+/* Paint one round chip: the picture if there is one, their initials if not.
+   `el` is an existing round element -- this sets its background and clears or
+   restores the letters, so it works on the banner avatar and the Profile
+   circle without either of them knowing which it got. */
+function photoPaintChip(el,pid,initials,color){
+  if(!el) return;
+  var img=photoOf(pid);
+  /* `background` is a SHORTHAND, so clearing it wipes the image as well --
+     which is exactly what is wanted first, and exactly why the longhands below
+     have to be set after it, never before. Getting that order wrong leaves a
+     colour sitting on top of the picture and the picture never shows, with
+     nothing anywhere to say why. */
+  el.style.background='';
+  if(img){
+    el.textContent='';
+    el.style.backgroundImage='url("'+img+'")';
+    el.style.backgroundSize='cover';
+    el.style.backgroundPosition='center';
+  }else{
+    el.style.backgroundImage='';
+    el.textContent=initials||'?';
+    el.style.background=color||'#58595b';
+  }
+}
+
 function namesOf(list){ return (list||[]).map(nameOf).filter(Boolean); }
 function pidsOf(list){ return (list||[]).map(pidOf).filter(Boolean); }
 /* Sort a list of ids the way people expect to read them. */
@@ -569,11 +804,24 @@ function rstWhyLocked(p){
   if(p.role==='Faculty')return 'Faculty records are held by the App Manager · '+APP_ADMIN.name;
   return 'In the '+(p.lab||'—')+' lab · edited by that PI or by Bill';
 }
-function fillProfile(){const u=me();const q=x=>document.getElementById(x);if(!q('pf-init'))return;q('pf-init').textContent=u.i;q('pf-init').style.background=u.c;q('pf-name').textContent=u.n;q('pf-role').textContent=u.t;q('pf-email').textContent=u.e;q('pf-lab').textContent=u.lab;var rr=q('pf-roster-row');if(rr){rr.style.display=rstCanOpen()?'':'none';var rs=q('pf-roster-sub');if(rs)rs.textContent=rstActive().length+' people · '+(currentRole==='manager'?'edit everyone but the faculty':'edit your lab and the undergrads');}/* Farm settings hangs here, beneath Preferences, rather than behind More
+function fillProfile(){const u=me();const q=x=>document.getElementById(x);if(!q('pf-init'))return;
+/* The circle is either their picture or their initials, and photoPaintChip is
+   the one place that decides which -- see PROFILE PICTURES above. */
+photoPaintChip(q('pf-init'),SESSION.pid,u.i,u.c);
+/* "Remove photo" only exists while there is one to remove. Hidden rather than
+   greyed out, the same way the Farm settings rows below are. */
+var _pr=q('pf-photo-rm');if(_pr)_pr.style.display=photoOf(SESSION.pid)?'':'none';q('pf-name').textContent=u.n;q('pf-role').textContent=u.t;q('pf-email').textContent=u.e;q('pf-lab').textContent=u.lab;var rr=q('pf-roster-row');if(rr){rr.style.display=rstCanOpen()?'':'none';var rs=q('pf-roster-sub');if(rs)rs.textContent=rstActive().length+' people · '+(currentRole==='manager'?'edit everyone but the faculty':'edit your lab and the undergrads');}/* Farm settings hangs here, beneath Preferences, rather than behind More
    (2026-09-30). Same gate as the old More row - farmCanSee() - so nobody gains
    or loses the page by it moving. The App Manager's extra rows are inside the
    page itself, not on this row; fstRender() decides those. */
-var fr=q('pf-farm-row');if(fr){var canFarm=false;try{canFarm=(typeof farmCanSee==='function')&&farmCanSee();}catch(e){}fr.style.display=canFarm?'':'none';var fs2=q('pf-farm-sub');if(fs2){var hat=false;try{hat=(typeof rstIsAdmin==='function')&&rstIsAdmin()===true;}catch(e){}fs2.textContent=hat?'Sprayer, mowers, labs \u2014 and the app itself':'Sprayer, mowers, labs and semester dates';}}renderProfileSchedule();var pso=q('pf-signout');if(pso&&!pso._wired){pso._wired=true;pso.addEventListener('click',signOut);}}
+var fr=q('pf-farm-row');if(fr){var canFarm=false;try{canFarm=(typeof farmCanSee==='function')&&farmCanSee();}catch(e){}fr.style.display=canFarm?'':'none';var fs2=q('pf-farm-sub');if(fs2){var hat=false;try{hat=(typeof rstIsAdmin==='function')&&rstIsAdmin()===true;}catch(e){}fs2.textContent=hat?'Sprayer, mowers, labs \u2014 and the app itself':'Sprayer, mowers, labs and semester dates';}}renderProfileSchedule();var pso=q('pf-signout');if(pso&&!pso._wired){pso._wired=true;pso.addEventListener('click',signOut);}
+/* Wired once each, the same way Log out above is: fillProfile() runs every
+   time the page is opened, and adding a listener per visit fires the handler
+   once per visit ever made. */
+var pb=q('pf-photo-btn');if(pb&&!pb._wired){pb._wired=true;pb.addEventListener('click',function(){photoPick();});}
+if(_pr&&!_pr._wired){_pr._wired=true;_pr.addEventListener('click',function(){
+  if(!photoClear(SESSION.pid)){toast('That picture could not be removed');return;}
+  toast('Picture removed');photoRepaint();});}}
 function renderProfEdit(){const u=me();
  document.getElementById('pfe-body').innerHTML=
    '<div class="sec" style="margin:14px 18px 7px">Profile</div><div class="list">'
@@ -722,6 +970,16 @@ function rstEditRender(){
      +'<div style="padding-right:12px"><div style="font:700 13px \'Public Sans\';color:var(--ink)">Currently working here</div>'
      +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:2px" id="rste-actsub">'+(p.active===false?'Off · kept on old records, hidden from every picker':'On · appears in crew lists and pickers')+'</div></div>'
      +'<span class="tgl'+(p.active===false?'':' on')+'" id="rste-active"></span></div></div>'
+     /* THE ONLY PLACE ANYBODY TOUCHES SOMEBODY ELSE'S PICTURE, and it can
+        only take one off -- never put one on. Drawn for Bill and the App
+        Manager (photoCanClear) and only while that person actually has a
+        picture, so the row is absent rather than dead. The thumbnail is here
+        because a moderation button has to show the thing it is moderating;
+        this is not one of the two screens that DRAW faces. */
+     +((photoCanClear()&&photoOf(p.id))?('<div class="sec">Profile picture</div><div class="list">'
+       +'<div class="row tap" id="rste-photorm"><span style="width:34px;height:34px;border-radius:50%;flex:none;background-image:url(\''+esc(photoOf(p.id))+'\');background-size:cover;background-position:center"></span>'
+       +'<div style="flex:1"><div class="rt" style="color:#c0392b">Remove this photo</div>'
+       +'<div class="rs">Goes back to their initials on every phone. They can set a new one themselves.</div></div></div></div>'):'')
      +'<div style="margin:16px 16px 0"><div class="tap" id="rste-del" style="border:1px solid #e6c6c2;border-radius:12px;padding:13px;text-align:center;font:800 13px \'Archivo\';color:#c0392b;background:#fdf3f2">Remove from roster</div>'
      +'<div style="margin:7px 4px 0;font:600 11px \'Public Sans\';color:var(--muted);line-height:1.45" id="rste-delsub">Deletes them outright. If they graduated but you still want their name on past logs, switch off <em>Currently working here</em> instead.</div></div>')
    +'<div style="height:26px"></div>';
@@ -745,6 +1003,14 @@ document.getElementById('s-roster').addEventListener('input',function(e){
 document.getElementById('s-rosteredit').addEventListener('click',function(e){
   var t=e.target.closest('#rste-active');
   if(t){var wasOn=t.classList.contains('on');var sb=document.getElementById('rste-actsub');if(sb)sb.textContent=wasOn?'Off · kept on old records, hidden from every picker':'On · appears in crew lists and pickers';return;}
+  var prm=e.target.closest('#rste-photorm');
+  if(prm){
+    var pp=rstFind(rstEditId); if(!pp)return;
+    if(!photoClear(pp.id)){toast('That picture could not be removed');return;}
+    toast(pName(pp)+'\u2019s picture removed');
+    rstEditRender(); photoRepaint();
+    return;
+  }
   var d=e.target.closest('#rste-del'); if(!d)return;
   var p=rstFind(rstEditId); if(!p)return;
   var me=rstMe();

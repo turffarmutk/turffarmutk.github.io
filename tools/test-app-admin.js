@@ -102,6 +102,8 @@ const EXEMPT = {
   schCanPush: 'passes through to schedCanEdit(), which lifts',
   tcCanPush: 'passes through to tcCanPunchFor(), which lifts',
   rstCanPush: 'passes through to rosterCanWrite(), which lifts',
+  photoCanWrite: 'passes through to photoCanSet()/photoCanClear(), which lift',
+  phCanPush: 'passes through to photoCanWrite(), which passes through to both of those',
   trsyncCanPushTrial: 'passes through to trCanEditLab(), which lifts',
   trsyncCanPushLift: 'passes through to trCanEditLab()/trCanLiftAny(), which lift',
   trCanEdit: 'passes through to trCanEditLab(), which lifts',

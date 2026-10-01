@@ -1957,7 +1957,15 @@ function hwApply(role){
    var _greet=scr.querySelector('.hh .title');
    if(_greet)_greet.textContent='Hey, '+((_p&&_p.first)||(_u.n||'').split(' ')[0]||_u.n||'');
    var _av=scr.querySelector('.hh-av');
-   if(_av){ _av.textContent=_u.i; _av.style.background=_u.c; }
+   /* Their picture if they have set one, their initials if not. photoPaintChip
+      lives in app-03-people.js, which has NOT been read yet while this file is
+      still loading -- so it is asked for by name rather than called outright,
+      and the initials remain the answer if it is not there. Calling across
+      files at load time is what took the app down the day they were split. */
+   if(_av){
+     if(typeof photoPaintChip==='function') photoPaintChip(_av,(_p&&_p.id)||null,_u.i,_u.c);
+     else { _av.textContent=_u.i; _av.style.background=_u.c; }
+   }
  }catch(e){}
  try{ if(HW_RENDER[role])HW_RENDER[role](); }catch(e){}
  var wrap=scr.querySelector('.app.field'); if(!wrap)return;

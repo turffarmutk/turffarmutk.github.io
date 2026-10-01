@@ -227,6 +227,13 @@ const DRAWERS = [
      to send it and the check would pass for the wrong reason. */
   { name: 'favorites',          coll: 'favorites',  push: 'favPush',   local: () => win.FAVS,
     sample: { id: P, tpls: ['tpl1', 'tpl9'], updatedAt: '2026-09-28T08:00:00', updatedBy: P } },
+  /* A profile picture. The sample carries a REAL img rather than null, because
+     a null one would prove nothing about the shape that actually travels --
+     the same mistake the studies row used to make with an empty restriction
+     list. Kept tiny here on purpose; the app caps a real one at PHOTO_MAX_CHARS. */
+  { name: 'profile pictures',   coll: 'photos',     push: 'phPush',    local: () => win.PHOTOS,
+    sample: { id: P, img: 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQ==',
+              at: '2026-10-01T08:00:00.000Z', by: P } },
   /* The sample carries a REAL restriction, not an empty list: a restriction is
      a record inside a list, which Firestore is happy with (a list inside a list
      is what it refuses), and since 2026-09-30 it can carry `whole` -- so the

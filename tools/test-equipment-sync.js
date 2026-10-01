@@ -467,6 +467,64 @@ section('7. Height of cut — on the mowers that hold one, and not the rotaries'
      /match \/equipment\/\{machineId\}/.test(rulesText));
 }
 
+/* ------------------------------------------- machine photos ------------
+   From the day the camera button shipped until 2026-10-01 a machine photo was
+   stored at full camera size -- three to five megabytes. Firestore refuses any
+   document over about one, so every one of them was thrown away before it left
+   the phone, with nothing to see but `· N refused` on the Shared database
+   screen. These checks are what stops that coming back. */
+section('9. A machine photo small enough to actually travel');
+{
+  as(BILL);
+  const m = EQ()[0];
+  const before = m.photo;
+
+  /* A link is a link however long it looks -- `photo` is also allowed to hold a
+     Photo URL typed into the Edit machine form, and measuring those would throw
+     away something the database was always happy to take. */
+  m.photo = 'https://example.com/a/very/long/path/to/a/machine/photo/' + 'x'.repeat(400) + '.jpg';
+  ok('a typed photo link is sent untouched, however long',
+     win.eqDoc(m).photo === m.photo);
+
+  /* A picture small enough to send goes as it is. */
+  const small = 'data:image/jpeg;base64,' + 'A'.repeat(500);
+  m.photo = small;
+  ok('a shrunk picture is sent as it is', win.eqDoc(m).photo === small);
+
+  /* And one that is not goes nowhere — but the machine still does. */
+  const huge = 'data:image/jpeg;base64,' + 'A'.repeat(win.EQ_PHOTO_MAX_CHARS + 50);
+  m.photo = huge;
+  const doc = win.eqDoc(m);
+  ok('an oversized picture is dropped before the wire, not refused after',
+     doc.photo === null);
+  /* THE POINT OF THIS ONE. Refusing the whole record over its photo would stop
+     the machine's STATUS travelling, so somebody marks a mower down and it
+     still reads Available on twenty-two other phones. */
+  ok('but the rest of the machine still travels — the status above all',
+     doc.id === m.id && doc.name === m.name && doc.status === m.status);
+
+  /* A drawer that cannot stop talking is the 4.4-million-read day. Both sides
+     of the drawer's comparison go through eqDoc, so a stripped photo settles
+     instead of being offered forever. */
+  ok('and it settles rather than being offered on every tick',
+     win.sdbJson(win.eqDoc(m)) === win.sdbJson(win.eqDoc(JSON.parse(JSON.stringify(doc)))));
+
+  m.photo = before;
+
+  /* The picker itself. The old version read the camera file straight onto the
+     record; this is what proves it does not any more. */
+  const src = fs.readFileSync(path.join(ROOT, 'app-04-spray-inventory.js'), 'utf8');
+  const picker = (src.match(/function eqPhotoInput\(\)[\s\S]*?\n\}/) || [''])[0];
+  ok('the picker shrinks a photo instead of storing the camera file',
+     /photoShrink\(/.test(picker) && !/readAsDataURL/.test(picker), picker.slice(0, 80));
+  ok('and keeps the whole machine in frame rather than cropping it square',
+     /square:\s*false/.test(picker));
+  ok('the two numbers it uses are written down where they can be found',
+     typeof win.EQ_PHOTO_PX === 'number' && typeof win.EQ_PHOTO_MAX_CHARS === 'number'
+       && win.EQ_PHOTO_MAX_CHARS < 1000000,
+     win.EQ_PHOTO_PX + ' / ' + win.EQ_PHOTO_MAX_CHARS);
+}
+
 /* ---------------------------------------------------------------- */
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

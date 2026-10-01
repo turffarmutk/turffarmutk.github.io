@@ -264,11 +264,11 @@ ok('the drawer never calls delete either', state.deletes.length === 0);
 section('7. The read-out, and no switches');
 ok('it has a read-out on the Shared database screen', /st:EVSYNC,\s*summary:evsyncSummary\(\)/.test(appText));
 ok('the read-out is in the list', /st:EQSYNC[\s\S]{0,1200}st:EVSYNC/.test(appText));
-/* Fifteen since 2026-09-28, when favorites became a drawer of its own. The
-   count is the point: a read-out that quietly stops being drawn is a drawer
-   nobody can see the state of. */
-ok('fifteen drawers now (favorites made fifteen), and every one of them on',
-   (appText.match(/summary:[a-z]+syncSummary\(\)/g) || []).length === 15,
+/* Sixteen since 2026-10-01, when profile pictures became a drawer of their own
+   (favorites made fifteen on 2026-09-28). The count is the point: a read-out
+   that quietly stops being drawn is a drawer nobody can see the state of. */
+ok('sixteen drawers now (profile pictures made sixteen), and every one of them on',
+   (appText.match(/summary:[a-z]+syncSummary\(\)/g) || []).length === 16,
    String((appText.match(/summary:[a-z]+syncSummary\(\)/g) || []).length));
 ok('it says in plain words what is being shared', /five people keeping five versions/.test(appText));
 ok('and that a removal sticks', /stays gone instead of coming back/.test(appText));

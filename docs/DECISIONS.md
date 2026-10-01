@@ -28,6 +28,91 @@ down.
 
 ## Process & project
 
+### Machine photos are shrunk too, and an old one is dropped from the copy that travels — 2026-10-01
+**Decision:** the equipment camera button now shrinks a photo to **640px on the
+long edge** before storing it (`EQ_PHOTO_PX` / `EQ_PHOTO_MAX_CHARS`,
+`eqPhotoInput()` in `app-04-spray-inventory.js`), reusing `photoShrink()` from
+`app-03-people.js` with `square:false`. `eqDoc()` in `app-02-fieldlog-sync.js`
+additionally drops any `data:` photo over the ceiling from the copy that goes to
+the database — **the photo only, never the whole record.**
+**Why:** from the day that button shipped until this date it stored the camera
+file at full size. A 4032×3024 frame is about 1.1MB, which is **1,543KB** once
+written as text — over Firestore's ~1MB limit — so **every machine photo was
+thrown out before it left the phone** and reached nobody. It looked completely
+normal to whoever took it; the only sign anywhere was `· N refused` on the
+Shared database screen. Same shape as the map drawer's 2026-09-22 bug, reached
+from a different direction. Measured after the fix: the same frame stores at
+**69KB**. It is **not** square-cropped like an avatar, because a machine is
+drawn in a wide strip and an 82px tile that both crop in CSS — squaring it here
+would cut the end off the mower in the one copy the farm keeps. The ceiling is
+not only Firestore's limit: there are 87 machines and every phone downloads
+every machine record, so the cap is what keeps the whole list affordable on a
+field with no wifi.
+**Don't:** refuse the whole machine record over its photo. That would stop the
+machine's **status** travelling, so somebody marks a mower down and it still
+reads Available on twenty-two other phones — the one thing that drawer exists to
+prevent. And don't measure a `photo` that is not a `data:` URL: the Edit machine
+form also accepts a typed **Photo URL**, and a link is a link however long it
+looks.
+
+### Profile pictures are their own drawer, not a field on the roster — 2026-10-01
+**Decision:** everybody on the farm can put a picture on their **own** account
+— undergraduates included, no role test on the way in. It travels as its own
+collection, `photos`, one record per person whose **document id is that
+person's id** (`{id, img, at, by}`), the same shape the favorites and the weekly
+schedules already use. It is **not** a field on the roster record.
+**Why:** the roster is the one record every other rule in `firestore.rules`
+reads, through `rec()`, and every phone holds all of it before anybody has even
+signed in. Picture bytes inside it would make the farm's most load-bearing
+record heavy for every rule evaluation on every write, to carry something only
+two screens ever draw. Keeping it beside the person instead also means a roster
+edit and a new picture are two separate writes, so neither can be refused
+because of the other. The id-is-the-person shape is what lets the rule be one
+comparison — "you may write the document named after you" — with no lookup.
+**Don't:** move `img` onto the roster record to save a collection. And don't
+give this drawer an App Manager override on the `id == document name` test: that
+says which record a phone owns, not who is allowed what, exactly as it does for
+favorites (`phCanPush`, and the `EXEMPT` entry in `tools/test-app-admin.js`).
+
+### A picture is shrunk on the phone, and the cap is in the rules too — 2026-10-01
+**Decision:** a chosen picture is cut to a **square from the middle** and
+redrawn at **160px** as a JPEG before it is ever stored (`photoShrink()`,
+`PHOTO_PX`, `app-03-people.js`), and anything still over `PHOTO_MAX_CHARS`
+(40,000) is refused — in the app, again in `phDoc()` before the wire, and a
+third time in `firestore.rules` as `img.size() < 60000`.
+**Why:** a phone camera photo is three to five megabytes. Firestore refuses any
+single record over about one megabyte outright, and this farm is on the free
+plan where every phone re-reads a record each time it changes. A record the
+database turns away is one the phone keeps offering on every tick forever —
+that is the shape of the 2026-08-31 disaster, arrived at from a different
+direction. 160px square is about 6–9KB, so twenty-three people cost under a
+third of a megabyte between them. The square crop is from the middle because
+the picture is drawn in a circle, and a tall phone photo squashed into a square
+puts the face somewhere nobody recognises.
+**Don't:** raise `PHOTO_PX` casually — it is what every phone downloads. And
+don't copy `eqPhotoInput()` in `app-04-spray-inventory.js`, which stores the
+camera file at full size with no resize and no cap; that is why a machine photo
+has never reached a second phone, not a pattern to follow.
+
+### Bill can clear somebody's picture but never choose one — 2026-10-01
+**Decision:** Bill (Farm Manager) and whoever holds the App Manager post can
+take **any** picture down, from the person's row on the Edit person screen. They
+cannot put one **up** for somebody else — there is no screen that does it and
+`firestore.rules` refuses any write to another person's record that leaves an
+image behind. Taking one off writes `img:null` and **keeps the record**.
+**Why:** Dillon's call when asked who deals with a picture that should not be on
+twenty-three phones. Without it a bad picture is permanent until that person
+changes it themselves, which may be never. Clear-only rather than edit is the
+line between moderating and impersonating: nobody else gets to choose your face.
+The record is kept because a genuinely deleted document comes straight back off
+the next phone that reconnects still holding its own copy — the same reason
+every other removal in this app is a tombstone.
+**Don't:** widen the second door to accept a write carrying an image, and don't
+collapse the two doors into one test. `photoCanWrite()` and the `photos` block
+in `firestore.rules` are the same two-part question asked twice and must move
+together, or Bill gets a button whose write the database refuses and the row
+comes back a second after the tap with nothing on screen to say why.
+
 ### The App Manager has no restrictions — 2026-09-29
 **Decision:** whoever holds the App Manager post answers **yes to every
 permission in the app**. Dillon asked for it in those words, starting from one

@@ -744,6 +744,121 @@ pin this behaviour — keep them green.
 
 ## Field data & farm constants
 
+### The yearly count writes movements, so the Inventory page just changes — 2026-10-01
+**Decision:** the yearly count (`CNT`, `cntSave()` and the three `cnt*` screens
+in `app-04-spray-inventory.js`) records what somebody found on the shelf as an
+ordinary **movement**, `why:'count'`, carrying the difference between the shelf
+and the ledger. Dillon asked for the count to "change the actual amount on the
+inventory page" and this is what does it: every screen already asks `invQty()`,
+and `invQty()` is April's opening balance plus every movement since, so the
+figure changes on the list, the product page, the low-stock widget and the mix
+calculator at once, on every phone, with no screen to remember to update.
+**Why:** the alternative — writing the counted figure over `it.qty` — gives a
+correct number today and destroys the only thing that makes a count worth doing.
+Kept as a movement, next March the product's own screen still reads "April said
+13.75 gal, four sprays took 9, a delivery put 5 back, the October count found
+1.5 jugs missing", so you can see *where the gap came from*. Overwriting leaves
+nothing to reason with. It is also what makes two people counting at once safe:
+two movements both count and there is nothing to overwrite.
+**Don't:** don't "simplify" a count into an assignment to `it.qty`, and don't add
+a second place that writes `t.qty` for any reason. And don't reach for a new
+collection — a count needed none, because movements already travel.
+
+### A count that found nothing wrong is still recorded — 2026-10-01
+**Decision:** `invMove()` accepts a delta of **zero**, but only when
+`why==='count'`. Dillon asked for it in those words on 2026-10-01.
+**Why:** "somebody stood in front of this and found it right" is a different
+fact from "nobody has reached this yet", and without a record of the match the
+two are indistinguishable — the progress figure becomes a lie and the products
+with no "last counted" date are exactly the ones that were correct. It stays
+limited to a count because a delivery of nothing or a spray of nothing is
+somebody mis-tapping, and recording those would fill a product's history with
+lines saying nothing happened. It reads as "Counted · no change" through
+`invMoveLabel()`, not as "Recount · +0", which states arithmetic instead of a
+fact.
+**Don't:** don't restore a blanket `if(!delta) return null;` — it silently
+deletes the match half of every count. And don't widen the zero to the other
+three reasons to make it "consistent"; the asymmetry is the decision.
+
+### A count run is named after the day it started — 2026-10-01
+**Decision:** every movement a count writes carries `run`, the id of the count
+it belongs to, and that id is `'cr'` plus the date the run began. Progress is
+read off the movements (`cntDone()`, `cntTotals()`) and never held on a phone. A
+phone joins whatever run has been active within `CNT_RUN_DAYS` (45) and starts a
+new one otherwise.
+**Why:** Dillon asked that starting a count show up on everyone else's phone so
+nobody recounts what somebody has already done. Deriving progress from the
+ledger gets that for free — every phone has the same movements, so every phone
+reaches the same answer — and it survives the app closing, a flat battery and
+swapping phones mid-count. The id is the *date* rather than a random id so that
+two people who both tap Begin on the same morning, neither having heard of the
+other yet, compute the same id and their progress merges with nothing
+coordinated and no record needing to exist first. 45 days because a count spread
+over a month of odd afternoons is normal and one spread over two months usually
+means last year's was abandoned.
+**Don't:** don't keep a "count in progress" record anywhere — it would be a new
+collection, a new rule, a hand-published rules change and a new row in
+`test-sync-settles.js`, to hold something the ledger already knows. Don't give a
+run a random id. And note that a recount typed into the Edit product form has
+**no** run on purpose: it is a correction somebody made in passing, not part of
+a count of the farm, and `cntMoves()` filters it out.
+
+### A product already answered is not offered again — and that is a safety rule — 2026-10-01
+**Decision:** `cntQueue()` is rebuilt from the ledger on every repaint and
+excludes anything this run has answered, so the count screen never offers a
+product somebody has already done. `cntOnSync()` repaints when another phone's
+answer arrives — except while this person is mid-answer, because rebuilding the
+screen would take the cursor out of the box they are typing in.
+**Why:** Dillon asked for it so nobody wastes time recounting. It also closes a
+hole nobody had spotted: if two people both found 4 jugs where the ledger said
+5.5 and both saved, the shortfall would be booked **twice** and the shelf would
+end at 2.5 with nothing anywhere to say why. His convenience request and the
+correctness fix are the same feature.
+**Don't:** don't turn the queue back into a list walked by an index — an index
+cannot notice a product leaving the list underneath it, which is exactly what
+another phone's answer does. Skips are deliberately **not** shared: "I cannot
+find it" is a fact about the person in the cage, not about the farm, and
+sharing it would hide the product from everybody else.
+
+### Anybody may say where a product is stored — one field, and only one — 2026-10-01
+**Decision:** storage location (`loc` on a product) is the **one** field on a
+product that is not `invCanEdit()`. Anybody who may move stock may change it,
+alone, and nothing else in the same write — `invCanSetLoc()` and `cntSetLoc()`
+in the app, `isStorageUpdate()` in `firestore.rules`, `STORAGE_FIELDS` in
+`tools/rules-model.js`. Dillon, 2026-10-01: he gave the counting job to anyone
+and wanted whoever is counting to be able to record where a product lives.
+**Why:** the person holding the jug is the only one who knows where the jug is,
+so putting it behind a role puts it behind the wrong people — and the farm needs
+it: 31 of the 191 products have no storage information at all and another 48 say
+only "Cage". It is one field and nothing else in the same write, the same shape
+as `isWorkUpdate()` on a task, because that is what stops "anybody may say where
+it lives" quietly becoming "anybody may rename a product".
+**Don't:** three things. **Don't widen `STORAGE_FIELDS`** without deciding you
+meant to — it is the list of what a crew member may rewrite on a product.
+**Don't open `allow create`** to it: a create is the product coming into
+existence, and a create carrying only `loc` would wipe it. And **don't remove
+the per-field gate in `invPush()`** (`invsyncMaySendItem()`, `app-02`) — before
+2026-10-01 that function refused to send *any* product record from a phone that
+could not edit products, which was right when every field was `invCanEdit()`.
+Left alone, a crew member's storage place would have saved on their phone,
+looked completely normal, and reached nobody — the `RST_SEED` failure in
+CLAUDE.md. The comparison there is against **what the server last said**, never
+a local copy, or two unrelated edits ride up together and the database refuses
+the pair.
+
+### The Storage row read "undefined" on all 191 products — 2026-10-01
+**Decision:** `invStoreLabel()` answers where a product lives: its own `loc`
+first, then what April wrote against its first container (`containers[0].loc`
+plus `.cage`), then a dash.
+**Why:** the April spreadsheet recorded storage against each **container**, not
+against the product, and the product screen's Storage row read `it.loc`, which
+no seeded product has. So from the day that row shipped until today it printed
+the word **"undefined"** on every one of the 191 products. It looked like data
+and it was a missing field. A dash at least reads as "nobody has said".
+**Don't:** don't read `it.loc` directly anywhere — it is filled in for a product
+somebody has deliberately placed and absent for the rest, so it is right for
+*writing* and wrong for *reading*. Read `invStoreLabel()`.
+
 ### The Field Log is one entry per job, not one per plot — 2026-09-29
 **Decision:** a Field Log entry is now **one operation**, and the ground it
 covered is a list, `plots`, on that record. A mow across six plots writes one

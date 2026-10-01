@@ -2956,9 +2956,23 @@ function invMovesFor(id){
 function invMove(itemId, delta, why, opts){
   opts=opts||{};
   var it=INVENTORY.find(function(x){return x.id===itemId;});
-  if(!it || !delta) return null;
-  var m={ id:newId('m'), item:itemId, delta:+delta, unit:it.unit,
+  if(!it) return null;
+  /* A MOVEMENT OF NOTHING IS STILL A FACT, BUT ONLY FOR A COUNT. Dillon asked
+     for this on 2026-10-01: during the yearly count he wants to know somebody
+     stood in front of a product and found it right, which is a different thing
+     from nobody having reached it yet. Without a record of the match the two
+     look identical, the progress figure is a lie, and the products missing a
+     "last counted" date are exactly the ones that were correct.
+
+     It stays limited to a count. A delivery of nothing, or a spray of nothing,
+     is somebody mis-tapping -- recording those would fill a product's history
+     with lines saying nothing happened. */
+  if(!delta && why!=='count') return null;
+  var m={ id:newId('m'), item:itemId, delta:+delta||0, unit:it.unit,
           why:why||'adjust', ref:opts.ref||null,
+          /* Which yearly count wrote this, so progress belongs to the COUNT
+             rather than to a phone -- see cntRunOf() in THE YEARLY COUNT. */
+          run:opts.run||null,
           who:(typeof SESSION!=='undefined'&&SESSION.pid)||null,
           at:isoLocal(new Date()), note:opts.note||'' };
   INVMOVES.push(m); invSumsDirty();
@@ -2984,6 +2998,17 @@ function invWhoName(pid){
 }
 
 var INV_WHY={in:'Delivery',out:'Used',count:'Recount',adjust:'Adjustment'};
+
+/* How one movement reads on a product's history. A count that found nothing
+   wrong has a delta of zero, and "Recount · +0 gal" is a line that states the
+   arithmetic instead of the fact. */
+function invMoveLabel(m, unit){
+  if(!m) return '';
+  var u=m.unit||unit||'';
+  if(m.why==='count' && !(+m.delta||0)) return 'Counted · no change';
+  var d=+m.delta||0;
+  return (INV_WHY[m.why]||'Adjustment')+' · '+(d>0?'+':'−')+fmt(Math.abs(d))+' '+u;
+}
 
 /* ---- units, so the field log can subtract what it says was used ----
 
@@ -3112,6 +3137,26 @@ function amtStr(it){
  var c=contCount(it); return fmt(c)+' '+plural(it.ctype,c);
 }
 function amtBoth(it){var c=contCount(it);return fmt(c)+' '+plural(it.ctype,c)+' · '+fmt(invQty(it))+' '+it.unit;}
+
+/* WHERE A PRODUCT LIVES, and the one place that answers it.
+
+   The April spreadsheet recorded storage against each CONTAINER -- "Cage",
+   "2" -- and never against the product. The product screen's Storage row read
+   `it.loc`, which no seeded product has, so from the day that row shipped
+   until 2026-10-01 it read the word "undefined" on all 191 products. It looked
+   like data and it was a missing field.
+
+   The product's own answer wins, because somebody wrote it down deliberately
+   -- on the yearly count screen or the Edit product form. Failing that, what
+   April said about the first container, which is the best the farm knows.
+   Failing that a dash, which reads as "nobody has said" rather than as a word. */
+function invStoreLabel(it){
+  var own=(it&&it.loc)||'';
+  if(own&&own!=='—') return own;
+  var c=(it&&it.containers&&it.containers[0])||null;
+  if(c&&c.loc) return c.loc+(c.cage?(' '+c.cage):'');
+  return '—';
+}
 function lowList(){return INVENTORY.filter(isLow);}
 
 function buildChips(){
@@ -3163,8 +3208,13 @@ function renderInvList(){
    if(q){var s=(it.name+' '+invAiText(it)+' '+(it.color||'')).toLowerCase();if(s.indexOf(q)<0)return false;}
    return true;
  });
- if(!items.length){body.innerHTML='<div class="sec" style="text-align:center;margin-top:26px">No products match</div>';return;}
- var html='';
+ /* THE YEARLY COUNT lives at the top of the list, not in the bottom bar.
+    Restock and Log usage are used every week; this is used once a year, and a
+    once-a-year job should not hold a thumb-sized piece of that bar forever.
+    Hidden while somebody is searching, when they are plainly after a product. */
+ var card=q?'':cntEntryHtml();
+ if(!items.length){body.innerHTML=card+'<div class="sec" style="text-align:center;margin-top:26px">No products match</div>';return;}
+ var html=card;
  CAT.forEach(function(c){
    var grp=items.filter(function(it){return it.cat===c.k;});
    if(!grp.length)return;
@@ -3197,7 +3247,7 @@ function openItem(id){
    if(cm.res&&ais[0].g)rows+=fldRowI(cm.res+' group', esc(ais[0].g));
  }
  rows+=fldRowI('Formulation', it.form);
- rows+=fldRowI('Storage', it.loc);
+ rows+=fldRowI('Storage', esc(invStoreLabel(it)));
  rows+=fldRowI('Container', '1 '+it.ctype+' = '+fmt(it.csize)+' '+it.unit);
  rows+=fldRowI('On hand', amtBoth(it));
  rows+=fldRowI('Reorder at', fmt(it.thr)+' '+it.unit, true);
@@ -3206,12 +3256,13 @@ function openItem(id){
     would have been read as a real record the day the shelf went shared. */
  var mv=invMovesFor(it.id).slice(0,12);
  var hist=mv.length ? mv.map(function(m){
-     var up=m.delta>0;
-     var sign=up?'+':'−';
-     var why=INV_WHY[m.why]||'Adjustment';
+     var d=+m.delta||0;
+     /* Grey for a count that found nothing wrong. Green or red would both
+        claim something moved. */
+     var dot=!d?'#9aa0a6':(d>0?'#2f9e4f':'#c0392b');
      var sub=invWhoName(m.who)+' · '+String(m.at||'').slice(0,10)+(m.note?(' · '+m.note):'');
-     return '<div class="row"><span class="dot" style="background:'+(up?'#2f9e4f':'#c0392b')+'"></span>'
-       +'<div style="flex:1;min-width:0"><div class="rt">'+esc(why)+' · '+sign+fmt(Math.abs(m.delta))+' '+esc(m.unit||it.unit)+'</div>'
+     return '<div class="row"><span class="dot" style="background:'+dot+'"></span>'
+       +'<div style="flex:1;min-width:0"><div class="rt">'+esc(invMoveLabel(m,it.unit))+'</div>'
        +'<div class="rs">'+esc(sub)+'</div></div></div>';
    }).join('')
  : '<div class="row"><div style="flex:1"><div class="rs">Nothing has moved yet. The figure above is the April count.</div></div></div>';
@@ -3621,6 +3672,614 @@ function renderLowStock(){
  }).join('')+'</div>';
  body.innerHTML=html;
 }
+
+/* ===================== THE YEARLY COUNT =====================
+   Once a year somebody walks the cages with a phone and tells the app what is
+   actually on the shelf. Dillon asked for it on 2026-10-01, for the obvious
+   reason: a spray gets used and not logged, a delivery goes on the shelf
+   without being booked in, and by August the figures have drifted.
+
+   WHAT IT WRITES, AND WHY THAT IS ALL IT WRITES. A count is a MOVEMENT, the
+   same as a delivery or a spray -- `why:'count'`, carrying the difference
+   between what the shelf holds and what the ledger thought. That is not a
+   detail, it is the whole design:
+
+     - the figure on the Inventory page changes immediately, everywhere, for
+       free, because every screen already asks invQty() and invQty() is the
+       opening balance plus every movement since;
+     - April's opening count is never touched, so a year later the product's
+       own screen still shows how the gap built up -- April said this, four
+       sprays took that, the count found the rest. A figure that had been
+       overwritten would be correct and useless;
+     - two people counting at once is safe, because two movements both count
+       and there is nothing to overwrite;
+     - and NOTHING NEW GOES IN THE DATABASE. Movements already travel. No new
+       collection, no new drawer, no new row in test-sync-settles.js.
+
+   PROGRESS BELONGS TO THE COUNT, NOT TO A PHONE. Every movement a count writes
+   is stamped with the run it belongs to, so "112 of 191 done" is read off the
+   movements and is therefore the same answer on every phone, survives the app
+   closing, and survives somebody swapping phones halfway through. There is
+   nothing kept on one phone for another phone to miss.
+
+   A RUN'S ID IS THE DAY IT STARTED, deliberately. Two people who both tap
+   Begin on the same morning, neither having heard of the other yet, work out
+   the same id and their progress merges. Nothing has to be coordinated and no
+   record has to exist first.
+
+   WHY A PRODUCT ALREADY ANSWERED IS NOT OFFERED AGAIN. Dillon asked for the
+   shared progress so nobody recounts what somebody else has done. It also
+   closes a hole: if two people both found 4 jugs where the ledger said 5.5,
+   and both saved, the shortfall would be booked TWICE and the shelf would end
+   at 2.5 with nothing to say why. Dropping an answered product out of the
+   queue is what makes that impossible, so the queue is rebuilt from the
+   movements on every repaint rather than being a list walked by an index.
+   ============================================================ */
+
+/* How long a run stays joinable. A count spread over a month of odd afternoons
+   is normal; one spread over two months usually means last year's was
+   abandoned, and joining it would make this year's progress a nonsense. */
+var CNT_RUN_DAYS=45;
+
+/* The sitting in progress on THIS phone. `run` and the answers are shared --
+   they live in the ledger. `skipped` is not: "not now, I cannot find it" is a
+   fact about the person walking the cage, not about the farm, and it should
+   not stop somebody else being offered the product. */
+var CNT={run:null, cat:null, skipped:[], mode:'ask',
+         whole:0, frac:0, meas:null, measMode:false, locNew:false};
+
+/* Only movements a yearly count wrote. A recount typed into the Edit product
+   form is also why:'count' and deliberately has no run -- it is a correction
+   somebody made in passing, not part of a count of the farm. */
+function cntMoves(){
+  return INVMOVES.filter(function(m){ return m && m.why==='count' && m.run; });
+}
+
+/* Every run this phone has heard of, the one with the most recent activity
+   first. */
+function cntRuns(){
+  var by={};
+  cntMoves().forEach(function(m){
+    var r=by[m.run];
+    if(!r){ by[m.run]=r={run:m.run, first:m.at, last:m.at, by:m.who, n:0}; }
+    if(String(m.at||'')<String(r.first||'')){ r.first=m.at; r.by=m.who; }
+    if(String(m.at||'')>String(r.last||'')){ r.last=m.at; }
+    r.n++;
+  });
+  return Object.keys(by).map(function(k){ return by[k]; })
+    .sort(function(a,b){ return String(b.last||'').localeCompare(String(a.last||'')); });
+}
+
+function cntDaysSince(iso){
+  var d=(typeof parseISO==='function')?parseISO(iso):null;
+  if(!d) return 1e9;
+  return Math.floor((Date.now()-d.getTime())/86400000);
+}
+
+/* The run still being worked on, or null if the last one is long finished. */
+function cntLiveRun(){
+  var rs=cntRuns();
+  for(var i=0;i<rs.length;i++){ if(cntDaysSince(rs[i].last)<=CNT_RUN_DAYS) return rs[i]; }
+  return null;
+}
+
+/* The run to write into: whatever is live, or a new one named after today. */
+function cntRunId(){
+  var live=cntLiveRun();
+  return live ? live.run : ('cr'+isoLocal(new Date()).slice(0,10));
+}
+
+/* What a run has answered: product id -> its newest answer.
+
+   Cached on the LENGTH of the ledger, which is a sound key only because the
+   ledger is append only -- a movement is never edited or deleted, by the app
+   or by the rules, so a length that has not changed means nothing has. The
+   pick screen asks this once per category and the count screen once per
+   repaint; walking several thousand movements that often is what would make
+   the screen feel slow in a cage. */
+var _cntDone=null, _cntDoneKey='';
+function cntDone(run){
+  var key=String(run||'')+'/'+INVMOVES.length;
+  if(_cntDone && _cntDoneKey===key) return _cntDone;
+  var out={};
+  if(run){
+    cntMoves().forEach(function(m){
+      if(m.run!==run) return;
+      var p=out[m.item];
+      if(!p || String(m.at||'')>String(p.at||'')) out[m.item]=m;
+    });
+  }
+  _cntDoneKey=key; return (_cntDone=out);
+}
+function cntIsDone(run,id){ return !!cntDone(run)[id]; }
+
+/* The types that actually hold something. A row reading "Seed · 0" can only
+   waste a tap. */
+function cntCats(){
+  return CAT.filter(function(c){
+    return INVENTORY.some(function(it){ return it.cat===c.k; });
+  });
+}
+/* Every product of a type, by name. An empty type means the whole shelf. */
+function cntItems(cat){
+  return INVENTORY.filter(function(it){ return !cat || it.cat===cat; })
+    .slice().sort(function(a,b){ return String(a.name||'').localeCompare(String(b.name||'')); });
+}
+function cntLeft(run,cat){
+  var d=cntDone(run);
+  return cntItems(cat).filter(function(it){ return !d[it.id]; }).length;
+}
+function cntTotals(run){
+  var d=cntDone(run), matched=0, changed=0;
+  Object.keys(d).forEach(function(k){ if(+d[k].delta) changed++; else matched++; });
+  return {done:matched+changed, matched:matched, changed:changed, total:INVENTORY.length};
+}
+
+/* What is left to count in this sitting, and the one in front of you. Both are
+   worked out from the ledger every time rather than held as a list and an
+   index -- that is what lets somebody else's answer arriving mid-count simply
+   remove a product from the queue, with no bookkeeping to get wrong. */
+function cntQueue(){
+  var d=cntDone(CNT.run);
+  return cntItems(CNT.cat).filter(function(it){ return !d[it.id]; });
+}
+function cntCurrent(){
+  var q=cntQueue();
+  for(var i=0;i<q.length;i++){ if(CNT.skipped.indexOf(q[i].id)<0) return q[i]; }
+  return null;
+}
+
+/* WHO MAY COUNT, AND WHO MAY SAY WHERE A PRODUCT LIVES.
+
+   Counting is invCanMove() -- everybody, undergraduates included, which has
+   been true of stock going in and out since 2026-08-25.
+
+   Saying where a product lives is new, and it is the ONE field on a product
+   that is not invCanEdit(). Dillon, 2026-10-01: the person holding the jug is
+   the only one who knows where the jug is, so putting it behind a role puts it
+   behind the wrong people. firestore.rules draws the same line in
+   isStorageUpdate() -- anybody who may move stock may change `loc`, on its
+   own, and nothing else in the same write. The two must never drift: a field
+   the app writes and the rules refuse is undone a second after the tap with
+   nothing on screen to say why, which is what stopped the crew finishing jobs
+   for three weeks in September. */
+function invCanSetLoc(){ if(appAdminAll())return true;   /* the App Manager has no restrictions -- app-01 */return true;}
+
+/* Can a storage place written here actually REACH the other phones?
+
+   The rules allow the narrow `loc` change on a product that is already in the
+   shared list, and refuse a CREATE from anybody who may not edit products. So
+   for a product no manager's phone has pushed yet, a crew member's write would
+   be refused -- and a refused write that looks saved is the exact September
+   failure. The screen asks this first and says so in words instead. */
+function cntLocShares(it){
+  if(!it) return false;
+  if(typeof invCanEdit==='function' && invCanEdit()) return true;
+  try{
+    return !!(typeof INVSYNC!=='undefined' && INVSYNC && INVSYNC.itemSeen
+              && INVSYNC.itemSeen[it.id]!==undefined);
+  }catch(e){ return false; }
+}
+
+/* The places the farm already uses, read off the products and off what April
+   wrote against each container. Deliberately NOT a list in the code: a new
+   shed is somebody typing it once and it is then in everybody's list, which is
+   the rule from docs/SUCCESSION.md -- naming a place must never need a push. */
+function cntPlaces(){
+  var seen={}, out=[];
+  var add=function(v){
+    v=String(v||'').trim();
+    if(!v || v==='—') return;
+    var k=v.toLowerCase();
+    if(seen[k]) return;
+    seen[k]=1; out.push(v);
+  };
+  INVENTORY.forEach(function(it){
+    add(it.loc);
+    (it.containers||[]).forEach(function(c){ if(c&&c.loc) add(c.loc+(c.cage?(' '+c.cage):'')); });
+  });
+  return out.sort(function(a,b){ return a.localeCompare(b); });
+}
+
+/* Set where a product lives. ONE field moves and nothing else in the same
+   write -- that is what isStorageUpdate() allows, so do not be tempted to
+   tidy a second field in here. Returns whether anything actually changed. */
+function cntSetLoc(it, place){
+  place=String(place||'').trim();
+  if(!it || !place || !invCanSetLoc()) return false;
+  if(String(it.loc||'')===place) return false;
+  it.loc=place;
+  return true;
+}
+
+/* THE one place a yearly count writes stock. `target` is what is on the shelf,
+   in the product's own unit. A target equal to the record writes a movement of
+   zero on purpose -- see invMove(). */
+function cntSave(it, target){
+  if(!it || !CNT.run || target==null || !isFinite(target)) return null;
+  var diff=target-invQty(it);
+  if(Math.abs(diff)<1e-9) diff=0;
+  return invMove(it.id, diff, 'count', {run:CNT.run});
+}
+
+/* ---- the entry card on the Inventory list ---- */
+function cntNice(iso){
+  return (typeof fmtDay==='function' && fmtDay(iso)) || String(iso||'').slice(0,10);
+}
+function cntEntryHtml(){
+  var live=cntLiveRun(), sub, right='';
+  if(live){
+    var t=cntTotals(live.run);
+    sub=t.done+' of '+t.total+' done · started '+esc(cntNice(live.first));
+    right='<span class="pill">'+Math.round(t.done/Math.max(1,t.total)*100)+'%</span>';
+  } else {
+    var last=cntRuns()[0];
+    sub=last?('last counted '+esc(cntNice(last.last))):'nothing counted yet';
+  }
+  return '<div class="list" style="margin-top:9px"><div class="row tap" data-go="cntpick">'
+    +'<span class="te" style="font-size:19px">🧮</span>'
+    +'<div style="flex:1;min-width:0"><div class="rt">Yearly count</div><div class="rs">'+sub+'</div></div>'
+    +right+'<span class="cnt-chev">›</span></div></div>';
+}
+
+/* ---- small shared bits of the screens ---- */
+function cntBox(text, tone){
+  var c={ok:['#eafaef','#bfe6c9','#2f7d3a'], info:['#eef4ff','#cfe0ff','#2456b8'],
+          warn:['#fff6e5','#f3dcb0','#8a5a00'], bad:['#fdeceb','#f3c9c4','#c0392b']}[tone||'info'];
+  return '<div style="margin:12px 16px;background:'+c[0]+';border:1px solid '+c[1]
+    +';border-radius:12px;padding:11px 13px;font:700 12px/1.45 \'Public Sans\';color:'+c[2]+'">'+text+'</div>';
+}
+
+/* Start the boxes off at what the record says, so somebody whose shelf is
+   right taps once. A jug read as 0.9 full is offered as one, not as none. */
+var CNT_FRACS=[0,0.25,0.5,0.75];
+function cntPrefill(it){
+  var q=invQty(it), c=(it.csize>0)?(q/it.csize):q;
+  var w=Math.floor(c+1e-9), fr=c-w, f=0;
+  CNT_FRACS.forEach(function(x){ if(Math.abs(fr-x)<Math.abs(fr-f)) f=x; });
+  if(fr>0.875){ w+=1; f=0; }
+  CNT.whole=Math.max(0,w); CNT.frac=f;
+  CNT.meas=Math.round(Math.max(0,q)*100)/100;
+  CNT.measMode=false; CNT.locNew=false;
+}
+function cntTarget(it){
+  if(CNT.measMode){
+    if(CNT.meas==null || CNT.meas==='' || !isFinite(+CNT.meas)) return null;
+    return Math.max(0,+CNT.meas);
+  }
+  return (CNT.whole+CNT.frac)*(it.csize||1);
+}
+function cntFracLabel(f){ return f===0?'none':(f===0.25?'¼':(f===0.5?'½':'¾')); }
+
+function cntPreviewHtml(it){
+  var target=cntTarget(it);
+  if(target==null) return cntBox('Type how much is on the shelf.','info');
+  var diff=target-invQty(it);
+  var cont=(it.csize>0)?(target/it.csize):target;
+  var asCont=fmt(cont)+' '+plural(it.ctype,cont);
+  if(Math.abs(diff)<1e-9){
+    return cntBox('✓ That matches. Saving records that you counted it and it was right.','ok');
+  }
+  /* Said in containers as well as the unit, because the person is holding jugs
+     and the Inventory page is the thing they will check afterwards. */
+  return cntBox('That is '+fmt(Math.abs(diff))+' '+esc(it.unit)+' '+(diff>0?'more':'fewer')
+    +' than the app thought. Saving changes the Inventory page to <b>'+esc(asCont)+'</b>.',
+    diff>0?'ok':'warn');
+}
+
+/* The storage place picker, or an honest line about why there isn't one. */
+function cntLocHtml(it){
+  var h='<div class="sec">Where is it stored?</div>';
+  if(!invCanSetLoc()){
+    return h+'<div class="list"><div class="fld" style="border-bottom:none"><span class="fl">Stored in</span>'
+      +'<span class="fv">'+esc(invStoreLabel(it))+'</span></div></div>';
+  }
+  if(!cntLocShares(it)){
+    return h+'<div class="list"><div class="fld" style="border-bottom:none"><span class="fl">Stored in</span>'
+      +'<span class="fv">'+esc(invStoreLabel(it))+'</span></div></div>'
+      +cntBox('This product has not reached the shared list yet, so a place set here would stay on this '
+             +'phone and reach nobody. Ask Bill or Dillon to set this one.','warn');
+  }
+  var cur=String(it.loc||''), places=cntPlaces(), opts='';
+  if(!cur) opts+='<option value="" selected>— not recorded —</option>';
+  places.forEach(function(p){
+    opts+='<option value="'+esc(p)+'"'+(p===cur?' selected':'')+'>'+esc(p)+'</option>';
+  });
+  if(cur && places.indexOf(cur)<0) opts+='<option value="'+esc(cur)+'" selected>'+esc(cur)+'</option>';
+  opts+='<option value="__new"'+(CNT.locNew?' selected':'')+'>Somewhere else…</option>';
+  h+='<div class="list"><div class="fld"'+(CNT.locNew?'':' style="border-bottom:none"')+'>'
+    +'<span class="fl">Stored in</span><select class="inv-sel" id="cnt-loc">'+opts+'</select></div>';
+  if(CNT.locNew){
+    h+='<div class="fld" style="border-bottom:none"><span class="fl">Call it</span>'
+      +'<input class="inv-in" id="cnt-locnew" placeholder="e.g. Cage 4" style="max-width:175px"></div>';
+  }
+  h+='</div>';
+  if(!cur) h+=cntBox('Nobody has written down where this one lives. Setting it now fixes it for everybody, '
+                    +'for good.','info');
+  return h;
+}
+
+/* Read whatever the location boxes say and apply it. Called when the product is
+   ANSWERED -- including on a skip, because skipping the count is not skipping
+   the place, and somebody who has just looked at the shelf should not lose it. */
+function cntApplyLoc(it){
+  if(!it || !invCanSetLoc() || !cntLocShares(it)) return false;
+  var sel=document.getElementById('cnt-loc'); if(!sel) return false;
+  var v=sel.value;
+  if(v==='__new'){
+    var box=document.getElementById('cnt-locnew');
+    v=box?String(box.value||'').trim():'';
+  }
+  if(!v) return false;
+  return cntSetLoc(it,v);
+}
+
+/* ---- screen: which type ---- */
+function renderCntPick(){
+  var body=document.getElementById('cp-body'); if(!body) return;
+  var live=cntLiveRun();
+  /* Joining whatever is live, so two people are always in the same run. */
+  CNT.run=live?live.run:null;
+  var run=CNT.run, h='';
+  if(run){
+    var t=cntTotals(run);
+    h+='<div class="sec">This count</div>'+progressCard(t.done,t.total)
+      +'<div class="list">'
+      +'<div class="fld"><span class="fl">Started</span><span class="fv">'+esc(cntNice(live.first))
+        +(live.by?(' · '+esc(invWhoName(live.by))):'')+'</span></div>'
+      +'<div class="fld"><span class="fl">Counted</span><span class="fv">'+t.done+' of '+t.total+'</span></div>'
+      +'<div class="fld" style="border-bottom:none"><span class="fl">Right / corrected</span>'
+        +'<span class="fv">'+t.matched+' / '+t.changed+'</span></div></div>';
+  } else {
+    var last=cntRuns()[0];
+    h+='<div class="sec">Start a count</div>'
+      +cntBox(last?('The last count finished '+esc(cntNice(last.last))+'. Pick a type below to start a new one.')
+                  :'Nothing has been counted yet. Pick a type below to start — you do not have to do it all at once.','info');
+  }
+  h+='<div class="sec">What are you counting?</div><div class="list">';
+  cntCats().forEach(function(c){
+    var items=cntItems(c.k), left=run?cntLeft(run,c.k):items.length, done=items.length-left;
+    h+='<div class="row tap" data-cntcat="'+esc(c.k)+'">'
+      +'<span class="te" style="font-size:18px">'+(c.emoji||'📦')+'</span>'
+      +'<div style="flex:1;min-width:0"><div class="rt">'+esc(c.label)+'</div>'
+      +'<div class="rs">'+items.length+' '+plural('product',items.length)
+        +(run?(left?(' · '+left+' left'):' · all done'):'')+'</div></div>'
+      +(run&&!left?'<span class="pill">✓</span>':(run&&done?('<span class="pill">'+done+'</span>'):''))
+      +'<span class="cnt-chev">›</span></div>';
+  });
+  h+='</div>';
+  h+='<div class="sec">Or all of it</div><div class="list"><div class="row tap" data-cntcat="">'
+    +'<span class="te" style="font-size:18px">📦</span>'
+    +'<div style="flex:1;min-width:0"><div class="rt">Every product</div>'
+    +'<div class="rs">'+(run?(cntLeft(run,'')+' left of '+INVENTORY.length):(INVENTORY.length+' products'))+'</div></div>'
+    +'<span class="cnt-chev">›</span></div></div>';
+  if(run){
+    h+='<div class="sec">&nbsp;</div><div class="list"><div class="row tap" data-go="cntdone">'
+      +'<div style="flex:1;min-width:0"><div class="rt">What this count has found</div>'
+      +'<div class="rs">'+cntTotals(run).changed+' corrected so far</div></div>'
+      +'<span class="cnt-chev">›</span></div></div>';
+  }
+  h+='<div style="height:18px"></div>';
+  body.innerHTML=h;
+}
+
+/* ---- screen: one product ---- */
+function renderCntCount(){
+  var body=document.getElementById('cc-body'); if(!body) return;
+  var act=document.getElementById('cc-actions');
+  if(!CNT.run) CNT.run=cntRunId();
+  var ttl=document.getElementById('cc-title');
+  var cm=CNT.cat?catMeta(CNT.cat):null;
+  if(ttl) ttl.textContent=cm?cm.label:'Every product';
+  var it=cntCurrent(), t=cntTotals(CNT.run);
+  if(!it){
+    var skipped=CNT.skipped.length;
+    body.innerHTML=progressCard(t.done,t.total)
+      +'<div class="sec">Nothing left here</div>'
+      +cntBox(skipped?('Everything in this group is either counted or skipped. You skipped '+skipped
+                      +' — they stay on the list for next time.')
+                     :'Everything in this group is counted. ✓','ok')
+      +'<div class="list"><div class="row tap" data-go="cntpick"><div style="flex:1;min-width:0">'
+      +'<div class="rt">Count something else</div><div class="rs">pick another type</div></div>'
+      +'<span class="cnt-chev">›</span></div>'
+      +'<div class="row tap" data-go="cntdone"><div style="flex:1;min-width:0">'
+      +'<div class="rt">See what this count found</div><div class="rs">'+t.changed+' corrected</div></div>'
+      +'<span class="cnt-chev">›</span></div></div>';
+    if(act) act.innerHTML='';
+    return;
+  }
+  var q=cntQueue().length;
+  var h=progressCard(t.done,t.total);
+  h+='<div class="cnt-card">'
+    +'<div class="cnt-name">'+esc(invIsPaintCat(it.cat)?paintFullName(it):it.name)+'</div>'
+    +'<div class="cnt-meta">'+esc(catMeta(it.cat).label)+' · one '+esc(it.ctype)+' holds '
+      +fmt(it.csize)+' '+esc(it.unit)+'</div>'
+    +'<div class="cnt-says"><span class="cnt-sayl">The app says</span>'
+      +'<span class="cnt-sayv">'+esc(amtBoth(it))+'</span></div>'
+    +'<div class="cnt-left">'+q+' left in this group</div>'
+    +'</div>';
+  if(CNT.mode==='edit'){
+    h+='<div class="sec">What is actually there?</div>';
+    if(CNT.measMode){
+      h+='<div class="list"><div class="fld"><span class="fl">Measured amount</span>'
+        +'<span style="display:flex;align-items:center;gap:7px">'
+        +'<input class="inv-in" id="cnt-meas" inputmode="decimal" value="'+esc(String(CNT.meas==null?'':CNT.meas))+'" style="max-width:90px">'
+        +'<span class="fv">'+esc(it.unit)+'</span></span></div>'
+        +'<div class="fld tap" style="border-bottom:none" data-cntmeas="0"><span class="fl">Count containers instead</span>'
+        +'<span class="fv">'+esc(plural(it.ctype,2))+' ›</span></div></div>';
+    } else {
+      h+='<div class="list">'
+        +'<div class="fld"><span class="fl">Whole '+esc(plural(it.ctype,2))+'</span>'
+        +'<div class="stepper"><span class="stepbtn tap" data-cntstep="-1">−</span>'
+        +'<span class="stepval">'+CNT.whole+'</span>'
+        +'<span class="stepbtn tap" data-cntstep="1">＋</span></div></div>'
+        +'<div class="fld"><span class="fl">Part of one</span><span class="cnt-fracs">'
+        +CNT_FRACS.map(function(f){
+            return '<span class="cnt-frac tap'+(CNT.frac===f?' on':'')+'" data-cntfrac="'+f+'">'
+              +cntFracLabel(f)+'</span>';
+          }).join('')
+        +'</span></div>'
+        +'<div class="fld tap" style="border-bottom:none" data-cntmeas="1"><span class="fl">Measure it instead</span>'
+        +'<span class="fv">in '+esc(it.unit)+' ›</span></div></div>';
+    }
+    /* Wrapped in an id so a keystroke can redraw just this, see the input
+       handler at the bottom of this section. */
+    h+='<div id="cnt-prev">'+cntPreviewHtml(it)+'</div>';
+  } else {
+    h+='<div class="cnt-btns">'
+      +'<div class="cnt-b ok tap" data-cnt="match">That\'s right ✓</div>'
+      +'<div class="cnt-b alt tap" data-cnt="diff">It\'s different</div>'
+      +'<div class="cnt-b skip tap" data-cnt="skip">Skip for now</div>'
+      +'</div>';
+  }
+  h+=cntLocHtml(it);
+  h+='<div style="height:18px"></div>';
+  body.innerHTML=h;
+  if(act){
+    act.innerHTML=(CNT.mode==='edit')
+      ? '<div class="action tap" data-cnt="cancel" style="flex:1;background:#17181a">Cancel</div>'
+        +'<div class="action tap" data-cnt="save" style="flex:1;background:#2f9e4f">Save count ✓</div>'
+      : '<div class="action tap" data-go="cntdone" style="flex:1;background:#17181a">Finish</div>';
+  }
+}
+
+/* A count movement arriving from another phone. The queue is rebuilt from the
+   ledger, so somebody else's answer simply removes a product from in front of
+   you -- but NOT while this person is part-way through answering one, because
+   rebuilding the screen would take the cursor out of the box they are typing
+   in. Their own answer repaints a moment later anyway. */
+function cntOnSync(id){
+  if(id==='cntpick') renderCntPick();
+  else if(id==='cntdone') renderCntDone();
+  else if(id==='cntcount' && CNT.mode!=='edit') renderCntCount();
+}
+
+/* ---- screen: what the count found ---- */
+function renderCntDone(){
+  var body=document.getElementById('cd-body'); if(!body) return;
+  var run=CNT.run||((cntLiveRun()||{}).run)||((cntRuns()[0]||{}).run);
+  if(!run){
+    body.innerHTML='<div class="sec" style="text-align:center;margin-top:26px">No count has been started yet</div>';
+    return;
+  }
+  var d=cntDone(run), t=cntTotals(run);
+  var moves=Object.keys(d).map(function(k){ return d[k]; })
+    .sort(function(a,b){ return String(b.at||'').localeCompare(String(a.at||'')); });
+  var h=progressCard(t.done,t.total)
+    +'<div class="list">'
+    +'<div class="fld"><span class="fl">Counted</span><span class="fv">'+t.done+' of '+t.total+'</span></div>'
+    +'<div class="fld"><span class="fl">Right first time</span><span class="fv">'+t.matched+'</span></div>'
+    +'<div class="fld" style="border-bottom:none"><span class="fl">Corrected</span><span class="fv">'+t.changed+'</span></div>'
+    +'</div>';
+  var changed=moves.filter(function(m){ return +m.delta; });
+  h+='<div class="sec">What changed · '+changed.length+'</div>';
+  if(!changed.length){
+    h+=cntBox('Nothing has needed correcting yet.','ok');
+  } else {
+    h+='<div class="list">'+changed.map(function(m){
+      var it=INVENTORY.find(function(x){ return x.id===m.item; });
+      var dl=+m.delta||0;
+      return '<div class="row tap" data-item="'+esc(m.item)+'">'
+        +'<span class="dot" style="background:'+(dl>0?'#2f9e4f':'#c0392b')+'"></span>'
+        +'<div style="flex:1;min-width:0"><div class="rt">'+esc(it?it.name:m.item)+'</div>'
+        +'<div class="rs">'+(dl>0?'+':'−')+fmt(Math.abs(dl))+' '+esc(m.unit||(it&&it.unit)||'')
+          +' · '+esc(invWhoName(m.who))+' · '+esc(cntNice(m.at))+'</div></div>'
+        +'<span class="cnt-chev">›</span></div>';
+    }).join('')+'</div>';
+  }
+  var left=cntLeft(run,'');
+  h+='<div class="sec">Still to count · '+left+'</div>';
+  h+=left?('<div class="list"><div class="row tap" data-go="cntpick"><div style="flex:1;min-width:0">'
+          +'<div class="rt">Carry on counting</div><div class="rs">'+left+' products left</div></div>'
+          +'<span class="cnt-chev">›</span></div></div>')
+        :cntBox('Every product has been counted. ✓','ok');
+  h+='<div style="height:18px"></div>';
+  body.innerHTML=h;
+}
+
+/* ---- the taps ----
+   One delegated handler per screen, attached once at load. Attaching inside a
+   render would stack a new listener every time the screen was opened and fire
+   the same tap several times -- the mistake the ingredient rows note in
+   renderAddItem() warns about. */
+document.getElementById('s-cntpick').addEventListener('click',function(e){
+  var row=e.target.closest('[data-cntcat]'); if(!row) return;
+  CNT.cat=row.getAttribute('data-cntcat')||'';
+  CNT.skipped=[]; CNT.mode='ask';
+  CNT.run=cntRunId();
+  go('cntcount');
+});
+
+document.getElementById('s-cntcount').addEventListener('click',function(e){
+  var it=cntCurrent();
+  var st=e.target.closest('[data-cntstep]');
+  if(st && it){
+    CNT.whole=Math.max(0,CNT.whole+(+st.getAttribute('data-cntstep')||0));
+    renderCntCount(); return;
+  }
+  var fr=e.target.closest('[data-cntfrac]');
+  if(fr && it){ CNT.frac=+fr.getAttribute('data-cntfrac')||0; renderCntCount(); return; }
+  var ms=e.target.closest('[data-cntmeas]');
+  if(ms && it){
+    CNT.measMode=ms.getAttribute('data-cntmeas')==='1';
+    if(CNT.measMode && CNT.meas==null) CNT.meas=Math.round(invQty(it)*100)/100;
+    renderCntCount(); return;
+  }
+  var b=e.target.closest('[data-cnt]'); if(!b) return;
+  var what=b.getAttribute('data-cnt');
+  if(what==='cancel'){ CNT.mode='ask'; renderCntCount(); return; }
+  if(!it) return;
+  if(what==='diff'){ cntApplyLoc(it); cntPrefill(it); CNT.mode='edit'; renderCntCount(); return; }
+  if(what==='skip'){
+    cntApplyLoc(it);
+    CNT.skipped.push(it.id);
+    renderCntCount(); return;
+  }
+  if(what==='match'){
+    cntApplyLoc(it);
+    cntSave(it, invQty(it));           /* a count of zero: right as it stands */
+    toast(it.name+' · counted ✓');
+    CNT.mode='ask'; renderCntCount(); return;
+  }
+  if(what==='save'){
+    cntApplyLoc(it);
+    var target=cntTarget(it);
+    if(target==null){ toast('Type how much is on the shelf'); return; }
+    var before=invQty(it);
+    cntSave(it,target);
+    var diff=target-before;
+    toast(Math.abs(diff)<1e-9 ? (it.name+' · counted ✓')
+      : (it.name+' · now '+fmt(contCount(it))+' '+plural(it.ctype,contCount(it))+' ✓'));
+    CNT.mode='ask'; renderCntCount(); return;
+  }
+});
+
+/* The typed amount and the typed place. Read on the way past rather than only
+   on Save, so what is on screen and what is in CNT cannot disagree. */
+document.getElementById('s-cntcount').addEventListener('input',function(e){
+  if(e.target.id==='cnt-meas'){
+    var v=String(e.target.value||'').trim();
+    CNT.meas=(v==='')?null:parseFloat(v);
+    var it=cntCurrent();
+    /* Only the preview is redrawn -- rebuilding the screen would take the
+       cursor out of the box the person is typing in. */
+    var pv=document.getElementById('cnt-prev');
+    if(it&&pv) pv.innerHTML=cntPreviewHtml(it);
+  }
+});
+document.getElementById('s-cntcount').addEventListener('change',function(e){
+  if(e.target.id!=='cnt-loc') return;
+  CNT.locNew=(e.target.value==='__new');
+  var it=cntCurrent();
+  if(!CNT.locNew && it) cntSetLoc(it,e.target.value);
+  renderCntCount();
+});
+
+document.getElementById('s-cntdone').addEventListener('click',function(e){
+  var row=e.target.closest('[data-item]'); if(!row) return;
+  openItem(row.getAttribute('data-item'));
+});
+/* =================== end THE YEARLY COUNT =================== */
 
 /* ===================== Equipment module ===================== */
 var eqTab='home'; var eqSearch=''; window.eqCur=null; window.eqEditId=null; window.eqSchedEditId=null; window.eqReportSetDown=false;

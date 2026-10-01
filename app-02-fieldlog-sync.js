@@ -1043,6 +1043,11 @@ function invsyncRepaintScreens(){
     if(id==='inventory'&&typeof renderInvList==='function') renderInvList();
     if(id==='lowstock'&&typeof renderLowStock==='function') renderLowStock();
     if(id==='sharedb'&&typeof sdbRender==='function') sdbRender();
+    /* The yearly count screens read their progress straight off the ledger, so
+       another phone's answer has to redraw them or two people counting the same
+       cage get offered the same products. cntOnSync() decides whether to, because
+       it is the half that knows whether somebody here is mid-answer. */
+    if(typeof cntOnSync==='function') cntOnSync(id);
   }catch(e){}
 }
 
@@ -1084,19 +1089,54 @@ function invPush(){
     try{ db.collection(INVSYNC_MOVES).doc(id).set(doc).catch(function(e){ invsyncFail(id,e); }); }
     catch(e){ invsyncFail(id,e); }
   });
-  if(typeof invCanEdit==='function' && invCanEdit()){
-    INVENTORY.forEach(function(it){
-      if(!it||!it.id) return;
-      var doc=invItemDoc(it); if(!doc) return;
-      var id=String(it.id), json=sdbJson(doc);
-      if(INVSYNC.itemSeen[id]===json) return;
-      if(!sdbMaySend('product/'+id,'product')) return;   /* the brake — see sdbMaySend() */
-      INVSYNC.itemSeen[id]=json; n++; INVSYNC.up++;
-      try{ db.collection(INVSYNC_ITEMS).doc(id).set(doc).catch(function(e){ invsyncFail(id,e); }); }
-      catch(e){ invsyncFail(id,e); }
-    });
-  }
+  INVENTORY.forEach(function(it){
+    if(!it||!it.id) return;
+    var doc=invItemDoc(it); if(!doc) return;
+    var id=String(it.id), json=sdbJson(doc);
+    if(INVSYNC.itemSeen[id]===json) return;
+    if(!invsyncMaySendItem(it,doc)) return;
+    if(!sdbMaySend('product/'+id,'product')) return;   /* the brake — see sdbMaySend() */
+    INVSYNC.itemSeen[id]=json; n++; INVSYNC.up++;
+    try{ db.collection(INVSYNC_ITEMS).doc(id).set(doc).catch(function(e){ invsyncFail(id,e); }); }
+    catch(e){ invsyncFail(id,e); }
+  });
   return n;
+}
+
+/* MAY THIS PHONE SEND THIS PRODUCT RECORD?
+
+   It used to be one question for the whole phone -- invCanEdit() wrapped the
+   loop above, so a phone that may not edit products sent none of them. That was
+   right while every field on a product was invCanEdit(). Since 2026-10-01 one
+   field is not: anybody counting the shelf may say WHERE A PRODUCT IS STORED
+   (invCanSetLoc(), and isStorageUpdate() in firestore.rules). Left as it was,
+   an undergraduate's storage place would save on their phone, look perfectly
+   fine, and reach nobody -- the RST_SEED failure in CLAUDE.md exactly.
+
+   So the question is per record and per field now. Two things are load-bearing:
+
+   THE COMPARISON IS AGAINST WHAT THE SERVER LAST SAID (INVSYNC.itemSeen), not
+   against any local copy. A diff measured against something local would let two
+   unrelated changes ride up in one write, and the database would refuse the
+   pair -- failing the storage change because of something else entirely.
+
+   A PRODUCT THE SERVER HAS NEVER SENT IS A CREATE, and the rules refuse a
+   create from somebody who may not edit products. So it is not attempted. A
+   write that is certain to be refused must never be sent as though it were
+   saved; cntLocShares() in app-04 asks the same question before it offers the
+   box, so nobody is handed a tap that dies here in silence. */
+function invsyncMaySendItem(it, doc){
+  if(typeof invCanEdit==='function' && invCanEdit()) return true;
+  if(!it||!doc) return false;
+  var was=INVSYNC.itemSeen[String(it.id)];
+  if(was===undefined) return false;              /* would be a create — refused */
+  var prev; try{ prev=JSON.parse(was); }catch(e){ return false; }
+  if(!prev||typeof prev!=='object') return false;
+  var keys={};
+  Object.keys(prev).forEach(function(k){ keys[k]=1; });
+  Object.keys(doc).forEach(function(k){ keys[k]=1; });
+  var diff=Object.keys(keys).filter(function(k){ return sdbJson(prev[k])!==sdbJson(doc[k]); });
+  return diff.length===1 && diff[0]==='loc';
 }
 
 function invsyncTick(){

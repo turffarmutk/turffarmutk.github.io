@@ -714,8 +714,42 @@ service cloud.firestore {
 
     match /invitems/{itemId} {
       allow read: if actor();
-      allow create, update: if canEditProduct()
+
+      /* WHERE A PRODUCT LIVES IS THE ONE FIELD ANYBODY MAY CHANGE.
+
+         Dillon, 2026-10-01, asked for the yearly count to let whoever is
+         counting record where a product is stored. The person holding the jug
+         is the only one who knows where the jug is, so putting it behind a role
+         puts it behind the wrong people -- and the farm needs it badly: 31 of
+         the 191 products have no storage information at all and another 48 say
+         only "Cage".
+
+         It is deliberately ONE FIELD AND NOTHING ELSE IN THE SAME WRITE, the
+         same shape as isWorkUpdate() on a task: that is what keeps "anybody may
+         say where it lives" from quietly becoming "anybody may rename a product
+         or change what a container holds".
+
+         The app half is invCanSetLoc() plus cntSetLoc() in
+         app-04-spray-inventory.js, and the two must never drift. A field the
+         app writes and these rules refuse is undone a second after the tap with
+         nothing on screen to say why -- that is the bug that stopped the crew
+         finishing jobs from late August to 2026-09-22. */
+      function changedItem() {
+        return request.resource.data.diff(resource.data).affectedKeys();
+      }
+      function isStorageUpdate() {
+        return canMoveStock() && changedItem().hasOnly(['loc']);
+      }
+
+      /* CREATE stays with whoever may edit a product. A create is the product
+         coming into existence, not a correction to one, and a create carrying
+         only `loc` would wipe it. The app knows this: cntLocShares() refuses to
+         offer the box for a product the shared list has never seen, so a crew
+         member is never handed a tap the database would throw away. */
+      allow create: if canEditProduct()
         && request.resource.data.id == itemId;
+      allow update: if request.resource.data.id == itemId
+        && (canEditProduct() || isStorageUpdate());
       allow delete: if false;
     }
 

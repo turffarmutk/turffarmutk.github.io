@@ -333,6 +333,25 @@
   .invcount{font:800 9px 'Public Sans';color:#fff;background:#c0392b;border-radius:20px;padding:2px 7px;margin-left:7px}
   .invamt{font:800 13.5px 'Archivo';color:var(--ink);min-width:76px;flex:none;line-height:1.15;text-align:left}
   .invhead{font:800 15.5px 'Archivo';color:var(--ink);padding:16px 16px 7px;letter-spacing:-.2px}
+  /* ---- the yearly count ---- */
+  .cnt-chev{color:var(--muted);font:800 15px 'Archivo';flex:none;padding-left:2px}
+  .cnt-card{margin:12px 16px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 16px}
+  .cnt-name{font:800 21px 'Archivo';color:var(--ink);line-height:1.15;letter-spacing:-.3px;word-break:break-word}
+  .cnt-meta{margin-top:5px;font:600 11.5px 'Public Sans';color:var(--muted)}
+  .cnt-says{margin-top:13px;padding-top:12px;border-top:1px solid var(--line);display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .cnt-sayl{font:800 9.5px 'Public Sans';text-transform:uppercase;letter-spacing:.7px;color:var(--muted);flex:none}
+  .cnt-sayv{font:800 16px 'Archivo';color:var(--ink);text-align:right}
+  .cnt-left{margin-top:9px;font:700 10.5px 'Public Sans';color:var(--muted)}
+  /* Stacked full-width answers, because the one that gets tapped 180 times is
+     "That's right" and it should be impossible to miss with a thumb. */
+  .cnt-btns{display:flex;flex-direction:column;gap:9px;margin:6px 16px 2px}
+  .cnt-b{border-radius:13px;padding:16px 14px;text-align:center;font:800 16px 'Archivo';cursor:pointer;user-select:none}
+  .cnt-b.ok{background:#2f9e4f;color:#fff}
+  .cnt-b.alt{background:#2f3133;color:#fff}
+  .cnt-b.skip{background:transparent;color:var(--muted);border:1px solid var(--line);font:800 14px 'Archivo';padding:12px 14px}
+  .cnt-fracs{display:flex;gap:6px}
+  .cnt-frac{min-width:42px;text-align:center;border:1px solid var(--line);border-radius:9px;padding:7px 8px;font:800 13px 'Archivo';color:var(--ink);background:var(--card);cursor:pointer;user-select:none}
+  .cnt-frac.on{background:#2f9e4f;border-color:#2f9e4f;color:#fff}
   .lowpill{background:#e8341f;color:#fff;box-shadow:0 2px 6px rgba(232,52,31,.45);letter-spacing:.5px}
   .il-input{width:100%;border:1px solid var(--line);background:#fff;border-radius:11px;padding:11px 13px;font:700 14px 'Public Sans';color:var(--ink);outline:none}
   .il-input:focus{border-color:var(--acc)}
@@ -1595,6 +1614,35 @@ html[data-size="tablet"] .thname{font-size:10px;max-width:76px}
             <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1" id="il-title">Restock</div></div>
             <div style="flex:1;overflow:auto" id="il-body"></div>
             <div class="actionbar"><div class="action tap" id="il-save">Save</div></div>
+          </div>
+<div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab"><span class="te">📋</span>Tasks</div><div class="tab"><span class="te">🗺️</span>Map</div><div class="tab on"><span class="te">📦</span>Inventory</div><div class="tab"><span class="te">•••</span>More</div></div>
+</section>
+
+<!-- THE YEARLY COUNT. Three screens: pick a type, count one product, see what
+     the count found. All three belong to the Inventory tab (SCREEN_DEST in
+     app-01-shell.js) so the bottom bar and the side rail both keep Inventory
+     lit while you are in them, and so the back arrow knows where it came from. -->
+<section class="screen" id="s-cntpick">
+<div class="app field">
+            <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">Yearly count</div></div>
+            <div style="flex:1;overflow:auto" id="cp-body"></div>
+          </div>
+<div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab"><span class="te">📋</span>Tasks</div><div class="tab"><span class="te">🗺️</span>Map</div><div class="tab on"><span class="te">📦</span>Inventory</div><div class="tab"><span class="te">•••</span>More</div></div>
+</section>
+
+<section class="screen" id="s-cntcount">
+<div class="app field">
+            <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1" id="cc-title">Counting</div></div>
+            <div style="flex:1;overflow:auto" id="cc-body"></div>
+            <div class="actionbar" id="cc-actions" style="display:flex;gap:8px"></div>
+          </div>
+<div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab"><span class="te">📋</span>Tasks</div><div class="tab"><span class="te">🗺️</span>Map</div><div class="tab on"><span class="te">📦</span>Inventory</div><div class="tab"><span class="te">•••</span>More</div></div>
+</section>
+
+<section class="screen" id="s-cntdone">
+<div class="app field">
+            <div class="hdr"><div class="backbtn tap" style="font-size:18px;color:#fff">‹</div><div class="title" style="flex:1">What the count found</div></div>
+            <div style="flex:1;overflow:auto" id="cd-body"></div>
           </div>
 <div class="tabs"><div class="tab"><span class="te">🏠</span>Home</div><div class="tab"><span class="te">📋</span>Tasks</div><div class="tab"><span class="te">🗺️</span>Map</div><div class="tab on"><span class="te">📦</span>Inventory</div><div class="tab"><span class="te">•••</span>More</div></div>
 </section>

@@ -83,7 +83,12 @@ const EX = ['INVENTORY','INVMOVES','invQty','invMove','invMovesFor','invSums','i
             'INVSYNC','invsyncOnMoves','invsyncOnItems','invsyncWanted','invsyncSetWanted',
             'invMoveDoc','invItemDoc','invsyncSummary','invMoveById',
             'invIsPaintCat','renderAddItem','paintItems','paintLabel','paintFullName','go',
-            'invAiList','invAiText','invAiGroups','invAiSplit','INV_AI_MAX','mixInvMatch','catMeta'];
+            'invAiList','invAiText','invAiGroups','invAiSplit','INV_AI_MAX','mixInvMatch','catMeta',
+            'CNT','CNT_RUN_DAYS','cntMoves','cntRuns','cntLiveRun','cntRunId','cntDone','cntIsDone',
+            'cntCats','cntItems','cntLeft','cntTotals','cntQueue','cntCurrent','cntSave','cntSetLoc',
+            'cntPlaces','cntLocShares','invCanSetLoc','invStoreLabel','invMoveLabel','cntPrefill',
+            'cntTarget','renderCntPick','renderCntCount','renderCntDone','invsyncMaySendItem',
+            'sdbJson','plural'];
 
 function boot(store) {
   const vc = new VirtualConsole();
@@ -886,6 +891,192 @@ section('25. a product can be a mixture — one row per active ingredient');
   ok('and it is a list of records, never a list inside a list',
      doc.ais.every(a => a && typeof a === 'object' && !Array.isArray(a)
                      && Object.keys(a).every(k => !Array.isArray(a[k]))));
+}
+
+section('26. the yearly count');
+{
+  /* A count is a MOVEMENT. Everything below follows from that, and the reason
+     the section is long is that Dillon was promised six specific things on
+     2026-10-01 and each one is checked here rather than assumed. */
+  const b = boot();
+  const it = first(b);
+
+  /* --- the figure on the Inventory page is what was counted --- */
+  b.p.CNT.run = 'cr2026-10-01';
+  const opening = it.qty;
+  b.p.invMove(it.id, -5, 'out');
+  const shelf = b.p.invQty(it) - 7;              /* somebody used 7 and never logged it */
+  b.p.cntSave(it, shelf);
+  ok('the shelf reads exactly what was counted', near(b.p.invQty(it), shelf), b.p.invQty(it));
+  ok('and April is untouched', near(it.qty, opening), it.qty);
+  ok('the list row shows the counted figure too',
+     b.p.amtBoth(it).indexOf(b.p.fmt(b.p.invQty(it))) >= 0, b.p.amtBoth(it));
+  const cm = b.p.invMovesFor(it.id).filter(m => m.why === 'count');
+  ok('as one count movement carrying its run', cm.length === 1 && cm[0].run === 'cr2026-10-01',
+     JSON.stringify(cm.map(m => [m.why, m.delta, m.run])));
+  ok('for exactly the difference, not the whole shelf', near(cm[0].delta, -7), cm[0].delta);
+
+  /* --- "I counted it and it matched" is a fact, and reads like one --- */
+  const it2 = b.p.INVENTORY[1];
+  const before2 = b.p.invQty(it2);
+  const z = b.p.cntSave(it2, before2);
+  ok('a count that matched IS recorded', !!z && z.why === 'count' && +z.delta === 0,
+     JSON.stringify(z && [z.why, z.delta]));
+  ok('and it moves nothing', near(b.p.invQty(it2), before2), b.p.invQty(it2));
+  ok('and it reads as a match, not as "+0"',
+     b.p.invMoveLabel(z, it2.unit) === 'Counted \u00b7 no change', b.p.invMoveLabel(z, it2.unit));
+  /* A zero stays limited to a count -- a delivery of nothing is a mis-tap. */
+  ok('a delivery of nothing is still refused', b.p.invMove(it2.id, 0, 'in') === null);
+  ok('and so is a usage of nothing', b.p.invMove(it2.id, 0, 'out') === null);
+
+  /* --- progress is read off the ledger, so every phone agrees --- */
+  const t = b.p.cntTotals('cr2026-10-01');
+  ok('two answers count as two done', t.done === 2, JSON.stringify(t));
+  ok('one right, one corrected', t.matched === 1 && t.changed === 1, JSON.stringify(t));
+  ok('out of the whole shelf', t.total === b.p.INVENTORY.length, String(t.total));
+  ok('nothing about progress is kept on the phone — it is all in the movements',
+     Object.keys(b.p.cntDone('cr2026-10-01')).sort().join(',') === [it.id, it2.id].sort().join(','));
+
+  /* --- a product this run has answered is NOT offered again ---
+     This is what Dillon asked for, and it is also what stops two people booking
+     the same shortfall twice and leaving the shelf wrong with nothing to say
+     why. If this check ever fails, that double-count is live again. */
+  b.p.CNT.cat = it.cat; b.p.CNT.skipped = [];
+  const q = b.p.cntQueue().map(x => x.id);
+  ok('the answered products have left the queue',
+     q.indexOf(it.id) < 0 && q.indexOf(it2.id) < 0 || it2.cat !== it.cat,
+     q.slice(0, 4).join(','));
+  ok('and the one in front of you is never one of them',
+     (b.p.cntCurrent() || {}).id !== it.id);
+  const leftAll = b.p.cntLeft('cr2026-10-01', '');
+  ok('what is left is the shelf minus what was answered',
+     leftAll === b.p.INVENTORY.length - 2, String(leftAll));
+
+  /* --- a run's id is the day it started, so two phones merge --- */
+  ok('a fresh run is named after today',
+     /^cr\d{4}-\d{2}-\d{2}$/.test(boot().p.cntRunId()), boot().p.cntRunId());
+  const live = b.p.cntLiveRun();
+  ok('the run in progress is the one found as live', live && live.run === 'cr2026-10-01',
+     JSON.stringify(live && live.run));
+  ok('and a second phone joins it rather than starting its own',
+     b.p.cntRunId() === 'cr2026-10-01', b.p.cntRunId());
+
+  /* An ad-hoc recount from the Edit product form is deliberately NOT part of a
+     count of the farm -- it has no run, so it must not show up as progress. */
+  const b2 = boot();
+  b2.p.invMove(first(b2).id, -1, 'count', { note: 'Recount on the item screen' });
+  ok('a recount with no run is not part of any count run', b2.p.cntRuns().length === 0);
+  ok('so it cannot invent progress', b2.p.cntTotals(b2.p.cntRunId()).done === 0);
+}
+
+section('27. the yearly count: where a product is stored');
+{
+  const b = boot();
+  const it = first(b);
+
+  /* The row that read the word "undefined" on all 191 products until today. */
+  ok('no seeded product has a storage field of its own', it.loc === undefined, String(it.loc));
+  ok('and the label never reads "undefined"', b.p.invStoreLabel(it).indexOf('undefined') < 0,
+     b.p.invStoreLabel(it));
+  ok('it falls back to what April said about the container',
+     b.p.invStoreLabel(it) === 'Barn', b.p.invStoreLabel(it));
+  b.p.openItem(it.id);
+  const body = b.doc.getElementById('id-body').textContent;
+  ok('so the item screen shows a real place', body.indexOf('undefined') < 0,
+     body.slice(0, 160));
+  ok('nothing on that screen reads undefined at all',
+     b.doc.getElementById('s-itemdetail').textContent.indexOf('undefined') < 0);
+
+  /* Anybody may say where it lives -- Dillon, 2026-10-01. */
+  b.p.sessionSet('p19');
+  ok('an undergraduate may not redefine a product', b.p.invCanEdit() === false);
+  ok('but may say where one is stored', b.p.invCanSetLoc() === true);
+  ok('and may count', b.p.invCanMove() === true);
+
+  ok('setting it writes the product\'s own field', b.p.cntSetLoc(it, 'Cage 2') === true && it.loc === 'Cage 2');
+  ok('and setting it to what it already says changes nothing',
+     b.p.cntSetLoc(it, 'Cage 2') === false);
+  ok('the places offered are read off the farm, not hardcoded',
+     b.p.cntPlaces().indexOf('Cage 2') >= 0 && b.p.cntPlaces().indexOf('Barn') >= 0,
+     b.p.cntPlaces().slice(0, 6).join(' | '));
+
+  /* THE HALF THAT WOULD HAVE BEEN SILENT. invPush() used to refuse to send ANY
+     product record from a phone that may not edit products, so a crew member's
+     storage place would have saved locally and reached nobody. */
+  const doc = b.p.invItemDoc(it);
+  b.p.INVSYNC.itemSeen = {};
+  ok('a product the server has never sent is not pushed by a crew member',
+     b.p.invsyncMaySendItem(it, doc) === false);
+  ok('because that write would be a create, which the rules refuse — and the screen knows',
+     b.p.cntLocShares(it) === false);
+
+  /* With the server's copy known, the loc-only change goes up and nothing else does. */
+  const asServer = JSON.parse(JSON.stringify(doc)); asServer.loc = 'Barn';
+  b.p.INVSYNC.itemSeen[it.id] = b.p.sdbJson(asServer);
+  ok('but a loc-only change from a crew member IS pushed',
+     b.p.invsyncMaySendItem(it, doc) === true);
+  const two = JSON.parse(JSON.stringify(doc)); two.name = 'Renamed';
+  ok('while loc plus anything else is not',
+     b.p.invsyncMaySendItem(it, two) === false);
+  const notLoc = JSON.parse(JSON.stringify(asServer)); notLoc.thr = 99;
+  ok('and a change that is not loc at all is not',
+     b.p.invsyncMaySendItem(it, notLoc) === false);
+
+  /* A manager is unaffected: everything still goes up as it always did. */
+  b.p.sessionSet('p01');
+  ok('somebody who may edit a product still sends the whole record',
+     b.p.invsyncMaySendItem(it, two) === true);
+
+  /* AND IT MUST NOT SPIN. A change this phone may not send is SKIPPED without
+     being stamped as sent, which is deliberate -- the record is paused, not
+     lost, the same way sdbMaySend() pauses one. The danger in a skip that does
+     not stamp is a drawer that reconsiders the same record every two seconds
+     forever; that is only free because a skip spends no network. This pins the
+     shape rather than trusting it: the question is asked twice and answered the
+     same way both times, with nothing sent. */
+  b.p.sessionSet('p19');
+  const unsendable = JSON.parse(JSON.stringify(asServer)); unsendable.name = 'Renamed by a crew member';
+  ok('a change a crew member may not send is refused consistently, not alternately',
+     b.p.invsyncMaySendItem(it, unsendable) === false
+     && b.p.invsyncMaySendItem(it, unsendable) === false);
+  ok('and refusing it leaves what the server last said untouched',
+     b.p.INVSYNC.itemSeen[it.id] === b.p.sdbJson(asServer));
+}
+
+section('28. the storage permission: the app and the rules say the same thing');
+{
+  const rules = fs.readFileSync(path.join(__dirname, '..', 'firestore.rules'), 'utf8');
+  const i = rules.indexOf('match /invitems/');
+  const items = rules.slice(i, rules.indexOf('\n    }', i));
+  const flat = items.replace(/\s+/g, ' ');
+
+  ok('the rules have the narrow storage permission', /function isStorageUpdate\(\)/.test(items));
+  ok('it is one field and nothing else in the same write',
+     /hasOnly\(\['loc'\]\)/.test(flat), flat.slice(-220));
+  ok('and only somebody who may move stock may use it',
+     /isStorageUpdate\(\) \{ return canMoveStock\(\)/.test(flat));
+  ok('an update is canEditProduct OR that',
+     /allow update: if request\.resource\.data\.id == itemId && \(canEditProduct\(\) \|\| isStorageUpdate\(\)\)/
+       .test(flat), flat.slice(-320));
+  /* A CREATE must stay with whoever may edit a product: a create carrying only
+     `loc` would wipe the product. */
+  ok('a create is still canEditProduct only',
+     /allow create: if canEditProduct\(\)/.test(flat) && !/allow create[^;]*isStorageUpdate/.test(flat));
+  ok('and a product still cannot be deleted', /allow delete: if false;/.test(items));
+
+  /* The mirror in tools/rules-model.js has to match the rules word for word,
+     the same discipline WORK_FIELDS keeps. */
+  const model = require('./rules-model');
+  ok('the mirror lists the same single field',
+     model.STORAGE_FIELDS.length === 1 && model.STORAGE_FIELDS[0] === 'loc',
+     JSON.stringify(model.STORAGE_FIELDS));
+  model.STORAGE_FIELDS.forEach(k => {
+    ok('the rules name ' + k + ' too', flat.indexOf("'" + k + "'") >= 0);
+  });
+  ok('the mirror agrees that loc alone is allowed',
+     model.isStorageUpdate({ loc: 'Cage 1', name: 'x' }, { loc: 'Cage 2', name: 'x' }) === true);
+  ok('and that loc plus a rename is not',
+     model.isStorageUpdate({ loc: 'Cage 1', name: 'x' }, { loc: 'Cage 2', name: 'y' }) === false);
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

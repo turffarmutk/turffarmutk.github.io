@@ -178,8 +178,16 @@ const DRAWERS = [
   { name: 'the field log',      coll: 'fieldlog',   push: 'flPush',    local: () => L().FIELDLOG,
     sample: { id: 'zz1', op: 'Mow', when: '2026-08-31', ord: 20260831, loggedBy: P,
               plots: ['11', '12', '13'], plot: '11' } },
+  /* The sample is a REAL count movement, carrying both of the things the yearly
+     count added on 2026-10-01: a delta of ZERO (somebody stood in front of the
+     product and found it right) and the `run` it belongs to. The old sample had
+     neither -- it did not even carry `delta` -- so the shape that now actually
+     travels was proven by nothing. A zero is worth pinning in particular,
+     because a falsy field is exactly the kind of thing a drawer drops on the way
+     out and then disagrees with the server about forever. */
   { name: 'stock movements',    coll: 'invmoves',   push: 'invPush',   local: () => L().INVMOVES,
-    sample: { id: 'zz1', item: 'i1', qty: 2, who: P, when: '2026-08-31' } },
+    sample: { id: 'zz1', item: 'i1', delta: 0, unit: 'gal', why: 'count',
+              run: 'cr2026-10-01', ref: null, who: P, at: '2026-10-01T09:00:00', note: '' } },
   /* The sample carries a MIXTURE deliberately. A product's active ingredients
      are a list of small records ({n, g}) since 2026-09-28, and a list is the
      shape that broke the map drawer for a month — so this drawer has to be seen

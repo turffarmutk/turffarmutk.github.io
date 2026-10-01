@@ -1334,6 +1334,52 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### Admin folded into Farm settings, and Farm settings moved to Profile — 2026-09-30
+**Decision:** two changes Dillon asked for together, and they only make sense
+together. **One:** the Admin screen is gone. Everything it held now sits at the
+bottom of the **Farm settings** page under a heading that says *The app itself*,
+drawn only for whoever holds the App Manager post (`FST_ADMIN` and the
+`rstIsAdmin()` branch in `fstRender()`). Everybody else's Farm settings page
+simply stops above that heading — no greyed rows, no padlock. **Two:** Farm
+settings is no longer reached from **More**. It is a row on the **Profile**
+page, directly beneath Preferences, shown to exactly the people the More row
+was shown to (`farmCanSee()`, unchanged). More now carries Report a technical
+bug and Log out.
+
+Two rows changed hands in the process. **Shared database** and **Bug reports**
+used to sit on the list Bill and the faculty can see; they are now on the App
+Manager's half and nobody else can open them. Dillon's call, asked and answered
+on the day. *Unfinished shifts* deliberately stayed with everybody, because the
+cut-off time decides what people get paid — that is a farm decision, not app
+upkeep.
+
+**Why:** two settings pages, one of which was a hub whose first row opened the
+other, is one page too many for a farm that has to keep running this app in
+2030. Folding them puts every setting behind one word, and hanging that word off
+Profile puts it where a person already goes to change things about themselves —
+next to Preferences, which is the same kind of thing. More is left doing the one
+job it is actually needed for. The App Manager rows being hidden rather than
+disabled is the same reasoning as the old Admin screen: a row you can see and
+cannot use is a question somebody has to ring Dillon about.
+
+Moving Shared database and Bug reports makes the **app** stricter than
+`firestore.rules`, which still lets Bill write the bug-report settings. That
+direction is safe. The dangerous direction is the other one — an app that offers
+a button the database refuses, which is the third trap in `CLAUDE.md` and cost
+this farm a month. Nothing was changed in the rules and nothing needs publishing.
+
+**Don't:** re-add a separate Admin screen, and don't grey these rows out for the
+crew instead of hiding them. Don't link Shared database or Bug reports from
+anywhere else without deciding who may see them there — the row on this page is
+now the **only** door to both. And above all, don't treat "Farm settings is on
+Profile" as safe just because it is written down: the only way to Profile is the
+round avatar in the home banner, so if that avatar ever goes missing from the
+wide shell, the sprayer figures, the mowers, the labs and the semester dates all
+vanish with it and nothing on screen will say so. That is exactly what happened
+on 2026-08-30 when More was left off the rail. `tools/test-responsive.js`
+section 6c walks avatar → Profile → the row → the screen at 1440px for that
+reason; section 6b still walks rail → More → Report a bug.
+
 ### A restriction shows Lift, not "Active" — 2026-09-30
 **Decision:** on a study's Restrictions list, a restriction that is still in
 force no longer carries an "Active" pill. Where that pill was, there is now a
@@ -2313,6 +2359,9 @@ it later shows up on a big screen automatically instead of being phone-only
 again. `RAIL_ROLLUP` also gained `farmsettings`, `admin`, `spraysettings`,
 `mowersettings`, `labsettings`, `semsettings` and `sharedb` → `more`, so the
 rail stays lit on More while you are inside one of them.
+**Since 2026-09-30** only *Report a technical bug* is still behind More. Farm
+settings and Admin moved to the Profile page — see the entry at the top of this
+section, which carries the same warning about the new single door.
 **Don't:** tidy More off the rail again as "redundant on a monitor" — that is
 the exact reasoning that caused this, and the comment in `renderRail()` used to
 say it out loud. It is not a page list. Before touching it, search the source
@@ -2328,8 +2377,10 @@ big screens again.
 its own flag, `IS_APP_ADMIN`, read off the `app_admin` claim on the sign-in
 token and answered by `rstIsAdmin()`. Your role still comes from the roster, so
 Dillon signs in as a **Technician in the Sorochan lab** who also happens to
-look after the app. Everything the post can do lives on one screen, **More →
-Admin**, and only its holder sees the row that reaches it.
+look after the app. Everything the post can do lives in one place — since
+2026-09-30 that is the bottom of **Profile → Farm settings**, under *The app
+itself*, and only its holder sees any of it. Until then it was its own screen,
+More → Admin.
 **Why:** the post used to be `currentRole='admin'`, which *replaced* the job.
 The moment Dillon signed in he stopped being a technician: no technician home,
 no technician tabs, `me()` returned an "App Manager" card instead of his own,

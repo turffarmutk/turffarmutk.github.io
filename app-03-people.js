@@ -569,7 +569,11 @@ function rstWhyLocked(p){
   if(p.role==='Faculty')return 'Faculty records are held by the App Manager · '+APP_ADMIN.name;
   return 'In the '+(p.lab||'—')+' lab · edited by that PI or by Bill';
 }
-function fillProfile(){const u=me();const q=x=>document.getElementById(x);if(!q('pf-init'))return;q('pf-init').textContent=u.i;q('pf-init').style.background=u.c;q('pf-name').textContent=u.n;q('pf-role').textContent=u.t;q('pf-email').textContent=u.e;q('pf-lab').textContent=u.lab;var rr=q('pf-roster-row');if(rr){rr.style.display=rstCanOpen()?'':'none';var rs=q('pf-roster-sub');if(rs)rs.textContent=rstActive().length+' people · '+(currentRole==='manager'?'edit everyone but the faculty':'edit your lab and the undergrads');}renderProfileSchedule();var pso=q('pf-signout');if(pso&&!pso._wired){pso._wired=true;pso.addEventListener('click',signOut);}}
+function fillProfile(){const u=me();const q=x=>document.getElementById(x);if(!q('pf-init'))return;q('pf-init').textContent=u.i;q('pf-init').style.background=u.c;q('pf-name').textContent=u.n;q('pf-role').textContent=u.t;q('pf-email').textContent=u.e;q('pf-lab').textContent=u.lab;var rr=q('pf-roster-row');if(rr){rr.style.display=rstCanOpen()?'':'none';var rs=q('pf-roster-sub');if(rs)rs.textContent=rstActive().length+' people · '+(currentRole==='manager'?'edit everyone but the faculty':'edit your lab and the undergrads');}/* Farm settings hangs here, beneath Preferences, rather than behind More
+   (2026-09-30). Same gate as the old More row - farmCanSee() - so nobody gains
+   or loses the page by it moving. The App Manager's extra rows are inside the
+   page itself, not on this row; fstRender() decides those. */
+var fr=q('pf-farm-row');if(fr){var canFarm=false;try{canFarm=(typeof farmCanSee==='function')&&farmCanSee();}catch(e){}fr.style.display=canFarm?'':'none';var fs2=q('pf-farm-sub');if(fs2){var hat=false;try{hat=(typeof rstIsAdmin==='function')&&rstIsAdmin()===true;}catch(e){}fs2.textContent=hat?'Sprayer, mowers, labs \u2014 and the app itself':'Sprayer, mowers, labs and semester dates';}}renderProfileSchedule();var pso=q('pf-signout');if(pso&&!pso._wired){pso._wired=true;pso.addEventListener('click',signOut);}}
 function renderProfEdit(){const u=me();
  document.getElementById('pfe-body').innerHTML=
    '<div class="sec" style="margin:14px 18px 7px">Profile</div><div class="list">'

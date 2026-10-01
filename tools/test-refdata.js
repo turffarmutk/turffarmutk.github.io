@@ -51,7 +51,7 @@ const EX = ['FARM_LABS','MOWER_CFG','MGMT_DATA','PEOPLE','TRIALS',
             'labsUnlisted','labsRename','labsApply','labsIsDefault','labsScan','labsValid','labFind',
             'mowersUnlisted','mowersRename','mowersApply','mowersIsDefault','mowersScan','mowersPlotCount','mowersValid',
             'mowerLabel','mowerColor','mowCanEdit','labsCanEdit','farmCanSee',
-            'fstRender','mwsRender','lbsRender','sessionSet','FARM_CATS'];
+            'fstRender','mwsRender','lbsRender','sessionSet','FARM_CATS','FST_ADMIN'];
 
 function boot(store) {
   const vc = new VirtualConsole();
@@ -261,9 +261,18 @@ section('9. the screens');
      b.p.FARM_CATS.length + " cats, " + (hub.match(/data-go="/g) || []).length + " rows");
   {
     const gos = b.p.FARM_CATS.map(function(c){ return c.go; });
-    ["spraysettings","mowersettings","labsettings","bugsettings"].forEach(function(g){
+    ["spraysettings","mowersettings","labsettings","semsettings"].forEach(function(g){
       ok("  " + g + " is on the hub", gos.indexOf(g) >= 0, gos.join(","));
     });
+    /* The App Manager's three rows are a separate list drawn under the same
+       page, and Bill is not the App Manager, so none of them belongs here.
+       tools/test-auth.js walks who sees them. */
+    ["roster","sharedb","bugsettings"].forEach(function(g){
+      ok("  " + g + " is NOT on the farm's own list", gos.indexOf(g) < 0, gos.join(","));
+    });
+    ok("  and they are on the App Manager's list instead",
+       b.p.FST_ADMIN.map(function(c){ return c.go; }).join(",") === "roster,sharedb,bugsettings",
+       b.p.FST_ADMIN.map(function(c){ return c.go; }).join(","));
   }
   ok('and summarises each one', /tips/.test(hub) && /machines/.test(hub) && /in trials/.test(hub), hub.slice(0, 200));
 

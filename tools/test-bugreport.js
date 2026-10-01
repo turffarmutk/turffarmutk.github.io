@@ -79,7 +79,7 @@ function makeLS(store) {
 
 const EX = ['BUGS','BUGCFG','BUGCFG_KEY','bugTo','bugKey','bugConfigured','bugCanConfig','bugQueued',
             'bugDiag','bugBody','bugToLabel','rstFind','bugSend','bugFlush','bugRender','bgsRender','bugFromScreen','bugNoteErr',
-            'BUG_ERRS','APP_ADMIN','FARM_CATS','MORE_ALWAYS','STORE_DEFS','storeFlush','storeScan',
+            'BUG_ERRS','APP_ADMIN','FARM_CATS','FST_ADMIN','MORE_ALWAYS','STORE_DEFS','storeFlush','storeScan',
             'bkPayload','sessionSet','SESSION','currentRole','TASKS','STUDENTS','nameOf','newId',
             'atToday','renderBoard','go','goRoot','moreEnter','stack','tbTab','boardDay','isoLocal'];
 
@@ -267,7 +267,10 @@ section('6. the address follows the hand-off');
   b.win.__set('BUGCFG.to', '');
   ok('and clearing it goes back to following', b.p.bugTo() === 'successor@utk.edu', b.p.bugTo());
 
-  ok('it is on the Farm settings hub', (b.p.FARM_CATS || []).some(c => c.go === 'bugsettings'));
+  /* On the App Manager's half of the Farm settings page since 2026-09-30 --
+     where the crew's reports are delivered is app upkeep, not a farm list. */
+  ok('it is on the App Manager\'s half of Farm settings',
+     (b.p.FST_ADMIN || []).some(c => c.go === 'bugsettings'));
   b.p.sessionSet('p07'); ok('the manager can set it up', b.p.bugCanConfig());
   b.p.sessionSet('p18'); ok('an undergrad cannot', !b.p.bugCanConfig());
 }

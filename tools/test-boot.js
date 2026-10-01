@@ -177,7 +177,7 @@ section('4. the screens the crash of 2026-08-27 took out');
  ['renderCalBody', 'the calendar grid'],
  ['tcEnter', 'the time clock'],
  ['fstRender', 'farm settings'],
- ['admRender', 'the admin screen'],
+ ['fstRows', 'the rows on farm settings'],
  ['renderBoard', 'the task board']].forEach(([fn, what]) => {
   ok(what + ' (' + fn + ')', typeof win[fn] === 'function');
 });

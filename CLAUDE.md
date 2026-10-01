@@ -167,10 +167,17 @@ Then look at it narrow (a phone, under 820px) **and** wide (a laptop, 820px and
 up). This is not tidiness. Those are two different shells — the narrow one has
 a bottom bar, the wide one hides that bar and puts a rail down the left — and a
 change can land in one and not the other. That is not hypothetical: More was
-left off the rail, and because More is the only thing that links to Report a
+left off the rail, and because More was the only thing that links to Report a
 bug, Farm settings and Admin, all three were unreachable on every laptop and
 iPad from the day the rail shipped until 2026-08-30. Nothing looked wrong. The
 rail just didn't have them.
+
+**The same shape is now under Farm settings, so know where it is.** Since
+2026-09-30 Farm settings hangs off the **Profile** page rather than More, and
+the only way to Profile is the round avatar in the home banner. Take that avatar
+away from either shell and the sprayer figures, the mowers, the labs and the
+semester dates go with it, silently. `tools/test-responsive.js` section 6c walks
+avatar → Profile → Farm settings at laptop width for exactly that reason.
 
 The crew are on phones in the fields, so narrow still decides how a thing should
 look. Wide decides whether it is there at all.
@@ -317,7 +324,8 @@ the other, with nothing on screen to say so**. It does not error, it does not
 look broken, it is simply not there. So before you add a screen, or move where
 one is reached from, ask: *what links to this?* — and check that link exists at
 both widths. `tools/test-responsive.js` section 6b does this for everything
-behind More; the rest is yours to check by opening the app twice.
+behind More and section 6c for Farm settings behind Profile; the rest is yours
+to check by opening the app twice.
 
 **Most pages are covered for the crew, on purpose.** Since 2026-09-18, anyone
 who is not the Farm Manager or the App Manager sees every page except Home,
@@ -542,6 +550,15 @@ theirs, correcting somebody else's record, fixing anybody's punch, changing a
 setting that is normally Bill's. They also get **Bill's view of the Task
 Board**, his Assign screen and his Time Clock, and no page is ever covered by
 the "Coming Soon" card for them.
+
+**Where the post's own rows live:** the bottom of **Profile → Farm settings**,
+under a heading that says *The app itself* — the roster, the shared database and
+the bug-report settings (`FST_ADMIN` and the `rstIsAdmin()` branch in
+`fstRender()`, both in `UT-TurfFarm-App.html`). They were their own screen,
+More → Admin, until 2026-09-30. Everybody else's Farm settings page stops above
+that heading; the rows are hidden, not greyed out, and that row is now the only
+door to the shared-database and bug-report screens. See `docs/DECISIONS.md`,
+2026-09-30.
 
 **It is the token, never the roster.** `rstIsAdmin()` reads the `app_admin`
 claim off the sign-in token, stamped by `tools/create-accounts.js` on a laptop.

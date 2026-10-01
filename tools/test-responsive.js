@@ -307,15 +307,17 @@ section('6. rail navigates');
 section('6b. nothing on the More screen is stranded on a big screen');
 {
   /* This is the section that pins the actual bug, so it is worth spelling out.
-     More is the ONLY thing in the app that links to Report a technical bug,
-     Farm settings and Admin -- grep the source for data-go="farmsettings" and
-     there is exactly one hit, on the More screen. When More was left off the
-     rail, and the bottom bar is hidden above 820px, all three were unreachable
-     on every iPad and laptop. Nothing on screen said so; the rail simply did
-     not have them.
+     More is the ONLY thing in the app that links to Report a technical bug.
+     When More was left off the rail, and the bottom bar is hidden above 820px,
+     that was unreachable on every iPad and laptop. Nothing on screen said so;
+     the rail simply did not have it.
 
      So this walks it for real rather than asserting a label exists: rail ->
-     More -> the row -> did we land on the screen. */
+     More -> the row -> did we land on the screen.
+
+     Farm settings and Admin used to be on this list too. They moved to the
+     Profile page on 2026-09-30, so section 6c walks that door instead -- same
+     trap, checked the same way. */
   setWidth(1440);
   win.go('home-manager');
 
@@ -349,9 +351,9 @@ section('6b. nothing on the More screen is stranded on a big screen');
      'stranded: ' + stranded.join(','));
 
   /* Named explicitly as well. A test that only checked "More is on the rail"
-     would go green again if More came back for some other reason while these
-     three had been moved somewhere a big screen still cannot see. */
-  ['bugreport', 'farmsettings', 'admin'].forEach(go => {
+     would go green again if More came back for some other reason while this
+     had been moved somewhere a big screen still cannot see. */
+  ['bugreport'].forEach(go => {
     win.go('home-manager');
     clickRailMore();
     const row = doc.querySelector('#s-more .row[data-go="' + go + '"]');
@@ -365,11 +367,41 @@ section('6b. nothing on the More screen is stranded on a big screen');
      bottom bar reads too. */
   win.go('home-manager');
   clickRailMore();
-  const fs = doc.querySelector('#s-more .row[data-go="farmsettings"]');
-  if (fs) {
-    fs.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+  const bug = doc.querySelector('#s-more .row[data-go="bugreport"]');
+  if (bug) {
+    bug.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
     const on = [...rail().querySelectorAll('.rl-item.on')].map(i => i.getAttribute('data-rail'));
-    ok('Farm settings keeps More lit on the rail', on[0] === 'More', on.join(',') || 'nothing lit');
+    ok('Report a bug keeps More lit on the rail', on[0] === 'More', on.join(',') || 'nothing lit');
+  }
+}
+
+section('6c. Farm settings is reachable on a big screen, through the Profile page');
+{
+  /* Farm settings left More on 2026-09-30 and now hangs off Profile, beneath
+     Preferences. That is a NEW single door, so it gets the same walk the old one
+     got: the only way to Profile is the round avatar in the home banner, and if
+     that is ever hidden on the wide shell then the sprayer figures, the mowers,
+     the labs and the semester dates all go with it -- silently, exactly like
+     2026-08-30. This walks avatar -> Profile -> the row -> the screen. */
+  setWidth(1440);
+  /* The row is drawn off the ROSTER, not off currentRole, so this harness has to
+     sign somebody in -- with no session farmCanSee() says no to everybody and
+     the walk below would pass for the wrong reason. p07 is Bill. */
+  win.sessionSet('p07');
+  win.go('home-manager');
+  const av = doc.querySelector('#s-home-manager .hdr .hh-av');
+  ok('the home banner still has an avatar to tap', !!av
+     && av.getAttribute('data-go') === 'profile');
+  if (av) {
+    av.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+    ok('it opens the Profile page', active() === 'profile', 'got ' + active());
+    const row = doc.querySelector('#s-profile .row[data-go="farmsettings"]');
+    ok('Profile has a Farm settings row', !!row && row.style.display !== 'none',
+       row ? row.style.display : 'no row');
+    if (row) {
+      row.dispatchEvent(new win.MouseEvent('click', { bubbles: true }));
+      ok('and it lands on Farm settings', active() === 'farmsettings', 'got ' + active());
+    }
   }
 }
 

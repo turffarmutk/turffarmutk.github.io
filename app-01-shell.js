@@ -169,7 +169,7 @@ const SCREEN_DEST={
  'timeclock':'timeclock','tcperson':'timeclock',
  'calendar':'calendar','calevent':'calendar','caladd':'calendar',
  'weather':'weather','wxday':'weather','wxradar':'weather',
- 'more':'more','bugreport':'more','bugsettings':'more'
+ 'more':'more','bugreport':'more'
 };
 /* renderTabs() runs from show(), so its emoji map has to be global. The other
    copy lower down is function-scoped and invisible from here — reading it threw
@@ -200,11 +200,17 @@ function renderTabs(){
    so it shows every page the role can reach, plus More.
 
    More is on the rail even though every page already is, because More is not
-   only a page list. It is the ONLY door in the app to Report a technical bug,
-   Farm settings and Admin. Leaving it off — on the reasoning that a monitor has
-   room for every page, so nothing needs hiding behind More — made those three
-   unreachable on every iPad and laptop, with nothing on screen to say so. The
-   rule this restores: the rail is navMap, whole. See docs/DECISIONS.md. */
+   only a page list. It is the ONLY door in the app to Report a technical bug.
+   Leaving it off — on the reasoning that a monitor has room for every page, so
+   nothing needs hiding behind More — made that unreachable on every iPad and
+   laptop, with nothing on screen to say so. The rule this restores: the rail is
+   navMap, whole. See docs/DECISIONS.md.
+
+   It used to be the only door to Farm settings and Admin as well. Both now hang
+   off the Profile page instead (2026-09-30), which is reached from the avatar in
+   every home banner at BOTH widths — so the same trap does not reopen. If you
+   move either of them again, check the door exists narrow and wide before you
+   push. */
 
 /* The rail's account block belonged to the retired desktop band. Profile,
    notifications, roster, preferences and log out are reached the same way they
@@ -214,16 +220,19 @@ function renderTabs(){
    the same treatment so the rail stays lit while you're three levels into
    Preferences or editing a roster entry.
 
-   The farm-settings and admin screens roll up to More for the same reason: they
-   are reached through it, so the rail should stay lit on More rather than going
-   dark the moment you open one. They belong HERE and not in SCREEN_DEST —
+   The farm-settings screens roll up to farmsettings, which rolls up to profile,
+   for the same reason Preferences does: they hang off the Profile page, and
+   Profile is not a rail item, so nothing lights while you are in one. That is
+   right — they are not pages. They belong HERE and not in SCREEN_DEST —
    SCREEN_DEST is shared with the phone's bottom bar, and adding them there
    would change what lights up on the crew's phones. */
 var RAIL_ROLLUP={profedit:'profile',rosteredit:'roster',adminxfer:'roster',
   navtabs:'navsettings',homescreen:'navsettings',notifsettings:'navsettings',theme:'navsettings',
   powersettings:'navsettings',
-  farmsettings:'more',admin:'more',spraysettings:'more',mowersettings:'more',
-  labsettings:'more',catsettings:'more',ressettings:'more',semsettings:'more',sharedb:'more'};
+  farmsettings:'profile',spraysettings:'farmsettings',mowersettings:'farmsettings',
+  labsettings:'farmsettings',catsettings:'farmsettings',ressettings:'farmsettings',
+  semsettings:'farmsettings',clocksettings:'farmsettings',sharedb:'farmsettings',
+  bugsettings:'farmsettings'};
 
 function railIcon(l){ return (typeof TAB_EMOJI!=='undefined' && TAB_EMOJI[l]) || '•'; }
 
@@ -346,7 +355,7 @@ window.addEventListener('orientationchange',function(){ setTimeout(adaptiveResiz
 /* bugreport is on this list on purpose: a broken app is exactly the thing that
    every role has to be able to flag, including the undergrad whose nav has been
    trimmed to four tabs. It is never hidden behind a permission. */
-var MORE_ALWAYS={roles:1,login:1,farmsettings:1,bugreport:1,admin:1};
+var MORE_ALWAYS={roles:1,login:1,bugreport:1};
 function moreEnter(){ var role=currentRole,nav=navMap[role]||{},chosen=navChosen(role);
   var onNav={};
   /* On the phone's bottom bar only the 3 chosen favourites sit outside More, so
@@ -354,8 +363,7 @@ function moreEnter(){ var role=currentRole,nav=navMap[role]||{},chosen=navChosen
      rail replaces that bar and shows EVERY reachable page (see renderRail()),
      so listing them again here would just be the same page twice on one
      screen. Treat every reachable page as already "on nav" there instead,
-     leaving More to do the one job the rail can't: Report a bug, Farm
-     settings and Admin. */
+     leaving More to do the one job the rail can't: Report a bug. */
   if((typeof APP_SIZE==='function')&&APP_SIZE()!=='phone'){
     (NAV_OPTIONS[role]||[]).forEach(function(l){ if(PAGE_DEST[l]) onNav[PAGE_DEST[l]]=1; });
   } else {
@@ -369,13 +377,10 @@ function moreEnter(){ var role=currentRole,nav=navMap[role]||{},chosen=navChosen
     r.style.display=(reachable[d]&&!onNav[d])?'':'none';
     r.classList.toggle('cs-soon',csLocked(d));
   });
-  /* The one row on this screen that depends on the HAT rather than the job.
-     Hiding it is a courtesy, not a lock - admRender() checks again. */
-  var ad=document.getElementById('more-admin');
-  if(ad) ad.style.display=((typeof rstIsAdmin==='function')&&rstIsAdmin())?'':'none';
-  /* Mixing is a chemical job: only the roles that can log one see the numbers. */
-  var sp=document.getElementById('more-spray');
-  if(sp) sp.style.display=(((typeof farmCanSee==='function')&&farmCanSee()))?'':'none';
+  /* Farm settings and Admin used to be the two rows on this screen that were
+     decided by something other than the role's page list - one by the App
+     Manager hat, one by farmCanSee(). Both moved to the Profile page on
+     2026-09-30 and fillProfile() makes that decision now. */
 }
 /* Preferences is a hub: each category is its own screen, reached from these rows.
    Add a category by appending to PREF_CATS — nothing else needs to change. */
@@ -2479,7 +2484,7 @@ function show(id,push){ const el=document.getElementById('s-'+id); if(!el)return
      SESSION replaces — your role comes from who signed in, so a screen can no
      longer promote you by being opened. The attribute stays as a label, used
      below to pick which home layout to paint. */
-  if(id==='profile')fillProfile(); if(id==='profedit')renderProfEdit(); if(id==='roster')rstRender(); if(id==='rosteredit')rstEditRender(); if(id==='adminxfer')axfRender(); if(id==='spraysettings')sprRender(); if(id==='farmsettings')fstRender(); if(id==='bugreport')bugRender(); if(id==='bugsettings')bgsRender(); if(id==='clocksettings')clkRender(); if(id==='sharedb')sdbRender(); if(id==='admin')admRender(); if(id==='flfix')flxRender(); if(id==='mowersettings')mwsRender(); if(id==='labsettings')lbsRender(); if(id==='catsettings')scsRender(); if(id==='ressettings')rtsRender(); if(id==='semsettings')smsRender(); if(id==='roles')authRenderAccount();
+  if(id==='profile')fillProfile(); if(id==='profedit')renderProfEdit(); if(id==='roster')rstRender(); if(id==='rosteredit')rstEditRender(); if(id==='adminxfer')axfRender(); if(id==='spraysettings')sprRender(); if(id==='farmsettings')fstRender(); if(id==='bugreport')bugRender(); if(id==='bugsettings')bgsRender(); if(id==='clocksettings')clkRender(); if(id==='sharedb')sdbRender(); if(id==='flfix')flxRender(); if(id==='mowersettings')mwsRender(); if(id==='labsettings')lbsRender(); if(id==='catsettings')scsRender(); if(id==='ressettings')rtsRender(); if(id==='semsettings')smsRender(); if(id==='roles')authRenderAccount();
   if(id==='login')authRenderLogin(); if(id==='notifications'){try{ntfScan();renderNotifFeed();}catch(e){}setSeen(Date.now());try{ntfMarkRead();}catch(e){}setTimeout(updateBellBadges,0);} if(id==='home-manager')renderHomeNotif(); if(id==='weather')wxEnter(); if(id==='map')mapEnter(); if(id==='taskboard')boardEnter(); if(id==='templates')renderTemplates(); if(id==='assign')assignEnter(); if(id==='plotpick')renderPlotPick(); if(id==='taskwork')renderTaskWork(); if(id==='taskprep')renderTaskPrep(); if(id==='eqpick')renderEqPick(); if(id==='inventory')invEnter(); if(id==='lowstock')renderLowStock(); if(id==='additem')renderAddItem(); if(id==='invlog')renderInvLog(); if(id==='itemdetail')0; if(id==='equipment')equipEnter(); if(id==='eqreport')renderEqReport(); if(id==='eqmaint')renderEqMaint(); if(id==='eqedit')renderEqEdit(); if(id==='eqsched')renderEqSched(); if(id==='calendar')calEnter(); if(id==='caladd')renderCalAdd(); if(id==='timeclock')tcEnter(); if(id==='tcperson')tcRenderPerson(); if(id==='fieldlog')fieldlogEnter(); if(id==='flexport')renderFlExport(); if(id==='flnew')renderFlNew(); if(id==='fldetail')renderFlDetail(); if(id==='more')moreEnter(); if(id==='trial')trialsEnter(); if(id==='trialdetail')trRenderDetail(); if(id==='trialedit')trRenderEdit(); if(id==='trialres')trRenderRes(); if(id==='trialpin')trRenderPin(); if(id==='navsettings')renderPrefsHub(); if(id==='notifsettings')renderNotifSettings(); if(id==='powersettings')renderPowerSettings(); if(id==='navtabs')renderNavSettings(); if(id==='homescreen')renderHomeSettings(); if(id==='theme')renderTheme(); if(id.indexOf('home-')===0)hwApply(r||currentRole); renderTabs();
   try{csApply(el,id);}catch(e){}
   try{updateBellBadges();}catch(e){}

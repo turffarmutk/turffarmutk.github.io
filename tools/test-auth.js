@@ -554,38 +554,68 @@ section('17. Admin is a page you go to, not the first thing you see');
      (c.doc.querySelector('.screen.active') || {}).id === 's-home-grad',
      (c.doc.querySelector('.screen.active') || {}).id);
 }
+/* THE APP MANAGER'S ROWS LIVE ON FARM SETTINGS  (2026-09-30)
+   There is no Admin screen any more. Its rows sit at the bottom of the Farm
+   settings page, drawn only for whoever holds the post. The two things worth
+   pinning are that the post-holder GETS them and that nobody else does -- the
+   second one matters most, because the row is the only door to those screens
+   now, so a bug there hands the shared database to the whole farm silently. */
 {
   const b = boot({}, { user: userFor('p01', true) });
-  ok('there is an Admin screen', !!b.doc.getElementById('s-admin'));
-  const row = b.doc.getElementById('more-admin');
-  ok('and a row on More that reaches it', !!row && row.getAttribute('data-go') === 'admin');
+  ok('the Admin screen is gone for good', !b.doc.getElementById('s-admin'));
+  ok('and so is its row on More', !b.doc.getElementById('more-admin'));
 
   b.p.authSignIn('admin@example.edu', 'pw');
   await settle();
-  b.win.__get('moreEnter')();
-  ok('the post-holder sees that row', row.style.display !== 'none', row.style.display);
-
-  b.win.__get('admRender')();
-  const body = b.doc.getElementById('adm-body').innerHTML;
-  ok('the page holds the roster', /data-go="roster"/.test(body));
-  ok('farm settings', /data-go="farmsettings"/.test(body));
+  b.win.__get('fstRender')();
+  const body = b.doc.getElementById('fst-body').innerHTML;
+  ok('farm settings holds the roster for the post-holder', /data-go="roster"/.test(body));
   ok('the shared database', /data-go="sharedb"/.test(body));
   ok('and bug reports', /data-go="bugsettings"/.test(body));
+  ok('the farm\'s own lists are still above them', /data-go="mowersettings"/.test(body));
   ok('and it says the post is not the job', /post, not a job/i.test(body), body.slice(0, 120));
 }
 {
-  /* A hidden row is a courtesy. The page checks again, because courtesy is
-     not a lock. */
-  const b = boot({}, { user: userFor('p09', false) });
-  b.p.authSignIn('rose@example.edu', 'pw');
+  /* Rose is a graduate student: she cannot see the Farm settings page at all,
+     so the check that matters is the manager one below. */
+  const b = boot({}, { user: userFor('p07', false) });
+  b.p.authSignIn('bill@example.edu', 'pw');
   await settle();
-  b.win.__get('moreEnter')();
-  ok('somebody without the post does not see the row',
-     b.doc.getElementById('more-admin').style.display === 'none');
-  b.win.__get('admRender')();
-  const body = b.doc.getElementById('adm-body').innerHTML;
-  ok('and gets none of it if they reach the page anyway', !/data-go="roster"/.test(body));
-  ok('with an explanation rather than a blank screen', /App Manager/.test(body));
+  b.win.__get('fstRender')();
+  const body = b.doc.getElementById('fst-body').innerHTML;
+  ok('Bill opens the same page and gets the farm lists', /data-go="mowersettings"/.test(body));
+  ok('but not the roster row', !/data-go="roster"/.test(body));
+  ok('not the shared database', !/data-go="sharedb"/.test(body));
+  ok('not the bug-report settings', !/data-go="bugsettings"/.test(body));
+  ok('and is told nothing about a post he does not hold',
+     !/App Manager/.test(body), body.slice(0, 160));
+}
+{
+  /* And the door itself: the Profile page is where Farm settings hangs now. */
+  const b = boot({}, { user: userFor('p07', false) });
+  b.p.authSignIn('bill@example.edu', 'pw');
+  await settle();
+  b.win.__get('fillProfile')();
+  const row = b.doc.getElementById('pf-farm-row');
+  ok('the Profile page has a Farm settings row', !!row
+     && row.getAttribute('data-go') === 'farmsettings');
+  ok('and Bill can see it', row && row.style.display !== 'none', row && row.style.display);
+  ok('it sits directly beneath Preferences',
+     row && row.previousElementSibling
+     && row.previousElementSibling.getAttribute('data-go') === 'navsettings',
+     row && row.previousElementSibling
+       && row.previousElementSibling.getAttribute('data-go'));
+}
+{
+  /* An undergraduate is the one who gets no row at all -- fstCanEditKit() lets
+     everybody above them change the sprayer and the mowers, which is the same
+     line the old More row read, so this is not a new decision. */
+  const b = boot({}, { user: userFor('p18', false) });
+  b.p.authSignIn('garrett@example.edu', 'pw');
+  await settle();
+  b.win.__get('fillProfile')();
+  ok('an undergraduate gets no Farm settings row',
+     b.doc.getElementById('pf-farm-row').style.display === 'none');
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

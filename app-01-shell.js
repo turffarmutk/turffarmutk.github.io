@@ -506,8 +506,15 @@ var NOTIF_ALERTS=[
  {g:'Time clock', k:'shiftask', t:'I forgot to clock out', d:1, live:1,
   sub:'Only when the app has no scheduled finish to use, so it asks you instead'}
 ];
+/* "Push notifications" used to be a row here and is not any more, as of
+   2026-10-02. Buzzing is granted by the BROWSER, per device -- somebody with a
+   phone and an iPad says yes on each -- so a single switch that followed the
+   person around could only ever disagree with what their phones were actually
+   doing. The real control is the "Buzz this phone" row at the top of the
+   screen (ntsPushRow), which reads the true state off the browser every time
+   it is drawn. The saved `d_push` setting is simply left alone on phones that
+   have one; nothing reads it. */
 var NOTIF_DELIVERY=[
- {k:'push',  t:'Push notifications', d:1},
  {k:'email', t:'Email digest',       d:0}
 ];
 function notifDef(){
@@ -529,7 +536,13 @@ function notifSummary(){
  var bits=[on+' of '+NOTIF_ALERTS.length+' alerts'];
  bits.push(NOTIF.quiet?(NOTIF.start+'–'+NOTIF.end):'any time');
  if(NOTIF.d_email)bits.push('email digest');
- if(!NOTIF.d_push)bits.push('push off');
+ /* Read off the browser rather than off a saved setting, because whether this
+    phone buzzes is the browser's answer to give, not ours. */
+ var st=''; try{ st=pushState(); }catch(e){}
+ if(st==='on') bits.push('buzzes this phone');
+ else if(st==='needs-install') bits.push('add to home screen to buzz');
+ else if(st==='blocked') bits.push('buzzing blocked');
+ else if(st==='off') bits.push('not buzzing this phone');
  return bits.join(' · ');
 }
 function ntsToggle(k,label,sub,last){
@@ -539,16 +552,19 @@ function ntsToggle(k,label,sub,last){
   +(sub?'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:2px">'+sub+'</div>':'')+'</div>'
   +'<span class="tgl nts-tgl'+(NOTIF[k]?' on':'')+'" data-k="'+k+'"></span></div>';
 }
-/* Said once at the top, because three sections of this screen are about a
-   phone buzzing with the app shut, and that is not built yet. A settings
-   screen that quietly promises something it cannot do is worse than one that
-   admits it. Delete this note in the same change that makes push work. */
+/* This note used to say that buzzing was "still to be built", which was true
+   until 2026-10-02 and is the reason it was written: a settings screen that
+   quietly promises something it cannot do is worse than one that admits it.
+   It now says the other true thing -- that the switches below decide WHAT you
+   are told, and the row above decides whether this particular phone buzzes
+   about it. Those are two different questions and people reasonably confuse
+   them. */
 var NTS_NOTE='<div style="margin:12px 16px 0;padding:11px 13px;background:var(--card);'
  +'border:1px solid var(--line);border-radius:12px;font:600 11.5px \'Public Sans\';'
- +'color:var(--muted);line-height:1.5">These alerts reach you <b style="color:var(--ink)">'
- +'inside the app</b> \u2014 on the bell at the top of the screen. Making your phone buzz '
- +'with the app closed is still to be built; the hours and delivery settings below are '
- +'ready for when it is.</div>';
+ +'color:var(--muted);line-height:1.5">The switches below decide <b style="color:var(--ink)">'
+ +'what you are told about</b>, on the bell and on your phone alike. Whether this '
+ +'phone buzzes with the app shut is the row above, and you set that on each '
+ +'phone or tablet you use.</div>';
 function ntsSec(t){
   return '<div style="font:700 10px \'Public Sans\';color:var(--muted);text-transform:uppercase;'
     +'letter-spacing:.5px;margin:16px 18px 6px">'+t+'</div>';
@@ -571,6 +587,45 @@ function ntsAlertGroups(){
     }).join('')+'</div>';
   }).join('');
 }
+/* The one row on this screen that is about THIS PHONE rather than about the
+   person. Notifications are granted by the browser, per device, so somebody
+   with a phone and an iPad has to say yes on both -- and an iPhone will not
+   even offer until the app has been added to the home screen, which is
+   Apple's rule and cannot be worked around in code. So the row says which of
+   those situations you are in, in words, rather than failing silently. */
+function ntsPushRow(){
+  var st=pushState(), head='Buzz this phone', sub='', btn='', hint='';
+  if(st==='nosender'){
+    sub='Not set up yet \u2014 nothing can reach a phone with the app shut';
+  } else if(st==='needs-install'){
+    sub='Add the app to your home screen first, then come back here';
+    hint='On an iPhone: the Share button at the bottom of Safari, then '
+       + '<b>Add to Home Screen</b>. Apple does not allow notifications until '
+       + 'you do, and there is nothing the app can do about that.';
+  } else if(st==='unsupported'){
+    sub='This browser cannot do it. The bell inside the app still works.';
+  } else if(st==='blocked'){
+    sub='Your phone is blocking them';
+    hint='Turn them back on in your phone\u2019s own settings for this app, '
+       + 'then come back. The app cannot ask again once it has been refused.';
+  } else if(st==='on'){
+    sub='On \u2014 this phone buzzes even with the app closed';
+    btn='<span class="pill tap nts-push" data-push="off" '
+      + 'style="background:var(--card);border:1px solid var(--line);color:var(--muted)">Turn off</span>';
+  } else {
+    sub='Off \u2014 alerts only appear when you open the app';
+    btn='<span class="pill tap nts-push" data-push="on" '
+      + 'style="background:var(--acc);color:#fff">Turn on</span>';
+  }
+  if(PUSH.err) sub=PUSH.err;
+  return '<div class="list" style="margin-top:12px">'
+   +'<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 15px">'
+   +'<div style="padding-right:12px"><div style="font:700 13px \'Public Sans\';color:var(--ink)">'+head+'</div>'
+   +'<div style="font:600 11px \'Public Sans\';color:var(--muted);margin-top:2px">'+sub+'</div></div>'
+   +(btn||'')+'</div>'
+   +(hint?('<div style="padding:0 15px 12px;font:600 11px \'Public Sans\';color:var(--muted);line-height:1.5">'+hint+'</div>'):'')
+   +'</div>';
+}
 function renderNotifSettings(){
  var body=document.getElementById('nts-body'); if(!body)return;
  var quietExtra='';
@@ -584,7 +639,8 @@ function renderNotifSettings(){
  }
  var sec=ntsSec;
  body.innerHTML=
-   NTS_NOTE
+   ntsPushRow()
+  +NTS_NOTE
   +sec('Push notification hours')
   +'<div class="list">'
    +ntsToggle('quiet','Limit delivery hours',
@@ -601,6 +657,17 @@ function renderNotifSettings(){
   +'<div style="height:16px"></div>';
 }
 document.getElementById('s-notifsettings').addEventListener('click',function(e){
+ var pb=e.target.closest('.nts-push');
+ if(pb){
+   e.stopPropagation();
+   var want=pb.getAttribute('data-push')==='on';
+   /* Asking the browser has to happen on the tap itself -- a browser refuses
+      the question if it did not come straight from somebody's finger. */
+   var job=want?pushAsk():pushStop();
+   renderNotifSettings();
+   job.then(function(){ renderNotifSettings(); });
+   return;
+ }
  var t=e.target.closest('.nts-tgl'); if(!t)return;
  e.stopPropagation();
  var k=t.getAttribute('data-k');
@@ -609,11 +676,16 @@ document.getElementById('s-notifsettings').addEventListener('click',function(e){
     was held back makes no sense when nothing is being held back. */
  if(k==='quiet'&&!NOTIF.quiet)NOTIF.summary=false;
  notifSave(); renderNotifSettings();
+ /* The sender keeps its own copy of these, because it is the one that has to
+    decide not to send -- see the note over pushPrefs(). Failing quietly is
+    right: the switch is already saved, and the bell obeys it either way. */
+ try{ pushPrefsChanged(); }catch(_e){}
 },true);
 document.getElementById('s-notifsettings').addEventListener('change',function(e){
  var t=e.target.closest&&e.target.closest('.nts-time'); if(!t)return;
  NOTIF[t.getAttribute('data-k')]=t.value||'07:00';
  notifSave();
+ try{ pushPrefsChanged(); }catch(_e){}
 });
 notifLoad();
 
@@ -666,7 +738,7 @@ var NTF_KEEP_DAYS=30;      /* and for how long, whichever runs out first */
    different moments: a phone can easily know about the farm's jobs a minute
    before the first punch reaches it, and counting that as "I have now seen
    the time clock" would make every historical shift look like news. */
-var NTF={seen:{},pseen:{},list:[],readAt:0,base:0,pbase:0,
+var NTF={v:2,seen:{},pseen:{},list:[],readAt:0,base:0,pbase:0,
          eseen:{},iseen:{},rseen:{},ebase:0,ibase:0,rbase:0};
 function ntfLoad(){
   var s=prefsGet('ntfeed',null)||{};
@@ -675,17 +747,48 @@ function ntfLoad(){
      written by an older build: it simply takes a fresh silent baseline for
      the new thing and tells nobody about the farm's history. */
   function map(x){ return (x&&typeof x==='object')?x:{}; }
-  NTF={seen:map(s.seen), pseen:map(s.pseen),
+  /* THE LEDGER'S SHAPE CHANGED ON 2026-10-02 and a phone cannot be allowed to
+     read the old one. It used to record "is this job MINE" as a yes or no;
+     it now records WHOSE it is, because the same walk has to answer that for
+     everybody before it can ask the sender to buzz them. Compare the two
+     shapes and a phone upgrading would read "it was mine (1), now it is
+     p18's" as p18 having just been given every job on the farm -- and buzz
+     them about all of it.
+
+     So an old ledger is dropped and the next walk is a silent baseline, the
+     same as a phone that has never had the app. The person's own read alerts
+     (`list` and `readAt`) are kept, because those are still perfectly good --
+     it is only the "what did the farm look like last time" half that cannot
+     be understood any more. */
+  var fresh=(+s.v||0)<2;
+  if(fresh) s={list:s.list, readAt:s.readAt};
+  NTF={v:2, seen:map(s.seen), pseen:map(s.pseen),
        eseen:map(s.eseen), iseen:map(s.iseen), rseen:map(s.rseen),
        list:Array.isArray(s.list)?s.list:[],
        readAt:+s.readAt||0, base:+s.base||0, pbase:+s.pbase||0,
        ebase:+s.ebase||0, ibase:+s.ibase||0, rbase:+s.rbase||0};
 }
-function ntfSave(){ prefsSet('ntfeed',{seen:NTF.seen,pseen:NTF.pseen,list:NTF.list,
+function ntfSave(){ prefsSet('ntfeed',{v:2,seen:NTF.seen,pseen:NTF.pseen,list:NTF.list,
                                        readAt:NTF.readAt,base:NTF.base,pbase:NTF.pbase,
                                        eseen:NTF.eseen,iseen:NTF.iseen,rseen:NTF.rseen,
                                        ebase:NTF.ebase,ibase:NTF.ibase,rbase:NTF.rbase}); }
-function ntfOn(k){ try{ return NOTIF['a_'+k]!==false; }catch(e){ return true; } }
+/* WHICH SWITCH GOVERNS WHICH ALERT, and they are not all the same word.
+   Five of the sixteen alerts are governed by a switch with a different name --
+   "work assigned to me" is one row on the settings screen but the event is
+   called `assigned`, a machine going down and coming back are one switch
+   between them, and so are ground closing and opening. Anything not named here
+   is governed by a switch of its own name.
+
+   Written down as a table on 2026-10-02 because it had been an accident until
+   then: each branch used to pass the switch name by hand, and when the walks
+   were rebuilt to ask "who hears this" the hand-written names went with them.
+   Muting "work assigned to me" then did nothing at all -- the switch said off,
+   the row still appeared, and nothing anywhere said why. The test caught it;
+   a person would have reported it as "the app ignores me". */
+var NTF_SWITCH={ assigned:'tasks', eqdown:'equip', equp:'equip',
+                 resclose:'trials', resopen:'trials' };
+function ntfSwitchOf(kind){ return NTF_SWITCH[kind]||kind; }
+function ntfOn(k){ try{ return NOTIF['a_'+ntfSwitchOf(k)]!==false; }catch(e){ return true; } }
 
 /* Whose plate the job is on. Just the assignee: a labor request that has not
    been taken on yet is NOT on anybody's plate, it is a question, and it has
@@ -737,10 +840,102 @@ function ntfReqFor(t,me){
    point of view of one person. Small on purpose: it is stored once per task.
    A missing field reads as 0, which is what makes adding one here safe for
    phones that already have a ledger written under the old shape. */
-function ntfWatch(t,me){
-  return { a:(ntfPlate(t)===me)?1:0, s:(t.status==='done')?1:0, p:ntfPart(t)?1:0,
-           q:ntfReqOpen(t)?1:0, r:ntfReqFor(t,me) };
+function ntfWatch(t){
+  return { a:String(ntfPlate(t)||''), s:(t.status==='done')?1:0,
+           p:ntfPart(t)?1:0, q:ntfReqOpen(t)?1:0 };
 }
+
+/* ===== WHO HEARS A THING, as opposed to whether I do =====
+   Added 2026-10-02, when phones started being able to buzz with the app shut.
+
+   Everything above this line was written from ONE point of view: "is this mine
+   to hear". That is all a bell needs, because the phone showing the bell
+   belongs to the person asking. It is no use at all for buzzing, and the
+   reason is worth understanding before changing any of it.
+
+   A phone can only raise an alert it is awake for. The whole point of buzzing
+   is to reach a phone that is ASLEEP, with the app shut -- so the phone that
+   notices has to work out who else should be told and ask the sender to tell
+   them. "Is it mine" cannot answer that. "Whose is it" can, and "is it mine"
+   then falls out of it: I hear a thing when I am in its audience.
+
+   So every walk below now decides the AUDIENCE of each change, and my own feed
+   is what is left after asking whether I am in it. One rule, read two ways,
+   which is the only arrangement where the bell and the buzz cannot disagree --
+   and tools/test-notifications.js section 23 sweeps every person against every
+   event to prove they never do.                                            */
+
+/* Tidy a list of maybe-people into real, active roster ids, with duplicates
+   and blanks dropped. Everything below hands its answer through here. */
+function ntfWho2(list){
+  var out=[], seen={};
+  (list||[]).forEach(function(x){
+    var id=null;
+    try{ id=(typeof pidOf==='function')?pidOf(x):x; }catch(e){ id=x; }
+    if(!id) return;
+    id=String(id);
+    if(seen[id]) return;
+    try{ if(typeof personActive==='function'&&!personActive(id)) return; }catch(e){}
+    seen[id]=1; out.push(id);
+  });
+  return out;
+}
+/* Everybody on the farm today. Used by the two alerts that genuinely are
+   everybody's business: a machine going out of service, and ground closing. */
+function ntfEveryone(){
+  var all=[];
+  try{ all=(typeof rstActive==='function')?rstActive():[]; }catch(e){ all=[]; }
+  return ntfWho2(all.map(function(p){ return p&&p.id; }));
+}
+/* Everybody holding one of these roster roles, plus whoever holds the App
+   Manager post -- who answers yes to everything, so he hears everything.
+   APP_ADMIN is this phone's copy of who that is; it is the best any phone can
+   do, because the real answer is a claim on a sign-in token that only that
+   person's own phone can read. Getting it wrong costs one alert too many or
+   one too few, never a wrong permission. */
+function ntfRoles(roles){
+  var all=[];
+  try{ all=(typeof rstActive==='function')?rstActive():[]; }catch(e){ all=[]; }
+  var out=all.filter(function(p){
+    try{ return p&&roles.indexOf(personRole(p.id))>=0; }catch(e){ return false; }
+  }).map(function(p){ return p.id; });
+  try{ if(APP_ADMIN&&APP_ADMIN.pid) out.push(APP_ADMIN.pid); }catch(e){}
+  return ntfWho2(out);
+}
+/* Whoever hands work to undergraduates -- read off the roster rather than
+   hardcoding Bill, so it still reaches the right person the week he is away.
+   The same question tcCanEditPunches() asks about one phone. */
+function ntfAssigners(){
+  var all=[];
+  try{ all=(typeof rstActive==='function')?rstActive():[]; }catch(e){ all=[]; }
+  var out=all.filter(function(p){
+    try{ return p&&(typeof assignsUndergrads==='function')&&assignsUndergrads(p.id); }catch(e){ return false; }
+  }).map(function(p){ return p.id; });
+  try{ if(APP_ADMIN&&APP_ADMIN.pid) out.push(APP_ADMIN.pid); }catch(e){}
+  return ntfWho2(out);
+}
+/* Take people OUT of an audience -- the person who did the thing, almost
+   always. Nobody needs telling about what they just did themselves. */
+function ntfNot(list,drop){
+  var bad={};
+  (drop||[]).forEach(function(d){ if(d) bad[String(d)]=1; });
+  return (list||[]).filter(function(x){ return !bad[String(x)]; });
+}
+
+/* The events one walk produced, with their audiences, for the sender to read.
+   Emptied at the start of every scan: it is this look's news, not a history. */
+var NTF_EVENTS=[];
+function ntfEmit(kind,to,fill){
+  to=ntfWho2(to);
+  if(!to.length) return null;
+  var ev={ k:kind, to:to };
+  if(fill) for(var key in fill) if(fill.hasOwnProperty(key)) ev[key]=fill[key];
+  NTF_EVENTS.push(ev);
+  return ev;
+}
+/* Do I show this one on my own bell. Two questions, both of which have to be
+   yes: is it addressed to me, and have I left that switch on. */
+function ntfForMe(ev,me){ return !!ev && ev.to.indexOf(me)>=0 && ntfOn(ev.k); }
 
 /* Walk the task list, and for anything that changed since the last walk, add
    the event to this person's feed. Returns how many were added, which is only
@@ -762,6 +957,7 @@ function ntfScan(){
      Nothing on screen said so; the test caught it. Written out one per line,
      with the result of each kept, for the same reason: a chain of && here
      would make an empty equipment list silence the ground alerts. */
+  NTF_EVENTS=[];                                 /* this look's news, not a history */
   var jobs=ntfScanTasks(me,now);
   var punches=ntfScanPunches(me,now);
   var machines=ntfScanEquip(me,now);
@@ -778,44 +974,72 @@ function ntfScanTasks(me,now){
   var first=!NTF.base, fresh={}, made=0;
   all.forEach(function(t){
     if(!t||!t.id) return;
-    var id=String(t.id), is=ntfWatch(t,me);
+    var id=String(t.id), is=ntfWatch(t);
     fresh[id]=is;
     if(first) return;                            /* the baseline walk tells nobody anything */
-    var was=NTF.seen[id]||{a:0,s:0,p:0,q:0,r:0};
-    var mine=(ntfFrom(t)===me);                  /* I handed it out, or I asked for it */
-    var req=ntfIsReq(t), asked=(req&&t.requestedBy===me);
+    var was=NTF.seen[id]||{a:'',s:0,p:0,q:0};
+    var from=ntfFrom(t);                         /* who handed it out, or asked for it */
+    var req=ntfIsReq(t);
 
-    /* ONE ROW PER JOB PER LOOK, and the chain below is in lifecycle order,
-       LATEST FIRST. A phone that was out of signal all morning can come back
-       to a job that was requested, accepted and finished since it last looked;
-       the only one of those three still worth saying is the last. */
+    /* ONE CHANGE CAN BE TWO PIECES OF NEWS, and that is the thing this list
+       exists to handle. Bill putting an undergraduate onto a technician's
+       request is, in the same instant, "your request was picked up" to the
+       technician and "here is a job" to the undergraduate. Two sentences, two
+       audiences, one tap.
 
-    /* Finished, and came back with plots nobody has been given. This one wins
-       over plain "finished" outright: a part-finished job IS a finished one,
-       and two rows about one job reads as a bug and buries the ask. */
-    if(is.p&&!was.p&&mine&&ntfOn('partial')){ ntfPush('partial',t,t.completedBy||t.assignee||null,now); made++; }
-    /* Finished. The job I ASKED for and the job I HANDED OUT are two different
-       alerts with two different switches, because they are two different
-       relationships -- so each branch excludes the other's jobs. */
-    else if(is.s&&!was.s&&asked&&t.completedBy!==me&&ntfOn('reqdone')){
-      ntfPush('reqdone',t,t.completedBy||t.assignee||null,now); made++; }
-    else if(is.s&&!was.s&&mine&&!req&&t.completedBy!==me&&ntfOn('done')){
-      ntfPush('done',t,t.completedBy||t.assignee||null,now); made++; }
+       So the branches below are CANDIDATES rather than a chain, written in
+       lifecycle order, LATEST FIRST -- and the collapse underneath is what
+       keeps the old promise of one row per job per look. It just keeps it per
+       PERSON, which is what it always really meant: a phone out of signal all
+       morning comes back to a job that was requested, accepted and finished,
+       and hears only the last of the three that was addressed to it. */
+    var cands=[];
+    /* Finished, and came back with plots nobody has been given. Ahead of plain
+       "finished" on purpose: a part-finished job IS a finished one, and two
+       rows about one job reads as a bug and buries the ask. */
+    if(is.p&&!was.p)
+      cands.push({k:'partial',to:[from],who:t.completedBy||t.assignee||null});
+    /* Finished. The job somebody ASKED for and the job somebody HANDED OUT are
+       two different alerts with two different switches, because they are two
+       different relationships. Neither tells whoever just finished it. */
+    if(is.s&&!was.s&&req&&t.requestedBy)
+      cands.push({k:'reqdone',to:ntfNot([t.requestedBy],[t.completedBy]),
+                  who:t.completedBy||t.assignee||null});
+    if(is.s&&!was.s&&!req)
+      cands.push({k:'done',to:ntfNot([from],[t.completedBy]),
+                  who:t.completedBy||t.assignee||null});
     /* Accepted -- it has stopped being a question and become somebody's job.
        Only the person who ASKED is told, and the record never says who
        accepted it because it never has to: in both directions the person who
-       accepts is somebody other than the person who asked. The t.assignee
-       guard is belt and braces for a route that does not exist yet. */
-    else if(was.q&&!is.q&&asked&&t.assignee!==me&&ntfOn('reqok')){
-      ntfPush('reqok',t,t.assignee||null,now); made++; }
-    /* Work landed on me. Not for a job I gave myself -- I was there. Not for
-       a request I was asked about and then accepted either: I already heard
-       about that one as a request, and I am the one who said yes. */
-    else if(is.a&&!was.a&&!mine&&t.target!==me&&ntfOn('tasks')){
-      ntfPush('assigned',t,ntfFrom(t),now); made++; }
-    /* Somebody is asking. Last in the chain because it is the earliest stage. */
-    else if(is.r&&!was.r&&!asked&&ntfOn('reqnew')){
-      ntfPush('reqnew',t,t.requestedBy||null,now); made++; }
+       accepts is somebody other than the person who asked. */
+    if(was.q&&!is.q&&req&&t.requestedBy)
+      cands.push({k:'reqok',to:ntfNot([t.requestedBy],[t.assignee]),who:t.assignee||null});
+    /* Work landed on somebody. Not on a job they gave themselves -- they were
+       there. Not on a request they were asked about and then accepted either:
+       they already heard about that one as a request, and they are the one who
+       said yes. */
+    if(is.a&&is.a!==was.a)
+      cands.push({k:'assigned',to:ntfNot([is.a],[from,t.target]),who:from});
+    /* Somebody is asking. Last because it is the earliest stage, and it goes
+       to whoever the question is actually FOR: the one person Bill named, or
+       everybody who hands work to undergraduates. */
+    if(is.q&&!was.q)
+      cands.push({k:'reqnew',to:ntfNot((t.origin==='manager')?[t.target]:ntfAssigners(),
+                                       [t.requestedBy]),who:t.requestedBy||null});
+
+    /* The collapse. Somebody covered by an earlier candidate is taken off
+       every later one, so each person ends up in at most one. Done BEFORE
+       anybody's switches are consulted, deliberately: muting "part-finished"
+       should make that job silent, not quietly demote it to "finished". */
+    var taken={}, mineEv=null;
+    cands.forEach(function(c){
+      var to=ntfWho2(c.to).filter(function(x){ return !taken[x]; });
+      if(!to.length) return;
+      to.forEach(function(x){ taken[x]=1; });
+      var ev=ntfEmit(c.k,to,{task:t,who:c.who});
+      if(!mineEv&&ntfForMe(ev,me)) mineEv=ev;
+    });
+    if(mineEv){ ntfPush(mineEv.k,t,mineEv.who,now); made++; }
   });
   /* Replacing the whole thing rather than merging is what keeps `seen` from
      growing forever: a task that has been deleted is simply not in `fresh`. */
@@ -835,6 +1059,13 @@ function ntfScanTasks(me,now){
 function ntfTick(){
   var made=0;
   try{ made=ntfScan(); }catch(e){}
+  /* What this look noticed goes to the sender as well as to my own bell --
+     ALL of it, not only the part addressed to me, because the people who need
+     buzzing are exactly the ones whose phones are shut and noticed nothing.
+     Queued rather than sent, so a dead spot at the far end of the farm delays
+     it rather than losing it. */
+  try{ if(NTF_EVENTS.length) pushQueue(NTF_EVENTS,Date.now()); }catch(e){}
+  try{ pushFlush(); }catch(e){}
   try{ if(made&&typeof updateBellBadges==='function') updateBellBadges(); }catch(e){}
   try{
     var n=document.getElementById('s-notifications');
@@ -857,10 +1088,10 @@ function ntfTick(){
    because it is their pay and their chance to say the time is wrong before
    payroll. If that ever needs turning back on it is one branch here plus one
    row in NOTIF_ALERTS -- nothing else. */
-function ntfPunchWatch(p,me,ask){
+function ntfPunchWatch(p,ask){
   return { o:p.out?1:0,
            a:(p.out&&p.auto)?1:0,
-           k:(String(p.pid)===me&&ask[String(p.id)])?1:0 };
+           k:ask[String(p.id)]?1:0 };
 }
 function ntfScanPunches(me,now){
   var all=null;
@@ -875,15 +1106,17 @@ function ntfScanPunches(me,now){
     if(typeof tcOpenPunches==='function')
       tcOpenPunches().forEach(function(r){ if(!r.end&&r.punch&&r.punch.id) ask[String(r.punch.id)]=1; });
   }catch(e){}
-  var mgr=false;
-  try{ mgr=(typeof tcCanEditPunches==='function')&&tcCanEditPunches(); }catch(e){}
+  /* Clocking in and out is news for whoever runs the crew -- the same people
+     tcCanEditPunches() lets correct a timesheet, asked of the roster rather
+     than of this one phone, because this walk now decides for everybody. */
+  var crew=ntfAssigners();
 
   var first=!NTF.pbase, fresh={}, made=0;
   all.forEach(function(p){
     if(!p||!p.id) return;
-    var id=String(p.id), is=ntfPunchWatch(p,me,ask), prev=NTF.pseen[id];
+    var id=String(p.id), is=ntfPunchWatch(p,ask), prev=NTF.pseen[id];
     fresh[id]=is;
-    var mine=(String(p.pid)===me);
+    var ev=null, baselineExempt=false;
 
     /* THE ONE ALERT THE BASELINE DOES NOT SWALLOW. "You never clocked out and
        the app has no scheduled finish to use" is a standing CONDITION, not a
@@ -893,25 +1126,29 @@ function ntfScanPunches(me,now){
        again about a shift still sitting open -- and this is the only clock
        alert with something for them to actually do about it.
 
-       Safe to raise on a first look precisely because it can only ever be
-       about the signed-in person's OWN shifts, of which there are a handful,
-       never the farm's whole history. */
-    if(is.k&&mine&&!(prev&&prev.k)&&ntfOn('shiftask')){
-      ntfPushPunch('shiftask',p,now); made++; return;
+       Safe to raise on a first look precisely because it only ever goes to the
+       one person whose shift it is, of which there are a handful, never the
+       farm's whole history. */
+    if(is.k&&!(prev&&prev.k)){
+      ev=ntfEmit('shiftask',[p.pid],{punch:p}); baselineExempt=true;
     }
-    if(first) return;                            /* the baseline walk tells nobody anything else */
-
-    if(prev===undefined){
+    else if(first){ /* the baseline walk tells nobody anything else */ }
+    else if(prev===undefined){
       /* Brand new to this phone. A punch that arrives already CLOSED is
          history, not news -- otherwise a phone catching up on a season of
          timesheets would announce every shift the farm has ever worked. */
-      if(!is.o&&!mine&&mgr&&ntfOn('clockin')){ ntfPushPunch('clockin',p,now); made++; }
-      return;
+      if(!is.o) ev=ntfEmit('clockin',ntfNot(crew,[p.pid]),{punch:p});
     }
-    if(!prev.o&&is.o){
-      if(is.a&&mine&&ntfOn('shiftauto')){ ntfPushPunch('shiftauto',p,now); made++; }
-      else if(!is.a&&!mine&&mgr&&ntfOn('clockout')){ ntfPushPunch('clockout',p,now); made++; }
+    else if(!prev.o&&is.o){
+      /* THE ONE DELIBERATE SILENCE. A shift closed automatically does NOT tell
+         the manager. Dillon, 2026-09-24: "just do it silently". The student is
+         told, because it is their pay and their chance to say the time is
+         wrong before payroll. */
+      if(is.a) ev=ntfEmit('shiftauto',[p.pid],{punch:p});
+      else ev=ntfEmit('clockout',ntfNot(crew,[p.pid]),{punch:p});
     }
+
+    if(ev&&(baselineExempt||!first)&&ntfForMe(ev,me)){ ntfPushPunch(ev.k,p,now); made++; }
   });
   var changed=first||made>0||ntfSeenDiff(NTF.pseen,fresh);
   NTF.pseen=fresh;
@@ -922,15 +1159,16 @@ function ntfScanPunches(me,now){
    so a row still reads as a sentence after the punch has been corrected or
    removed. `at` is the time the row is about; `hrs` only means anything on a
    clock-out. */
-function ntfPushPunch(kind,p,now){
+function ntfPushPunch(kind,p,now){ NTF.list.unshift(ntfRecPunch(kind,p,now)); }
+function ntfRecPunch(kind,p,now){
   var d=null; try{ d=String(p.date||''); }catch(e){ d=''; }
-  NTF.list.unshift({ id:ntfNewId(now),
+  return { id:ntfNewId(now),
     k:kind, punch:String(p.id), t:now,
     who:String(p.pid||''), d:d,
     at:String((kind==='clockin'||kind==='shiftask')?(p.in||''):(p.out||'')),
     inAt:String(p.in||''),
     off:(p.locOk===false)?1:0,
-    hrs:ntfHrs(p.in,p.out) });
+    hrs:ntfHrs(p.in,p.out) };
 }
 function ntfHrs(a,b){
   if(!a||!b) return 0;
@@ -1042,9 +1280,10 @@ function ntfClip(txt,n){
 function ntfScanEquip(me,now){
   var all=null; try{ all=EQUIP; }catch(e){}
   if(!all||!all.length) return {made:0,changed:false};
-  /* The issue report goes to whoever would fix it, and that is the same list
-     of roles the Edit machine form itself asks for. */
-  var fixes=ntfRoleIs(['Farm Manager','Technician','Faculty']);
+  /* Everybody hears a machine go down, because anybody might walk out to it.
+     An issue report goes only to whoever would fix it -- the same roles the
+     Edit machine form itself asks for. */
+  var farm=ntfEveryone(), fixers=ntfRoles(['Farm Manager','Technician','Faculty']);
   var first=!NTF.ebase, fresh={}, made=0;
   all.forEach(function(m){
     if(!m||!m.id) return;
@@ -1054,24 +1293,27 @@ function ntfScanEquip(me,now){
     var st=(m.status==='down')?'down':(m.flagged?'flag':'');
     if(st) fresh[id]=st;
     if(first) return;                            /* the baseline walk tells nobody anything */
-    var was=NTF.eseen[id]||'';
-    if(st==='down'&&was!=='down'&&ntfOn('equip')){
-      var q=ntfEqProblem(id);
-      ntfPushEq('eqdown',m,now,(q&&(q.downBy||q.by))||null,q?q.desc:'');  made++;
+    var was=NTF.eseen[id]||'', ev=null, q=null;
+    if(st==='down'&&was!=='down'){
+      q=ntfEqProblem(id);
+      ev=ntfEmit('eqdown',farm,{eq:m,who:(q&&(q.downBy||q.by))||null,note:q?q.desc:'',
+                                prob:(q&&q.id)||''});
     }
     /* It was out of service and it is not any more. Covers both ways back:
        Bill setting it available, and the repair being signed off. */
-    else if(was==='down'&&st!=='down'&&ntfOn('equip')){
-      ntfPushEq('equp',m,now,null,''); made++;
+    else if(was==='down'&&st!=='down'){
+      ev=ntfEmit('equp',farm,{eq:m,who:null,note:''});
     }
     /* Reported, but still running. Only from nothing -- a machine that goes
        from flagged to down has already said the louder of the two things, and
        a flag CLEARING says nothing at all, because nobody wants "the issue on
        the 3235C has gone away" when what happened is somebody tidied up. */
-    else if(st==='flag'&&was===''&&fixes&&ntfOn('eqflag')){
-      var r=ntfEqProblem(id);
-      ntfPushEq('eqflag',m,now,(r&&r.by)||null,r?r.desc:''); made++;
+    else if(st==='flag'&&was===''){
+      q=ntfEqProblem(id);
+      ev=ntfEmit('eqflag',fixers,{eq:m,who:(q&&q.by)||null,note:q?q.desc:'',
+                                  prob:(q&&q.id)||''});
     }
+    if(ntfForMe(ev,me)){ ntfPushEq(ev.k,m,now,ev.who,ev.note); made++; }
   });
   var changed=first||made>0||ntfFlagDiff(NTF.eseen,fresh);
   NTF.eseen=fresh;
@@ -1083,7 +1325,10 @@ function ntfScanEquip(me,now){
 function ntfScanInv(me,now){
   var all=null; try{ all=INVENTORY; }catch(e){}
   if(!all||!all.length) return {made:0,changed:false};
-  var orders=ntfRoleIs(['Farm Manager','Faculty']);
+  /* Bill and faculty, because they are the people who order. Deliberately NOT
+     technicians -- Dillon, 2026-10-01 -- which is the line most likely to be
+     "tidied" into matching the equipment one above. */
+  var buyers=ntfRoles(['Farm Manager','Faculty']);
   var first=!NTF.ibase, fresh={}, made=0;
   all.forEach(function(it){
     if(!it||!it.id) return;
@@ -1100,7 +1345,10 @@ function ntfScanInv(me,now){
        a fortnight says it once, which is what the map keeps it for; coming
        back up says nothing, because a delivery is not news to the person who
        booked it in. */
-    if(!NTF.iseen[id]&&orders&&ntfOn('low')){ ntfPushLow(it,now); made++; }
+    if(!NTF.iseen[id]){
+      var ev=ntfEmit('low',buyers,{item:it});
+      if(ntfForMe(ev,me)){ ntfPushLow(it,now); made++; }
+    }
   });
   var changed=first||made>0||ntfFlagDiff(NTF.iseen,fresh);
   NTF.iseen=fresh;
@@ -1117,6 +1365,10 @@ function ntfScanInv(me,now){
 function ntfScanRes(me,now){
   var all=null; try{ all=TRIALS; }catch(e){}
   if(!all||!all.length) return {made:0,changed:false};
+  /* Everybody, named by PLOT and never by study. An undergraduate on a mower
+     has to know CAFS14 is shut whoever owns it; whose trial it is, is not the
+     farm's business. Same rule the map already follows -- see trLiveRes(). */
+  var farm=ntfEveryone();
   var first=!NTF.rbase, fresh={}, made=0;
   all.forEach(function(t){
     if(!t) return;
@@ -1131,7 +1383,7 @@ function ntfScanRes(me,now){
       try{ live=(typeof trResState==='function')&&trResState(r)==='active'; }catch(e){}
       if(live) fresh[key]=1;
       if(first) return;
-      var was=!!NTF.rseen[key];
+      var was=!!NTF.rseen[key], ev=null;
       /* The person who PLACED it is told as well, unlike a job you gave
          yourself. Two reasons, and the second is the real one: seeing the row
          appear is how they know it took, and the record only carries the
@@ -1139,8 +1391,9 @@ function ntfScanRes(me,now){
          matching on a name, and the price of getting that wrong is somebody
          not being told that ground is closed. That is the one thing this alert
          must never do. */
-      if(live&&!was&&ntfOn('trials')){ ntfPushRes('resclose',t,r,now); made++; }
-      else if(was&&!live&&ntfOn('trials')){ ntfPushRes('resopen',t,r,now); made++; }
+      if(live&&!was) ev=ntfEmit('resclose',farm,{study:t,res:r,key:key});
+      else if(was&&!live) ev=ntfEmit('resopen',farm,{study:t,res:r,key:key});
+      if(ntfForMe(ev,me)){ ntfPushRes(ev.k,t,r,now); made++; }
     });
   });
   var changed=first||made>0||ntfFlagDiff(NTF.rseen,fresh);
@@ -1153,26 +1406,29 @@ function ntfScanRes(me,now){
    row needs -- the same reason ntfPush() copies a job's title: the machine may
    be retired, the product renamed and the study finished by the time somebody
    scrolls back, and a row has to still read as a sentence. */
-function ntfPushEq(kind,m,now,who,note){
-  NTF.list.unshift({ id:ntfNewId(now), k:kind, t:now,
-    eq:String(m.id), ttl:String(m.name||'A machine'),
-    area:String(m.location||''), who:who||null, note:ntfClip(note,64) });
+function ntfPushEq(kind,m,now,who,note){ NTF.list.unshift(ntfRecEq(kind,m,now,who,note)); }
+function ntfRecEq(kind,m,now,who,note){
+  return { id:ntfNewId(now), k:kind, t:now, eq:String(m.id),
+    ttl:String(m.name||'A machine'), area:String(m.location||''),
+    who:who||null, note:ntfClip(note,64) };
 }
-function ntfPushLow(it,now){
+function ntfPushLow(it,now){ NTF.list.unshift(ntfRecLow(it,now)); }
+function ntfRecLow(it,now){
   var q=0; try{ q=(typeof invQty==='function')?invQty(it):(+it.qty||0); }catch(e){}
-  NTF.list.unshift({ id:ntfNewId(now), k:'low', t:now,
+  return { id:ntfNewId(now), k:'low', t:now,
     item:String(it.id), ttl:String(it.name||'A product'),
-    q:q, thr:(+it.thr||0), u:String(it.unit||'') });
+    q:q, thr:(+it.thr||0), u:String(it.unit||'') };
 }
-function ntfPushRes(kind,t,r,now){
+function ntfPushRes(kind,t,r,now){ NTF.list.unshift(ntfRecRes(kind,t,r,now)); }
+function ntfRecRes(kind,t,r,now){
   var ty='Restricted', endTxt='';
   try{ if(typeof trRType==='function') ty=trRType(r.type).label||ty; }catch(e){}
   try{ if(typeof trResEndText==='function') endTxt=trResEndText(r); }catch(e){}
-  NTF.list.unshift({ id:ntfNewId(now), k:kind, t:now,
+  return { id:ntfNewId(now), k:kind, t:now,
     /* The plot, and deliberately NOT the study's name or its lab -- see the
        note at the top of this section. */
     plot:String(r.scope||''), ttl:String(ty),
-    endTxt:String(endTxt), why:(r.lifted?'lifted':'ended') });
+    endTxt:String(endTxt), why:(r.lifted?'lifted':'ended') };
 }
 /* One id generator, so the three above and the two older pushes cannot drift
    into making ids of different shapes. */
@@ -1199,15 +1455,16 @@ function ntfSeenDiff(a,b){
         you to take this on" or "is asking for help" -- the record's own
         `origin` is unreliable to read later because the request has by then
         become an ordinary task                                            */
-function ntfPush(kind,t,who,now){
-  NTF.list.unshift({ id:ntfNewId(now),
+function ntfPush(kind,t,who,now){ NTF.list.unshift(ntfRecTask(kind,t,who,now)); }
+function ntfRecTask(kind,t,who,now){
+  return { id:ntfNewId(now),
     k:kind, task:String(t.id), t:now,
     ttl:String(t.title||'A job'),
     who:who||null,
     area:String(t.area||''),
     o:(t.origin||''),
     n:(kind==='partial'?(t.leftPlots||[]).length
-      :kind==='reqnew'?(+t.students||0):0) });
+      :kind==='reqnew'?(+t.students||0):0) };
 }
 function ntfTrim(){
   var cut=Date.now()-NTF_KEEP_DAYS*86400000;
@@ -1219,6 +1476,343 @@ function ntfUnread(){
   return n;
 }
 function ntfMarkRead(){ NTF.readAt=Date.now(); ntfSave(); }
+
+/* ===================== MAKING THE PHONE BUZZ =====================
+   Added 2026-10-02. Everything above works out alerts and shows them on the
+   bell; this is the half that reaches a phone with the app SHUT.
+
+   HOW IT HANGS TOGETHER, because no one file contains all of it:
+
+     this file          notices what changed and WHO should hear it, and asks
+                        the sender to tell them (ntfEmit / pushSend below)
+     worker/            the sender. Outside the farm, on Cloudflare's free
+     ut-turf-push.js    plan, no card on anybody's account. It checks the
+                        caller is really signed in to this farm, refuses to
+                        send the same thing twice, and skips anybody whose own
+                        switches say no.
+     sw.js              receives the message on the phone and shows it. Written
+                        by tools/build-sw.js -- never edited by hand.
+     docs/SET-UP-        the twenty minutes somebody does once, by hand, to
+     NOTIFICATIONS.md   make the sender exist at all.
+
+   THE ONE THING THAT IS NOT OBVIOUS. A phone only notices events while it is
+   awake, so the phone that reports a thing is almost never the phone that
+   needs telling about it. That is the whole reason the walks above work out an
+   audience rather than just "is this mine": my phone, awake in my hand, is what
+   tells the sender to buzz somebody else's phone, asleep in their pocket. Every
+   awake phone reports the same event and the sender keeps only the first.
+
+   AND THE ONE THING THAT WOULD BE EASY TO BREAK. The switches a person sets
+   are checked by the SENDER, not here and not on the receiving phone. That is
+   not where you would put it, and the reason is a browser quirk: a phone that
+   receives a message and then decides to show nothing gets Chrome's own "this
+   site was updated in the background" notice instead. So a muted alert must
+   never be sent at all, which means the sender has to know -- and it is told,
+   by each phone uploading its own owner's switches. It looks up a yes or no it
+   was handed; it never decides anything.                                    */
+
+/* WHERE THE SENDER LIVES. Changing this is a change to the app, the same as
+   the Firebase settings in the page are -- it is plumbing, not a farm figure,
+   and the address only ever changes if the whole thing is rebuilt. When that
+   happens: docs/SET-UP-NOTIFICATIONS.md is the sheet, and this is the line. */
+var PUSH_URL='https://ut-turf-push.turffarmutk.workers.dev';
+
+var PUSH_KEY_KEY='ut_push_key';          /* the sender's public key, once fetched */
+var PUSH_OUT_KEY='ut_push_out';          /* things noticed but not yet handed over */
+var PUSH_OUT_MAX=60;
+var PUSH_TRIES_MAX=5;                    /* before a message is given up on */
+var PUSH={on:false,endpoint:'',busy:false,sending:false,err:''};
+
+/* ---- can this phone do it at all ---- */
+function pushSupported(){
+  try{ return !!(navigator.serviceWorker&&window.PushManager&&window.Notification); }
+  catch(e){ return false; }
+}
+/* An iPhone refuses notifications to a web app outright until it has been
+   added to the home screen -- Apple's rule, not ours, and there is no way
+   around it in code. Worth detecting precisely, because the honest answer
+   ("add it to your home screen first") is useful and "your phone cannot do
+   this" is not. An iPad reports itself as a Mac, hence the touch test. */
+function pushIsApple(){
+  try{
+    var ua=navigator.userAgent||'';
+    /* Asked first, and it is not belt and braces. An iPad reports itself as a
+       Mac, so the only way to tell one from a laptop is that it has a
+       touchscreen -- and that same test says yes to an Android phone being
+       emulated on a Mac, which is exactly how this app gets tested. Without
+       this line the Notifications screen tells a tester to add the app to
+       their iPhone home screen while they are looking at an Android. */
+    if(/android/i.test(ua)) return false;
+    return /iphone|ipad|ipod/i.test(ua)
+        || (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  }catch(e){ return false; }
+}
+function pushInstalled(){
+  try{
+    return !!(window.navigator.standalone
+      ||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches));
+  }catch(e){ return false; }
+}
+/* One word for what this phone's situation is, so the screen and the tests
+   both ask the same question. */
+function pushState(){
+  if(!PUSH_URL) return 'nosender';
+  if(pushIsApple()&&!pushInstalled()) return 'needs-install';
+  if(!pushSupported()) return 'unsupported';
+  var perm=''; try{ perm=Notification.permission; }catch(e){}
+  if(perm==='denied') return 'blocked';
+  return PUSH.on?'on':'off';
+}
+
+/* ---- talking to the sender ---- */
+/* Proof that whoever is calling is really signed in to this farm. The sender
+   checks it against Google's own public keys, which is what stops a stranger
+   who finds the address buzzing twenty-three phones at three in the morning. */
+function pushToken(){
+  try{
+    var a=(typeof fbAuth==='function')?fbAuth():null;
+    if(a&&a.currentUser&&a.currentUser.getIdToken) return a.currentUser.getIdToken();
+  }catch(e){}
+  return Promise.reject(new Error('not signed in'));
+}
+function pushFetch(path,body){
+  return pushToken().then(function(tok){
+    return fetch(PUSH_URL+path,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},
+      body:JSON.stringify(body||{})
+    });
+  }).then(function(r){
+    if(!r.ok){
+      /* The number comes along, because what to do next depends on it: a
+         refusal is permanent and a dead spot is not. */
+      var err=new Error('sender said '+r.status); err.status=r.status; throw err;
+    }
+    return r.json();
+  });
+}
+/* Fetched rather than written into the app, so the farm's sending key can be
+   replaced without pushing a new app to twenty-three phones. */
+function pushServerKey(){
+  var c=null; try{ c=localStorage.getItem(PUSH_KEY_KEY); }catch(e){}
+  if(c) return Promise.resolve(c);
+  return fetch(PUSH_URL+'/key').then(function(r){ return r.json(); }).then(function(j){
+    if(!j||!j.key) throw new Error('the sender has no key set up');
+    try{ localStorage.setItem(PUSH_KEY_KEY,j.key); }catch(e){}
+    return j.key;
+  });
+}
+function pushB64ToBytes(b64){
+  var s=String(b64).replace(/-/g,'+').replace(/_/g,'/');
+  while(s.length%4) s+='=';
+  var bin=atob(s), out=new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i);
+  return out;
+}
+
+/* This person's own switches, as the sender needs them: a plain list of what
+   they left on, their delivery hours, and where in the world they are -- the
+   sender runs in UTC and "nine at night" is a local idea. Nothing about WHO
+   hears WHAT is in here; that is worked out on the phone that notices. */
+function pushPrefs(){
+  var alerts={};
+  try{
+    NOTIF_ALERTS.forEach(function(a){ alerts['a_'+a.k]=(NOTIF['a_'+a.k]!==false); });
+  }catch(e){}
+  var tz='UTC';
+  try{ tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'; }catch(e){}
+  return { alerts:alerts, quiet:!!NOTIF.quiet, start:String(NOTIF.start||''),
+           end:String(NOTIF.end||''), tz:tz };
+}
+
+/* ---- turning it on and off for THIS phone ---- */
+function pushRefresh(){
+  if(!pushSupported()) return Promise.resolve(null);
+  return navigator.serviceWorker.ready
+    .then(function(reg){ return reg.pushManager.getSubscription(); })
+    .then(function(sub){
+      PUSH.on=!!sub; PUSH.endpoint=sub?sub.endpoint:'';
+      return sub;
+    })
+    .catch(function(){ PUSH.on=false; PUSH.endpoint=''; return null; });
+}
+function pushAsk(){
+  if(PUSH.busy) return Promise.resolve(false);
+  PUSH.busy=true; PUSH.err='';
+  return Notification.requestPermission().then(function(perm){
+    if(perm!=='granted') throw new Error(perm==='denied'
+      ? 'Your phone is set to block notifications from this app.'
+      : 'Notifications were not turned on.');
+    return Promise.all([navigator.serviceWorker.ready,pushServerKey()]);
+  }).then(function(both){
+    return both[0].pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey:pushB64ToBytes(both[1])
+    });
+  }).then(function(sub){
+    var j=sub.toJSON();
+    return pushFetch('/subscribe',{ pid:SESSION.pid, prefs:pushPrefs(),
+      sub:{endpoint:j.endpoint,keys:j.keys} }).then(function(){ return sub; });
+  }).then(function(sub){
+    PUSH.on=true; PUSH.endpoint=sub.endpoint;
+    return true;
+  }).catch(function(e){
+    PUSH.err=(e&&e.message)||'Could not turn notifications on.';
+    return false;
+  }).then(function(r){ PUSH.busy=false; return r; });
+}
+function pushStop(){
+  if(PUSH.busy) return Promise.resolve(false);
+  PUSH.busy=true; PUSH.err='';
+  var ep=PUSH.endpoint;
+  return pushRefresh().then(function(sub){
+    if(!sub) return null;
+    ep=sub.endpoint;
+    return sub.unsubscribe();
+  }).then(function(){
+    /* Told to forget it as well as unsubscribing: an address nobody clears up
+       sits in the sender's list forever, and every message to that person then
+       costs a pointless round trip to a push service that will refuse it. */
+    return ep?pushFetch('/forget',{endpoint:ep}):null;
+  }).then(function(){
+    PUSH.on=false; PUSH.endpoint='';
+    return true;
+  }).catch(function(e){
+    PUSH.err=(e&&e.message)||'Could not turn notifications off.';
+    return false;
+  }).then(function(r){ PUSH.busy=false; return r; });
+}
+/* A switch moved. The sender keeps its own copy of these because it is the one
+   that has to decide not to send; this is what keeps that copy honest. Failing
+   quietly is right: the switch has already been saved on the phone, and the
+   bell obeys it either way. */
+function pushPrefsChanged(){
+  if(!PUSH.on||!PUSH.endpoint) return Promise.resolve(false);
+  return pushFetch('/prefs',{pid:SESSION.pid,endpoint:PUSH.endpoint,prefs:pushPrefs()})
+    .then(function(){ return true; }).catch(function(){ return false; });
+}
+
+/* ---- handing the sender what the walks noticed ---- */
+/* The same name on every phone that notices the same thing, so the sender can
+   keep the first and ignore the rest. Built out of the records themselves --
+   never out of the time, which every phone would answer differently. */
+function ntfEventId(ev){
+  try{
+    if(ev.task){
+      var extra=(ev.k==='assigned'||ev.k==='reqok')?String(ev.task.assignee||''):'';
+      return ev.k+':'+ev.task.id+(extra?(':'+extra):'');
+    }
+    if(ev.punch) return ev.k+':'+ev.punch.id;
+    /* The problem report is in here so a mower that breaks twice in a day is
+       two pieces of news rather than one. */
+    if(ev.eq) return ev.k+':'+ev.eq.id+(ev.prob?(':'+ev.prob):'');
+    if(ev.item) return 'low:'+ev.item.id;
+    if(ev.key) return ev.k+':'+ev.key;
+  }catch(e){}
+  return '';
+}
+/* ntfLine() writes for a web page, so it escapes the handful of characters
+   that mean something in one. A notification is plain text and shows them
+   back raw, so "Smith & Sons" arrives as "Smith &amp; Sons" unless this
+   undoes it. Same sentence, one costume off. */
+function ntfPlain(txt){
+  return String(txt==null?'':txt)
+    .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"')
+    .replace(/&#39;/g,"'").replace(/&middot;/g,'·').replace(/&amp;/g,'&');
+}
+/* The sentence the buzz carries is the sentence the bell shows, because it is
+   built by the same function from the same record. They cannot drift. */
+function ntfEventText(ev,now){
+  var rec=null;
+  try{
+    if(ev.task) rec=ntfRecTask(ev.k,ev.task,ev.who,now);
+    else if(ev.punch) rec=ntfRecPunch(ev.k,ev.punch,now);
+    else if(ev.eq) rec=ntfRecEq(ev.k,ev.eq,now,ev.who,ev.note);
+    else if(ev.item) rec=ntfRecLow(ev.item,now);
+    else if(ev.res) rec=ntfRecRes(ev.k,ev.study,ev.res,now);
+  }catch(e){ rec=null; }
+  if(!rec) return null;
+  var l=null; try{ l=ntfLine(rec); }catch(e){ return null; }
+  if(!l) return null;
+  return { title:ntfPlain(l.t), body:ntfPlain(l.s) };
+}
+
+function pushOutRead(){
+  try{ var r=JSON.parse(localStorage.getItem(PUSH_OUT_KEY)||'[]'); return Array.isArray(r)?r:[]; }
+  catch(e){ return []; }
+}
+function pushOutWrite(list){
+  try{ localStorage.setItem(PUSH_OUT_KEY,JSON.stringify(list.slice(0,PUSH_OUT_MAX))); }catch(e){}
+}
+/* Queued rather than sent on the spot, because the phone that notices may be
+   the one standing in a dead spot at the far end of the farm. It goes up on
+   the next tick that has signal. Nothing here ever blocks a screen. */
+function pushQueue(events,now){
+  if(!PUSH_URL||!events||!events.length) return 0;
+  var out=pushOutRead(), added=0;
+  events.forEach(function(ev){
+    var id=ntfEventId(ev); if(!id) return;
+    var text=ntfEventText(ev,now); if(!text) return;
+    if(out.some(function(x){ return x.id===id; })) return;
+    out.unshift({ id:id, to:ev.to, kind:ev.k, sw:ntfSwitchOf(ev.k),
+                  title:text.title, body:text.body, at:now });
+    added++;
+  });
+  if(added) pushOutWrite(out);
+  return added;
+}
+/* Hand over whatever is queued, oldest first.
+
+   THE THING THIS HAS TO GET RIGHT is a message that can never be sent. A
+   refused message left at the front of the queue is retried for ever, and
+   every alert behind it waits -- so ONE bad message would silence the whole
+   farm, with nothing on any screen to say why. That is the shape of the
+   stuck-record problem sdbMaySend() exists for on the database side.
+
+   So a failure is read rather than just repeated. A refusal that names a
+   problem with the message itself is permanent and the message is dropped; a
+   dead spot, an expired sign-in or being told to slow down are all temporary
+   and it stays. Anything that merely keeps failing is given up on after a few
+   goes, because the alternative is a queue that never empties again. */
+function pushFlush(){
+  if(PUSH.sending||!PUSH_URL) return Promise.resolve(0);
+  var out=pushOutRead();
+  if(!out.length) return Promise.resolve(0);
+  /* No point offering anything if this phone cannot prove who it is -- which
+     is the normal state of a copy of the app being tested on a laptop. */
+  var live=false;
+  try{ live=(typeof dbConfigured!=='function')||dbConfigured(); }catch(e){ live=false; }
+  if(!live) return Promise.resolve(0);
+
+  PUSH.sending=true;
+  var done=0;
+  function step(){
+    var list=pushOutRead();
+    if(!list.length) return Promise.resolve();
+    var m=list[list.length-1];                   /* oldest first */
+    return pushFetch('/tell',{ id:m.id, to:m.to, kind:m.kind, sw:m.sw,
+                               title:m.title, body:m.body })
+      .then(function(){
+        var now=pushOutRead().filter(function(x){ return x.id!==m.id; });
+        pushOutWrite(now); done++;
+        return step();
+      });
+  }
+  return step().catch(function(e){
+    PUSH.err=(e&&e.message)||'';
+    var st=(e&&e.status)||0;
+    var list=pushOutRead();
+    var m=list[list.length-1];
+    if(m){
+      m.tries=(+m.tries||0)+1;
+      /* 401 is "this phone is not signed in yet", 429 is "slow down", and no
+         number at all is no signal. All three are worth another go. */
+      var hopeless=(st>=400&&st<500&&st!==401&&st!==429);
+      if(hopeless||m.tries>=PUSH_TRIES_MAX) list.pop();
+      pushOutWrite(list);
+    }
+  }).then(function(){ PUSH.sending=false; return done; });
+}
 
 /* ---- the screen ---- */
 /* Short enough to sit on the right of a row without wrapping. */
@@ -1426,6 +2020,25 @@ document.getElementById('s-notifications').addEventListener('click',function(e){
   if(typeof openTask==='function') openTask(t.id);
 });
 ntfLoad();
+/* Late on purpose: the offline copy has to be running before the browser can
+   say whether this phone is registered, and none of it matters in the first
+   seconds of opening the app. Also the moment anything queued from last time
+   gets another go. */
+try{ setTimeout(function(){
+  try{ pushRefresh().then(function(){ return pushFlush(); }); }catch(e){}
+}, 3000); }catch(e){}
+
+/* Tapping a notification with the app already open: the offline copy focuses
+   this window and says which alert it was, and the app opens the right screen
+   rather than leaving somebody looking at whatever was last on it. */
+try{
+  if(navigator.serviceWorker&&navigator.serviceWorker.addEventListener){
+    navigator.serviceWorker.addEventListener('message',function(e){
+      if(!e||!e.data||e.data.ntf!=='open') return;
+      try{ go('notifications'); }catch(_e){}
+    });
+  }
+}catch(e){}
 
 function renderPrefsHub(){
  var body=document.getElementById('prf-body'); if(!body)return;

@@ -1534,6 +1534,83 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### The walks work out WHO hears a thing, not whether I do — 2026-10-02
+**Decision:** every notification walk in `app-01-shell.js` now decides the
+**audience** of each change — a list of people — and "do I see it on my own
+bell" is what falls out of asking whether I am in that list (`ntfEmit()`,
+`ntfForMe()`). It used to ask the second question directly and never the first.
+**Why:** a phone can only notice things while it is awake, and the whole point
+of buzzing is to reach a phone that is **asleep, with the app shut**. So the
+phone that notices is almost never the phone that needs telling — it has to work
+out who else should hear it and ask the sender to tell them. "Is this mine"
+cannot answer that; "whose is this" can, and the bell's answer falls out of it
+for free. The alternative was a second walk for the buzz, duplicating the change
+detection, and two copies of this would have drifted the first time anybody
+touched either.
+**Don't:** don't put the per-person tests back inside the branches. The giveaway
+is that `ntfWatch()` records **whose** a job is rather than whether it is mine,
+and the ledger carries `v:2` for exactly that reason — a phone holding the old
+shape throws it away and takes a fresh silent baseline, because reading "it was
+mine (1), now it is p18's" would announce every job on the farm to p18.
+`tools/test-notifications.js` section 23 is the guard: it runs each change
+forward once per kind of person and fails if anybody's bell disagrees with the
+audience the sender was handed. A person on the list whose bell stays dark is
+somebody buzzed about something they cannot find in the app; a person off the
+list whose bell lights up is somebody the farm never buzzes. Both are invisible
+from every screen.
+
+### One change can be two pieces of news — 2026-10-02
+**Decision:** the task walk builds a **list of candidates** in lifecycle order
+and then takes each person off every candidate after the first one that names
+them, rather than picking one branch for the whole job.
+**Why:** Bill putting an undergraduate onto a technician's request is, in the
+same instant, "your request was picked up" to the technician and "here is a job"
+to the undergraduate. The old chain of `else if` could only ever produce one
+sentence, and got away with it because every phone walked the chain alone from
+its own point of view. One walk deciding for everybody cannot.
+**Don't:** don't collapse it back into a chain, and don't do the collapsing
+after consulting people's switches — muting "part-finished" should make that job
+silent, not quietly demote it to "finished", which is what the old chain did.
+
+### A muted alert is never SENT, and that check lives in the sender — 2026-10-02
+**Decision:** each phone uploads its own owner's switches, delivery hours and
+timezone to the Cloudflare worker (`pushPrefs()`, the `/prefs` route), and the
+worker skips anybody whose settings say no. The receiving phone filters nothing.
+**Why:** a browser quirk, and it is the whole reason this is not where you would
+expect it. A phone that receives a push and then decides to show nothing makes
+the browser show **its own** "this site was updated in the background" notice —
+wording nobody chose, nobody can turn off and nobody can explain. Filtering on
+the phone would turn every muted alert into a mystery notification. So the
+message must not be sent at all.
+**Don't:** this is **not** farm policy moving into the sender, and the
+difference matters. The message carries the NAME of the switch that governs it
+(`sw`), and the worker looks up a yes or no it was handed; it has never heard of
+any alert and must not learn. Who hears what is still worked out on the phone.
+And don't forget `NTF_SWITCH` in `app-01-shell.js`: five alerts are governed by
+a switch of a different name (`assigned` answers to **tasks**, a machine going
+down and coming back share **equip**, ground closing and opening share
+**trials**). That table was an accident waiting to happen until it was written
+down — when the walks were rebuilt, the hand-written switch names went with them
+and muting "work assigned to me" silently did nothing at all.
+
+### Buzzing is per PHONE, so the person-wide push switch is gone — 2026-10-02
+**Decision:** the "Push notifications" row under Delivery was removed. Whether a
+device buzzes is the **"Buzz this phone"** row at the top of the Notifications
+screen (`ntsPushRow()`), which reads the real state off the browser every time
+it is drawn.
+**Why:** notifications are granted by the browser, per device. Somebody with a
+phone and an iPad says yes on each. A single switch that followed the person
+around could only ever disagree with what their devices were actually doing, and
+the saved setting would quietly be the one that was wrong.
+**Don't:** don't add it back as a person-wide setting, and don't delete the
+`d_push` value from anybody's saved preferences — it is simply left alone and
+read by nothing. Note also that the row has to say which of five situations a
+phone is in, in words: no sender set up, an iPhone that has not been added to
+the home screen (Apple refuses notifications until it has, and no code can get
+round that), a browser that cannot do it, one that has been refused and cannot
+be asked again, and plain on or off. A single toggle that silently did nothing
+on an iPhone is the failure this replaced.
+
 ### Three of the four dead notification switches are wired; weather is not — 2026-10-01
 **Decision:** the Equipment, Inventory and Trials switches on the Notifications
 screen now actually raise alerts, and **weather deliberately still does not**.

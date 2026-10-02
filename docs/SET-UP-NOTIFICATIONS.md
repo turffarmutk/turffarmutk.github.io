@@ -102,6 +102,30 @@ is a one-line change to the app that I make and push. Until that happens the
 Worker sits there doing nothing, costing nothing, which is a perfectly safe
 place for it to sit.
 
+**9. Turn it on, on each phone.** This last step is not yours alone — every
+person does it once on every phone or tablet they use, because **the browser
+grants notifications per device, not per person.** In the app: the round avatar
+on the home screen → **Preferences** → **Notifications**, and the row at the top
+says **Buzz this phone**. Tap Turn on and say yes to what the phone asks.
+
+On an **iPhone or iPad** there is a step before that, and it is Apple's rule
+rather than ours: the app has to be **added to the home screen** first. Share
+button at the bottom of Safari → **Add to Home Screen** → open it from there.
+Until somebody does that, iPhones will not allow notifications at all, and the
+row says so rather than pretending. Android asks straight away.
+
+---
+
+## When the sender itself changes
+
+Pushing the app does **not** update the Worker, exactly like pushing the app does
+not publish the database rules. If I change `worker/ut-turf-push.js`, you repeat
+**step 3** — open the Worker, select everything, paste the new file, Deploy. I
+will tell you when that is needed and why; it should be rare.
+
+Check `/health` afterwards. Nothing else needs touching: the keys, the storage
+and the four settings all stay as they were.
+
 ---
 
 ## What it costs
@@ -110,6 +134,10 @@ Nothing, and here is the arithmetic rather than a promise. Cloudflare's free
 plan allows **100,000 requests a day**. A busy farm day is a few hundred. The
 storage allows **1,000 writes a day**; registering a phone is one write and
 happens once per phone, ever.
+
+The phones' own registrations are one write each, ever. The messages themselves
+cost nothing at all — Apple's and Google's push services are free and need no
+account.
 
 There is no payment method on the account, so there is nothing that *can* be
 charged — the same protection the Firebase free plan gives you. If the farm ever

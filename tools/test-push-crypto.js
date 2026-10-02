@@ -223,6 +223,56 @@ async function loadWorker() {
   const bad = await subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, pubKey, unb64url(s64), tampered);
   ok('and a changed message does not', !bad);
 
+  section('4b. a person who muted it is never sent it');
+  {
+    /* THE CHECK HAS TO HAPPEN IN THE SENDER, which is not where anybody would
+       put it. If a phone receives a message and then decides to show nothing,
+       the browser shows its OWN "this site was updated in the background"
+       notice instead -- wording nobody chose and nobody can turn off. So a
+       muted alert must never leave here at all. */
+    const on  = { prefs: { alerts: { a_tasks: true, a_equip: false } } };
+    ok('an alert they left on goes', W.wantsIt(on, { sw: 'tasks' }));
+    ok('one they turned off does not', !W.wantsIt(on, { sw: 'equip' }));
+    ok('one they have never seen goes, rather than being silently dropped',
+       W.wantsIt(on, { sw: 'somethingnew' }));
+    ok('a phone that has told us nothing hears everything', W.wantsIt({}, { sw: 'tasks' }));
+
+    /* DELIVERY HOURS. The sender runs in UTC and "nine at night" is a local
+       idea, so the phone says which part of the world it is in. Fixed hours
+       are used here rather than the real clock, or this test would pass or
+       fail depending on when somebody ran it. */
+    const tz = 'America/New_York';
+    const nowHHMM = new Date().toLocaleTimeString('en-GB',
+      { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).slice(0, 5);
+    const plus = (m) => {
+      const [h, mi] = nowHHMM.split(':').map(Number);
+      let t = (h * 60 + mi + m + 1440 * 2) % 1440;
+      return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+    };
+    const win = (a, b) => ({ prefs: { quiet: true, start: a, end: b, tz: tz, alerts: {} } });
+    ok('inside the hours somebody asked for, it goes',
+       W.wantsIt(win(plus(-60), plus(60)), { sw: 'tasks' }), nowHHMM);
+    ok('outside them, it does not',
+       !W.wantsIt(win(plus(60), plus(120)), { sw: 'tasks' }), nowHHMM);
+    /* A WINDOW THAT RUNS PAST MIDNIGHT is the easy one to get wrong, and the
+       reason is that it is not a range to be inside at all -- 22:00 to 06:00
+       is a GAP to be outside of. Both directions are checked here because the
+       two readings disagree about exactly these cases and about nothing else.
+       (Getting this test's own arithmetic backwards is just as easy: a window
+       from 11:29 round to 10:29 covers all but one hour of the day.) */
+    ok('a window that wraps round midnight still lets the middle of it through',
+       W.wantsIt(win(plus(-60), plus(-120)), { sw: 'tasks' }),
+       nowHHMM + ' in ' + plus(-60) + '-' + plus(-120));
+    ok('and holds anything that falls in the gap',
+       !W.wantsIt(win(plus(60), plus(-60)), { sw: 'tasks' }),
+       nowHHMM + ' in ' + plus(60) + '-' + plus(-60));
+    ok('hours turned off means any time', W.wantsIt({ prefs: { quiet: false, alerts: {} } }, { sw: 'tasks' }));
+    /* A timezone nobody recognises must not silence somebody for ever. */
+    ok('an unreadable timezone never silences anybody',
+       W.wantsIt({ prefs: { quiet: true, start: '09:00', end: '10:00', tz: 'Mars/Olympus', alerts: {} } },
+                 { sw: 'tasks' }));
+  }
+
   section('5. the sender holds no farm records, and says so in its own source');
   const src = fs.readFileSync(path.join(__dirname, '..', 'worker', 'ut-turf-push.js'), 'utf8');
   /* If somebody ever teaches this worker to read the farm's database, these
@@ -238,8 +288,16 @@ async function loadWorker() {
      !/-----BEGIN|"private_key"|client_email/.test(src));
   ok('the Google address it does use is the public-keys one',
      /service_accounts\/v1\/jwk\//.test(src));
-  ok('the only thing it stores is where to reach a phone',
-     (src.match(/SUBS\.put\(/g) || []).length === 2, String((src.match(/SUBS\.put\(/g) || []).length));
+  /* Counted by WHAT IT WRITES UNDER, not how many times -- the second is a
+     number that changes for innocent reasons, and a test that fails for
+     innocent reasons gets edited until it passes. There are exactly two kinds
+     of thing in that store: where to reach a phone, and a note that an event
+     has already been sent. Anything else appearing here means the sender has
+     started keeping farm data, which is a decision to argue about rather than
+     one to slip in. */
+  const kinds = [...new Set((src.match(/'([a-z]+):'/g) || []))].sort();
+  ok('everything it stores is either a phone or an already-sent marker',
+     kinds.join(' ') === "'seen:' 'sub:'", kinds.join(' '));
   ok('and it refuses anybody who is not signed in to this farm',
      /whoIsCalling\(req, env\)/.test(src) && /401/.test(src));
 

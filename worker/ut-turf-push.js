@@ -25,9 +25,19 @@
  *   somebody changed one -- which is the shape of the bug that cost this farm
  *   a month in September (see CLAUDE.md, the third trap).
  *
- *   It does not decide whether a person actually wants that alert. Each phone
- *   applies its OWN owner's switches when the message arrives. So muting
- *   "somebody clocks in" works even though this file has never heard of it.
+ *   It does not decide whether a person actually wants that alert -- but it
+ *   does CHECK, and the difference matters. Each phone uploads its owner's own
+ *   switches, as a plain list of names they left on or turned off, and the
+ *   message says which switch governs it. So this file looks up a yes or no
+ *   it was handed; it has never heard of "somebody clocks in" and does not
+ *   need to.
+ *
+ *   That check has to happen HERE rather than on the phone, and the reason is
+ *   a browser quirk worth writing down: if a phone receives a message and then
+ *   decides not to show anything, Chrome shows its own "this site was updated
+ *   in the background" notice instead. Filtering on the phone would therefore
+ *   turn every muted alert into a mystery notification nobody can turn off.
+ *   So a message a person does not want is never sent to them at all.
  *
  *   It does not hold any farm records. The only thing it stores is "this
  *   phone can be reached at this address" -- no names beyond a person id, no
@@ -39,7 +49,7 @@
  *   secrets  VAPID_PUBLIC, VAPID_PRIVATE, VAPID_SUBJECT, FB_PROJECT
  */
 
-const VERSION = '1';
+const VERSION = '2';
 
 /* Who is allowed to call this. The app is served from GitHub Pages; localhost
    is here so a copy of the app on a laptop can be tested against it without
@@ -245,6 +255,39 @@ async function whoIsCalling(req, env) {
   return claims.sub || null;                     /* the Firebase account id */
 }
 
+/* ===================== does this person want it =====================
+   Two questions, both answered from what that person's own phone uploaded.
+   Neither is a decision this file makes: the first is a switch they set, the
+   second is a window they chose. If a phone has never uploaded anything, the
+   answer is yes to everything -- somebody who went to the trouble of turning
+   notifications on should hear things, not be silenced by a missing record. */
+function wantsIt(sub, msg) {
+  const p = sub.prefs;
+  if (!p) return true;
+
+  /* The switch this alert answers to. The phone says which one; this file
+     never needs to know what alerts exist. */
+  const name = msg.sw || msg.kind;
+  if (name && p.alerts && p.alerts['a_' + name] === false) return false;
+
+  /* Delivery hours. The phone also uploads which part of the world it is in,
+     because this worker runs in UTC and "nine at night" is a local idea. */
+  if (p.quiet && p.start && p.end) {
+    let hhmm;
+    try {
+      hhmm = new Date().toLocaleTimeString('en-GB',
+        { timeZone: p.tz || 'UTC', hour: '2-digit', minute: '2-digit', hour12: false });
+    } catch (e) { return true; }         /* an unknown timezone must not silence anybody */
+    const now = hhmm.slice(0, 5);
+    /* A window that runs past midnight (22:00 to 06:00) is the other way
+       round, and reads as "outside the gap" rather than "inside the range". */
+    const inside = (p.start <= p.end) ? (now >= p.start && now <= p.end)
+                                      : (now >= p.start || now <= p.end);
+    if (!inside) return false;
+  }
+  return true;
+}
+
 /* ===================== the worker ===================== */
 function cors(req) {
   const o = req.headers.get('Origin') || '';
@@ -300,9 +343,24 @@ export default {
       const id = (await sha256Hex(s.endpoint)).slice(0, 16);
       await env.SUBS.put('sub:' + (b.pid || pid) + ':' + id, JSON.stringify({
         endpoint: s.endpoint, p256dh: s.keys.p256dh, auth: s.keys.auth,
-        pid: b.pid || pid, at: Date.now()
+        pid: b.pid || pid, at: Date.now(), prefs: b.prefs || null
       }));
       return reply(req, 200, { ok: true, id: id });
+    }
+
+    /* Somebody changed a switch, or their delivery hours. Sent on its own so
+       changing a setting does not mean asking the browser to subscribe again,
+       which it would make the person approve a second time. */
+    if (url.pathname === '/prefs' && req.method === 'POST') {
+      const b = await req.json().catch(() => null);
+      if (!b || !b.endpoint) return reply(req, 400, { error: 'no endpoint' });
+      const id = (await sha256Hex(b.endpoint)).slice(0, 16);
+      const key = 'sub:' + (b.pid || pid) + ':' + id;
+      const had = await env.SUBS.get(key, 'json');
+      if (!had) return reply(req, 404, { error: 'this phone is not registered' });
+      had.prefs = b.prefs || null;
+      await env.SUBS.put(key, JSON.stringify(had));
+      return reply(req, 200, { ok: true });
     }
 
     /* This phone no longer wants them, or is being handed to somebody else. */
@@ -335,8 +393,11 @@ export default {
       });
 
       const subs = await subsFor(b.to.slice(0, 60), env);
-      let sent = 0, dropped = 0;
+      let sent = 0, dropped = 0, muted = 0;
       for (const s of subs) {
+        /* Not wanted is not a failure: it is the person's own setting doing
+           exactly what they asked it to. */
+        if (!wantsIt(s, { sw: b.sw, kind: b.kind })) { muted++; continue; }
         let st = 0;
         try { st = await pushOne(s, text, env); } catch (e) { st = 0; }
         if (st >= 200 && st < 300) sent++;
@@ -345,7 +406,8 @@ export default {
            behind every time. */
         else if (st === 404 || st === 410) { await env.SUBS.delete(s._key); dropped++; }
       }
-      return reply(req, 200, { ok: true, sent: sent, dropped: dropped, phones: subs.length });
+      return reply(req, 200, { ok: true, sent: sent, dropped: dropped,
+                               muted: muted, phones: subs.length });
     }
 
     return reply(req, 404, { error: 'no such thing here' });
@@ -356,4 +418,4 @@ export default {
    tools/test-push-crypto.js can take the encryption apart and check each step
    against the specification -- the alternative being to find out it was wrong
    when twenty-three phones quietly never buzz. */
-export { encryptPayload, vapidHeader, b64urlToBytes, bytesToB64url, hkdf, infoBytes, join };
+export { encryptPayload, vapidHeader, b64urlToBytes, bytesToB64url, hkdf, infoBytes, join, wantsIt };

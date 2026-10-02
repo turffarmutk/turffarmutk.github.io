@@ -96,7 +96,15 @@ function boot(store) {
          the rest are `let` inside the app and never land on window. */
       + 'ntfTick:ntfTick,equip:function(){return EQUIP;},probs:function(){return EQPROBLEMS;},'
       + 'inv:function(){return INVENTORY;},trials:function(){return TRIALS;},'
-      + 'isLow:isLow,invQty:invQty,today:trTodayISO,csLocked:csLocked'
+      + 'isLow:isLow,invQty:invQty,today:trTodayISO,csLocked:csLocked,'
+      /* What the walks decided, with the audience on each one -- the half the
+         sender uses and the bell does not. */
+      + 'events:function(){return NTF_EVENTS;},eventId:ntfEventId,'
+      + 'eventText:function(e){return ntfEventText(e,Date.now());},'
+      + 'switchOf:ntfSwitchOf,pushState:pushState,pushPrefs:pushPrefs,'
+      + 'queue:function(e,n){return pushQueue(e,n);},flush:pushFlush,'
+      + 'triesMax:function(){return PUSH_TRIES_MAX;},outbox:function(){'
+      + 'try{return JSON.parse(localStorage.getItem(\'ut_push_out\')||\'[]\');}catch(x){return [];}}'
       + '};');
   } catch (e) { console.log('app script threw: ' + e.message); fail++; }
   return { win, doc: win.document, n: win.__n || {}, errs };
@@ -1134,5 +1142,321 @@ section('22. the three new walks cannot silence each other, or the two old ones'
   ok('nothing threw', b.errs.length === 0, b.errs.join(' | '));
 }
 
-console.log('\n' + pass + ' passed, ' + fail + ' failed');
-process.exit(fail ? 1 : 0);
+section('23. THE SWEEP: the buzz and the bell agree about who hears what');
+{
+  /* THE ONE TEST THAT HOLDS PHONE NOTIFICATIONS TOGETHER.
+     ------------------------------------------------------------------
+     Every alert is now answered twice. The BELL asks "is this mine" on the
+     phone of the person reading it. The BUZZ asks "whose is this" on whatever
+     phone happened to be awake when it happened, and hands that list to the
+     sender -- because the people who need buzzing are precisely the ones whose
+     phones were shut and noticed nothing.
+
+     Those two answers come from one walk, which is the whole point of the way
+     it is written. This sweep is what proves it: for each change below it runs
+     the farm forward once per PERSON, sees whether their own bell lit up, and
+     checks that against the audience the walk handed the sender. A person on
+     the list whose bell stayed dark would be somebody buzzed about something
+     they cannot see in the app. A person off the list whose bell lit up would
+     be somebody the farm never buzzes. Both are silent failures in the field
+     and neither is visible from any screen. */
+
+  /* Everything one scenario needs: what the farm looked like, and what
+     changed. `make` runs against a freshly booted app signed in as `who`. */
+  function sweep(name, make) {
+    /* First pass: one phone watches, and we take the audiences it worked out. */
+    const lead = boot({});
+    lead.n.signIn(lead.n.RST_LOGIN.manager);
+    make(lead.n, true);                          /* set the scene */
+    lead.n.ntfScan();                            /* ...silently */
+    make(lead.n, false);                         /* now change it */
+    lead.n.ntfScan();
+    const evs = lead.n.events().map(e => ({ k: e.k, to: e.to.slice() }));
+    ok(name + ': the walk produced news at all', evs.length > 0,
+       JSON.stringify(evs));
+
+    /* Second pass: every kind of person on the farm, one at a time, each on
+       their own phone, and we look at their bell. */
+    const roles = ['manager', 'faculty', 'tech', 'grad', 'undergrad'];
+    roles.forEach(role => {
+      const b = boot({});
+      const pid = b.n.RST_LOGIN[role];
+      b.n.signIn(pid);
+      make(b.n, true);
+      b.n.ntfScan();
+      make(b.n, false);
+      b.n.ntfScan();
+      const rows = b.n.ntf().list.map(e => e.k);
+      /* What the audiences say this person should have seen -- at most one,
+         because a person hears one thing per record per look. */
+      const addressed = evs.filter(e => e.to.indexOf(pid) >= 0).map(e => e.k);
+      ok(name + ': ' + role + ' hears exactly what the sender would tell them',
+         rows.join(',') === addressed.slice(0, rows.length || 1).join(',')
+           || (rows.length === 0 && addressed.length === 0)
+           || (rows.length === 1 && addressed[0] === rows[0]),
+         'bell=[' + rows + '] audience=[' + addressed + ']');
+      ok(name + ': ' + role + ' is not told twice about one thing',
+         rows.length <= 1, '[' + rows + ']');
+    });
+  }
+
+  const T = () => boot({}).n;   /* only for reading RST_LOGIN below */
+  const L = T().RST_LOGIN;
+
+  sweep('a job handed to an undergrad', (n, setup) => {
+    if (setup) { n.setTasks([task({ id: 'sw1', assignee: null, createdBy: L.manager })]); return; }
+    n.tasks()[0].assignee = L.undergrad;
+    n.tasks()[0].assignedBy = L.manager;
+  });
+
+  sweep('that job coming back finished', (n, setup) => {
+    if (setup) {
+      n.setTasks([task({ id: 'sw2', assignee: L.undergrad, assignedBy: L.manager,
+                         createdBy: L.manager })]);
+      return;
+    }
+    Object.assign(n.tasks()[0], { status: 'done', completedBy: L.undergrad });
+  });
+
+  sweep('a technician asking for help', (n, setup) => {
+    if (setup) { n.setTasks([task({ id: 'sw3', assignee: null, title: 'Pull covers' })]); return; }
+    Object.assign(n.tasks()[0], { kind: 'request', origin: 'crew', requestedBy: L.tech,
+                                  createdBy: L.tech, students: 2, assignee: null });
+  });
+
+  sweep('Bill putting somebody on that request', (n, setup) => {
+    if (setup) {
+      n.setTasks([task({ id: 'sw4', kind: 'request', origin: 'crew', requestedBy: L.tech,
+                         createdBy: L.tech, students: 2, assignee: null })]);
+      return;
+    }
+    Object.assign(n.tasks()[0], { kind: 'task', assignee: L.undergrad });
+  });
+
+  sweep('a machine going down', (n, setup) => {
+    if (setup) return;
+    const m = n.equip()[0];
+    n.probs().unshift({ id: 'swp', eq: m.id, by: L.manager, downBy: L.manager,
+                        status: 'open', desc: 'Hydraulic leak' });
+    m.status = 'down';
+  });
+
+  sweep('an issue reported on a machine', (n, setup) => {
+    if (setup) return;
+    const m = n.equip()[1];
+    n.probs().unshift({ id: 'swq', eq: m.id, by: L.undergrad, status: 'open', desc: 'Belt squeal' });
+    m.flagged = true;
+  });
+
+  sweep('a product reaching its reorder point', (n, setup) => {
+    if (setup) return;
+    const it = n.inv().filter(x => !n.isLow(x))[0];
+    it.thr = n.invQty(it) + 5;
+  });
+
+  sweep('ground closing', (n, setup) => {
+    if (setup) {
+      n.trials().push({ id: 'sws', title: 'A study', lab: 'Sorochan', stage: 'active',
+                        start: n.today(), end: '', plots: ['CAFS14'], restrictions: [] });
+      return;
+    }
+    n.trials().filter(t => t.id === 'sws')[0].restrictions.push(
+      { id: 'swr', type: 'mow', scope: 'CAFS14', start: n.today(), end: '', by: 'Somebody' });
+  });
+}
+
+section('24. what the sender is actually handed');
+{
+  const b = boot({});
+  const { n } = b;
+  const BILL = n.RST_LOGIN.manager, STU = n.RST_LOGIN.undergrad;
+  n.signIn(BILL);
+  n.setTasks([task({ id: 'q1', assignee: null, createdBy: BILL })]);
+  n.ntfScan();
+  n.tasks()[0].assignee = STU;
+  n.tasks()[0].assignedBy = BILL;
+  n.ntfScan();
+
+  const ev = n.events().filter(e => e.k === 'assigned')[0];
+  ok('the undergrad is in the audience', !!ev && ev.to.indexOf(STU) >= 0,
+     JSON.stringify(ev && ev.to));
+  ok('and Bill, who did it, is not', !!ev && ev.to.indexOf(BILL) < 0);
+
+  /* SAME NAME ON EVERY PHONE. The sender keeps the first report of a thing and
+     throws the rest away, which only works if two phones that saw the same
+     change call it the same thing. Nothing in here may come from the clock. */
+  const b2 = boot({});
+  b2.n.signIn(b2.n.RST_LOGIN.tech);
+  b2.n.setTasks([task({ id: 'q1', assignee: null, createdBy: BILL })]);
+  b2.n.ntfScan();
+  b2.n.tasks()[0].assignee = STU;
+  b2.n.tasks()[0].assignedBy = BILL;
+  b2.n.ntfScan();
+  const ev2 = b2.n.events().filter(e => e.k === 'assigned')[0];
+  ok('two different phones give the change the same name',
+     n.eventId(ev) === b2.n.eventId(ev2), n.eventId(ev) + ' vs ' + b2.n.eventId(ev2));
+  ok('and the name is not empty', !!n.eventId(ev), n.eventId(ev));
+
+  /* THE QUEUE, taken FIRST. Opening any screen rescans, and a rescan is a new
+     look with new news -- so anything read after one is the wrong list. That
+     is not a quirk of the test, it is how the feed works. */
+  const text = n.eventText(ev);
+  n.queue(n.events(), Date.now());
+  const out = n.outbox();
+
+  /* THE SENTENCE IS THE SAME SENTENCE. A buzz that words things differently
+     from the bell behind it reads as two separate events to the person
+     holding the phone. Checked on the UNDERGRAD's phone, because they are the
+     one the alert is addressed to -- Bill did it, so his own bell is rightly
+     empty. */
+  const bs = boot({});
+  bs.n.signIn(STU);
+  bs.n.setTasks([task({ id: 'q1', assignee: null, createdBy: BILL })]);
+  bs.n.ntfScan();
+  bs.n.tasks()[0].assignee = STU;
+  bs.n.tasks()[0].assignedBy = BILL;
+  bs.n.ntfScan();
+  bs.n.go('notifications');
+  const html = bs.doc.getElementById('ntf-body').innerHTML;
+  ok('the buzz says what the bell says', !!text && html.indexOf(text.title) >= 0,
+     JSON.stringify(text) + ' | ' + html.slice(0, 160));
+  ok('and it is plain words, not web-page markup',
+     !!text && !/&(amp|lt|gt|quot|#39);/.test(text.title + text.body), JSON.stringify(text));
+
+  /* THE SWITCH THAT GOVERNS IT travels with the message, because the sender
+     has to decide not to send without knowing what any alert means. */
+  ok('"assigned" is governed by the "tasks" switch', n.switchOf('assigned') === 'tasks');
+  ok('a machine going down and coming back share one switch',
+     n.switchOf('eqdown') === 'equip' && n.switchOf('equp') === 'equip');
+  ok('ground closing and opening share one too',
+     n.switchOf('resclose') === 'trials' && n.switchOf('resopen') === 'trials');
+  ok('and anything else answers to its own name', n.switchOf('low') === 'low');
+
+  /* Noticed now, handed over when there is signal. */
+  ok('the news is queued for the sender', out.length > 0, String(out.length));
+  ok('each queued message carries its audience', out.every(m => Array.isArray(m.to) && m.to.length));
+  ok('and the switch that governs it', out.every(m => !!m.sw));
+  const before = out.length;
+  n.queue([ev], Date.now());
+  ok('queueing the same news twice does not double it', n.outbox().length === before,
+     n.outbox().length + ' vs ' + before);
+
+  /* WHAT THE SENDER IS TOLD ABOUT A PERSON, and what it is not. */
+  const prefs = n.pushPrefs();
+  ok('the sender is told which switches this person left on',
+     prefs.alerts && prefs.alerts.a_tasks === true);
+  ok('and their delivery hours and where in the world they are',
+     'quiet' in prefs && 'start' in prefs && !!prefs.tz, JSON.stringify(prefs.tz));
+  ok('but nothing about who hears what', !('to' in prefs) && !('roles' in prefs));
+
+  ok('and none of that threw', b.errs.length === 0, b.errs.join(' | '));
+}
+
+/* Written as a function and run at the very bottom, rather than as a block
+   like every other section here. A bare `return` at the top level of one of
+   these files leaves the WHOLE FILE -- so the sections after it never run and
+   the summary never prints, which looks exactly like the tests hanging. */
+async function flushSection() {
+  section('24b. one message the sender will not take cannot silence the farm');
+
+  /* THE FAILURE THIS PREVENTS. The queue goes out oldest first, so a message
+     that can never be sent sits at the front and everything behind it waits.
+     ONE bad message would quietly stop the whole farm being told anything,
+     with nothing on any screen to say why -- the same shape as the stuck
+     record sdbMaySend() exists for on the database side.
+
+     The sender is stood in for here, because what matters is how the phone
+     reads an ANSWER: a refusal that names a problem with the message itself
+     will never pass, while a dead spot or an expired sign-in might. */
+  function rig(status) {
+    const b = boot({});
+    const { n, win } = b;
+    const BILL = n.RST_LOGIN.manager, STU = n.RST_LOGIN.undergrad;
+    win.dbConfigured = () => true;
+    win.fbAuth = () => ({ currentUser: { getIdToken: () => Promise.resolve('pretend-token') } });
+    let calls = 0;
+    win.fetch = () => { calls++; return Promise.resolve({ ok: false, status: status, json: () => Promise.resolve({}) }); };
+    n.signIn(BILL);
+    n.setTasks([task({ id: 'f1', assignee: null, createdBy: BILL })]);
+    n.ntfScan();
+    n.tasks()[0].assignee = STU;
+    n.tasks()[0].assignedBy = BILL;
+    n.ntfScan();
+    n.queue(n.events(), Date.now());
+    return { b, n, calls: () => calls };
+  }
+
+  /* A REFUSAL ABOUT THE MESSAGE ITSELF. Trying again tomorrow will not help,
+     so it goes at once rather than blocking everything behind it. */
+  {
+    const r = rig(400);
+    ok('there is something waiting to go', r.n.outbox().length === 1, String(r.n.outbox().length));
+    await r.n.flush();
+    ok('a message the sender will never accept is dropped straight away',
+       r.n.outbox().length === 0, String(r.n.outbox().length));
+    ok('and it was really offered first', r.calls() === 1, String(r.calls()));
+  }
+
+  /* A DEAD SPOT, or a sign-in that has gone stale. Both pass on their own, so
+     the message waits -- but not for ever, because a queue that never empties
+     is the same silence by a slower route. */
+  {
+    const r = rig(503);
+    await r.n.flush();
+    ok('a message that failed for a reason that might pass is kept',
+       r.n.outbox().length === 1, String(r.n.outbox().length));
+    let rounds = 1;
+    while (r.n.outbox().length && rounds < r.n.triesMax() + 3) { rounds++; await r.n.flush(); }
+    ok('but it is given up on after a few goes rather than blocking the queue',
+       r.n.outbox().length === 0, String(r.n.outbox().length));
+    ok('and that took several attempts, not one', rounds >= r.n.triesMax(), String(rounds));
+    ok('nothing threw', r.b.errs.length === 0, r.b.errs.join(' | '));
+  }
+
+  /* AND THE ONE THAT MUST NOT BE GIVEN UP ON LIGHTLY: a phone with no signal
+     never reaches the sender at all, and its news has to survive that. */
+  {
+    const b = boot({});
+    const { n, win } = b;
+    const BILL = n.RST_LOGIN.manager, STU = n.RST_LOGIN.undergrad;
+    win.dbConfigured = () => true;
+    win.fbAuth = () => ({ currentUser: { getIdToken: () => Promise.resolve('pretend-token') } });
+    win.fetch = () => Promise.reject(new Error('no signal'));
+    n.signIn(BILL);
+    n.setTasks([task({ id: 'f2', assignee: null, createdBy: BILL })]);
+    n.ntfScan();
+    n.tasks()[0].assignee = STU;
+    n.tasks()[0].assignedBy = BILL;
+    n.ntfScan();
+    n.queue(n.events(), Date.now());
+    await n.flush();
+    ok('news noticed in a dead spot is still waiting afterwards',
+       n.outbox().length === 1, String(n.outbox().length));
+  }
+}
+
+section('25. this phone says honestly whether it can buzz at all');
+{
+  const b = boot({});
+  /* jsdom has no push support, which is the same situation as an old browser
+     on somebody's laptop -- and the answer has to be a plain word rather than
+     a crash or a silent nothing. */
+  const st = b.n.pushState();
+  ok('it gives one of the words the screen knows how to explain',
+     ['nosender','needs-install','unsupported','blocked','off','on'].indexOf(st) >= 0, st);
+  ok('the sender address is set', /^https:\/\//.test(b.win.PUSH_URL || ''), String(b.win.PUSH_URL));
+  b.n.go('notifsettings');
+  /* textContent, not innerText: the test harness is not a real browser and
+     has no idea how a page would LOOK, so innerText is simply not there. */
+  const t = b.doc.getElementById('nts-body').textContent || '';
+  ok('the screen has a row for this phone', /Buzz this phone/.test(t), t.slice(0, 120));
+  ok('and it says what the situation is rather than failing quietly',
+     /bell inside the app|home screen|blocked|Turn on|Turn off|Not set up/.test(t), t.slice(0, 200));
+}
+
+flushSection()
+  .catch(e => { console.log('  FAIL  the queue section threw: ' + e.message); fail++; })
+  .then(() => {
+    console.log('\n' + pass + ' passed, ' + fail + ' failed');
+    process.exit(fail ? 1 : 0);
+  });

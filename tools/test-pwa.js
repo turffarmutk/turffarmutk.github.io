@@ -158,13 +158,104 @@ section('5. registration is conditional');
 }
 
 /* ---------------------------------------------------------------- */
-if (process.argv.indexOf('--browser') >= 0) {
-  section('6. it installs and survives the network dying (browser)');
-  runBrowser().then(finish, e => { console.log('  FAIL  browser check: ' + e.message); fail++; finish(); });
-} else {
-  console.log('\n(run with --browser to install it in Chromium and pull the plug)');
-  finish();
+/* THE ONLY PART OF THIS APP THAT RUNS WITH NOBODY LOOKING AT IT, so it is run
+   here rather than reasoned about: sw.js is loaded with a pretend browser
+   around it, a message is pushed in, and we see what it would put on screen.
+
+   The rule it must never break: IT ALWAYS SHOWS SOMETHING. A push that puts
+   nothing on screen makes the browser show its own "this site was updated in
+   the background" notice -- wording nobody chose, nobody can turn off and
+   nobody can explain. So even a message that arrives damaged has to produce a
+   sentence of the farm's own. */
+async function pushSection() {
+  section('7. a notification arriving with the app shut');
+  const L = {};
+  const shown = [], posted = [], waits = [];
+  let opened = null;
+  const self = {
+    addEventListener: (k, fn) => { L[k] = fn; },
+    registration: { showNotification: (title, opts) => { shown.push({ title, opts }); return Promise.resolve(); } },
+    clients: {
+      matchAll: () => Promise.resolve(self.__windows),
+      openWindow: u => { opened = u; return Promise.resolve(); },
+      claim: () => Promise.resolve()
+    },
+    skipWaiting: () => {},
+    location: { href: 'https://turffarmutk.github.io/UT-TurfFarm-App.html' },
+    __windows: []
+  };
+  const swSrc = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
+  let threw = null;
+  try {
+    new Function('self', 'caches', 'fetch', 'Response', 'URL', swSrc)(
+      self,
+      { open: () => Promise.resolve({ addAll: () => Promise.resolve() }),
+        keys: () => Promise.resolve([]), match: () => Promise.resolve(null) },
+      () => Promise.resolve({ ok: true }), function Res() {}, URL);
+  } catch (e) { threw = e.message; }
+  ok('the offline copy loads at all', !threw, threw || '');
+  ok('and it is listening for notifications', typeof L.push === 'function');
+  ok('and for somebody tapping one', typeof L.notificationclick === 'function');
+  if (!L.push || !L.notificationclick) return;
+
+  L.push({ data: { json: () => ({ k: 'eqdown', t: 'John Deere 7700A is out of service',
+                                  b: 'Bill Czekai marked it down · Bullpen',
+                                  g: 'eqdown:e3', u: '' }) },
+           waitUntil: pr => waits.push(pr) });
+  ok('it shows the message', shown.length === 1, String(shown.length));
+  ok('with the farm’s own words as the title',
+     shown[0] && shown[0].title === 'John Deere 7700A is out of service', shown[0] && shown[0].title);
+  ok('and the detail underneath',
+     shown[0] && /marked it down/.test(shown[0].opts.body), shown[0] && shown[0].opts.body);
+  ok('tagged, so a second message about one job replaces it rather than stacking up',
+     shown[0] && shown[0].opts.tag === 'eqdown:e3', shown[0] && shown[0].opts.tag);
+  ok('and it holds the phone awake until the showing is done', waits.length === 1);
+
+  /* A DAMAGED MESSAGE, and one with nothing in it at all. */
+  shown.length = 0;
+  L.push({ data: { json: () => { throw new Error('rubbish'); } }, waitUntil: pr => waits.push(pr) });
+  ok('a message that arrives damaged still shows something', shown.length === 1, String(shown.length));
+  ok('and it is the farm’s name rather than the browser’s own wording',
+     shown[0] && shown[0].title === 'UT Turf Farm', shown[0] && shown[0].title);
+  shown.length = 0;
+  L.push({ data: null, waitUntil: pr => waits.push(pr) });
+  ok('so does one with no message in it', shown.length === 1, String(shown.length));
+
+  /* TAPPING IT. An app already open is focused, never duplicated -- a second
+     window on top of the first would lose whatever somebody was typing. */
+  let closed = false, focused = false;
+  const note = { close: () => { closed = true; }, data: { url: '', kind: 'eqdown' } };
+  self.__windows = [{ focus: () => { focused = true; return Promise.resolve(); },
+                      postMessage: m => posted.push(m) }];
+  let run = [];
+  L.notificationclick({ notification: note, waitUntil: pr => run.push(pr) });
+  await Promise.all(run);
+  ok('tapping it puts the notification away', closed);
+  ok('and brings the app that is already open to the front', focused);
+  ok('rather than opening a second one', opened === null, String(opened));
+  ok('and tells it to show the bell', posted.some(m => m && m.ntf === 'open'),
+     JSON.stringify(posted));
+
+  self.__windows = [];
+  run = [];
+  L.notificationclick({ notification: note, waitUntil: pr => run.push(pr) });
+  await Promise.all(run);
+  ok('with nothing open, it opens the app', /UT-TurfFarm-App\.html/.test(String(opened)),
+     String(opened));
 }
+
+/* ---------------------------------------------------------------- */
+pushSection().catch(e => { console.log('  FAIL  push section threw: ' + e.message); fail++; })
+  .then(() => {
+    if (process.argv.indexOf('--browser') >= 0) {
+      section('6. it installs and survives the network dying (browser)');
+      return runBrowser().then(finish, e => {
+        console.log('  FAIL  browser check: ' + e.message); fail++; finish();
+      });
+    }
+    console.log('\n(run with --browser to install it in Chromium and pull the plug)');
+    finish();
+  });
 
 function finish() {
   console.log('\n' + pass + ' passed, ' + fail + ' failed');

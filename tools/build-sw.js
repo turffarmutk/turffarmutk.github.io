@@ -116,6 +116,50 @@ self.addEventListener('message', e => {
   if (e.data === 'VERSION') e.source && e.source.postMessage({ version: VERSION });
 });
 
+/* ---- a notification arriving with the app shut ----------------------------
+   This is the only part of the app that runs when nobody has it open. It is
+   deliberately almost empty, and that is the design: the farm's rules about
+   who hears what are worked out on a phone that IS awake, and whether this
+   person wants it at all was already settled by the sender before the message
+   left. Everything that arrives here is wanted by whoever holds this phone.
+
+   IT MUST ALWAYS SHOW SOMETHING. A push that puts nothing on screen makes the
+   browser show its own "this site was updated in the background" notice
+   instead -- wording nobody chose and nobody can turn off. So even a message
+   that arrives damaged gets a plain sentence rather than silence. */
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (err) { d = {}; }
+  const title = d.t || 'UT Turf Farm';
+  e.waitUntil(self.registration.showNotification(title, {
+    body: d.b || '',
+    /* Same tag means a second message about one job REPLACES the first rather
+       than stacking up behind it. */
+    tag: d.g || 'ut-turf',
+    icon: 'icons/icon-192.png',
+    badge: 'icons/favicon-32.png',
+    data: { url: d.u || '', kind: d.k || '' }
+  }));
+});
+
+/* Tapping it. An app already open is focused and told to show the bell;
+   otherwise the app is opened. Never a second window on top of the first --
+   somebody halfway through filling in a form would lose it. */
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil((async () => {
+    const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of open) {
+      if ('focus' in c) {
+        try { await c.focus(); } catch (err) {}
+        try { c.postMessage({ ntf: 'open', kind: (e.notification.data || {}).kind || '' }); } catch (err) {}
+        return;
+      }
+    }
+    try { await self.clients.openWindow('UT-TurfFarm-App.html'); } catch (err) {}
+  })());
+});
+
 const isTile = u => /server\\.arcgisonline\\.com/.test(u);
 /* The radar loop is a live picture; a cached one is a lie about the weather. */
 const isLive = u => /radar\\.weather\\.gov/.test(u);

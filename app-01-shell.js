@@ -497,6 +497,8 @@ var NOTIF_ALERTS=[
  /* Still the only unwired row, and deliberately so: Dillon's call on
     2026-10-01 was that a spray window you only hear about when you happen to
     open the app is worth little, so weather waits for real phone push. */
+ {g:'Weather',    k:'rain24', t:'How much rain fell overnight', d:1, live:1,
+  sub:'A total for the last 24 hours each morning \u00b7 nothing on a dry one'},
  {g:'Weather',    k:'wx',     t:'Weather & spray window',d:1},
  /* Default ON, where the day it was written it was off. Closed ground is the
     one thing on this list that can put somebody on a trial with a mower. */
@@ -1105,6 +1107,8 @@ function ntfTick(){
   /* And the reminders that have to be booked days before they are due. Says
      nothing at all when nothing has changed, which is almost every tick. */
   try{ planSync(); }catch(e){}
+  /* Once a morning, and only when the weather service answers. */
+  try{ rainMorning(SESSION.pid,Date.now()); }catch(e){}
   try{ if(made&&typeof updateBellBadges==='function') updateBellBadges(); }catch(e){}
   try{
     var n=document.getElementById('s-notifications');
@@ -2190,6 +2194,97 @@ function planSync(){
   return step(0).then(function(){ return done; });
 }
 
+/* ---- how much rain fell, each morning ----
+   Dillon asked for this on 2026-10-05: a total for the last 24 hours, every
+   morning, and nothing at all on a dry one.
+
+   WHERE THE NUMBER COMES FROM, and it is not the farm's own gauge. The rain
+   log on the Rainfall screen is typed in by hand, and most mornings nobody has
+   emptied the gauge yet -- so an alert built on it would be silent on exactly
+   the mornings somebody wanted it. Worse, until today that log was seeded with
+   a year of INVENTED readings, so it would have reported rain that never fell.
+   Dillon's call was to read the weather service instead: the same free
+   National Weather Service feed the forecast already uses, which needs no
+   account, no key and no card. It is the Knoxville station rather than the
+   farm's own gauge, so it will differ a little, and the row says where it came
+   from rather than pretending otherwise.
+
+   WHY THIS ONE IS NOT BOOKED AHEAD like the other three. The number is not
+   known until the morning arrives, and a message has to carry its words when
+   it is booked. So this one is sent by whichever phone is awake first after
+   six -- which for a rainfall total is good enough, and is said plainly here
+   rather than being discovered later. */
+var RAIN_HOUR=6;                         /* nothing before this, local time */
+var RAIN_SAID_KEY='ut_rain_said';        /* the day this phone last said it */
+var RAIN_STATION='KTYS';
+var _rainBusy=false;
+
+function rainSaid(){ try{ return localStorage.getItem(RAIN_SAID_KEY)||''; }catch(e){ return ''; } }
+function rainMarkSaid(di){ try{ localStorage.setItem(RAIN_SAID_KEY,di); }catch(e){} }
+
+/* Hourly readings for the last 24 hours, added up. A station reports nothing
+   rather than a zero on a dry hour, so a missing figure is not a gap in the
+   data -- it is the absence of rain, and adding only what is there is the
+   right sum either way. */
+function rainLast24(){
+  var start=new Date(Date.now()-24*3600000).toISOString();
+  var url='https://api.weather.gov/stations/'+RAIN_STATION
+         +'/observations?start='+encodeURIComponent(start)+'&limit=50';
+  return fetch(url,{headers:{'Accept':'application/geo+json'}})
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(j){
+      var mm=0;
+      ((j&&j.features)||[]).forEach(function(f){
+        var p=f&&f.properties&&f.properties.precipitationLastHour;
+        if(p&&typeof p.value==='number'&&isFinite(p.value)) mm+=p.value;
+      });
+      return Math.round((mm/25.4)*100)/100;      /* the farm reads inches */
+    });
+}
+
+function rainMorning(me,now){
+  if(_rainBusy||!me) return Promise.resolve(0);
+  var d=new Date(now);
+  if(d.getHours()<RAIN_HOUR) return Promise.resolve(0);
+  function p2(n){ return (n<10?'0':'')+n; }
+  var di=d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
+  if(rainSaid()===di) return Promise.resolve(0);
+  if(!ntfOn('rain24')){ rainMarkSaid(di); return Promise.resolve(0); }
+  try{ if(navigator.onLine===false) return Promise.resolve(0); }catch(e){}
+
+  _rainBusy=true;
+  return rainLast24().then(function(inches){
+    /* Said once a day whatever the answer, so a dry morning is not re-asked
+       every two seconds for the rest of the day. */
+    rainMarkSaid(di);
+    /* NOTHING ON A DRY MORNING -- Dillon asked for the alert to be cancelled
+       when the total is zero, and that is this line. */
+    if(!(inches>0)) return 0;
+
+    var farm=ntfEveryone();
+    var ev=ntfEmit('rain24',farm,{rain:di,inches:inches});
+    if(!ev) return 0;
+    var title=inches.toFixed(2)+'″ of rain in the last 24 hours';
+    var body='Measured at '+RAIN_STATION+' · National Weather Service';
+    try{
+      pushQueue([{k:'rain24',to:ev.to,rainId:'rain24:'+di,
+                  rainTitle:title,rainBody:body}],now);
+    }catch(e){}
+    if(ntfForMe(ev,me)){
+      NTF.list.unshift({ id:ntfNewId(now), k:'rain24', t:now, plan:'rain:'+di,
+                         ttl:title, note:body });
+      ntfTrim(); ntfSave();
+      try{ updateBellBadges(); }catch(e){}
+      return 1;
+    }
+    return 0;
+  }).catch(function(){
+    /* No signal, or the service is having a bad day. Say nothing and try
+       again tomorrow -- never guess at a rainfall figure. */
+    return 0;
+  }).then(function(r){ _rainBusy=false; return r; });
+}
+
 function pushOutRead(){
   try{ var r=JSON.parse(localStorage.getItem(PUSH_OUT_KEY)||'[]'); return Array.isArray(r)?r:[]; }
   catch(e){ return []; }
@@ -2204,8 +2299,11 @@ function pushQueue(events,now){
   if(!PUSH_URL||!events||!events.length) return 0;
   var out=pushOutRead(), added=0;
   events.forEach(function(ev){
-    var id=ntfEventId(ev); if(!id) return;
-    var text=ntfEventText(ev,now); if(!text) return;
+    /* The rainfall total writes its own sentence, because the number in it is
+       not in any record -- it came from the weather service a moment ago. */
+    var id=ev.rainId||ntfEventId(ev); if(!id) return;
+    var text=ev.rainId?{title:ev.rainTitle,body:ev.rainBody}:ntfEventText(ev,now);
+    if(!text) return;
     if(out.some(function(x){ return x.id===id; })) return;
     out.unshift({ id:id, to:ev.to, kind:ev.k, sw:ntfSwitchOf(ev.k),
                   title:text.title, body:text.body, at:now });
@@ -2321,7 +2419,8 @@ var NTF_KIND={
      and only one person can answer it, and the pay period is about money. */
   boardempty:{c:'#d17a00'}, /* diamond  - needs attention */
   noclock: {c:'#c0392b'},   /* square   - urgent, only you can answer it */
-  payend:  {c:'#9a5b00'}    /* diamond  - check this, it is your pay */
+  payend:  {c:'#9a5b00'},   /* diamond  - check this, it is your pay */
+  rain24:  {c:'#22a5c4'}    /* ring     - informational, it rained or it did not */
 };
 /* 24-hour "07:02" as the farm reads it. The time clock has its own t12()
    inside its closure; this is the same answer where the bell can reach it. */
@@ -2493,6 +2592,7 @@ document.getElementById('s-notifications').addEventListener('click',function(e){
   if(ev.plan){
     try{
       if(ev.k==='boardempty') go('taskboard');
+      else if(ev.k==='rain24') go('weather');
       else go('timeclock');
     }catch(_q){}
     return;

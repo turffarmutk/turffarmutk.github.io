@@ -1534,6 +1534,41 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### The rainfall total reads the weather service, and the invented year is gone — 2026-10-05
+**Decision:** the morning "how much rain fell" alert reads **observed hourly
+rainfall from the National Weather Service** (station KTYS, the same free feed
+the forecast already uses), not the farm's own rain-gauge log. And the rain log
+**no longer ships with a fabricated year** of readings; a phone that already has
+them strips them out once, on load (`stripSeeded()` in `app-05-tasks-clock.js`).
+**Why:** two reasons, and the second is the serious one. The gauge log is typed
+in by hand and most mornings nobody has emptied the gauge yet, so an alert built
+on it would be silent on exactly the mornings somebody wanted it. But worse:
+that log was **seeded with invented readings**, generated so the chart would not
+look empty. Harmless while it was only a chart. The moment a number out of it is
+sent to twenty-three phones it is a record, and a record nobody measured is one
+nobody should be told. Dillon chose to clear it and read the service instead.
+It is the Knoxville station rather than the farm's gauge, so the figure differs
+a little — and the row says where it came from rather than pretending.
+**Don't:** don't let this one guess. A service that cannot be reached, or has
+nothing to report, says **nothing** — "0.00 inches" and "we do not know" are
+different sentences and only one of them is honest. And don't re-seed the rain
+log to make the chart look fuller; that is the same decision the time clock
+made on 2026-08-25, for the same reason.
+
+### This one alert is not booked ahead, and that is a real limitation — 2026-10-05
+**Decision:** the rainfall total is sent by whichever phone is awake first after
+6am, rather than being booked with the sender in advance like the other three
+clock-driven alerts.
+**Why:** a booked message has to carry its words when it is booked, and the
+number is not known until the morning arrives. The alternative was teaching the
+sender to fetch the weather itself on its cron run — which would make it decide
+something rather than relay something, and that is the line this whole design
+keeps.
+**Don't:** don't assume it arrives at a fixed time. On a morning when nobody
+opens the app before ten, it arrives at ten. That is acceptable for a rainfall
+summary and would NOT be for the clock-in nudge, which is why only this one
+works this way.
+
 ### Three alerts the CLOCK sets off, worked out days in advance — 2026-10-05
 **Decision:** "45 minutes before a shift with an empty task board", "9am on the
 day the pay period ends" and "30 minutes after a shift started with no clock-in"

@@ -2972,7 +2972,9 @@ function wxDraw(){
   /* deterministic PRNG — same seeded year on every machine, every reload */
   function lcg(seed){var s=seed>>>0;return function(){s=(s*1664525+1013904223)>>>0;return s/4294967296;};}
 
-  function seed(){
+  /* NOT CALLED TO MAKE DATA ANY MORE -- see stripSeeded() above. It exists so
+     the fabricated readings it once wrote can be recognised and removed. */
+  function seedOld(){
     var out=[],r=lcg(20260101),t=today(),y=t.getFullYear(),id=1;
     for(var m=0;m<12;m++){
       if(new Date(y,m,1)>t)break;
@@ -2995,9 +2997,36 @@ function wxDraw(){
     return out;
   }
 
+  /* THE INVENTED YEAR IS GONE -- Dillon's call, 2026-10-05, and it is the same
+     call the time clock made on 2026-08-25 for the same reason: nothing but
+     equipment, the roster and the task catalog is supposed to ship pre-loaded.
+
+     It mattered more here than it looked. The rainfall figure is about to be
+     read by a notification, and a reading nobody took is a number nobody
+     should be told. A chart with invented bars in it is a demo; a chart that
+     feeds a message to twenty-three phones is a record.
+
+     seedOld() is kept for ONE purpose: working out which readings on a phone
+     were invented, so they can be taken out again. It is deterministic -- the
+     same seeded year on every machine -- so matching on the date and the
+     amount finds exactly the fabricated ones and nothing else. Same approach
+     as TRIALS_STRIPPED_SEED_IDS in the page, and for the same reason: a phone
+     that already has them will otherwise keep them for ever. */
+  var RN_SEED_KEY='ut_rain_seed_v';
+  function stripSeeded(){
+    try{
+      if(localStorage.getItem(RN_SEED_KEY)==='gone') return;
+      var fake={};
+      seedOld().forEach(function(x){ fake[x.d+'|'+x.amt]=1; });
+      var before=RN.length;
+      RN=RN.filter(function(x){ return !fake[x.d+'|'+x.amt]; });
+      if(RN.length!==before) save();
+      localStorage.setItem(RN_SEED_KEY,'gone');
+    }catch(e){}
+  }
   function load(){
-    try{var r=JSON.parse(localStorage.getItem(RN_KEY)||'null');if(r&&r.length){RN=r;return;}}catch(e){}
-    RN=seed(); save();
+    try{var r=JSON.parse(localStorage.getItem(RN_KEY)||'null');if(r&&r.length){RN=r;}}catch(e){}
+    stripSeeded();
   }
   function save(){try{localStorage.setItem(RN_KEY,JSON.stringify(RN));}catch(e){}}
   function nextId(){var n=0;RN.forEach(function(x){if(x.id>n)n=x.id;});return n+1;}

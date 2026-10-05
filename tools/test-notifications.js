@@ -108,6 +108,7 @@ function boot(store) {
          still -- see the note over planDays(). */
       + 'planWanted:function(at){return planWanted(at);},'
       + 'periodEndOn:function(d){return tcPeriodEndOn(d);},'
+      + 'rainMorning:function(me,at){return rainMorning(me,at);},'
       + 'queue:function(e,n){return pushQueue(e,n);},flush:pushFlush,'
       + 'triesMax:function(){return PUSH_TRIES_MAX;},outbox:function(){'
       + 'try{return JSON.parse(localStorage.getItem(\'ut_push_out\')||\'[]\');}catch(x){return [];}}'
@@ -426,10 +427,10 @@ section('6d. one row per job per look, and the six switches are separate');
      ever creeps into this list without push being built, that label is a lie
      again. */
   const kinds = ('tasks,done,partial,reqnew,reqok,reqdone,boardempty,equip,eqflag,low,'
-               + 'restock,fllog,trials,resnew,trnew,trstart,trdone,clockin,clockout,'
-               + 'shiftauto,shiftask,noclock,payend').split(',');
+               + 'restock,fllog,rain24,trials,resnew,trnew,trstart,trdone,clockin,'
+               + 'clockout,shiftauto,shiftask,noclock,payend').split(',');
   const live = n.NOTIF_ALERTS.filter(a => a.live).map(a => a.k);
-  ok('all twenty-three are marked as really sending',
+  ok('all twenty-four are marked as really sending',
      live.join(',') === kinds.join(','), live.join(','));
   ok('and weather is still honest about not sending',
      n.NOTIF_ALERTS.filter(a => a.k === 'wx')[0].live === undefined);
@@ -504,7 +505,8 @@ section('6e. the dot colours survive colour-blind mode');
     'shiftask+eqdown+noclock',                    /* red square    - urgent, only you can answer */
     'reqok+trnew',                                /* blue ring     - informational */
     'clockin+trstart',                            /* dark circle   - something is now running */
-    'clockout+fllog'                              /* grey ring     - informational, it is written down */
+    'clockout+fllog',                             /* grey ring     - informational, it is written down */
+    'assigned+rain24'                             /* light ring    - informational, nothing to do */
   ];
   const shared = Object.keys(seen).filter(p => seen[p].length > 1).map(p => seen[p].join('+'));
   const stray = shared.filter(g => DELIBERATE.indexOf(g) < 0);
@@ -580,9 +582,9 @@ section('7. the toggles on the Notifications screen actually gate it');
   ok('turned back on and it works again', n.ntfScan() === 1);
 
   const live = n.NOTIF_ALERTS.filter(a => a.live).map(a => a.k).join(',');
-  ok('twenty-three alerts are marked as really sending',
+  ok('twenty-four alerts are marked as really sending',
      live === 'tasks,done,partial,reqnew,reqok,reqdone,boardempty,equip,eqflag,low,restock,'
-            + 'fllog,trials,resnew,trnew,trstart,trdone,clockin,clockout,shiftauto,'
+            + 'fllog,rain24,trials,resnew,trnew,trstart,trdone,clockin,clockout,shiftauto,'
             + 'shiftask,noclock,payend', live);
 }
 
@@ -1684,6 +1686,90 @@ section('27. the three the calendar sets off, with the clock held still');
   ok('and none of that threw', b.errs.length === 0, b.errs.join(' | '));
 }
 
+/* Async like flushSection() below, and for the same reason: it waits on the
+   weather service answering, and a bare `await` cannot sit at the top level of
+   one of these files. */
+async function rainSection() {
+  section('28. the morning rainfall total, and the invented year that is gone');
+
+  /* THE READING HAD TO STOP BEING INVENTED BEFORE THIS COULD EXIST. The farm's
+     rain log shipped pre-loaded with a fabricated year, generated so the chart
+     would not look empty. Harmless while it was only a chart. The moment a
+     number out of it is sent to twenty-three phones it is a record, and a
+     record nobody measured is one nobody should be told. Dillon's call on
+     2026-10-05 was to clear it out and read the weather service instead. */
+  {
+    const b = boot({});
+    ok('the rain log no longer ships with invented readings',
+       !b.win.localStorage.getItem('ut_rain'),
+       String(b.win.localStorage.getItem('ut_rain') || '').slice(0, 80));
+    shut(b);
+  }
+
+  /* The weather service is stood in for, because what is being checked is what
+     the farm is TOLD, not whether Knoxville reported rain this morning. */
+  function morning(hourlyMm, hour) {
+    const b = boot({});
+    b.n.signIn(b.n.RST_LOGIN.manager);
+    b.win.fetch = () => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({
+        features: (hourlyMm || []).map(v => ({ properties: { precipitationLastHour: { value: v } } }))
+      })
+    });
+    const d = new Date();
+    d.setHours(hour === undefined ? 7 : hour, 30, 0, 0);
+    return { b, run: () => b.n.rainMorning(b.n.RST_LOGIN.manager, d.getTime()) };
+  }
+
+  /* 10.16 + 11.18 mm is 21.34, which is 0.84 of an inch. */
+  let m = morning([10.16, 11.18, null, 0]);
+  await m.run();
+  let rows = m.b.n.ntf().list;
+  ok('a wet night is reported', rows.length === 1, String(rows.length));
+  ok('in inches, to two places', rows[0] && /0\.84/.test(rows[0].ttl), rows[0] && rows[0].ttl);
+  ok('and it says where the figure came from',
+     rows[0] && /National Weather Service/.test(rows[0].note), rows[0] && rows[0].note);
+  await m.run();
+  ok('and it is not said again the same day', m.b.n.ntf().list.length === 1,
+     String(m.b.n.ntf().list.length));
+  shut(m.b);
+
+  /* NOTHING ON A DRY MORNING, which is what Dillon asked for in those words. */
+  m = morning([0, 0, null]);
+  await m.run();
+  ok('a dry night says nothing at all', m.b.n.ntf().list.length === 0,
+     m.b.n.ntf().list.map(e => e.k).join(','));
+  shut(m.b);
+
+  m = morning([]);
+  await m.run();
+  ok('and so does a service with nothing to report', m.b.n.ntf().list.length === 0,
+     m.b.n.ntf().list.map(e => e.k).join(','));
+  shut(m.b);
+
+  /* A SERVICE HAVING A BAD DAY MUST NOT PRODUCE A GUESS. Silence is the only
+     honest answer to "how much rain fell" when nobody knows. */
+  {
+    const b = boot({});
+    b.n.signIn(b.n.RST_LOGIN.manager);
+    b.win.fetch = () => Promise.reject(new Error('no signal'));
+    const d = new Date(); d.setHours(7, 30, 0, 0);
+    await b.n.rainMorning(b.n.RST_LOGIN.manager, d.getTime());
+    ok('a weather service that cannot be reached says nothing',
+       b.n.ntf().list.length === 0, b.n.ntf().list.map(e => e.k).join(','));
+    ok('and nothing threw', b.errs.length === 0, b.errs.join(' | '));
+    shut(b);
+  }
+
+  /* It is a MORNING total. */
+  m = morning([20], 3);
+  await m.run();
+  ok('nothing is said at three in the morning', m.b.n.ntf().list.length === 0,
+     String(m.b.n.ntf().list.length));
+  shut(m.b);
+}
+
 /* Written as a function and run at the very bottom, rather than as a block
    like every other section here. A bare `return` at the top level of one of
    these files leaves the WHOLE FILE -- so the sections after it never run and
@@ -1786,7 +1872,9 @@ section('25. this phone says honestly whether it can buzz at all');
      /bell inside the app|home screen|blocked|Turn on|Turn off|Not set up/.test(t), t.slice(0, 200));
 }
 
-flushSection()
+rainSection()
+  .catch(e => { console.log('  FAIL  the rainfall section threw: ' + e.message); fail++; })
+  .then(flushSection)
   .catch(e => { console.log('  FAIL  the queue section threw: ' + e.message); fail++; })
   .then(() => {
     console.log('\n' + pass + ' passed, ' + fail + ' failed');

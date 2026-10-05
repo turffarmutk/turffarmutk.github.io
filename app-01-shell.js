@@ -486,6 +486,10 @@ var NOTIF_ALERTS=[
   sub:'Bill, the technicians and faculty \u00b7 whoever would fix it'},
  {g:'Inventory',  k:'low',    t:'A product reaches its reorder point', d:1, live:1,
   sub:'Bill and faculty \u00b7 the people who order'},
+ {g:'Inventory',  k:'restock', t:'Somebody books stock in', d:1, live:1,
+  sub:'Bill and faculty \u00b7 a delivery arriving, not a job taking stock out'},
+ {g:'Field Log',  k:'fllog',  t:'Somebody logs work by hand', d:1, live:1,
+  sub:'Bill and faculty \u00b7 an entry typed in, not one a finished job wrote'},
  /* Still the only unwired row, and deliberately so: Dillon's call on
     2026-10-01 was that a spray window you only hear about when you happen to
     open the app is worth little, so weather waits for real phone push. */
@@ -494,6 +498,16 @@ var NOTIF_ALERTS=[
     one thing on this list that can put somebody on a trial with a mower. */
  {g:'Trials',     k:'trials', t:'Ground closes, or opens again', d:1, live:1,
   sub:'A restriction starting, ending or being lifted, named by plot'},
+ /* The four Dillon asked for on 2026-10-05. All of them reach the whole farm,
+    which was his call and not my advice -- so each has its own switch, and
+    anybody who finds them noisy turns that one off rather than the lot. */
+ {g:'Trials',     k:'resnew', t:'A restriction is added for a later date', d:1, live:1,
+  sub:'One that starts today says "closed" instead, so nothing is said twice'},
+ {g:'Trials',     k:'trnew',  t:'A new study is added', d:1, live:1,
+  sub:'By its ground and its lab \u2014 a study not yet started is not named'},
+ {g:'Trials',     k:'trstart',t:'A study starts', d:1, live:1},
+ {g:'Trials',     k:'trdone', t:'A study is finished', d:1, live:1,
+  sub:'Its restrictions are lifted in the same moment'},
  /* The clock's four. The first two are for whoever runs the crew -- they only
     ever raise on a phone that can edit a timesheet -- and the last two are
     for the student whose shift it is. Everybody sees all four switches,
@@ -738,8 +752,9 @@ var NTF_KEEP_DAYS=30;      /* and for how long, whichever runs out first */
    different moments: a phone can easily know about the farm's jobs a minute
    before the first punch reaches it, and counting that as "I have now seen
    the time clock" would make every historical shift look like news. */
-var NTF={v:2,seen:{},pseen:{},list:[],readAt:0,base:0,pbase:0,
-         eseen:{},iseen:{},rseen:{},ebase:0,ibase:0,rbase:0};
+var NTF={v:3,seen:{},pseen:{},list:[],readAt:0,base:0,pbase:0,
+         eseen:{},iseen:{},rseen:{},ebase:0,ibase:0,rbase:0,
+         fseen:{},mseen:{},tseen:{},aseen:{},fbase:0,mbase:0};
 function ntfLoad(){
   var s=prefsGet('ntfeed',null)||{};
   /* A map that is missing reads as empty and a baseline that is missing reads
@@ -760,18 +775,24 @@ function ntfLoad(){
      (`list` and `readAt`) are kept, because those are still perfectly good --
      it is only the "what did the farm look like last time" half that cannot
      be understood any more. */
-  var fresh=(+s.v||0)<2;
+  var fresh=(+s.v||0)<3;
   if(fresh) s={list:s.list, readAt:s.readAt};
-  NTF={v:2, seen:map(s.seen), pseen:map(s.pseen),
+  NTF={v:3, seen:map(s.seen), pseen:map(s.pseen),
        eseen:map(s.eseen), iseen:map(s.iseen), rseen:map(s.rseen),
+       fseen:map(s.fseen), mseen:map(s.mseen),
+       tseen:map(s.tseen), aseen:map(s.aseen),
        list:Array.isArray(s.list)?s.list:[],
        readAt:+s.readAt||0, base:+s.base||0, pbase:+s.pbase||0,
-       ebase:+s.ebase||0, ibase:+s.ibase||0, rbase:+s.rbase||0};
+       ebase:+s.ebase||0, ibase:+s.ibase||0, rbase:+s.rbase||0,
+       fbase:+s.fbase||0, mbase:+s.mbase||0};
 }
-function ntfSave(){ prefsSet('ntfeed',{v:2,seen:NTF.seen,pseen:NTF.pseen,list:NTF.list,
+function ntfSave(){ prefsSet('ntfeed',{v:3,seen:NTF.seen,pseen:NTF.pseen,list:NTF.list,
                                        readAt:NTF.readAt,base:NTF.base,pbase:NTF.pbase,
                                        eseen:NTF.eseen,iseen:NTF.iseen,rseen:NTF.rseen,
-                                       ebase:NTF.ebase,ibase:NTF.ibase,rbase:NTF.rbase}); }
+                                       ebase:NTF.ebase,ibase:NTF.ibase,rbase:NTF.rbase,
+                                       fseen:NTF.fseen,mseen:NTF.mseen,
+                                       tseen:NTF.tseen,aseen:NTF.aseen,
+                                       fbase:NTF.fbase,mbase:NTF.mbase}); }
 /* WHICH SWITCH GOVERNS WHICH ALERT, and they are not all the same word.
    Five of the sixteen alerts are governed by a switch with a different name --
    "work assigned to me" is one row on the settings screen but the event is
@@ -963,10 +984,14 @@ function ntfScan(){
   var machines=ntfScanEquip(me,now);
   var shelf=ntfScanInv(me,now);
   var ground=ntfScanRes(me,now);
-  if(jobs.changed||punches.changed||machines.changed||shelf.changed||ground.changed){
+  var logbook=ntfScanLog(me,now);
+  var moves=ntfScanMoves(me,now);
+  if(jobs.changed||punches.changed||machines.changed||shelf.changed||ground.changed
+     ||logbook.changed||moves.changed){
     ntfTrim(); ntfSave();
   }
-  return jobs.made+punches.made+machines.made+shelf.made+ground.made;
+  return jobs.made+punches.made+machines.made+shelf.made+ground.made
+       + logbook.made+moves.made;
 }
 function ntfScanTasks(me,now){
   var all=null; try{ all=TASKS; }catch(e){}
@@ -1276,6 +1301,74 @@ function ntfClip(txt,n){
   return (txt.length>n)?(txt.slice(0,n-1)+'…'):txt;
 }
 
+/* THE TWO LISTS THAT ONLY EVER GROW, and the one rule for watching them.
+   The field log and the stock ledger are not like machines or products: they
+   are histories, one record per thing that happened, and they never get
+   shorter. A ledger of "what this phone has already seen" would therefore grow
+   with them for ever, on every phone, and a phone catching up on a season
+   would announce every job the farm has ever logged.
+
+   So only the newest few are ever considered. Anything older is not news; it
+   is history somebody is scrolling through. */
+var NTF_RECENT=120;
+function ntfNewest(list,n,key){
+  return (list||[]).slice().sort(function(a,b){
+    var x=a?a[key]:null, y=b?b[key]:null;
+    return (x<y)?1:((x>y)?-1:0);
+  }).slice(0,n);
+}
+
+/* ---- work typed into the field log by hand ----
+   Only `source:'manual'`. A finished job writes a field log entry too, and
+   that has already been said once as "the job is done" -- saying it twice is
+   how a feed starts being ignored. Dillon asked for this one on 2026-10-05
+   in exactly those words: somebody adding something DIRECTLY. */
+function ntfScanLog(me,now){
+  var all=null; try{ all=FIELDLOG; }catch(e){}
+  if(!all||!all.length) return {made:0,changed:false};
+  var who=ntfRoles(['Farm Manager','Faculty']);
+  var first=!NTF.fbase, fresh={}, made=0;
+  ntfNewest(all,NTF_RECENT,'ord').forEach(function(a){
+    if(!a||!a.id||a.source!=='manual') return;
+    var id=String(a.id);
+    fresh[id]=1;
+    if(first) return;
+    if(!NTF.fseen[id]){
+      var ev=ntfEmit('fllog',ntfNot(who,[a.loggedBy]),{log:a});
+      if(ntfForMe(ev,me)){ ntfPushLog(a,now); made++; }
+    }
+  });
+  var changed=first||made>0||ntfFlagDiff(NTF.fseen,fresh);
+  NTF.fseen=fresh;
+  if(first) NTF.fbase=now;
+  return {made:made,changed:changed};
+}
+
+/* ---- stock being booked IN ----
+   `why:'in'` and nothing else. 'out' is a job taking stock off the shelf,
+   'count' is the yearly count and 'adjust' is a correction -- none of those
+   is a delivery arriving, which is the thing Dillon asked to hear about. */
+function ntfScanMoves(me,now){
+  var all=null; try{ all=INVMOVES; }catch(e){}
+  if(!all||!all.length) return {made:0,changed:false};
+  var who=ntfRoles(['Farm Manager','Faculty']);
+  var first=!NTF.mbase, fresh={}, made=0;
+  ntfNewest(all,NTF_RECENT,'at').forEach(function(m){
+    if(!m||!m.id||m.why!=='in') return;
+    var id=String(m.id);
+    fresh[id]=1;
+    if(first) return;
+    if(!NTF.mseen[id]){
+      var ev=ntfEmit('restock',ntfNot(who,[m.by]),{move:m});
+      if(ntfForMe(ev,me)){ ntfPushMove(m,now); made++; }
+    }
+  });
+  var changed=first||made>0||ntfFlagDiff(NTF.mseen,fresh);
+  NTF.mseen=fresh;
+  if(first) NTF.mbase=now;
+  return {made:made,changed:changed};
+}
+
 /* ---- machines ---- */
 function ntfScanEquip(me,now){
   var all=null; try{ all=EQUIP; }catch(e){}
@@ -1367,11 +1460,38 @@ function ntfScanRes(me,now){
   if(!all||!all.length) return {made:0,changed:false};
   /* Everybody, named by PLOT and never by study. An undergraduate on a mower
      has to know CAFS14 is shut whoever owns it; whose trial it is, is not the
-     farm's business. Same rule the map already follows -- see trLiveRes(). */
+     farm's business. Same rule the map already follows -- see trLiveRes().
+
+     THE STUDIES THEMSELVES also reach everybody, which was Dillon's call on
+     2026-10-05 against my advice that it would be noisy. Each has its own
+     switch, so anybody who agrees with me can turn it off.
+
+     AND THE ONE CARE THAT TAKES. A study sitting at Planned is hidden from
+     everybody outside its own lab -- that is trVisible(), and it is deliberate.
+     So a new study is announced by its GROUND and its LAB and never by its
+     name. A study STARTING is the moment it becomes visible to the whole farm,
+     and a study finishing was visible all the way through, so both of those
+     may say what they are called. The rule in one line: name a study the farm
+     could already see, never one it could not. */
   var farm=ntfEveryone();
-  var first=!NTF.rbase, fresh={}, made=0;
+  var first=!NTF.rbase, fresh={}, tfresh={}, afresh={}, made=0;
   all.forEach(function(t){
     if(!t) return;
+
+    /* ---- the study itself ---- */
+    if(t.id){
+      var sid=String(t.id), stage=String(t.stage||'');
+      tfresh[sid]=stage;
+      if(!first){
+        var wasStage=NTF.tseen[sid], sev=null;
+        if(wasStage===undefined) sev=ntfEmit('trnew',farm,{study:t});
+        else if(wasStage!=='active'&&stage==='active') sev=ntfEmit('trstart',farm,{study:t});
+        else if(wasStage!=='completed'&&stage==='completed') sev=ntfEmit('trdone',farm,{study:t});
+        if(ntfForMe(sev,me)){ ntfPushStudy(sev.k,t,now); made++; }
+      }
+    }
+
+    /* ---- the restrictions on it ---- */
     var list=t.restrictions||[];
     list.forEach(function(r,i){
       if(!r) return;
@@ -1382,8 +1502,23 @@ function ntfScanRes(me,now){
       var live=false;
       try{ live=(typeof trResState==='function')&&trResState(r)==='active'; }catch(e){}
       if(live) fresh[key]=1;
+      afresh[key]=1;
       if(first) return;
-      var was=!!NTF.rseen[key], ev=null;
+      var was=!!NTF.rseen[key], isNew=!NTF.aseen[key], ev=null;
+
+      /* THE COLLAPSE, and it is the reason "a restriction was added" and
+         "ground is closed" do not both fire for one tap. Nearly every
+         restriction is written on the day it starts, so the two would land
+         together and read as the app saying one thing twice.
+
+         Closed wins when they coincide, because that is the sentence a person
+         on a mower needs. "Added" is kept for a restriction dated for LATER,
+         where it is the only thing worth saying -- the ground is still open
+         today and will shut on its own when the date comes. */
+      if(live&&!was) ev=ntfEmit('resclose',farm,{study:t,res:r,key:key});
+      else if(was&&!live) ev=ntfEmit('resopen',farm,{study:t,res:r,key:key});
+      else if(isNew&&!live) ev=ntfEmit('resnew',farm,{study:t,res:r,key:key});
+
       /* The person who PLACED it is told as well, unlike a job you gave
          yourself. Two reasons, and the second is the real one: seeing the row
          appear is how they know it took, and the record only carries the
@@ -1391,13 +1526,12 @@ function ntfScanRes(me,now){
          matching on a name, and the price of getting that wrong is somebody
          not being told that ground is closed. That is the one thing this alert
          must never do. */
-      if(live&&!was) ev=ntfEmit('resclose',farm,{study:t,res:r,key:key});
-      else if(was&&!live) ev=ntfEmit('resopen',farm,{study:t,res:r,key:key});
       if(ntfForMe(ev,me)){ ntfPushRes(ev.k,t,r,now); made++; }
     });
   });
-  var changed=first||made>0||ntfFlagDiff(NTF.rseen,fresh);
-  NTF.rseen=fresh;
+  var changed=first||made>0||ntfFlagDiff(NTF.rseen,fresh)
+              ||ntfFlagDiff(NTF.tseen,tfresh)||ntfFlagDiff(NTF.aseen,afresh);
+  NTF.rseen=fresh; NTF.tseen=tfresh; NTF.aseen=afresh;
   if(first) NTF.rbase=now;
   return {made:made,changed:changed};
 }
@@ -1424,11 +1558,51 @@ function ntfRecRes(kind,t,r,now){
   var ty='Restricted', endTxt='';
   try{ if(typeof trRType==='function') ty=trRType(r.type).label||ty; }catch(e){}
   try{ if(typeof trResEndText==='function') endTxt=trResEndText(r); }catch(e){}
+  var startTxt='';
+  try{ if(typeof trFmt==='function') startTxt=trFmt(r.start); }catch(e){}
   return { id:ntfNewId(now), k:kind, t:now,
     /* The plot, and deliberately NOT the study's name or its lab -- see the
        note at the top of this section. */
     plot:String(r.scope||''), ttl:String(ty),
-    endTxt:String(endTxt), why:(r.lifted?'lifted':'ended') };
+    endTxt:String(endTxt), startTxt:String(startTxt),
+    why:(r.lifted?'lifted':'ended') };
+}
+function ntfPushLog(a,now){ NTF.list.unshift(ntfRecLog(a,now)); }
+function ntfRecLog(a,now){
+  var plots='';
+  try{ plots=(typeof flPlotsLabel==='function')?flPlotsLabel(a):String(a.plot||''); }catch(e){ plots=String(a.plot||''); }
+  return { id:ntfNewId(now), k:'fllog', t:now, log:String(a.id),
+    ttl:String(a.title||a.op||'Work'), who:a.loggedBy||null,
+    area:String(plots||''), note:ntfClip(a.detail,64) };
+}
+function ntfPushMove(m,now){ NTF.list.unshift(ntfRecMove(m,now)); }
+function ntfRecMove(m,now){
+  var name='A product';
+  try{
+    var it=INVENTORY.filter(function(x){ return x.id===m.item; })[0];
+    if(it&&it.name) name=it.name;
+  }catch(e){}
+  return { id:ntfNewId(now), k:'restock', t:now, move:String(m.id),
+    item:String(m.item||''), ttl:String(name), who:m.by||null,
+    q:Math.abs(+m.delta||0), u:String(m.unit||'') };
+}
+function ntfPushStudy(kind,t,now){ NTF.list.unshift(ntfRecStudy(kind,t,now)); }
+function ntfRecStudy(kind,t,now){
+  var plots='';
+  /* trPlotsLabel() is written for a screen, where "No plots assigned" is a
+     useful thing to read in a field. In a one-line notification it would come
+     out as "A new study on No plots assigned", so an empty answer is turned
+     back into nothing and the sentence says "the farm" instead. */
+  try{
+    if(typeof trPlotsLabel==='function') plots=trPlotsLabel(t)||'';
+    if(/^No plots/.test(plots)) plots='';
+  }catch(e){ plots=''; }
+  /* A study still at Planned is hidden from everybody outside its own lab, so
+     a new one is announced by its ground and its lab and NEVER by its name --
+     see the long note over ntfScanRes(). The other two may say it. */
+  return { id:ntfNewId(now), k:kind, t:now, study:String(t.id),
+    ttl:(kind==='trnew')?'':String(t.title||''),
+    lab:String(t.lab||''), area:String(plots||'') };
 }
 /* One id generator, so the three above and the two older pushes cannot drift
    into making ids of different shapes. */
@@ -1703,6 +1877,11 @@ function ntfEventId(ev){
       return ev.k+':'+ev.task.id+(extra?(':'+extra):'');
     }
     if(ev.punch) return ev.k+':'+ev.punch.id;
+    if(ev.log) return 'fllog:'+ev.log.id;
+    if(ev.move) return 'restock:'+ev.move.id;
+    /* The stage is in the name, so a study that is put back and started again
+       is news the second time rather than being mistaken for the first. */
+    if(ev.study&&!ev.res) return ev.k+':'+ev.study.id;
     /* The problem report is in here so a mower that breaks twice in a day is
        two pieces of news rather than one. */
     if(ev.eq) return ev.k+':'+ev.eq.id+(ev.prob?(':'+ev.prob):'');
@@ -1730,6 +1909,9 @@ function ntfEventText(ev,now){
     else if(ev.eq) rec=ntfRecEq(ev.k,ev.eq,now,ev.who,ev.note);
     else if(ev.item) rec=ntfRecLow(ev.item,now);
     else if(ev.res) rec=ntfRecRes(ev.k,ev.study,ev.res,now);
+    else if(ev.log) rec=ntfRecLog(ev.log,now);
+    else if(ev.move) rec=ntfRecMove(ev.move,now);
+    else if(ev.study) rec=ntfRecStudy(ev.k,ev.study,now);
   }catch(e){ rec=null; }
   if(!rec) return null;
   var l=null; try{ l=ntfLine(rec); }catch(e){ return null; }
@@ -1853,7 +2035,16 @@ var NTF_KIND={
   eqflag:  {c:'#d17a00'},   /* diamond  - needs attention, still running */
   low:     {c:'#9a5b00'},   /* diamond  - check this, order something */
   resclose:{c:'#7c5cbf'},   /* triangle - ground is shut, stay off it */
-  resopen: {c:'#2f9e4f'}    /* circle   - complete, the ground is yours again */
+  resopen: {c:'#2f9e4f'},   /* circle   - complete, the ground is yours again */
+  /* 2026-10-05. Same rule as above: reuse a colour already here rather than
+     introduce one, so the meaning carries over and nothing can fall out of
+     CB_MAP. */
+  fllog:   {c:'#517c96'},   /* ring     - informational, somebody wrote it down */
+  restock: {c:'#2f9e4f'},   /* circle   - good news, the shelf went up */
+  trnew:   {c:'#2456b8'},   /* ring     - informational */
+  trstart: {c:'#2f7d3a'},   /* circle   - something is now running */
+  trdone:  {c:'#2f9e4f'},   /* circle   - complete */
+  resnew:  {c:'#7c5cbf'}    /* triangle - stop, this ground is spoken for */
 };
 /* 24-hour "07:02" as the farm reads it. The time clock has its own t12()
    inside its closure; this is the same answer where the bell can reach it. */
@@ -1921,6 +2112,21 @@ function ntfLine(e){
     s:esq(e.ttl)+(e.endTxt?(' \u00b7 '+esq(e.endTxt)):'') };
   if(e.k==='resopen') return { t:(e.plot?esq(e.plot):'Ground')+' is open again',
     s:esq(e.ttl)+(e.why==='lifted'?' was lifted':' has ended') };
+  /* The six added on 2026-10-05. */
+  if(e.k==='fllog')   return { t:ntfWho(e.who)+' logged '+esq(e.ttl),
+    s:(e.area?esq(e.area):'the farm')+(e.note?(' \u00b7 '+esq(e.note)):'') };
+  if(e.k==='restock') return { t:esq(e.ttl)+' booked in',
+    s:'+'+ntfQty(e.q)+' '+esq(e.u)+' \u00b7 '+ntfWho(e.who) };
+  /* No name on this one on purpose: a study that has not started is not the
+     farm's to read yet. The ground and the lab are. */
+  if(e.k==='trnew')   return { t:'A new study on '+(e.area?esq(e.area):'the farm'),
+    s:(e.lab?esq(e.lab)+' lab':'A lab')+' \u00b7 not started yet' };
+  if(e.k==='trstart') return { t:(e.ttl?esq(e.ttl):'A study')+' has started',
+    s:(e.area?esq(e.area)+' \u00b7 ':'')+(e.lab?esq(e.lab)+' lab':'') };
+  if(e.k==='trdone')  return { t:(e.ttl?esq(e.ttl):'A study')+' is finished',
+    s:(e.area?esq(e.area)+' \u00b7 ':'')+'every restriction on it has been lifted' };
+  if(e.k==='resnew')  return { t:'A restriction is coming on '+(e.plot?esq(e.plot):'the farm'),
+    s:esq(e.ttl)+(e.startTxt?(' \u00b7 from '+esq(e.startTxt)):'') };
   if(e.k==='reqok')   return { t:esq(e.ttl)+' was accepted', s:ntfWho(e.who)+' has taken it on'+where };
   if(e.k==='reqdone') return { t:esq(e.ttl)+' is done', s:ntfWho(e.who)+' finished the job you asked for'+where };
   return { t:esq(e.ttl)+' came back part-finished',
@@ -1998,6 +2204,19 @@ document.getElementById('s-notifications').addEventListener('click',function(e){
   }
   if(ev.item){
     try{ if(!csLocked('inventory')&&typeof openItem==='function') openItem(ev.item); }catch(_q){}
+    return;
+  }
+  /* A field log entry and a study open their own page, on the same terms as
+     the two above: only for somebody who can actually get to that page. The
+     studies alerts in particular go to the WHOLE farm, and the crew cannot
+     open Trials -- so for most of the people hearing them, tapping does
+     nothing rather than dropping them on a Coming Soon card. */
+  if(ev.log){
+    try{ if(!csLocked('fieldlog')&&typeof openFlEntry==='function') openFlEntry(ev.log); }catch(_q){}
+    return;
+  }
+  if(ev.study){
+    try{ if(!csLocked('trial')&&typeof trOpen==='function') trOpen(ev.study); }catch(_q){}
     return;
   }
   /* Ground opens the farm map at that plot, which every phone can reach --

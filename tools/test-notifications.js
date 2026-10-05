@@ -97,6 +97,8 @@ function boot(store) {
       + 'ntfTick:ntfTick,equip:function(){return EQUIP;},probs:function(){return EQPROBLEMS;},'
       + 'inv:function(){return INVENTORY;},trials:function(){return TRIALS;},'
       + 'isLow:isLow,invQty:invQty,today:trTodayISO,csLocked:csLocked,'
+      + 'log:function(){return FIELDLOG;},moves:function(){return INVMOVES;},'
+      + 'commitLog:flCommit,'
       /* What the walks decided, with the audience on each one -- the half the
          sender uses and the bell does not. */
       + 'events:function(){return NTF_EVENTS;},eventId:ntfEventId,'
@@ -409,10 +411,10 @@ section('6d. one row per job per look, and the six switches are separate');
      not -- so `wx` is the one row still carrying "Not sending yet", and if it
      ever creeps into this list without push being built, that label is a lie
      again. */
-  const kinds = ('tasks,done,partial,reqnew,reqok,reqdone,equip,eqflag,low,trials,'
-               + 'clockin,clockout,shiftauto,shiftask').split(',');
+  const kinds = ('tasks,done,partial,reqnew,reqok,reqdone,equip,eqflag,low,restock,fllog,'
+               + 'trials,resnew,trnew,trstart,trdone,clockin,clockout,shiftauto,shiftask').split(',');
   const live = n.NOTIF_ALERTS.filter(a => a.live).map(a => a.k);
-  ok('all fourteen are marked as really sending', live.join(',') === kinds.join(','), live.join(','));
+  ok('all twenty are marked as really sending', live.join(',') === kinds.join(','), live.join(','));
   ok('and weather is still honest about not sending',
      n.NOTIF_ALERTS.filter(a => a.k === 'wx')[0].live === undefined);
   kinds.forEach(k => {
@@ -478,13 +480,21 @@ section('6e. the dot colours survive colour-blind mode');
 
      Add an alert and it either joins one of these groups or brings its own
      pair. What it may not do is quietly land on top of an unrelated one. */
-  const DELIBERATE = ['done+reqdone+equp+resopen', 'partial+eqflag',
-                      'reqnew+resclose', 'shiftauto+low', 'shiftask+eqdown'];
+  const DELIBERATE = [
+    'done+reqdone+equp+resopen+restock+trdone',   /* green circle  - finished, or yours again */
+    'partial+eqflag',                             /* amber diamond - somebody must pick this up */
+    'reqnew+resclose+resnew',                     /* pink triangle - stop before you carry on */
+    'shiftauto+low',                              /* dark diamond  - check this one */
+    'shiftask+eqdown',                            /* red square    - urgent, only you can answer */
+    'reqok+trnew',                                /* blue ring     - informational */
+    'clockin+trstart',                            /* dark circle   - something is now running */
+    'clockout+fllog'                              /* grey ring     - informational, it is written down */
+  ];
   const shared = Object.keys(seen).filter(p => seen[p].length > 1).map(p => seen[p].join('+'));
   const stray = shared.filter(g => DELIBERATE.indexOf(g) < 0);
   ok('every shared colour and shape is one of the deliberate groups',
      stray.length === 0, stray.join(' | ') || 'none');
-  ok('and all five groups are still there',
+  ok('and all of those groups are still there',
      DELIBERATE.every(g => shared.indexOf(g) >= 0), shared.join(' | '));
 }
 
@@ -553,9 +563,9 @@ section('7. the toggles on the Notifications screen actually gate it');
   ok('turned back on and it works again', n.ntfScan() === 1);
 
   const live = n.NOTIF_ALERTS.filter(a => a.live).map(a => a.k).join(',');
-  ok('fourteen alerts are marked as really sending',
-     live === 'tasks,done,partial,reqnew,reqok,reqdone,equip,eqflag,low,trials,'
-            + 'clockin,clockout,shiftauto,shiftask', live);
+  ok('twenty alerts are marked as really sending',
+     live === 'tasks,done,partial,reqnew,reqok,reqdone,equip,eqflag,low,restock,fllog,'
+               + 'trials,resnew,trnew,trstart,trdone,clockin,clockout,shiftauto,shiftask', live);
 }
 
 section('8. the feed is the person’s, not the phone’s');
@@ -1078,11 +1088,21 @@ section('21. closed ground reaches everybody, by plot and never by study');
   ok('the row says the plot is open again', /CAFS14 is open again/.test(html), html.slice(0, 300));
   ok('and that somebody lifted it', /was lifted/.test(html));
 
-  /* A restriction that has not started yet is not standing on anything. */
+  /* A restriction that has not started yet is not standing on anything -- but
+     since 2026-10-05 it IS worth saying that it is coming, and that is the
+     only time "a restriction was added" is said at all. One that starts today
+     says "closed" instead, so one tap never reads as two pieces of news. */
   const future = '2099-01-01';
   study.restrictions.push({ id: 'r-ntf2', type: 'herbicide', scope: 'CAFS15',
                             start: future, end: '', by: 'Somebody Else' });
-  ok('a restriction starting next year closes nothing today', n.ntfScan() === 0);
+  ok('a restriction starting next year says it is coming', n.ntfScan() === 1);
+  ok('and says exactly that, not that the ground is shut',
+     n.ntf().list[0].k === 'resnew', n.ntf().list[0].k);
+  n.go('notifications');
+  const soon = doc.getElementById('ntf-body').innerHTML;
+  ok('naming the plot it will close', /CAFS15/.test(soon), soon.slice(0, 200));
+  ok('and it does not also claim the ground is closed today',
+     !/CAFS15 is closed/.test(soon));
 
   /* AND THE TRAP: a study that is GONE says nothing. Its ground is open, but
      "CAFS16 is open again" from a record nobody can look at any more is a
@@ -1092,7 +1112,13 @@ section('21. closed ground reaches everybody, by plot and never by study');
                  restrictions: [{ id: 'r-ntf3', type: 'mow', scope: 'CAFS16',
                                   start: today, end: '', by: 'Somebody Else' }] };
   n.trials().push(gone);
-  ok('its restriction closes the ground', n.ntfScan() === 1);
+  /* Two pieces of news from one push, and both are right: a study appeared,
+     and ground shut. */
+  ok('a new study with live ground says both things', n.ntfScan() === 2);
+  ok('one of them being that the ground is closed',
+     n.ntf().list.some(e => e.k === 'resclose'), n.ntf().list.map(e => e.k).join(','));
+  ok('and the other that a study was added',
+     n.ntf().list.some(e => e.k === 'trnew'), n.ntf().list.map(e => e.k).join(','));
   const before = n.ntf().list.length;
   n.trials().splice(n.trials().indexOf(gone), 1);
   ok('and the study being removed altogether says nothing', n.ntfScan() === 0);
@@ -1350,6 +1376,156 @@ section('24. what the sender is actually handed');
   ok('but nothing about who hears what', !('to' in prefs) && !('roles' in prefs));
 
   ok('and none of that threw', b.errs.length === 0, b.errs.join(' | '));
+}
+
+section('26. the six Dillon asked for on 2026-10-05');
+{
+  /* Each of these is a record appearing or a field changing, so they sit in
+     the same machinery as everything above. What is worth checking is not
+     that they fire -- it is WHO they reach and WHAT THEY SAY, because both
+     were decisions rather than defaults. */
+  const L = boot({}).n.RST_LOGIN;
+
+  /* ---- work typed into the field log by hand ---- */
+  function logEntry(n, o) {
+    n.log().push(Object.assign({
+      plots: ['CAFS14'], plot: 'CAFS14', type: 'mow', title: 'Mow fairways',
+      detail: 'Toro 3235C · Garrett Willard', date: 'Oct 5', ord: 20261005,
+      op: 'Mow', person: L.undergrad, loggedBy: L.undergrad, time: '09:14',
+      source: 'manual'
+    }, o || {}));
+    n.commitLog();
+  }
+  /* EVERY WALK TAKES ITS BASELINE ON THE FIRST LOOK THAT FINDS ANYTHING, and
+     a walk that finds an empty list has not started watching yet. So each of
+     these puts one record there, looks once to baseline it, and only then
+     does the thing being tested. Getting that wrong reads as "the alert does
+     not work" when what happened is that the test never started it. */
+  function feel(role, make) {
+    const b = boot({});
+    b.n.signIn(b.n.RST_LOGIN[role]);
+    logEntry(b.n, { id: 'fl-seed', title: 'Something earlier' });
+    b.n.moves().push({ id: 'mv-seed', item: b.n.inv()[0].id, delta: 1, unit: 'gal',
+                       why: 'in', by: L.manager, at: '2026-10-01T08:00:00', note: '' });
+    b.n.ntfScan();
+    make(b.n);
+    const made = b.n.ntfScan();
+    return { b, made, kinds: b.n.ntf().list.map(e => e.k) };
+  }
+
+  let r = feel('manager', n => logEntry(n, { id: 'fl-a' }));
+  ok('Bill hears when somebody logs work by hand', r.made === 1, String(r.made));
+  ok('by the right alert', r.kinds[0] === 'fllog', r.kinds[0]);
+  r.b.n.go('notifications');
+  let html = r.b.doc.getElementById('ntf-body').innerHTML;
+  ok('and the row says who did it', /Garrett/.test(html), html.slice(0, 220));
+  ok('and what it was', /Mow fairways/.test(html));
+
+  ok('faculty hear it too', feel('faculty', n => logEntry(n, { id: 'fl-b' })).made === 1);
+  ok('an undergraduate does not', feel('undergrad', n => logEntry(n, { id: 'fl-c' })).made === 0);
+  ok('and a technician does not', feel('tech', n => logEntry(n, { id: 'fl-d' })).made === 0);
+
+  /* THE WORD "DIRECTLY" IS LOAD-BEARING. Finishing a job writes a field log
+     entry as well, and that has already been said once as "the job is done".
+     Saying it twice is how a feed starts being ignored. */
+  r = feel('manager', n => logEntry(n, { id: 'fl-e', source: 'task' }));
+  ok('an entry a finished job wrote says nothing', r.made === 0, r.kinds.join(','));
+
+  /* ---- stock being booked in ---- */
+  function restock(n, id) {
+    n.moves().push({ id: id, item: n.inv()[0].id, delta: 10, unit: n.inv()[0].unit,
+                     why: 'in', by: L.tech, at: '2026-10-05T09:00:00', note: '' });
+  }
+  r = feel('manager', n => restock(n, 'mv-a'));
+  ok('Bill hears a delivery being booked in', r.made === 1, String(r.made));
+  ok('by the right alert', r.kinds[0] === 'restock', r.kinds[0]);
+  ok('an undergraduate does not', feel('undergrad', n => restock(n, 'mv-b')).made === 0);
+
+  /* The other three reasons a stock figure moves are not deliveries. */
+  ['out', 'count', 'adjust'].forEach(why => {
+    const rr = feel('manager', n => {
+      n.moves().push({ id: 'mv-' + why, item: n.inv()[0].id, delta: -5, unit: 'gal',
+                       why: why, by: L.tech, at: '2026-10-05T09:00:00', note: '' });
+    });
+    ok('"' + why + '" is not a delivery and says nothing', rr.made === 0, rr.kinds.join(','));
+  });
+
+  /* ---- studies ---- */
+  function study(n, o) {
+    /* `locations`, not `plots` -- a study's ground is a list of {plot, sqft},
+       and trPlots() reads that. A fixture with `plots` quietly has no ground
+       at all, which is how the row came out saying "the farm". */
+    const t = Object.assign({ id: 's-x', title: 'Dollar spot fungicide screen',
+                              lab: 'Brosnan', stage: 'planned', start: n.today(),
+                              end: '', locations: [{ plot: 'CAFS14', sqft: 400 }],
+                              restrictions: [] }, o || {});
+    n.trials().push(t);
+    return t;
+  }
+  /* The trials walk takes its baseline on the first look that finds ANY
+     study, so one has to exist before the one being watched for. */
+  function withStudies(role, make) {
+    const b = boot({});
+    b.n.signIn(b.n.RST_LOGIN[role]);
+    study(b.n, { id: 's-seed', title: 'Something else', stage: 'active' });
+    b.n.ntfScan();
+    make(b.n);
+    const made = b.n.ntfScan();
+    return { b, made, kinds: b.n.ntf().list.map(e => e.k) };
+  }
+
+  r = withStudies('undergrad', n => study(n));
+  ok('a new study reaches even an undergraduate', r.made === 1, String(r.made));
+  ok('by the right alert', r.kinds[0] === 'trnew', r.kinds[0]);
+  r.b.n.go('notifications');
+  html = r.b.doc.getElementById('ntf-body').innerHTML;
+  /* A STUDY AT PLANNED IS HIDDEN from everybody outside its lab -- trVisible()
+     -- so announcing it by name to the whole farm would give away exactly
+     what that rule protects. The ground and the lab are the farm's business;
+     the name is not, yet. */
+  ok('but it is NOT named, because it has not started', !/Dollar spot/.test(html), html.slice(0, 260));
+  ok('it names the ground instead', /CAFS14/.test(html), html.slice(0, 260));
+  ok('and the lab', /Brosnan/.test(html), html.slice(0, 260));
+
+  r = withStudies('undergrad', n => { study(n, { stage: 'planned' }); });
+  const b2 = r.b;
+  b2.n.trials().filter(t => t.id === 's-x')[0].stage = 'active';
+  const started = b2.n.ntfScan();
+  ok('a study starting says so', started === 1, String(started));
+  ok('by the right alert', b2.n.ntf().list[0].k === 'trstart', b2.n.ntf().list[0].k);
+  b2.n.go('notifications');
+  html = b2.doc.getElementById('ntf-body').innerHTML;
+  /* Now it MAY be named: starting is the moment the whole farm can see it. */
+  ok('and now it may be named, because the farm can see it', /Dollar spot/.test(html),
+     html.slice(0, 260));
+
+  r = withStudies('undergrad', n => study(n, { stage: 'active' }));
+  r.b.n.trials().filter(t => t.id === 's-x')[0].stage = 'completed';
+  const done = r.b.n.ntfScan();
+  ok('a study finishing says so', done === 1, String(done));
+  ok('by the right alert', r.b.n.ntf().list[0].k === 'trdone', r.b.n.ntf().list[0].k);
+
+  /* ---- a restriction added for later ---- */
+  r = withStudies('undergrad', n => {
+    const t = study(n, { stage: 'active' });
+    t.restrictions.push({ id: 'rr1', type: 'mow', scope: 'CAFS20',
+                          start: '2099-01-01', end: '', by: 'Somebody' });
+  });
+  ok('a study arriving with a future restriction says both things',
+     r.made === 2, r.kinds.join(','));
+  ok('one of them being that a restriction is coming',
+     r.kinds.indexOf('resnew') >= 0, r.kinds.join(','));
+
+  /* AND THE COLLAPSE: one that starts today is said ONCE, as closed ground. */
+  r = withStudies('undergrad', n => {
+    const t = study(n, { stage: 'active' });
+    t.restrictions.push({ id: 'rr2', type: 'mow', scope: 'CAFS21',
+                          start: n.today(), end: '', by: 'Somebody' });
+  });
+  ok('a restriction starting today is not said twice',
+     r.kinds.filter(k => k === 'resnew' || k === 'resclose').length === 1, r.kinds.join(','));
+  ok('and the one thing said is that the ground is closed',
+     r.kinds.indexOf('resclose') >= 0 && r.kinds.indexOf('resnew') < 0, r.kinds.join(','));
 }
 
 /* Written as a function and run at the very bottom, rather than as a block

@@ -1534,6 +1534,60 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### Six more alerts, and the three judgement calls inside them — 2026-10-05
+**Decision:** Dillon asked for eleven new notifications. Six of them are record
+changes and went in together: work typed into the **Field Log** by hand, stock
+**booked in**, a **new study**, a study **starting**, a study **finishing**, and
+a **restriction added for a later date**. Three choices inside them are not
+obvious and all three are deliberate.
+
+**One: "directly" means `source:'manual'`.** Finishing a job writes a Field Log
+entry too, and that has already been said once as "the job is done". An alert
+for both would say one thing twice, which is how a feed starts being ignored.
+
+**Two: a restriction added for TODAY says "closed", not "added".** Nearly every
+restriction is written on the day it starts, so "a restriction was added" and
+"ground is closed" would land together from one tap. Closed wins, because that
+is the sentence somebody on a mower needs; "added" is kept for a restriction
+dated for later, where the ground is still open today and the only thing worth
+saying is that it is coming.
+
+**Three: a study that has not started is never named.** `trVisible()` hides a
+study at the Planned stage from everybody outside its own lab — so announcing
+one by name to the whole farm would give away exactly what that rule protects.
+A new study is announced by its **ground** and its **lab**. A study *starting*
+may be named, because starting is the moment the whole farm can see it, and a
+study *finishing* may be named because the farm could read it all the way
+through. The rule in one line: **name a study the farm could already see, never
+one it could not.**
+**Why:** Dillon's call on who hears them, and it went against my advice: the
+four trial alerts reach **everybody, crew included**, where I recommended Bill
+and the owning lab. He has it; each has its own switch, so anybody who finds
+them noisy turns that one off. The Field Log and restock alerts go to **Bill and
+faculty**, matching the low-stock alert, because those are the people who act on
+them.
+**Don't:** don't widen the Field Log alert to every entry, don't let "added" and
+"closed" both fire for one restriction, and don't put a study's name into the
+`trnew` row. And note the ledger carries `v:3` now — the shape changed again, so
+a phone holding the old one drops it and takes a fresh silent baseline rather
+than announcing the farm's whole history.
+
+### Two lists that only ever grow get watched by their newest few — 2026-10-05
+**Decision:** the Field Log and the stock ledger are watched through
+`ntfNewest(list, NTF_RECENT, key)` — only the most recent 120 records are ever
+considered news.
+**Why:** every other thing the bell watches is a *state* — a machine is down or
+it is not, a product is low or it is not — so its ledger is naturally short.
+These two are *histories*, one record per thing that ever happened, and they
+never get shorter. A ledger of "what this phone has already seen" would grow
+with them for ever on every phone, and a phone catching up after a long
+absence would announce every job the farm has ever logged.
+**Don't:** don't swap this for a date cut-off without checking what the record
+actually carries — a Field Log entry's `ord` is the day the WORK happened, not
+when it was typed in, so an entry back-dated a week is still news the moment it
+appears. Sorting by the newest few handles that; a date cut-off would silently
+drop it.
+
 ### The walks work out WHO hears a thing, not whether I do — 2026-10-02
 **Decision:** every notification walk in `app-01-shell.js` now decides the
 **audience** of each change — a list of people — and "do I see it on my own

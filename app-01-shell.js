@@ -470,6 +470,10 @@ var NOTIF_ALERTS=[
   sub:'Bill asking you to take a job on, or a grad or technician asking you for help'},
  {g:'Task board', k:'reqok',  t:'A labor request I sent is accepted', d:1, live:1},
  {g:'Task board', k:'reqdone',t:'A job I asked for is finished', d:1, live:1},
+ /* The first of the three the CALENDAR sets off rather than a tap. See the
+    long note over planWanted() in this file for why those are different. */
+ {g:'Task board', k:'boardempty', t:'Nothing on the board before a shift', d:1, live:1,
+  sub:'45 minutes before the first person is due, and only if it is empty'},
  /* Wired up on 2026-10-01; before that these three saved their setting and
     nothing read it. WHO HEARS WHICH is Dillon's call and is written out in
     full over ntfScanEquip() further down -- the short version is that a
@@ -518,7 +522,11 @@ var NOTIF_ALERTS=[
  {g:'Time clock', k:'shiftauto',t:'My shift was closed for me', d:1, live:1,
   sub:'You forgot to clock out and the app closed it at your scheduled finish'},
  {g:'Time clock', k:'shiftask', t:'I forgot to clock out', d:1, live:1,
-  sub:'Only when the app has no scheduled finish to use, so it asks you instead'}
+  sub:'Only when the app has no scheduled finish to use, so it asks you instead'},
+ {g:'Time clock', k:'noclock', t:'I have not clocked in', d:1, live:1,
+  sub:'30 minutes after your shift should have started'},
+ {g:'Time clock', k:'payend', t:'The pay period ends today', d:1, live:1,
+  sub:'At 9am \u00b7 the crew submit their hours, Bill approves them'}
 ];
 /* "Push notifications" used to be a row here and is not any more, as of
    2026-10-02. Buzzing is granted by the BROWSER, per device -- somebody with a
@@ -754,7 +762,7 @@ var NTF_KEEP_DAYS=30;      /* and for how long, whichever runs out first */
    the time clock" would make every historical shift look like news. */
 var NTF={v:3,seen:{},pseen:{},list:[],readAt:0,base:0,pbase:0,
          eseen:{},iseen:{},rseen:{},ebase:0,ibase:0,rbase:0,
-         fseen:{},mseen:{},tseen:{},aseen:{},fbase:0,mbase:0};
+         fseen:{},mseen:{},tseen:{},aseen:{},fbase:0,mbase:0,plseen:{}};
 function ntfLoad(){
   var s=prefsGet('ntfeed',null)||{};
   /* A map that is missing reads as empty and a baseline that is missing reads
@@ -780,7 +788,7 @@ function ntfLoad(){
   NTF={v:3, seen:map(s.seen), pseen:map(s.pseen),
        eseen:map(s.eseen), iseen:map(s.iseen), rseen:map(s.rseen),
        fseen:map(s.fseen), mseen:map(s.mseen),
-       tseen:map(s.tseen), aseen:map(s.aseen),
+       tseen:map(s.tseen), aseen:map(s.aseen), plseen:map(s.plseen),
        list:Array.isArray(s.list)?s.list:[],
        readAt:+s.readAt||0, base:+s.base||0, pbase:+s.pbase||0,
        ebase:+s.ebase||0, ibase:+s.ibase||0, rbase:+s.rbase||0,
@@ -791,7 +799,7 @@ function ntfSave(){ prefsSet('ntfeed',{v:3,seen:NTF.seen,pseen:NTF.pseen,list:NT
                                        eseen:NTF.eseen,iseen:NTF.iseen,rseen:NTF.rseen,
                                        ebase:NTF.ebase,ibase:NTF.ibase,rbase:NTF.rbase,
                                        fseen:NTF.fseen,mseen:NTF.mseen,
-                                       tseen:NTF.tseen,aseen:NTF.aseen,
+                                       tseen:NTF.tseen,aseen:NTF.aseen,plseen:NTF.plseen,
                                        fbase:NTF.fbase,mbase:NTF.mbase}); }
 /* WHICH SWITCH GOVERNS WHICH ALERT, and they are not all the same word.
    Five of the sixteen alerts are governed by a switch with a different name --
@@ -986,12 +994,15 @@ function ntfScan(){
   var ground=ntfScanRes(me,now);
   var logbook=ntfScanLog(me,now);
   var moves=ntfScanMoves(me,now);
+  /* Not a walk over records like the six above: this one asks the CLOCK
+     whether a moment has arrived -- see the long note over planWanted(). */
+  var timed=planBell(me,now);
   if(jobs.changed||punches.changed||machines.changed||shelf.changed||ground.changed
-     ||logbook.changed||moves.changed){
+     ||logbook.changed||moves.changed||timed.changed){
     ntfTrim(); ntfSave();
   }
   return jobs.made+punches.made+machines.made+shelf.made+ground.made
-       + logbook.made+moves.made;
+       + logbook.made+moves.made+timed.made;
 }
 function ntfScanTasks(me,now){
   var all=null; try{ all=TASKS; }catch(e){}
@@ -1091,6 +1102,9 @@ function ntfTick(){
      it rather than losing it. */
   try{ if(NTF_EVENTS.length) pushQueue(NTF_EVENTS,Date.now()); }catch(e){}
   try{ pushFlush(); }catch(e){}
+  /* And the reminders that have to be booked days before they are due. Says
+     nothing at all when nothing has changed, which is almost every tick. */
+  try{ planSync(); }catch(e){}
   try{ if(made&&typeof updateBellBadges==='function') updateBellBadges(); }catch(e){}
   try{
     var n=document.getElementById('s-notifications');
@@ -1919,6 +1933,263 @@ function ntfEventText(ev,now){
   return { title:ntfPlain(l.t), body:ntfPlain(l.s) };
 }
 
+/* ===================== THE ALERTS THE CLOCK SETS OFF =====================
+   Added 2026-10-05, and they work differently from every other alert here.
+
+   Everything above is set off by somebody TAPPING something: a phone notices
+   the change and asks the sender to tell the others. These three are set off
+   by the CLOCK -- forty-five minutes before a shift, nine in the morning on
+   the day a pay period ends, half an hour after somebody should have clocked
+   in -- and at those moments every phone on the farm may be asleep with
+   nobody to notice anything at all.
+
+   SO THEY ARE WORKED OUT IN ADVANCE. The farm's schedule is known days ahead,
+   so a phone that IS awake books the message with the sender now, with a time
+   on it, and the sender holds it until then (worker/ut-turf-push.js, /later).
+   If the reason goes away before the time comes -- Bill fills the task board
+   in, the student clocks in -- whichever phone notices takes it back
+   (/cancel).
+
+   THE THREE WAYS THIS COULD GO WRONG, and what stops each:
+
+     Booked over and over. Every awake phone works out the same booking, and
+     each one is a write to the sender. So each phone remembers what it has
+     already booked and only speaks when something has actually changed, and
+     the sender's key is built from the time and the name, so two phones
+     booking the same thing is one booking.
+
+     Sent after it stopped being true. A reminder is only as good as the
+     cancel, and a cancel needs a phone awake to notice. So the conditions are
+     also re-checked as late as possible, and the sender throws away anything
+     more than an hour past its time rather than sending it stale.
+
+     Booked for somebody who is not coming. The clock-in nudge deliberately
+     does NOT check where the phone is, which was Dillon's call on 2026-10-05:
+     a closed phone cannot be asked where it is, so the choice was between
+     nudging somebody who called out and nudging nobody at all.            */
+
+var PUSH_PLAN_KEY='ut_push_plan';        /* what this phone has already booked */
+var PLAN_DAYS=3;                         /* how far ahead to look */
+/* AND HOW LONG EACH ONE STAYS WORTH SAYING once its moment has passed. This
+   is the other half of the same idea: a condition that has already come round
+   still has to appear on the bell, or a phone buzzes at nine in the morning
+   and the app has nothing to show for it when somebody opens it -- which is
+   exactly how a feed stops being believed.
+
+   But they go stale at very different speeds, and one length for all of them
+   would be wrong for most. "Nothing on the task board yet" is worth saying in
+   the three quarters of an hour before the crew arrive and is simply untrue
+   by the afternoon, when they have been and gone. "You have not clocked in"
+   is still worth saying at eleven. "The pay period ends today" is worth
+   saying all day. */
+var PLAN_GOOD={ boardempty:45*60000, noclock:4*3600000, payend:8*3600000 };
+function planGood(kind){ return PLAN_GOOD[kind]||3600000; }
+
+function planRead(){
+  try{ var r=JSON.parse(localStorage.getItem(PUSH_PLAN_KEY)||'{}'); return (r&&typeof r==='object')?r:{}; }
+  catch(e){ return {}; }
+}
+function planWrite(o){
+  try{ localStorage.setItem(PUSH_PLAN_KEY,JSON.stringify(o)); }catch(e){}
+}
+function planISO(d){
+  function p2(n){ return (n<10?'0':'')+n; }
+  return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
+}
+/* A local time on a local day, as the moment it actually is. Built this way
+   rather than from a string so the farm's own clock decides, daylight saving
+   and all -- the sender is in UTC and must be told a real instant. */
+function planAt(d,hhmm,offsetMin){
+  var a=String(hhmm||'00:00').split(':');
+  var t=new Date(d.getFullYear(),d.getMonth(),d.getDate(),+a[0]||0,+a[1]||0,0,0);
+  if(offsetMin) t=new Date(t.getTime()+offsetMin*60000);
+  return t;
+}
+/* `at` is passed in everywhere below rather than read from the clock inside,
+   and that is for one reason: these alerts are ABOUT times of day, so a test
+   that cannot hold the clock still can only check them at whatever moment it
+   happens to run. Everything in the app calls these with nothing and gets the
+   real clock; the tests call them with a fixed instant and get a fixed
+   answer. */
+function planDays(nowMs){
+  var out=[], now=nowMs?new Date(nowMs):new Date();
+  for(var i=0;i<PLAN_DAYS;i++){
+    out.push(new Date(now.getFullYear(),now.getMonth(),now.getDate()+i));
+  }
+  return out;
+}
+
+/* Everybody down to work on a day, with the hours they are down for. Read
+   through schedShiftOn(), which is the same answer the Task Board and the
+   time clock use, so a reminder and the board can never disagree. */
+function planShiftsOn(d){
+  var out=[];
+  var all=[];
+  try{ all=(typeof rstActive==='function')?rstActive():[]; }catch(e){}
+  all.forEach(function(p){
+    if(!p||!p.id) return;
+    var sh=null;
+    try{ sh=(typeof schedShiftOn==='function')?schedShiftOn(p.id,d):null; }catch(e){}
+    if(sh&&sh.start) out.push({pid:p.id,start:sh.start,end:sh.end});
+  });
+  return out;
+}
+/* Has anybody been given anything for this day. Deliberately ANY task dated to
+   it, not just an undergrad's -- Dillon asked to be reminded when he has "not
+   entered anything into the task board", and an empty board is an empty board
+   whoever it would have been for. */
+function planBoardHas(di){
+  var all=null; try{ all=TASKS; }catch(e){}
+  if(!all) return false;
+  return all.some(function(t){
+    if(!t||t.status==='done') return false;
+    var at=String(t.dueAt||'');
+    return at.slice(0,10)===di;
+  });
+}
+function planPunchedOn(pid,di){
+  var all=null;
+  try{ all=(typeof tcPunchDocs==='function')?tcPunchDocs():null; }catch(e){}
+  if(!all) return false;
+  return all.some(function(p){ return p&&String(p.pid)===String(pid)&&String(p.date)===di; });
+}
+
+/* Work out everything that should be booked right now. Returns a map of
+   name -> the booking, so comparing it with what this phone booked last time
+   says both what to add and what to take back, in one pass. */
+function planWanted(nowMs){
+  var want={}, now=nowMs||Date.now();
+  var crew=[]; try{ crew=ntfAssigners(); }catch(e){}
+
+  planDays(now).forEach(function(d){
+    var di=planISO(d), shifts=planShiftsOn(d);
+    if(!shifts.length) return;
+
+    /* ---- 45 minutes before the first shift, if the board is empty ---- */
+    if(crew.length&&!planBoardHas(di)){
+      var earliest=shifts.slice().sort(function(a,b){
+        return a.start<b.start?-1:(a.start>b.start?1:0);
+      })[0];
+      var at=planAt(d,earliest.start,-45);
+      if(at.getTime()>now-planGood('boardempty')){
+        want['board:'+di]={ at:at, to:crew, kind:'boardempty', sw:'boardempty',
+          title:'Nothing on the task board yet',
+          body:shifts.length+(shifts.length===1?' person is':' people are')
+               +' down to work at '+ntfT12(earliest.start) };
+      }
+    }
+
+    /* ---- 30 minutes after a shift starts, if they have not clocked in ---- */
+    shifts.forEach(function(sh){
+      if(planPunchedOn(sh.pid,di)) return;
+      var at=planAt(d,sh.start,30);
+      if(at.getTime()<=now-planGood('noclock')) return;
+      want['clockin:'+sh.pid+':'+di]={ at:at, to:[sh.pid], kind:'noclock', sw:'noclock',
+        title:'You are down to work at '+ntfT12(sh.start),
+        body:'No clock-in yet — open the app and tap Clock In' };
+    });
+  });
+
+  /* ---- 9am on the day the pay period ends ---- */
+  var end=null;
+  try{ end=(typeof tcPeriodEndOn==='function')?tcPeriodEndOn(new Date(now)):null; }catch(e){}
+  if(end){
+    var p=end.split('-');
+    var day=new Date(+p[0],+p[1]-1,+p[2]);
+    var nine=planAt(day,'09:00',0);
+    if(nine.getTime()>now-planGood('payend')&&(nine.getTime()-now)<PLAN_DAYS*86400000){
+      var studs=[];
+      try{ studs=ntfWho2((typeof rstUndergradIds==='function')?rstUndergradIds():[]); }catch(e){}
+      if(studs.length){
+        want['payend:'+end+':crew']={ at:nine, to:studs, kind:'payend', sw:'payend',
+          title:'The pay period ends today',
+          body:'Check your hours on the Time Clock and submit them' };
+      }
+      if(crew.length){
+        want['payend:'+end+':boss']={ at:nine, to:crew, kind:'payend', sw:'payend',
+          title:'The pay period ends today',
+          body:'The crew are submitting their hours — they need approving' };
+      }
+    }
+  }
+  return want;
+}
+
+/* The same conditions, read the other way round: anything whose moment has
+   already passed and which is addressed to ME goes on my own bell. So the
+   buzz and the app say the same thing about these as they do about everything
+   else, and nobody is left looking for a notification that is not there.
+
+   It keeps its own short ledger, trimmed with the eight-hour window, so one
+   condition is filed once rather than on every tick. */
+function planBell(me,now){
+  if(!me) return {made:0,changed:false};
+  var want={}; try{ want=planWanted(now); }catch(e){ return {made:0,changed:false}; }
+  var fresh={}, made=0;
+  Object.keys(want).forEach(function(id){
+    var w=want[id];
+    if(w.at.getTime()>now) return;               /* not yet; the sender has it */
+    if(w.to.indexOf(me)<0) return;               /* not mine to hear */
+    fresh[id]=1;
+    if(NTF.plseen[id]) return;                   /* already said once */
+    if(!ntfOn(w.kind)) return;
+    NTF.list.unshift({ id:ntfNewId(now), k:w.kind, t:now, plan:id,
+                       ttl:String(w.title||''), note:String(w.body||'') });
+    made++;
+  });
+  var changed=made>0||ntfFlagDiff(NTF.plseen,fresh);
+  NTF.plseen=fresh;
+  return {made:made,changed:changed};
+}
+
+/* Book what is newly wanted, take back what is not wanted any more, and say
+   nothing at all when neither has changed -- which is almost every tick. */
+function planSync(){
+  if(!PUSH_URL) return Promise.resolve(0);
+  var live=false;
+  try{ live=(typeof dbConfigured!=='function')||dbConfigured(); }catch(e){ live=false; }
+  if(!live) return Promise.resolve(0);
+  var me=null; try{ me=SESSION.pid; }catch(e){}
+  if(!me) return Promise.resolve(0);
+
+  var want={}, had=planRead(), jobs=[], now=Date.now();
+  try{ want=planWanted(now); }catch(e){ return Promise.resolve(0); }
+
+  Object.keys(want).forEach(function(id){
+    var w=want[id], at=w.at.toISOString();
+    /* One whose moment has already gone is for the bell, not the sender --
+       booking it would ask the sender to send something late. */
+    if(w.at.getTime()<=now) return;
+    if(had[id]===at) return;                     /* already booked, same time */
+    jobs.push({ path:'/later', body:{ id:id, at:at, to:w.to, kind:w.kind, sw:w.sw,
+                                      title:w.title, body:w.body }, id:id, at:at });
+  });
+  Object.keys(had).forEach(function(id){
+    if(want[id]&&want[id].at.getTime()>now) return;
+    /* Gone from the list means the reason went away -- the board got filled
+       in, they clocked in, or the day simply passed. */
+    jobs.push({ path:'/cancel', body:{ id:id }, id:id, at:null });
+  });
+  if(!jobs.length) return Promise.resolve(0);
+
+  var done=0;
+  function step(i){
+    if(i>=jobs.length) return Promise.resolve();
+    var j=jobs[i];
+    return pushFetch(j.path,j.body).then(function(){
+      var now=planRead();
+      if(j.at) now[j.id]=j.at; else delete now[j.id];
+      planWrite(now); done++;
+      return step(i+1);
+    }).catch(function(){
+      /* No signal, or the sender said no. Left as it was so the next tick
+         tries again; nothing here is urgent to the second. */
+      return step(i+1);
+    });
+  }
+  return step(0).then(function(){ return done; });
+}
+
 function pushOutRead(){
   try{ var r=JSON.parse(localStorage.getItem(PUSH_OUT_KEY)||'[]'); return Array.isArray(r)?r:[]; }
   catch(e){ return []; }
@@ -2044,7 +2315,13 @@ var NTF_KIND={
   trnew:   {c:'#2456b8'},   /* ring     - informational */
   trstart: {c:'#2f7d3a'},   /* circle   - something is now running */
   trdone:  {c:'#2f9e4f'},   /* circle   - complete */
-  resnew:  {c:'#7c5cbf'}    /* triangle - stop, this ground is spoken for */
+  resnew:  {c:'#7c5cbf'},   /* triangle - stop, this ground is spoken for */
+  /* The three the calendar sets off. Each takes the colour of the thing it is
+     most like: an empty board needs attention, a missing clock-in is urgent
+     and only one person can answer it, and the pay period is about money. */
+  boardempty:{c:'#d17a00'}, /* diamond  - needs attention */
+  noclock: {c:'#c0392b'},   /* square   - urgent, only you can answer it */
+  payend:  {c:'#9a5b00'}    /* diamond  - check this, it is your pay */
 };
 /* 24-hour "07:02" as the farm reads it. The time clock has its own t12()
    inside its closure; this is the same answer where the bell can reach it. */
@@ -2068,6 +2345,10 @@ function ntfWho(pid){
 }
 function ntfLine(e){
   var esq=(typeof esc==='function')?esc:function(x){return x==null?'':String(x);};
+  /* The calendar's three carry their sentence already written, because it was
+     worked out days ago when the reminder was booked with the sender -- and
+     the bell has to say exactly what the phone buzzed, word for word. */
+  if(e.plan) return { t:esq(e.ttl), s:esq(e.note) };
   var where=e.area?' · '+esq(e.area):'';
   if(e.k==='assigned') return { t:esq(e.ttl), s:ntfWho(e.who)+' gave you this job'+where };
   if(e.k==='done')     return { t:esq(e.ttl)+' is done', s:ntfWho(e.who)+' finished it'+where };
@@ -2204,6 +2485,16 @@ document.getElementById('s-notifications').addEventListener('click',function(e){
   }
   if(ev.item){
     try{ if(!csLocked('inventory')&&typeof openItem==='function') openItem(ev.item); }catch(_q){}
+    return;
+  }
+  /* The calendar's three go to the page that does something about them. All
+     three are open to everybody who gets them: the Task Board for Bill, and
+     the Time Clock, which came off the Coming Soon list on 2026-09-28. */
+  if(ev.plan){
+    try{
+      if(ev.k==='boardempty') go('taskboard');
+      else go('timeclock');
+    }catch(_q){}
     return;
   }
   /* A field log entry and a study open their own page, on the same terms as

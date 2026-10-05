@@ -47,9 +47,24 @@
  * WHAT IT NEEDS SET UP AROUND IT (all in the Cloudflare dashboard):
  *   a KV namespace bound as  SUBS
  *   secrets  VAPID_PUBLIC, VAPID_PRIVATE, VAPID_SUBJECT, FB_PROJECT
+ *   a cron trigger of  *\/5 * * * *  (every five minutes)
+ *
+ * THE CRON TRIGGER is what makes the clock-driven alerts possible at all, and
+ * it is worth understanding why they need anything new. Everything else here
+ * is set off by somebody tapping something: a phone notices, and asks this
+ * worker to tell the others. But "45 minutes before a shift", "9am on the day
+ * the pay period ends" and "30 minutes after a shift started" are set off by
+ * the CLOCK, and at those moments every phone on the farm may be asleep with
+ * nobody to notice anything.
+ *
+ * So a phone works the message out IN ADVANCE -- it knows the schedule days
+ * ahead -- and hands it over with a time on it. This worker holds it and sends
+ * it when the time comes. A phone can also take it back: if Bill fills in the
+ * task board, the reason for the reminder has gone, and whichever phone sees
+ * that cancels it.
  */
 
-const VERSION = '2';
+const VERSION = '3';
 
 /* Who is allowed to call this. The app is served from GitHub Pages; localhost
    is here so a copy of the app on a laptop can be tested against it without
@@ -255,6 +270,37 @@ async function whoIsCalling(req, env) {
   return claims.sub || null;                     /* the Firebase account id */
 }
 
+/* ===================== messages held for later =====================
+   Stored under a key that begins with the time they are due, because KV hands
+   keys back in alphabetical order -- so "everything due by now" is simply
+   everything up to a certain prefix, with no index to keep and nothing to
+   search. The id is on the end so a message can be taken back by name.
+
+   They are kept for a day past their time and then dropped. A reminder nobody
+   sent on the morning it was for is not worth sending in the afternoon, and a
+   phone that was off for a week must not come back to a pile of them. */
+const LATER_GRACE = 3600000;             /* an hour late is still worth sending */
+const LATER_MAX_AHEAD = 30 * 86400000;   /* nothing may be booked further out */
+
+function laterKey(whenMs, id) {
+  return 'later:' + new Date(whenMs).toISOString() + ':' + id;
+}
+/* Everything whose time has come, oldest first. */
+async function laterDue(env, nowMs) {
+  const out = [];
+  const list = await env.SUBS.list({ prefix: 'later:' });
+  for (const k of list.keys) {
+    const stamp = k.name.slice(6, 30);     /* the ISO time sits right after "later:" */
+    const due = Date.parse(stamp);
+    if (!isFinite(due) || due > nowMs) continue;
+    const msg = await env.SUBS.get(k.name, 'json');
+    /* Too late to be useful, or unreadable: drop it rather than send it. */
+    if (!msg || (nowMs - due) > LATER_GRACE) { await env.SUBS.delete(k.name); continue; }
+    out.push({ key: k.name, msg: msg });
+  }
+  return out;
+}
+
 /* ===================== does this person want it =====================
    Two questions, both answered from what that person's own phone uploaded.
    Neither is a decision this file makes: the first is a switch they set, the
@@ -313,7 +359,50 @@ async function subsFor(pids, env) {
   return out;
 }
 
+/* Send one piece of news to everybody it is addressed to. Used by /tell, which
+   is a phone saying "this just happened", and by the cron below, which is a
+   message whose time has come -- one routine for both, because two would
+   eventually disagree about something like whether muting is checked. */
+async function fanOut(msg, env) {
+  const text = JSON.stringify({
+    k: String(msg.kind || ''), t: String(msg.title || '').slice(0, 120),
+    b: String(msg.body || '').slice(0, 200), u: String(msg.url || ''),
+    g: String(msg.tag || msg.id || '')
+  });
+  const subs = await subsFor((msg.to || []).slice(0, 60), env);
+  let sent = 0, dropped = 0, muted = 0;
+  for (const s of subs) {
+    /* Not wanted is not a failure: it is the person's own setting doing
+       exactly what they asked it to. */
+    if (!wantsIt(s, { sw: msg.sw, kind: msg.kind })) { muted++; continue; }
+    let st = 0;
+    try { st = await pushOne(s, text, env); } catch (e) { st = 0; }
+    if (st >= 200 && st < 300) sent++;
+    /* The push service says this address is dead. Nothing else will ever clean
+       these up, and a phone that was wiped or reinstalled leaves one behind
+       every time. */
+    else if (st === 404 || st === 410) { await env.SUBS.delete(s._key); dropped++; }
+  }
+  return { sent: sent, dropped: dropped, muted: muted, phones: subs.length };
+}
+
 export default {
+  /* THE CLOCK. Cloudflare calls this on the schedule set in the dashboard, and
+     it is the only thing here that runs with every phone on the farm asleep.
+     It sends what is due and nothing else -- it never decides anything, never
+     reads the farm's records, and cannot invent a message. */
+  async scheduled(event, env, ctx) {
+    const now = Date.now();
+    const due = await laterDue(env, now);
+    for (const d of due) {
+      try { await fanOut(d.msg, env); } catch (e) {}
+      /* Deleted whatever happened. A message that failed to send is not worth
+         trying again at the wrong time, and leaving it would send it on every
+         tick for an hour. */
+      await env.SUBS.delete(d.key);
+    }
+  },
+
   async fetch(req, env) {
     const url = new URL(req.url);
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req) });
@@ -376,6 +465,47 @@ export default {
       return reply(req, 200, { ok: true, removed: gone });
     }
 
+    /* Tell these people this AT A SET TIME. The phone works the message out in
+       advance, because at the moment it is due there may be nobody awake to
+       work anything out. */
+    if (url.pathname === '/later' && req.method === 'POST') {
+      const b = await req.json().catch(() => null);
+      if (!b || !b.id || !Array.isArray(b.to) || !b.title) return reply(req, 400, { error: 'bad message' });
+      const when = Date.parse(b.at || '');
+      if (!isFinite(when)) return reply(req, 400, { error: 'no time on it' });
+      if (when - Date.now() > LATER_MAX_AHEAD) return reply(req, 400, { error: 'too far ahead' });
+
+      /* Booked twice by two phones is one booking: the key is built from the
+         time and the id, both of which every phone works out the same way. */
+      await env.SUBS.put(laterKey(when, b.id), JSON.stringify({
+        id: b.id, to: b.to, kind: b.kind || '', sw: b.sw || '',
+        title: b.title, body: b.body || '', url: b.url || '', tag: b.tag || b.id
+      }), { expirationTtl: Math.max(60, Math.floor((when - Date.now() + LATER_GRACE * 2) / 1000)) });
+      return reply(req, 200, { ok: true, at: new Date(when).toISOString() });
+    }
+
+    /* Take one back. The reason for a reminder can go away before its time --
+       Bill fills the task board in, the student clocks in -- and whichever
+       phone notices that says so. */
+    if (url.pathname === '/cancel' && req.method === 'POST') {
+      const b = await req.json().catch(() => null);
+      if (!b || !b.id) return reply(req, 400, { error: 'no id' });
+      const list = await env.SUBS.list({ prefix: 'later:' });
+      let gone = 0;
+      for (const k of list.keys) {
+        if (k.name.endsWith(':' + b.id)) { await env.SUBS.delete(k.name); gone++; }
+      }
+      return reply(req, 200, { ok: true, cancelled: gone });
+    }
+
+    /* What is booked, so a person can be shown it and a test can check it. */
+    if (url.pathname === '/pending' && req.method === 'GET') {
+      const list = await env.SUBS.list({ prefix: 'later:' });
+      return reply(req, 200, { ok: true, count: list.keys.length,
+        items: list.keys.slice(0, 50).map(k => ({ at: k.name.slice(6, 30),
+                                                  id: k.name.slice(31) })) });
+    }
+
     /* Tell these people this. */
     if (url.pathname === '/tell' && req.method === 'POST') {
       const b = await req.json().catch(() => null);
@@ -392,22 +522,8 @@ export default {
         g: String(b.tag || b.id)
       });
 
-      const subs = await subsFor(b.to.slice(0, 60), env);
-      let sent = 0, dropped = 0, muted = 0;
-      for (const s of subs) {
-        /* Not wanted is not a failure: it is the person's own setting doing
-           exactly what they asked it to. */
-        if (!wantsIt(s, { sw: b.sw, kind: b.kind })) { muted++; continue; }
-        let st = 0;
-        try { st = await pushOne(s, text, env); } catch (e) { st = 0; }
-        if (st >= 200 && st < 300) sent++;
-        /* The push service says this address is dead. Nothing else will ever
-           clean these up, and a phone that was wiped or reinstalled leaves one
-           behind every time. */
-        else if (st === 404 || st === 410) { await env.SUBS.delete(s._key); dropped++; }
-      }
-      return reply(req, 200, { ok: true, sent: sent, dropped: dropped,
-                               muted: muted, phones: subs.length });
+      const r = await fanOut(b, env);
+      return reply(req, 200, Object.assign({ ok: true }, r));
     }
 
     return reply(req, 404, { error: 'no such thing here' });
@@ -418,4 +534,5 @@ export default {
    tools/test-push-crypto.js can take the encryption apart and check each step
    against the specification -- the alternative being to find out it was wrong
    when twenty-three phones quietly never buzz. */
-export { encryptPayload, vapidHeader, b64urlToBytes, bytesToB64url, hkdf, infoBytes, join, wantsIt };
+export { encryptPayload, vapidHeader, b64urlToBytes, bytesToB64url, hkdf, infoBytes, join,
+         wantsIt, laterKey, laterDue, LATER_GRACE };

@@ -1563,6 +1563,13 @@ document.getElementById('s-calevent').addEventListener('click',function(e){
   function periodStart(i){var d=new Date(TC_ANCHOR);d.setDate(d.getDate()+i*14);return d;}
   function periodEnd(i){var d=periodStart(i);d.setDate(d.getDate()+13);return d;}
   function curIdx(){return periodIndexOf(new Date());}
+  /* A door out of this closure, like window.tcOpenPerson above. The bell needs
+     to know when a pay period ends so it can book the "submit your hours"
+     reminder days ahead -- and the anchor date and the fortnight live in here,
+     where they belong. Working them out a second time in app-01 would be two
+     copies of the farm's payroll calendar, and the day somebody moved the
+     anchor only one of them would follow. */
+  window.tcPeriodEndOn=function(d){ try{ return iso(periodEnd(periodIndexOf(d||new Date()))); }catch(e){ return null; } };
   function pad(n){return (n<10?'0':'')+n;}
   function iso(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
   /* These two shadow the app-wide parseISO()/todayISO() in

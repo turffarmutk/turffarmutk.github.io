@@ -273,6 +273,80 @@ async function loadWorker() {
                  { sw: 'tasks' }));
   }
 
+section('4c. messages held until their time comes');
+{
+  /* THE ONE THING THAT RUNS WITH EVERY PHONE ASLEEP. Everything else here is
+     set off by somebody tapping something; "45 minutes before a shift" and
+     "9am on the day the pay period ends" are set off by the clock, at moments
+     when there may be nobody awake to notice anything. So a phone works the
+     message out days ahead and this holds it.
+
+     A pretend store stands in for Cloudflare's, because what is being checked
+     is the arithmetic of WHEN, not whether Cloudflare works. */
+  function store() {
+    const m = new Map();
+    return {
+      m: m,
+      put: async (k, v) => { m.set(k, v); },
+      get: async (k) => { const v = m.get(k); return v === undefined ? null : JSON.parse(v); },
+      delete: async (k) => { m.delete(k); },
+      list: async ({ prefix }) => ({
+        keys: [...m.keys()].filter(k => k.startsWith(prefix)).sort().map(name => ({ name }))
+      })
+    };
+  }
+  const SUBS = store();
+  const env = { SUBS };
+  const now = Date.parse('2026-10-06T09:00:00.000Z');
+  const msg = (id) => JSON.stringify({ id: id, to: ['p07'], title: 'x', body: 'y' });
+
+  /* The key starts with the time, so "everything due" is a prefix and never a
+     search. That is the whole reason it is shaped this way. */
+  const k1 = W.laterKey(now - 60000, 'early');
+  const k2 = W.laterKey(now + 60000, 'later');
+  ok('the key begins with when it is due', /^later:2026-10-06T0[89]/.test(k1), k1);
+  ok('and ends with its own name, so it can be taken back', /:early$/.test(k1), k1);
+  ok('two due times sort in the order they will happen', k1 < k2, k1 + ' | ' + k2);
+
+  await SUBS.put(k1, msg('early'));
+  await SUBS.put(k2, msg('later'));
+  let due = await W.laterDue(env, now);
+  ok('one that is due comes back', due.length === 1, String(due.length));
+  ok('and it is the right one', due[0] && due[0].msg.id === 'early', due[0] && due[0].msg.id);
+  ok('one that is not due yet is left alone', SUBS.m.has(k2));
+
+  /* TOO LATE IS DROPPED, NOT SENT. A reminder for this morning is not worth
+     sending this afternoon, and a phone that was off for a week must not come
+     back to a pile of them. */
+  const stale = W.laterKey(now - (W.LATER_GRACE + 60000), 'stale');
+  await SUBS.put(stale, msg('stale'));
+  due = await W.laterDue(env, now);
+  ok('one that is long past is not sent', due.every(d => d.msg.id !== 'stale'),
+     due.map(d => d.msg.id).join(','));
+  ok('and it is thrown away rather than left to pile up', !SUBS.m.has(stale));
+
+  /* An hour late is still worth sending -- a phone can be out of signal. */
+  const lateish = W.laterKey(now - (W.LATER_GRACE - 60000), 'lateish');
+  await SUBS.put(lateish, msg('lateish'));
+  due = await W.laterDue(env, now);
+  ok('one that is only a little late still goes',
+     due.some(d => d.msg.id === 'lateish'), due.map(d => d.msg.id).join(','));
+
+  /* AND WHAT A HELD MESSAGE IS ALLOWED TO CONTAIN. It is a sentence and a list
+     of people, worked out on a phone. If farm records ever start being stored
+     here so the sender can decide something at the time, that is a different
+     service with a different risk, and it should be argued about rather than
+     arrived at. */
+  const held = JSON.parse(SUBS.m.get(k2));
+  const fields = Object.keys(held).sort().join(',');
+  ok('a held message is a sentence and an audience, nothing else',
+     fields === 'body,id,title,to', fields);
+  /* Read here rather than borrowed from section 5, which has not run yet. */
+  const srcNow = fs.readFileSync(path.join(__dirname, '..', 'worker', 'ut-turf-push.js'), 'utf8');
+  ok('the sender still never reads the farm’s records',
+     !/firestore|FIELDLOG|TASKS|INVENTORY/.test(srcNow));
+}
+
   section('5. the sender holds no farm records, and says so in its own source');
   const src = fs.readFileSync(path.join(__dirname, '..', 'worker', 'ut-turf-push.js'), 'utf8');
   /* If somebody ever teaches this worker to read the farm's database, these
@@ -296,8 +370,8 @@ async function loadWorker() {
      started keeping farm data, which is a decision to argue about rather than
      one to slip in. */
   const kinds = [...new Set((src.match(/'([a-z]+):'/g) || []))].sort();
-  ok('everything it stores is either a phone or an already-sent marker',
-     kinds.join(' ') === "'seen:' 'sub:'", kinds.join(' '));
+  ok('it stores three kinds of thing and no others',
+     kinds.join(' ') === "'later:' 'seen:' 'sub:'", kinds.join(' '));
   ok('and it refuses anybody who is not signed in to this farm',
      /whoIsCalling\(req, env\)/.test(src) && /401/.test(src));
 

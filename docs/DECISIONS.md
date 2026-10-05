@@ -1534,6 +1534,46 @@ always offer the bake-in after map editing.
 
 ## Interface
 
+### Three alerts the CLOCK sets off, worked out days in advance — 2026-10-05
+**Decision:** "45 minutes before a shift with an empty task board", "9am on the
+day the pay period ends" and "30 minutes after a shift started with no clock-in"
+are worked out **ahead of time** by whatever phone is awake, booked with the
+sender (`/later` in `worker/ut-turf-push.js`), and held there until their
+moment. A phone takes a booking back (`/cancel`) when its reason goes away —
+Bill fills the board in, the student clocks in. The sender runs a five-minute
+cron trigger and sends whatever is due.
+**Why:** every other alert on the farm is set off by somebody tapping
+something, so a phone is awake to notice it. These are set off by the clock, at
+moments when every phone on the farm may be shut with nobody to notice
+anything. Deriving them on a phone the way everything else is derived would
+mean the 9am reminder arriving whenever somebody happened to open the app, and
+the 45-minute warning usually never arriving at all.
+**Don't:** three things. **Don't teach the sender to decide anything** — it
+holds a sentence and a list of people, both worked out on a phone, and
+`tools/test-push-crypto.js` section 4c fails if a held message starts carrying
+anything else. **Don't give them all one shelf life**: `PLAN_GOOD` is
+per-alert, because "nothing on the task board yet" is worth saying for the
+three quarters of an hour before the crew arrive and is simply untrue by the
+afternoon, while "the pay period ends today" is worth saying all day. And
+**don't drop the bell half**: these also file a row on the phone of anybody
+they are addressed to once their moment passes, because a phone that buzzes
+while the app has nothing to show for it is how a feed stops being believed.
+
+### The clock-in nudge does not check where the phone is — 2026-10-05
+**Decision:** it nudges anybody who was down to work and has not clocked in
+thirty minutes later, wherever they are. Dillon asked for "and their location
+says they are at the farm"; this deliberately does not do that half.
+**Why:** a browser will not tell a web app where a phone is while the app is
+shut, and shut is exactly when this has to work. The honest choice was between
+nudging somebody who called out — one buzz they can ignore — and nudging
+nobody at all, because a nudge that only fires with the app already open
+reaches somebody who can already see the Clock In button. Dillon chose the
+first on 2026-10-05 once the limit was explained.
+**Don't:** don't "finish" it by adding the geofence back. `test-notifications.js`
+section 27 fails if anything location-shaped appears in `planWanted()`, and the
+reason is written here rather than left to be rediscovered. If background
+location ever becomes possible, that is a new decision, not a missing half.
+
 ### Six more alerts, and the three judgement calls inside them — 2026-10-05
 **Decision:** Dillon asked for eleven new notifications. Six of them are record
 changes and went in together: work typed into the **Field Log** by hand, stock

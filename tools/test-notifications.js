@@ -104,6 +104,10 @@ function boot(store) {
       + 'events:function(){return NTF_EVENTS;},eventId:ntfEventId,'
       + 'eventText:function(e){return ntfEventText(e,Date.now());},'
       + 'switchOf:ntfSwitchOf,pushState:pushState,pushPrefs:pushPrefs,'
+      /* The calendar's three, with the clock passed in so a test can hold it
+         still -- see the note over planDays(). */
+      + 'planWanted:function(at){return planWanted(at);},'
+      + 'periodEndOn:function(d){return tcPeriodEndOn(d);},'
       + 'queue:function(e,n){return pushQueue(e,n);},flush:pushFlush,'
       + 'triesMax:function(){return PUSH_TRIES_MAX;},outbox:function(){'
       + 'try{return JSON.parse(localStorage.getItem(\'ut_push_out\')||\'[]\');}catch(x){return [];}}'
@@ -111,6 +115,16 @@ function boot(store) {
   } catch (e) { console.log('app script threw: ' + e.message); fail++; }
   return { win, doc: win.document, n: win.__n || {}, errs };
 }
+
+/* SHUT A PRETEND BROWSER WHEN YOU ARE FINISHED WITH IT. Each boot() builds a
+   whole copy of the app -- the page, every screen, all five files -- and holds
+   it until something lets go. This file boots sixty-odd of them now, and
+   leaving them all open ran Node clean out of memory partway through, which
+   reads as the tests mysteriously dying rather than as anything failing.
+
+   Closing is the fix and it costs nothing, because by the time it is called
+   every answer has already been read out of it. */
+function shut(b) { try { b && b.win && b.win.close(); } catch (e) {} }
 
 /* A task in the shape the app really makes one: see the assign wizard in
    app-05-tasks-clock.js and openRestSheet() in app-04-spray-inventory.js. */
@@ -411,10 +425,12 @@ section('6d. one row per job per look, and the six switches are separate');
      not -- so `wx` is the one row still carrying "Not sending yet", and if it
      ever creeps into this list without push being built, that label is a lie
      again. */
-  const kinds = ('tasks,done,partial,reqnew,reqok,reqdone,equip,eqflag,low,restock,fllog,'
-               + 'trials,resnew,trnew,trstart,trdone,clockin,clockout,shiftauto,shiftask').split(',');
+  const kinds = ('tasks,done,partial,reqnew,reqok,reqdone,boardempty,equip,eqflag,low,'
+               + 'restock,fllog,trials,resnew,trnew,trstart,trdone,clockin,clockout,'
+               + 'shiftauto,shiftask,noclock,payend').split(',');
   const live = n.NOTIF_ALERTS.filter(a => a.live).map(a => a.k);
-  ok('all twenty are marked as really sending', live.join(',') === kinds.join(','), live.join(','));
+  ok('all twenty-three are marked as really sending',
+     live.join(',') === kinds.join(','), live.join(','));
   ok('and weather is still honest about not sending',
      n.NOTIF_ALERTS.filter(a => a.k === 'wx')[0].live === undefined);
   kinds.forEach(k => {
@@ -482,10 +498,10 @@ section('6e. the dot colours survive colour-blind mode');
      pair. What it may not do is quietly land on top of an unrelated one. */
   const DELIBERATE = [
     'done+reqdone+equp+resopen+restock+trdone',   /* green circle  - finished, or yours again */
-    'partial+eqflag',                             /* amber diamond - somebody must pick this up */
+    'partial+eqflag+boardempty',                  /* amber diamond - somebody must pick this up */
     'reqnew+resclose+resnew',                     /* pink triangle - stop before you carry on */
-    'shiftauto+low',                              /* dark diamond  - check this one */
-    'shiftask+eqdown',                            /* red square    - urgent, only you can answer */
+    'shiftauto+low+payend',                       /* dark diamond  - check this one */
+    'shiftask+eqdown+noclock',                    /* red square    - urgent, only you can answer */
     'reqok+trnew',                                /* blue ring     - informational */
     'clockin+trstart',                            /* dark circle   - something is now running */
     'clockout+fllog'                              /* grey ring     - informational, it is written down */
@@ -522,11 +538,12 @@ section('6f. the switches are grouped by the page they come from');
      ['Equipment', 'Inventory', 'Weather', 'Trials', 'Time clock']
        .every(h => heads.indexOf(h) >= 0), heads.join(' | '));
 
-  /* Every alert that really sends something today is a Task Board one, and
-     all six of them are under that heading rather than scattered. */
+  /* The Task Board's own alerts stay together under that heading rather than
+     being scattered. Seven since 2026-10-05, when the reminder that fires
+     before a shift with an empty board joined them. */
   const board = n.NOTIF_ALERTS.filter(a => a.g === 'Task board').map(a => a.k).join(',');
-  ok('all six working alerts are on the Task board',
-     board === 'tasks,done,partial,reqnew,reqok,reqdone', board);
+  ok('the Task board alerts are all under that heading',
+     board === 'tasks,done,partial,reqnew,reqok,reqdone,boardempty', board);
   ok('nothing is left without a heading', n.NOTIF_ALERTS.every(a => !!a.g),
      n.NOTIF_ALERTS.filter(a => !a.g).map(a => a.k).join(','));
 
@@ -563,9 +580,10 @@ section('7. the toggles on the Notifications screen actually gate it');
   ok('turned back on and it works again', n.ntfScan() === 1);
 
   const live = n.NOTIF_ALERTS.filter(a => a.live).map(a => a.k).join(',');
-  ok('twenty alerts are marked as really sending',
-     live === 'tasks,done,partial,reqnew,reqok,reqdone,equip,eqflag,low,restock,fllog,'
-               + 'trials,resnew,trnew,trstart,trdone,clockin,clockout,shiftauto,shiftask', live);
+  ok('twenty-three alerts are marked as really sending',
+     live === 'tasks,done,partial,reqnew,reqok,reqdone,boardempty,equip,eqflag,low,restock,'
+            + 'fllog,trials,resnew,trnew,trstart,trdone,clockin,clockout,shiftauto,'
+            + 'shiftask,noclock,payend', live);
 }
 
 section('8. the feed is the person’s, not the phone’s');
@@ -799,6 +817,15 @@ section('16. who hears what about the clock');
 
   /* --- Bill's phone --- */
   n.signIn(BILL);
+  /* THIS SECTION IS ABOUT THE CLOCK ALERTS, so the three the calendar sets
+     off are turned off for it. They are not noise here -- seeding a shift for
+     today with an empty task board is exactly the situation that earns the
+     "nothing on the task board yet" reminder, and it would fire or not
+     depending on what time of day the tests happen to be run. Section 27
+     tests those three properly, with the clock held still. */
+  n.NOTIF().a_boardempty = false;
+  n.NOTIF().a_noclock = false;
+  n.NOTIF().a_payend = false;
   const day = seedShift(win, STU, 0, '08:00', '12:00');
   punch(win, { id: 'pu-x', pid: STU, date: day, in: '07:02', out: null });
   n.ntfScan();                                   /* baseline over the punch list */
@@ -1200,6 +1227,7 @@ section('23. THE SWEEP: the buzz and the bell agree about who hears what');
     const evs = lead.n.events().map(e => ({ k: e.k, to: e.to.slice() }));
     ok(name + ': the walk produced news at all', evs.length > 0,
        JSON.stringify(evs));
+    shut(lead);
 
     /* Second pass: every kind of person on the farm, one at a time, each on
        their own phone, and we look at their bell. */
@@ -1223,6 +1251,7 @@ section('23. THE SWEEP: the buzz and the bell agree about who hears what');
          'bell=[' + rows + '] audience=[' + addressed + ']');
       ok(name + ': ' + role + ' is not told twice about one thing',
          rows.length <= 1, '[' + rows + ']');
+      shut(b);
     });
   }
 
@@ -1401,6 +1430,10 @@ section('26. the six Dillon asked for on 2026-10-05');
      these puts one record there, looks once to baseline it, and only then
      does the thing being tested. Getting that wrong reads as "the alert does
      not work" when what happened is that the test never started it. */
+  /* Hands back the answers and SHUTS the browser rather than leaving one open.
+     Each boot is a whole copy of the app, and this file makes sixty-odd of
+     them; holding them all ran Node out of memory partway through, which
+     looks like the tests dying rather than like anything failing. */
   function feel(role, make) {
     const b = boot({});
     b.n.signIn(b.n.RST_LOGIN[role]);
@@ -1410,16 +1443,18 @@ section('26. the six Dillon asked for on 2026-10-05');
     b.n.ntfScan();
     make(b.n);
     const made = b.n.ntfScan();
-    return { b, made, kinds: b.n.ntf().list.map(e => e.k) };
+    const kinds = b.n.ntf().list.map(e => e.k);
+    b.n.go('notifications');
+    const html = b.doc.getElementById('ntf-body').innerHTML;
+    shut(b);
+    return { made, kinds, html, errs: b.errs };
   }
 
   let r = feel('manager', n => logEntry(n, { id: 'fl-a' }));
   ok('Bill hears when somebody logs work by hand', r.made === 1, String(r.made));
   ok('by the right alert', r.kinds[0] === 'fllog', r.kinds[0]);
-  r.b.n.go('notifications');
-  let html = r.b.doc.getElementById('ntf-body').innerHTML;
-  ok('and the row says who did it', /Garrett/.test(html), html.slice(0, 220));
-  ok('and what it was', /Mow fairways/.test(html));
+  ok('and the row says who did it', /Garrett/.test(r.html), r.html.slice(0, 220));
+  ok('and what it was', /Mow fairways/.test(r.html));
 
   ok('faculty hear it too', feel('faculty', n => logEntry(n, { id: 'fl-b' })).made === 1);
   ok('an undergraduate does not', feel('undergrad', n => logEntry(n, { id: 'fl-c' })).made === 0);
@@ -1471,14 +1506,17 @@ section('26. the six Dillon asked for on 2026-10-05');
     b.n.ntfScan();
     make(b.n);
     const made = b.n.ntfScan();
-    return { b, made, kinds: b.n.ntf().list.map(e => e.k) };
+    return { b, made, kinds: b.n.ntf().list.map(e => e.k),
+             /* kept open: several of these are poked again afterwards, so each
+                caller shuts its own with shut(). */
+             html: () => { b.n.go('notifications');
+                           return b.doc.getElementById('ntf-body').innerHTML; } };
   }
 
   r = withStudies('undergrad', n => study(n));
   ok('a new study reaches even an undergraduate', r.made === 1, String(r.made));
   ok('by the right alert', r.kinds[0] === 'trnew', r.kinds[0]);
-  r.b.n.go('notifications');
-  html = r.b.doc.getElementById('ntf-body').innerHTML;
+  let html = r.html();
   /* A STUDY AT PLANNED IS HIDDEN from everybody outside its lab -- trVisible()
      -- so announcing it by name to the whole farm would give away exactly
      what that rule protects. The ground and the lab are the farm's business;
@@ -1486,6 +1524,7 @@ section('26. the six Dillon asked for on 2026-10-05');
   ok('but it is NOT named, because it has not started', !/Dollar spot/.test(html), html.slice(0, 260));
   ok('it names the ground instead', /CAFS14/.test(html), html.slice(0, 260));
   ok('and the lab', /Brosnan/.test(html), html.slice(0, 260));
+  shut(r.b);
 
   r = withStudies('undergrad', n => { study(n, { stage: 'planned' }); });
   const b2 = r.b;
@@ -1498,12 +1537,14 @@ section('26. the six Dillon asked for on 2026-10-05');
   /* Now it MAY be named: starting is the moment the whole farm can see it. */
   ok('and now it may be named, because the farm can see it', /Dollar spot/.test(html),
      html.slice(0, 260));
+  shut(b2);
 
   r = withStudies('undergrad', n => study(n, { stage: 'active' }));
   r.b.n.trials().filter(t => t.id === 's-x')[0].stage = 'completed';
   const done = r.b.n.ntfScan();
   ok('a study finishing says so', done === 1, String(done));
   ok('by the right alert', r.b.n.ntf().list[0].k === 'trdone', r.b.n.ntf().list[0].k);
+  shut(r.b);
 
   /* ---- a restriction added for later ---- */
   r = withStudies('undergrad', n => {
@@ -1515,6 +1556,7 @@ section('26. the six Dillon asked for on 2026-10-05');
      r.made === 2, r.kinds.join(','));
   ok('one of them being that a restriction is coming',
      r.kinds.indexOf('resnew') >= 0, r.kinds.join(','));
+  shut(r.b);
 
   /* AND THE COLLAPSE: one that starts today is said ONCE, as closed ground. */
   r = withStudies('undergrad', n => {
@@ -1526,6 +1568,120 @@ section('26. the six Dillon asked for on 2026-10-05');
      r.kinds.filter(k => k === 'resnew' || k === 'resclose').length === 1, r.kinds.join(','));
   ok('and the one thing said is that the ground is closed',
      r.kinds.indexOf('resclose') >= 0 && r.kinds.indexOf('resnew') < 0, r.kinds.join(','));
+  shut(r.b);
+}
+
+section('27. the three the calendar sets off, with the clock held still');
+{
+  /* THESE DO NOT WORK LIKE THE OTHERS and the difference is the whole point.
+     Every alert above is set off by somebody tapping something, so a phone is
+     awake to notice. These three are set off by the CLOCK -- before a shift,
+     at nine in the morning, half an hour after somebody should have arrived --
+     and at those moments every phone on the farm may be shut.
+
+     So a phone works them out DAYS AHEAD and books them with the sender, which
+     holds each one until its time. What is checked here is the working-out:
+     whether the right reminder is wanted, at the right minute, for the right
+     people, and -- just as important -- whether it stops being wanted the
+     moment its reason goes away.
+
+     The clock is passed in rather than read, so these answers are the same
+     whenever somebody runs the tests. */
+  const b = boot({});
+  const { win, n } = b;
+  const BILL = n.RST_LOGIN.manager, STU = n.RST_LOGIN.undergrad;
+  n.signIn(BILL);
+
+  /* A shift today from 09:00, and a fixed "now" of 06:00 the same morning. */
+  const day = seedShift(win, STU, 0, '09:00', '17:00');
+  const p = day.split('-').map(Number);
+  const at6 = new Date(p[0], p[1] - 1, p[2], 6, 0, 0, 0).getTime();
+  const mins = (ms) => Math.round(ms / 60000);
+
+  n.setTasks([]);                                 /* nothing on the board */
+  let want = n.planWanted(at6);
+  const boardKey = 'board:' + day;
+  ok('an empty board before a shift is worth a reminder', !!want[boardKey],
+     Object.keys(want).join(' | '));
+  ok('and it is booked 45 minutes before the first person is due',
+     want[boardKey] && mins(want[boardKey].at.getTime() -
+       new Date(p[0], p[1] - 1, p[2], 9, 0).getTime()) === -45,
+     want[boardKey] && want[boardKey].at.toString());
+  ok('it goes to whoever runs the crew',
+     want[boardKey] && want[boardKey].to.indexOf(BILL) >= 0, JSON.stringify(want[boardKey] && want[boardKey].to));
+  ok('and not to the student who is coming in',
+     want[boardKey] && want[boardKey].to.indexOf(STU) < 0);
+  ok('the sentence says how many are due and when',
+     want[boardKey] && /down to work at 9:00am/.test(want[boardKey].body),
+     want[boardKey] && want[boardKey].body);
+
+  /* THE REASON GOING AWAY IS THE OTHER HALF. Bill fills the board in and the
+     reminder stops being wanted -- which is what makes a phone take it back
+     off the sender. */
+  n.setTasks([task({ id: 'bd1', assignee: STU, assignedBy: BILL, dueAt: day + 'T09:00' })]);
+  want = n.planWanted(at6);
+  ok('filling the board in stops it being wanted', !want[boardKey],
+     Object.keys(want).join(' | '));
+
+  /* A job that is already finished does not count as a board with work on it. */
+  n.setTasks([task({ id: 'bd2', assignee: STU, assignedBy: BILL,
+                     dueAt: day + 'T09:00', status: 'done' })]);
+  want = n.planWanted(at6);
+  ok('a job already finished does not count as filling it in', !!want[boardKey],
+     Object.keys(want).join(' | '));
+
+  /* ---- the clock-in nudge ---- */
+  const clockKey = 'clockin:' + STU + ':' + day;
+  ok('a student down to work is nudged if they have not clocked in', !!want[clockKey],
+     Object.keys(want).join(' | '));
+  ok('half an hour after they were due to start',
+     want[clockKey] && mins(want[clockKey].at.getTime() -
+       new Date(p[0], p[1] - 1, p[2], 9, 0).getTime()) === 30,
+     want[clockKey] && want[clockKey].at.toString());
+  ok('and it goes to them and nobody else',
+     want[clockKey] && want[clockKey].to.length === 1 && want[clockKey].to[0] === STU,
+     JSON.stringify(want[clockKey] && want[clockKey].to));
+
+  /* Clocking in takes it back. */
+  punch(win, { id: 'pu-nc', pid: STU, date: day, in: '09:05', out: null });
+  want = n.planWanted(at6);
+  ok('clocking in stops the nudge being wanted', !want[clockKey],
+     Object.keys(want).join(' | '));
+
+  /* AND THE DELIBERATE GAP, which was Dillon's call on 2026-10-05: it does not
+     ask where the phone is. A phone with the app shut cannot be asked, so the
+     choice was between nudging somebody who called out and nudging nobody. */
+  const src = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'app-01-shell.js'), 'utf8');
+  const planPart = src.slice(src.indexOf('function planWanted'), src.indexOf('function planSync'));
+  ok('the nudge never consults the geofence',
+     !/geo|locOk|coords|latitude/i.test(planPart), 'something location-ish is in planWanted');
+
+  /* ---- the pay period ---- */
+  ok('the payroll calendar has one home, and the bell borrows it',
+     typeof n.periodEndOn === 'function' && /^\d{4}-\d\d-\d\d$/.test(n.periodEndOn(new Date(at6))),
+     String(n.periodEndOn(new Date(at6))));
+  /* Asked from a day whose period ends within the look-ahead, so the two
+     reminders are really there rather than only when the calendar obliges. */
+  const endISO = n.periodEndOn(new Date(at6));
+  const ep = endISO.split('-').map(Number);
+  const dayBefore = new Date(ep[0], ep[1] - 1, ep[2] - 1, 6, 0, 0, 0).getTime();
+  want = n.planWanted(dayBefore);
+  const crewKey = 'payend:' + endISO + ':crew', bossKey = 'payend:' + endISO + ':boss';
+  ok('the crew are told to submit their hours', !!want[crewKey], Object.keys(want).join(' | '));
+  ok('and Bill to approve them', !!want[bossKey], Object.keys(want).join(' | '));
+  ok('both at nine in the morning',
+     want[crewKey] && want[crewKey].at.getHours() === 9 && want[crewKey].at.getMinutes() === 0,
+     want[crewKey] && want[crewKey].at.toString());
+  ok('on the day it actually ends',
+     want[crewKey] && want[crewKey].at.getDate() === ep[2], endISO);
+  ok('the students are told to submit', /submit/i.test(want[crewKey].body), want[crewKey].body);
+  ok('and Bill to approve', /approv/i.test(want[bossKey].body), want[bossKey].body);
+  ok('and they are two different audiences',
+     want[crewKey].to.indexOf(BILL) < 0 && want[bossKey].to.indexOf(BILL) >= 0,
+     JSON.stringify([want[crewKey].to, want[bossKey].to]));
+
+  ok('and none of that threw', b.errs.length === 0, b.errs.join(' | '));
 }
 
 /* Written as a function and run at the very bottom, rather than as a block
